@@ -1,0 +1,9 @@
+{
+  "name": "dindin-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Angular project not initialized yet. Run: ng new apps/web --routing --style=scss'",
+    "start": "echo 'Angular project not initialized yet. Run: ng new apps/web --routing --style=scss'"
+  }
+}
