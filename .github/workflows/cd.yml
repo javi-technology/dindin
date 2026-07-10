@@ -27,19 +27,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # Instala apenas as dependências raiz (firebase-tools, etc.); os artefatos
-        # de build já foram gerados pela CI e são baixados nos passos seguintes.
+        # Instala as dependências da raiz (firebase-tools) e dos workspaces.
+        # As Cloud Functions são rebuildadas pelo Firebase CLI a partir do source;
+        # apenas o artefato do frontend é reutilizado da CI.
         run: npm ci
 
-      # Reutiliza os artefatos compilados pela CI, evitando rebuild no deploy.
-      - name: Download API artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: api-dist
-          path: apps/api/lib
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
+      # Reutiliza o artefato do frontend compilado pela CI, evitando rebuild no deploy.
       - name: Download Web artifact
         uses: actions/download-artifact@v4
         with:
