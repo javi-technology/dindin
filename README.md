@@ -1,5 +1,7 @@
 # DinDin
 
+[![CI](https://github.com/javi-technology/dindin/actions/workflows/ci.yml/badge.svg)](https://github.com/javi-technology/dindin/actions/workflows/ci.yml)
+
 Sistema de controle de carteira de Fundos Imobiliários (FIIs) com estratégia de "geladeira".
 
 ## Stack
@@ -28,7 +30,7 @@ dindin/
 
 - Node.js 22
 - Firebase CLI
-- Conta Google e projeto Firebase (`dindin-dev`)
+- Conta Google e projeto Firebase (`dindin-4e720`)
 
 ## Comandos
 
@@ -49,8 +51,22 @@ npm run api:serve
 npm run deploy
 ```
 
+## Integração Contínua
+
+A pipeline de CI roda a cada push ou pull request para as branches `main` e `develop`, executando instalação, build e testes da API e do frontend.
+
+Veja os detalhes em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) e acompanhe as execuções em [Actions](https://github.com/javi-technology/dindin/actions/workflows/ci.yml).
+
+## Deploy contínuo
+
+O deploy para o Firebase Hosting e Cloud Functions é feito automaticamente quando a pipeline de CI passa na branch `main`, no projeto `dindin-4e720`.
+
+O workflow de CD está em [`.github/workflows/cd.yml`](.github/workflows/cd.yml) e exige a secret `FIREBASE_SERVICE_ACCOUNT` configurada no repositório.
+
+> **Nota:** os artefatos de build mantêm-se disponíveis por **1 dia** (`retention-days: 1`). Se for necessário re-executar o CD manualmente após esse prazo, re-execute a CI primeiro para regenerar os artefatos.
+
 ## Próximos passos
 
-1. Criar o projeto `dindin-dev` no Firebase Console (ou renomear em `.firebaserc`).
-2. Inicializar o Angular em `apps/web`.
+1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).
+2. Configurar a secret `FIREBASE_SERVICE_ACCOUNT` no repositório para habilitar o deploy contínuo.
 3. Implementar autenticação e CRUD de carteira.
