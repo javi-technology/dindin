@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Enable Firebase webframeworks experiment
+        run: npx firebase experiments:enable webframeworks
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
