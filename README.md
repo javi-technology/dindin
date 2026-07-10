@@ -49,6 +49,12 @@ npm run api:serve
 npm run deploy
 ```
 
+## Deploy contínuo
+
+O deploy para o Firebase Hosting e Cloud Functions é feito automaticamente quando a pipeline de CI passa na branch `main`.
+
+O workflow de CD está em [`.github/workflows/cd.yml`](.github/workflows/cd.yml) e exige a secret `FIREBASE_SERVICE_ACCOUNT` configurada no repositório.
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-dev` no Firebase Console (ou renomear em `.firebaserc`).
