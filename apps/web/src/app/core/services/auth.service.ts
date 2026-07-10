@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   Auth,
   signInWithEmailAndPassword,
@@ -17,7 +17,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 export class AuthService {
   private readonly auth = inject(Auth);
 
-  user = toSignal(authState(this.auth), { initialValue: null as User | null });
+  user$ = authState(this.auth);
+  user = toSignal(this.user$, { initialValue: null as User | null });
 
   async loginWithEmail(email: string, password: string): Promise<void> {
     await signInWithEmailAndPassword(this.auth, email, password);
