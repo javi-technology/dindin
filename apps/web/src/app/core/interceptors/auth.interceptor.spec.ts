@@ -9,22 +9,23 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { User } from '@angular/fire/auth';
+import { ReplaySubject } from 'rxjs';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from '../services/auth.service';
 
 describe('authInterceptor', () => {
   let httpClient: HttpClient;
   let httpMock: HttpTestingController;
-  let authServiceMock: { user: () => User | null };
+  let user$: ReplaySubject<User | null>;
 
   beforeEach(() => {
-    authServiceMock = { user: () => null };
+    user$ = new ReplaySubject<User | null>(1);
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: authServiceMock },
+        { provide: AuthService, useValue: { user$: user$.asObservable() } },
       ],
     });
 
@@ -42,7 +43,7 @@ describe('authInterceptor', () => {
         .createSpy('getIdToken')
         .and.returnValue(Promise.resolve('token-123')),
     } as unknown as User;
-    authServiceMock.user = () => userMock;
+    user$.next(userMock);
 
     httpClient.get('/api/me').subscribe();
     tick();
@@ -54,7 +55,7 @@ describe('authInterceptor', () => {
   }));
 
   it('deve manter requisição sem alteração quando não há usuário autenticado', () => {
-    authServiceMock.user = () => null;
+    user$.next(null);
 
     httpClient.get('/api/health').subscribe();
 
@@ -62,4 +63,42 @@ describe('authInterceptor', () => {
     expect(req.request.headers.has('Authorization')).toBeFalse();
     req.flush({});
   });
+
+  it('deve aguardar emissão do user$ antes de prosseguir com a requisição', fakeAsync(() => {
+    const userMock = {
+      getIdToken: jasmine
+        .createSpy('getIdToken')
+        .and.returnValue(Promise.resolve('token-delayed')),
+    } as unknown as User;
+
+    httpClient.get('/api/me').subscribe();
+
+    httpMock.expectNone('/api/me');
+
+    tick();
+    user$.next(userMock);
+    tick();
+
+    const req = httpMock.expectOne('/api/me');
+    expect(req.request.headers.get('Authorization')).toBe(
+      'Bearer token-delayed',
+    );
+    req.flush({});
+  }));
+
+  it('deve prosseguir sem header quando falhar ao obter token', fakeAsync(() => {
+    const userMock = {
+      getIdToken: jasmine
+        .createSpy('getIdToken')
+        .and.returnValue(Promise.reject(new Error('token error'))),
+    } as unknown as User;
+    user$.next(userMock);
+
+    httpClient.get('/api/me').subscribe({ error: () => {} });
+    tick();
+
+    const req = httpMock.expectOne('/api/me');
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+  }));
 });
