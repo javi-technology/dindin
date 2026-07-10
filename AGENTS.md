@@ -32,11 +32,11 @@ Todo desenvolvimento segue obrigatoriamente o ciclo TDD. Não há exceção.
 
 ### Estrutura de testes
 
-| Camada     | Ferramenta              | Localização                    |
-|------------|-------------------------|--------------------------------|
-| API        | Jest                    | `apps/api/src/**/*.spec.ts`    |
-| Frontend   | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`  |
-| E2E        | (a definir)             | -                              |
+| Camada   | Ferramenta                | Localização                 |
+| -------- | ------------------------- | --------------------------- |
+| API      | Jest                      | `apps/api/src/**/*.spec.ts` |
+| Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts` |
+| E2E      | (a definir)               | -                           |
 
 ### Comandos de teste
 
@@ -62,15 +62,15 @@ npm run test --workspace=apps/web
 
 ### Tipos aceitos
 
-| Tipo       | Quando usar                                              |
-|------------|----------------------------------------------------------|
-| `feat`     | Nova funcionalidade                                      |
-| `fix`      | Correção de bug                                          |
-| `test`     | Adição ou ajuste de testes                               |
-| `refactor` | Refatoração sem mudança de comportamento                 |
-| `chore`    | Tarefas de infraestrutura, configuração, dependências    |
-| `docs`     | Documentação                                             |
-| `style`    | Formatação, lint (sem mudança de lógica)                 |
+| Tipo       | Quando usar                                           |
+| ---------- | ----------------------------------------------------- |
+| `feat`     | Nova funcionalidade                                   |
+| `fix`      | Correção de bug                                       |
+| `test`     | Adição ou ajuste de testes                            |
+| `refactor` | Refatoração sem mudança de comportamento              |
+| `chore`    | Tarefas de infraestrutura, configuração, dependências |
+| `docs`     | Documentação                                          |
+| `style`    | Formatação, lint (sem mudança de lógica)              |
 
 ### Exemplos
 
@@ -94,15 +94,45 @@ chore(#3): configura Jest na API
 
 ## 4. Fluxo completo de uma tarefa
 
+### 4.1. Preparação da branch
+
+Antes de iniciar qualquer implementação, executar **sempre** os passos abaixo:
+
+```bash
+# 1. Garantir que está na main atualizada
+git checkout main
+git pull origin main
+
+# 2. Criar ou atualizar a branch develop
+git checkout develop 2>/dev/null || git checkout -b develop
+git pull origin develop 2>/dev/null || true
+git merge main
+
+# 3. Criar a branch da issue a partir da develop
+git checkout -b issue-<numero_issue>
+```
+
+**Exemplo:** para a issue #3, a branch deve ser `issue-3`.
+
+### 4.2. Ciclo de desenvolvimento
+
 ```
 1. Verificar/criar issue no GitHub Projects
-2. Criar branch: feat/<numero>-<descricao-curta>
+2. Preparar branch: checkout develop → atualizar com main → criar issue-<N>
 3. RED:      escrever teste → confirmar falha → commit test(#N): ...
 4. GREEN:    escrever código → confirmar que passa → commit feat(#N): ...
 5. REFACTOR: refatorar → confirmar que passa → commit refactor(#N): ... (se houver)
-6. Abrir PR referenciando a issue (Closes #N)
+6. Abrir PR da branch issue-<N> para develop, referenciando a issue (Closes #N)
 7. Merge após revisão
+8. (Opcional) Sincronizar develop e main quando acordado
 ```
+
+### 4.3. Regras de branch
+
+- Toda implementação parte da `develop` e retorna para `develop` via PR.
+- Nome da branch deve ser **exatamente** `issue-<numero_issue>`.
+- A `develop` deve estar sempre sincronizada com a `main` antes de criar uma nova branch.
+- Nunca commitar diretamente na `main` ou na `develop`.
 
 ---
 
@@ -135,15 +165,15 @@ firebase deploy
 
 ## 6. Stack
 
-| Camada         | Tecnologia                          |
-|----------------|-------------------------------------|
-| Frontend       | Angular 19 + Tailwind CSS 3         |
-| Backend        | Cloud Functions + Express + Node 22 |
-| Banco de dados | Firestore                           |
-| Autenticação   | Firebase Authentication             |
-| Hospedagem     | Firebase Hosting                    |
-| Monorepo       | npm workspaces                      |
-| Projeto Firebase | `dindin-4e720`                    |
+| Camada           | Tecnologia                          |
+| ---------------- | ----------------------------------- |
+| Frontend         | Angular 19 + Tailwind CSS 3         |
+| Backend          | Cloud Functions + Express + Node 22 |
+| Banco de dados   | Firestore                           |
+| Autenticação     | Firebase Authentication             |
+| Hospedagem       | Firebase Hosting                    |
+| Monorepo         | npm workspaces                      |
+| Projeto Firebase | `dindin-4e720`                      |
 
 ---
 
