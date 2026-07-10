@@ -11,3 +11,4 @@ app.get("/api/health", (req: Request, res: Response) => {
 });
 
 export const api = functions.https.onRequest(app);
+export { app };
