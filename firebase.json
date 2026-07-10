@@ -10,7 +10,7 @@
     }
   ],
   "hosting": {
-    "source": "apps/web",
+    "public": "apps/web/dist/dindin-web/browser",
     "ignore": [
       "firebase.json",
       "**/.*",

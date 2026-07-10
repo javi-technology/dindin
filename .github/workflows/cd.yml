@@ -13,6 +13,7 @@ jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
 
     steps:
@@ -26,15 +27,33 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        # Instala apenas as dependências raiz (firebase-tools, etc.); os artefatos
+        # de build já foram gerados pela CI e são baixados nos passos seguintes.
         run: npm ci
 
-      - name: Enable Firebase webframeworks experiment
-        run: npx firebase experiments:enable webframeworks
+      # Reutiliza os artefatos compilados pela CI, evitando rebuild no deploy.
+      - name: Download API artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-dist
+          path: apps/api/lib
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Download Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/dindin-web
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
+      # gerenciados separadamente para evitar alterações acidentais de segurança.
       - name: Deploy to Firebase
-        run: npx firebase deploy --project dindin-4e720
+        run: npx firebase deploy --only hosting,functions --project dindin-4e720
