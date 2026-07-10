@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test-api:
+    name: Build and Test API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      # O firebase.json usa hosting.source apontando para o projeto Angular,
+      # então o experimento webframeworks precisa estar habilitado para que os
+      # emuladores do Firebase funcionem corretamente no runner.
+      - name: Enable Firebase webframeworks experiment
+        run: npx firebase experiments:enable webframeworks
+
+      - name: Build API
+        run: npm run api:build
+
+      - name: Test API
+        run: npm run test --workspace=apps/api
+
+  build-and-test-web:
+    name: Build and Test Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      # O firebase.json usa hosting.source apontando para o projeto Angular,
+      # então o experimento webframeworks precisa estar habilitado para que os
+      # emuladores do Firebase funcionem corretamente no runner.
+      - name: Enable Firebase webframeworks experiment
+        run: npx firebase experiments:enable webframeworks
+
+      - name: Build Web
+        run: npm run web:build
+
+      - name: Test Web
+        run: npm run test --workspace=apps/web -- --watch=false --browsers=ChromeHeadless --no-progress
