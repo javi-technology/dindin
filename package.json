@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "web:dev": "npm run start --workspace=apps/web",
+    "web:build": "npm run build --workspace=apps/web",
     "api:build": "npm run build --workspace=apps/api",
     "api:serve": "npm run serve --workspace=apps/api",
     "emulators": "firebase emulators:start",
