@@ -6,6 +6,7 @@
     "target": "ES2022",
     "strict": true,
     "skipLibCheck": true,
+    "isolatedModules": true,
     "outDir": "lib",
     "sourceMap": true
   },
