@@ -57,6 +57,12 @@ A pipeline de CI roda a cada push ou pull request para as branches `main` e `dev
 
 Veja os detalhes em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) e acompanhe as execuções em [Actions](https://github.com/javi-technology/dindin/actions/workflows/ci.yml).
 
+## Deploy contínuo
+
+O deploy para o Firebase Hosting e Cloud Functions é feito automaticamente quando a pipeline de CI passa na branch `main`.
+
+O workflow de CD está em [`.github/workflows/cd.yml`](.github/workflows/cd.yml) e exige a secret `FIREBASE_SERVICE_ACCOUNT` configurada no repositório.
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-dev` no Firebase Console (ou renomear em `.firebaserc`).
