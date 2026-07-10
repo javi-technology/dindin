@@ -1,5 +1,7 @@
 # DinDin
 
+[![CI](https://github.com/javi-technology/dindin/actions/workflows/ci.yml/badge.svg)](https://github.com/javi-technology/dindin/actions/workflows/ci.yml)
+
 Sistema de controle de carteira de Fundos Imobiliários (FIIs) com estratégia de "geladeira".
 
 ## Stack
@@ -48,6 +50,12 @@ npm run api:serve
 # Deploy
 npm run deploy
 ```
+
+## Integração Contínua
+
+A pipeline de CI roda a cada push ou pull request para as branches `main` e `develop`, executando instalação, build e testes da API e do frontend.
+
+Veja os detalhes em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) e acompanhe as execuções em [Actions](https://github.com/javi-technology/dindin/actions/workflows/ci.yml).
 
 ## Próximos passos
 
