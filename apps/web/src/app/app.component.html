@@ -1,3 +1,18 @@
+<header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+  <h1 class="text-xl font-bold text-gray-900">DinDin</h1>
+  <div class="flex items-center gap-4">
+    @if (user(); as currentUser) {
+      <span class="text-sm text-gray-700">{{ currentUser.email }}</span>
+      <button
+        (click)="logout()"
+        class="text-sm text-red-600 hover:text-red-800 font-medium"
+      >
+        Sair
+      </button>
+    }
+  </div>
+</header>
+
 <main
   class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6"
 >

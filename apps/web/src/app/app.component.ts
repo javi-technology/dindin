@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, OnInit, inject } from '@angular/core';
+import { RouterOutlet, Router } from '@angular/router';
 import { HealthService } from './core/services/health.service';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -14,7 +15,11 @@ export class AppComponent implements OnInit {
   healthProject: string | null = null;
   healthError: string | null = null;
 
-  constructor(private healthService: HealthService) {}
+  private readonly healthService = inject(HealthService);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+
+  user = this.authService.user;
 
   ngOnInit(): void {
     this.healthService.check().subscribe({
@@ -27,5 +32,10 @@ export class AppComponent implements OnInit {
           err.message || 'Não foi possível conectar ao backend.';
       },
     });
+  }
+
+  async logout(): Promise<void> {
+    await this.authService.logout();
+    await this.router.navigate(['/login']);
   }
 }
