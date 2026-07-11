@@ -65,8 +65,22 @@ O workflow de CD está em [`.github/workflows/cd.yml`](.github/workflows/cd.yml)
 
 > **Nota:** os artefatos de build mantêm-se disponíveis por **1 dia** (`retention-days: 1`). Se for necessário re-executar o CD manualmente após esse prazo, re-execute a CI primeiro para regenerar os artefatos.
 
+## API Endpoints
+
+Todos os endpoints abaixo exigem autenticação via `Authorization: Bearer <token>`.
+
+### Carteiras (`/api/wallets`)
+
+| Método   | Rota               | Descrição                                                 |
+| -------- | ------------------ | --------------------------------------------------------- |
+| `GET`    | `/api/wallets`     | Lista as carteiras do usuário autenticado                 |
+| `POST`   | `/api/wallets`     | Cria uma nova carteira (`name` e `currency` obrigatórios) |
+| `GET`    | `/api/wallets/:id` | Retorna uma carteira específica do usuário                |
+| `PUT`    | `/api/wallets/:id` | Atualiza uma carteira existente                           |
+| `DELETE` | `/api/wallets/:id` | Remove uma carteira existente                             |
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).
 2. Configurar a secret `FIREBASE_SERVICE_ACCOUNT` no repositório para habilitar o deploy contínuo.
-3. Implementar autenticação e CRUD de carteira.
+3. Implementar CRUD de posições dentro de uma carteira.
