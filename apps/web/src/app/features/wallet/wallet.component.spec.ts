@@ -185,6 +185,39 @@ describe('WalletComponent', () => {
     );
   }));
 
+  it('deve fazer parse de preço com vírgula decimal', fakeAsync(() => {
+    const newPosition: Position = {
+      id: 'position-3',
+      walletId: 'wallet-1',
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 15,
+      averagePrice: 1.55,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    positionServiceMock.create.and.returnValue(of(newPosition));
+    positionServiceMock.list.and.returnValue(of([...positions, newPosition]));
+
+    fixture.componentInstance.openForm();
+    fixture.componentInstance.form.patchValue({
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 15,
+      averagePrice: '1,55',
+    });
+    fixture.componentInstance.savePosition();
+    tick();
+    fixture.detectChanges();
+
+    expect(positionServiceMock.create).toHaveBeenCalledWith('wallet-1', {
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 15,
+      averagePrice: 1.55,
+    });
+  }));
+
   it('deve criar nova posição e recarregar lista', fakeAsync(() => {
     const newPosition: Position = {
       id: 'position-3',
