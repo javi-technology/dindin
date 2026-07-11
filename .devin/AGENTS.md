@@ -199,3 +199,43 @@ dindin/
 ├── firestore.indexes.json
 └── AGENTS.md             # este arquivo
 ```
+
+---
+
+## 8. Regras de padrão de UX e código
+
+Regras estabelecidas durante o desenvolvimento da issue #9 e que devem ser
+observadas em implementações futuras:
+
+### 8.1 Ícones
+
+- Utilizar a biblioteca gratuita/open source **@lucide/angular** para ícones no
+  frontend. Preferir ícones como SVG inline (tree-shakable) e importar apenas os
+  ícones utilizados.
+
+### 8.2 Formatação de código
+
+- Todo código deve ser formatado com **Prettier** antes de ser commitado.
+- O projeto utiliza **husky** + **lint-staged** para rodar Prettier
+  automaticamente no hook `pre-commit`.
+- Para formatar manualmente: `npm run format`.
+- Para verificar a formatação: `npm run format:check`.
+
+### 8.3 Locale brasileiro em campos numéricos
+
+- Campos de preço e valor monetário no frontend devem aceitar a vírgula como
+  separador decimal (ex: `1,55`, `0,95`).
+- O código deve fazer parse correto desses valores para número antes de enviar
+  para a API.
+
+### 8.4 Confirmação de ações destrutivas
+
+- Não usar `window.confirm`, `window.alert` ou `window.prompt` nativos.
+- Sempre utilizar um **modal customizado** para confirmação de exclusão ou outras
+  ações destrutivas.
+
+### 8.5 Logs de execução
+
+- Erros no backend devem ser logados de forma clara para facilitar o diagnóstico
+  em desenvolvimento (ex: `console.error` no catch dos controllers).
+- Em produção, considerar um logger estruturado.

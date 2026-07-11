@@ -1,14 +1,17 @@
-import { Request, Response, NextFunction } from "express";
-import { authMiddleware, AuthRequest } from "../../src/middleware/auth.middleware";
+import { Request, Response, NextFunction } from 'express';
+import {
+  authMiddleware,
+  AuthRequest,
+} from '../../src/middleware/auth.middleware';
 
 const verifyIdTokenMock = jest.fn();
-jest.mock("firebase-admin", () => ({
+jest.mock('firebase-admin', () => ({
   auth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
   })),
 }));
 
-describe("AuthMiddleware", () => {
+describe('AuthMiddleware', () => {
   let req: AuthRequest;
   let res: Partial<Response>;
   let next: NextFunction;
@@ -23,44 +26,44 @@ describe("AuthMiddleware", () => {
     verifyIdTokenMock.mockReset();
   });
 
-  it("deve rejeitar requisição sem header Authorization", async () => {
+  it('deve rejeitar requisição sem header Authorization', async () => {
     await authMiddleware(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("deve rejeitar requisição com token malformado", async () => {
-    req.headers = { authorization: "TokenInvalido" };
+  it('deve rejeitar requisição com token malformado', async () => {
+    req.headers = { authorization: 'TokenInvalido' };
 
     await authMiddleware(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("deve rejeitar requisição com token inválido", async () => {
-    req.headers = { authorization: "Bearer token-invalido" };
-    verifyIdTokenMock.mockRejectedValue(new Error("invalid token"));
+  it('deve rejeitar requisição com token inválido', async () => {
+    req.headers = { authorization: 'Bearer token-invalido' };
+    verifyIdTokenMock.mockRejectedValue(new Error('invalid token'));
 
     await authMiddleware(req, res as Response, next);
 
-    expect(verifyIdTokenMock).toHaveBeenCalledWith("token-invalido");
+    expect(verifyIdTokenMock).toHaveBeenCalledWith('token-invalido');
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("deve permitir requisição com token válido e anexar uid", async () => {
-    req.headers = { authorization: "Bearer token-valido" };
-    verifyIdTokenMock.mockResolvedValue({ uid: "user-123" });
+  it('deve permitir requisição com token válido e anexar uid', async () => {
+    req.headers = { authorization: 'Bearer token-valido' };
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
 
     await authMiddleware(req, res as Response, next);
 
-    expect(verifyIdTokenMock).toHaveBeenCalledWith("token-valido");
-    expect(req.user).toEqual({ uid: "user-123" });
+    expect(verifyIdTokenMock).toHaveBeenCalledWith('token-valido');
+    expect(req.user).toEqual({ uid: 'user-123' });
     expect(next).toHaveBeenCalled();
   });
 });
