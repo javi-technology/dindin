@@ -98,9 +98,12 @@ jobs:
 
       - name: Install dependencies
         # Instala as dependências da raiz (firebase-tools) e dos workspaces.
-        # As Cloud Functions são rebuildadas pelo Firebase CLI a partir do source;
-        # apenas o artefato do frontend é reutilizado do job de build.
         run: npm ci
+
+      - name: Build API
+        # O Firebase CLI não compila TypeScript automaticamente; o build deve
+        # ser executado antes do deploy para gerar apps/api/lib/index.js.
+        run: npm run api:build
 
       # Reutiliza o artefato do frontend compilado no job build-and-test-web,
       # evitando rebuild desnecessário no deploy.
