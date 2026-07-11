@@ -70,7 +70,16 @@ describe("models – Position", () => {
   });
 
   it("deve aceitar todos os AssetTypes válidos", () => {
-    const types: AssetType[] = ["FII", "STOCK", "ETF", "REIT", "OTHER"];
+    const assertAssetType = (value: AssetType): AssetType => value;
+
+    const types: AssetType[] = [
+      assertAssetType("FII"),
+      assertAssetType("STOCK"),
+      assertAssetType("ETF"),
+      assertAssetType("REIT"),
+      assertAssetType("OTHER"),
+    ];
+
     expect(types).toHaveLength(5);
   });
 });
