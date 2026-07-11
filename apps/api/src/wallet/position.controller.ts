@@ -31,13 +31,23 @@ function validatePositionBody(
 
   if (!allowPartial || ticker !== undefined) {
     if (!ticker || typeof ticker !== "string" || ticker.trim().length === 0) {
-      return { valid: false, error: "Ticker is required and must be a non-empty string" };
+      return {
+        valid: false,
+        error: "Ticker is required and must be a non-empty string",
+      };
     }
   }
 
   if (!allowPartial || quantity !== undefined) {
-    if (typeof quantity !== "number" || quantity <= 0 || !Number.isFinite(quantity)) {
-      return { valid: false, error: "Quantity is required and must be a positive number" };
+    if (
+      typeof quantity !== "number" ||
+      quantity <= 0 ||
+      !Number.isFinite(quantity)
+    ) {
+      return {
+        valid: false,
+        error: "Quantity is required and must be a positive number",
+      };
     }
   }
 
@@ -47,7 +57,10 @@ function validatePositionBody(
       averagePrice < 0 ||
       !Number.isFinite(averagePrice)
     ) {
-      return { valid: false, error: "Average price is required and must be a non-negative number" };
+      return {
+        valid: false,
+        error: "Average price is required and must be a non-negative number",
+      };
     }
   }
 
@@ -60,25 +73,42 @@ function validatePositionBody(
     }
   }
 
-  if (currentPrice !== undefined && (typeof currentPrice !== "number" || currentPrice < 0 || !Number.isFinite(currentPrice))) {
-    return { valid: false, error: "Current price must be a non-negative number" };
+  if (
+    currentPrice !== undefined &&
+    (typeof currentPrice !== "number" ||
+      currentPrice < 0 ||
+      !Number.isFinite(currentPrice))
+  ) {
+    return {
+      valid: false,
+      error: "Current price must be a non-negative number",
+    };
   }
 
   return { valid: true };
 }
 
-export async function listPositions(req: Request, res: Response): Promise<void> {
+export async function listPositions(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const walletId = req.params.walletId;
     const snapshot = await positionsCollection(uid(req), walletId).get();
-    const positions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const positions = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
     res.json(positions);
   } catch {
     res.status(500).json({ error: "Internal server error" });
   }
 }
 
-export async function createPosition(req: Request, res: Response): Promise<void> {
+export async function createPosition(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const walletId = req.params.walletId;
     const body = req.body as Partial<Position>;
@@ -96,14 +126,20 @@ export async function createPosition(req: Request, res: Response): Promise<void>
       assetType: body.assetType!,
       quantity: body.quantity!,
       averagePrice: body.averagePrice!,
-      currentPrice: body.currentPrice,
       createdAt: now,
       updatedAt: now,
     };
 
-    const docRef = await positionsCollection(uid(req), walletId).add(positionData);
+    if (body.currentPrice !== undefined) {
+      positionData.currentPrice = body.currentPrice;
+    }
+
+    const docRef = await positionsCollection(uid(req), walletId).add(
+      positionData,
+    );
     res.status(201).json({ id: docRef.id, ...positionData });
-  } catch {
+  } catch (error) {
+    console.error("[createPosition] error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -124,7 +160,10 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function updatePosition(req: Request, res: Response): Promise<void> {
+export async function updatePosition(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const { walletId, id } = req.params;
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
@@ -146,11 +185,14 @@ export async function updatePosition(req: Request, res: Response): Promise<void>
       updatedAt: new Date().toISOString(),
     };
 
-    if (body.ticker !== undefined) updates.ticker = body.ticker.trim().toUpperCase();
+    if (body.ticker !== undefined)
+      updates.ticker = body.ticker.trim().toUpperCase();
     if (body.assetType !== undefined) updates.assetType = body.assetType;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
-    if (body.averagePrice !== undefined) updates.averagePrice = body.averagePrice;
-    if (body.currentPrice !== undefined) updates.currentPrice = body.currentPrice;
+    if (body.averagePrice !== undefined)
+      updates.averagePrice = body.averagePrice;
+    if (body.currentPrice !== undefined)
+      updates.currentPrice = body.currentPrice;
 
     await positionRef.update(updates);
 
@@ -161,7 +203,10 @@ export async function updatePosition(req: Request, res: Response): Promise<void>
   }
 }
 
-export async function deletePosition(req: Request, res: Response): Promise<void> {
+export async function deletePosition(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const { walletId, id } = req.params;
     const positionRef = positionsCollection(uid(req), walletId).doc(id);

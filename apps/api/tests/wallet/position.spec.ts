@@ -34,7 +34,9 @@ function createFirestoreMock(positions: PositionData[] = []) {
       id: position.id,
       get: jest
         .fn()
-        .mockImplementation(() => Promise.resolve(createPositionSnapshot(data))),
+        .mockImplementation(() =>
+          Promise.resolve(createPositionSnapshot(data)),
+        ),
       set: jest.fn().mockImplementation((value: any) => {
         data = { ...data, ...value };
         return Promise.resolve();
@@ -52,7 +54,9 @@ function createFirestoreMock(positions: PositionData[] = []) {
       docs: positions.map((position) => createPositionSnapshot(position)),
       empty: positions.length === 0,
       forEach: (callback: any) => {
-        positions.forEach((position) => callback(createPositionSnapshot(position)));
+        positions.forEach((position) =>
+          callback(createPositionSnapshot(position)),
+        );
       },
     };
   }
@@ -92,10 +96,15 @@ function createFirestoreMock(positions: PositionData[] = []) {
                 return {
                   doc: jest.fn((walletId: string) => ({
                     collection: jest.fn((positionPath: string) => {
-                      if (positionPath === "positions" && walletId === "wallet-1") {
+                      if (
+                        positionPath === "positions" &&
+                        walletId === "wallet-1"
+                      ) {
                         return positionsCollection;
                       }
-                      throw new Error(`Unexpected subcollection: ${positionPath}`);
+                      throw new Error(
+                        `Unexpected subcollection: ${positionPath}`,
+                      );
                     }),
                   })),
                 };
@@ -117,12 +126,22 @@ function createFailingFirestoreMock() {
         collection: jest.fn(() => ({
           doc: jest.fn(() => ({
             collection: jest.fn(() => ({
-              get: jest.fn().mockRejectedValue(new Error("Firestore unavailable")),
-              add: jest.fn().mockRejectedValue(new Error("Firestore unavailable")),
+              get: jest
+                .fn()
+                .mockRejectedValue(new Error("Firestore unavailable")),
+              add: jest
+                .fn()
+                .mockRejectedValue(new Error("Firestore unavailable")),
               doc: jest.fn(() => ({
-                get: jest.fn().mockRejectedValue(new Error("Firestore unavailable")),
-                update: jest.fn().mockRejectedValue(new Error("Firestore unavailable")),
-                delete: jest.fn().mockRejectedValue(new Error("Firestore unavailable")),
+                get: jest
+                  .fn()
+                  .mockRejectedValue(new Error("Firestore unavailable")),
+                update: jest
+                  .fn()
+                  .mockRejectedValue(new Error("Firestore unavailable")),
+                delete: jest
+                  .fn()
+                  .mockRejectedValue(new Error("Firestore unavailable")),
               })),
             })),
           })),
@@ -166,7 +185,9 @@ describe("Position CRUD", () => {
     it("deve retornar 401 sem token de autenticação", async () => {
       firestoreMock = createFirestoreMock([]);
 
-      const response = await request(app).get("/api/wallets/wallet-1/positions");
+      const response = await request(app).get(
+        "/api/wallets/wallet-1/positions",
+      );
 
       expect(response.status).toBe(401);
     });
@@ -190,7 +211,12 @@ describe("Position CRUD", () => {
       const response = await request(app)
         .post("/api/wallets/wallet-1/positions")
         .set("Authorization", authHeader)
-        .send({ ticker: "HGLG11", quantity: 10, averagePrice: 110.5, assetType: "FII" });
+        .send({
+          ticker: "HGLG11",
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: "FII",
+        });
 
       expect(response.status).toBe(201);
       expect(response.body.id).toBe("new-position-id");
@@ -199,6 +225,24 @@ describe("Position CRUD", () => {
       expect(response.body.quantity).toBe(10);
       expect(response.body.averagePrice).toBe(110.5);
       expect(response.body.assetType).toBe("FII");
+    });
+
+    it("deve criar uma posição sem currentPrice", async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post("/api/wallets/wallet-1/positions")
+        .set("Authorization", authHeader)
+        .send({
+          ticker: "HGLG11",
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: "FII",
+          currentPrice: undefined,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.currentPrice).toBeUndefined();
     });
 
     it("deve retornar 400 quando ticker não é informado", async () => {
@@ -229,7 +273,12 @@ describe("Position CRUD", () => {
       const response = await request(app)
         .post("/api/wallets/wallet-1/positions")
         .set("Authorization", authHeader)
-        .send({ ticker: "HGLG11", quantity: -5, averagePrice: 110.5, assetType: "FII" });
+        .send({
+          ticker: "HGLG11",
+          quantity: -5,
+          averagePrice: 110.5,
+          assetType: "FII",
+        });
 
       expect(response.status).toBe(400);
     });
@@ -240,7 +289,12 @@ describe("Position CRUD", () => {
       const response = await request(app)
         .post("/api/wallets/wallet-1/positions")
         .set("Authorization", authHeader)
-        .send({ ticker: "HGLG11", quantity: 10, averagePrice: 110.5, assetType: "FII" });
+        .send({
+          ticker: "HGLG11",
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: "FII",
+        });
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty("error");
