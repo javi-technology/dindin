@@ -12,9 +12,20 @@
     "api:build": "npm run build --workspace=apps/api",
     "api:serve": "npm run serve --workspace=apps/api",
     "emulators": "npm run api:build && npm run web:build && firebase emulators:start",
-    "deploy": "firebase deploy"
+    "deploy": "firebase deploy",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,md,html,css,scss,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
-    "firebase-tools": "^15.0.0"
+    "firebase-tools": "^15.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.5"
   }
 }
