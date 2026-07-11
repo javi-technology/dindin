@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { authMiddleware, AuthRequest } from "./auth.middleware";
+import { authMiddleware, AuthRequest } from "../../src/middleware/auth.middleware";
 
 const verifyIdTokenMock = jest.fn();
 jest.mock("firebase-admin", () => ({
