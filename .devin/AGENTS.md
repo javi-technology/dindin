@@ -192,7 +192,8 @@ dindin/
 │               ├── features/   # wallet, fridge, dashboard (um módulo por feature)
 │               └── shared/     # componentes, pipes e utilitários reutilizáveis
 ├── packages/
-│   └── shared-types/     # Interfaces TypeScript compartilhadas entre web e api
+│   ├── models/           # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
+│   └── shared-types/     # Outros tipos compartilhados entre web e api (ex: HealthResponse)
 ├── firebase.json
 ├── firestore.rules
 ├── firestore.indexes.json
