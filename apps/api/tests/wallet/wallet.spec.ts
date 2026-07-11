@@ -106,6 +106,37 @@ function createFirestoreMock(wallets: WalletData[] = []) {
   };
 }
 
+/** Cria um mock do Firestore que lança erro em qualquer operação de coleção. */
+function createFailingFirestoreMock() {
+  return {
+    collection: jest.fn(() => {
+      return {
+        doc: jest.fn(() => ({
+          collection: jest.fn(() => ({
+            get: jest
+              .fn()
+              .mockRejectedValue(new Error("Firestore unavailable")),
+            add: jest
+              .fn()
+              .mockRejectedValue(new Error("Firestore unavailable")),
+            doc: jest.fn(() => ({
+              get: jest
+                .fn()
+                .mockRejectedValue(new Error("Firestore unavailable")),
+              update: jest
+                .fn()
+                .mockRejectedValue(new Error("Firestore unavailable")),
+              delete: jest
+                .fn()
+                .mockRejectedValue(new Error("Firestore unavailable")),
+            })),
+          })),
+        })),
+      };
+    }),
+  };
+}
+
 describe("Wallet CRUD", () => {
   const authHeader = "Bearer valid-token";
   const baseWallet: WalletData = {
@@ -140,6 +171,17 @@ describe("Wallet CRUD", () => {
       const response = await request(app).get("/api/wallets");
 
       expect(response.status).toBe(401);
+    });
+
+    it("deve retornar 500 quando o Firestore falha", async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .get("/api/wallets")
+        .set("Authorization", authHeader);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
     });
   });
 
@@ -181,6 +223,30 @@ describe("Wallet CRUD", () => {
 
       expect(response.status).toBe(400);
     });
+
+    it("deve retornar 400 para currency com código inválido", async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post("/api/wallets")
+        .set("Authorization", authHeader)
+        .send({ name: "Nova Carteira", currency: "REAL" });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/not supported/);
+    });
+
+    it("deve retornar 500 quando o Firestore falha", async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .post("/api/wallets")
+        .set("Authorization", authHeader)
+        .send({ name: "Nova Carteira", currency: "BRL" });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
+    });
   });
 
   describe("GET /api/wallets/:id", () => {
@@ -203,6 +269,17 @@ describe("Wallet CRUD", () => {
         .set("Authorization", authHeader);
 
       expect(response.status).toBe(404);
+    });
+
+    it("deve retornar 500 quando o Firestore falha", async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .get("/api/wallets/wallet-1")
+        .set("Authorization", authHeader);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
     });
   });
 
@@ -230,6 +307,30 @@ describe("Wallet CRUD", () => {
 
       expect(response.status).toBe(404);
     });
+
+    it("deve retornar 400 para currency inválida na atualização", async () => {
+      firestoreMock = createFirestoreMock([baseWallet]);
+
+      const response = await request(app)
+        .put("/api/wallets/wallet-1")
+        .set("Authorization", authHeader)
+        .send({ currency: "INVALID" });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/not supported/);
+    });
+
+    it("deve retornar 500 quando o Firestore falha", async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .put("/api/wallets/wallet-1")
+        .set("Authorization", authHeader)
+        .send({ name: "Carteira Atualizada" });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
+    });
   });
 
   describe("DELETE /api/wallets/:id", () => {
@@ -251,6 +352,17 @@ describe("Wallet CRUD", () => {
         .set("Authorization", authHeader);
 
       expect(response.status).toBe(404);
+    });
+
+    it("deve retornar 500 quando o Firestore falha", async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .delete("/api/wallets/wallet-1")
+        .set("Authorization", authHeader);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty("error");
     });
   });
 });
