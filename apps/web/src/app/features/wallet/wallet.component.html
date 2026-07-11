@@ -6,7 +6,7 @@
       >
         <div>
           <h1 class="text-2xl font-bold text-gray-900">Carteira</h1>
-          <p class="text-gray-600">Gerencie suas posições de FIIs</p>
+          <p class="text-gray-600">Gerencie suas posições de investimentos</p>
         </div>
 
         @if (wallets().length > 0) {
@@ -94,7 +94,7 @@
                     Valor unitário
                   </th>
                   <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Total a receber
+                    Total investido
                   </th>
                   <th
                     class="py-3 px-4 text-sm font-semibold text-gray-700 text-right"
@@ -272,9 +272,17 @@
               form.get('averagePrice')?.invalid &&
               form.get('averagePrice')?.touched
             ) {
-              <p class="text-red-600 text-xs mt-1">
-                Preço médio deve ser maior ou igual a zero.
-              </p>
+              @if (form.get('averagePrice')?.hasError('required')) {
+                <p class="text-red-600 text-xs mt-1">
+                  Preço médio é obrigatório.
+                </p>
+              } @else if (
+                form.get('averagePrice')?.hasError('invalidDecimal')
+              ) {
+                <p class="text-red-600 text-xs mt-1">
+                  Informe um número válido (ex: 110,50).
+                </p>
+              }
             }
           </div>
 
@@ -290,7 +298,19 @@
               inputmode="decimal"
               formControlName="currentPrice"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [class.border-red-500]="
+                form.get('currentPrice')?.invalid &&
+                form.get('currentPrice')?.touched
+              "
             />
+            @if (
+              form.get('currentPrice')?.hasError('invalidDecimal') &&
+              form.get('currentPrice')?.touched
+            ) {
+              <p class="text-red-600 text-xs mt-1">
+                Informe um número válido (ex: 112,00).
+              </p>
+            }
           </div>
 
           <div class="flex justify-end gap-3 pt-2">

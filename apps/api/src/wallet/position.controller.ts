@@ -1,9 +1,15 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Position } from 'dindin-models';
+import { Position, AssetType } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-const ASSET_TYPES = new Set(['FII', 'STOCK', 'ETF', 'REIT', 'OTHER']);
+const ASSET_TYPES = new Set<AssetType>([
+  'FII',
+  'STOCK',
+  'ETF',
+  'REIT',
+  'OTHER',
+]);
 
 function uid(req: Request): string {
   return (req as AuthRequest).user!.uid;
@@ -19,8 +25,8 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('positions');
 }
 
-function isValidAssetType(value: unknown): value is string {
-  return typeof value === 'string' && ASSET_TYPES.has(value);
+function isValidAssetType(value: unknown): value is AssetType {
+  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
 }
 
 function validatePositionBody(
@@ -100,7 +106,8 @@ export async function listPositions(
       ...doc.data(),
     }));
     res.json(positions);
-  } catch {
+  } catch (error) {
+    console.error('[listPositions] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -155,7 +162,8 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
     }
 
     res.json({ id: doc.id, ...doc.data() });
-  } catch {
+  } catch (error) {
+    console.error('[getPosition] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -198,7 +206,8 @@ export async function updatePosition(
 
     const updatedPosition = { id, ...doc.data(), ...updates };
     res.json(updatedPosition);
-  } catch {
+  } catch (error) {
+    console.error('[updatePosition] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -219,7 +228,8 @@ export async function deletePosition(
 
     await positionRef.delete();
     res.status(204).send();
-  } catch {
+  } catch (error) {
+    console.error('[deletePosition] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

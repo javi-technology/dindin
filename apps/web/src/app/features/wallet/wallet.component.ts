@@ -1,9 +1,19 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  OnInit,
+  inject,
+  signal,
+  computed,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
+  AbstractControl,
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
+  ValidationErrors,
+  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
@@ -15,6 +25,17 @@ import {
   LucidePencil,
   LucideTrash2,
 } from '@lucide/angular';
+
+/** Valida que o valor é um número decimal válido (aceita vírgula ou ponto). */
+function decimalValidator(): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = control.value;
+    if (value == null || value === '') return null;
+    const normalized = String(value).trim().replace(/,/g, '.');
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? { invalidDecimal: true } : null;
+  };
+}
 
 @Component({
   selector: 'app-wallet',
@@ -49,8 +70,8 @@ export class WalletComponent implements OnInit {
     ticker: ['', [Validators.required]],
     assetType: ['FII', [Validators.required]],
     quantity: [0, [Validators.required, Validators.min(0.0001)]],
-    averagePrice: ['0', [Validators.required]],
-    currentPrice: [''],
+    averagePrice: ['0', [Validators.required, decimalValidator()]],
+    currentPrice: ['', [decimalValidator()]],
   });
 
   totalGeral = computed(() =>
@@ -259,6 +280,15 @@ export class WalletComponent implements OnInit {
     this.deleteConfirmPosition.set(null);
   }
 
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.deleteConfirmPosition()) {
+      this.cancelDelete();
+    } else if (this.formVisible()) {
+      this.closeForm();
+    }
+  }
+
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -270,7 +300,7 @@ export class WalletComponent implements OnInit {
     if (value == null || value === '') {
       return null;
     }
-    const normalized = String(value).trim().replace(',', '.');
+    const normalized = String(value).trim().replace(/,/g, '.');
     const parsed = Number(normalized);
     return Number.isNaN(parsed) ? null : parsed;
   }

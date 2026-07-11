@@ -15,9 +15,7 @@ jest.mock('firebase-admin', () => ({
 import { app } from '../../src/index';
 import { Position, AssetType } from 'dindin-models';
 
-interface PositionData extends Position {}
-
-function createPositionSnapshot(position: PositionData) {
+function createPositionSnapshot(position: Position) {
   return {
     id: position.id,
     exists: true,
@@ -25,7 +23,7 @@ function createPositionSnapshot(position: PositionData) {
   };
 }
 
-function createFirestoreMock(positions: PositionData[] = []) {
+function createFirestoreMock(positions: Position[] = []) {
   const positionMap = new Map<string, any>();
 
   positions.forEach((position) => {
@@ -51,7 +49,9 @@ function createFirestoreMock(positions: PositionData[] = []) {
 
   function getPositionsSnapshot() {
     return {
-      docs: positions.map((position) => createPositionSnapshot(position)),
+      docs: positions.map((position: Position) =>
+        createPositionSnapshot(position),
+      ),
       empty: positions.length === 0,
       forEach: (callback: any) => {
         positions.forEach((position) =>
@@ -153,7 +153,7 @@ function createFailingFirestoreMock() {
 
 describe('Position CRUD', () => {
   const authHeader = 'Bearer valid-token';
-  const basePosition: PositionData = {
+  const basePosition: Position = {
     id: 'position-1',
     walletId: 'wallet-1',
     ticker: 'HGLG11',

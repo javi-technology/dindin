@@ -4,7 +4,7 @@ import {
   fakeAsync,
   tick,
 } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
@@ -273,4 +273,129 @@ describe('WalletComponent', () => {
       currentPrice: 10,
     });
   }));
+
+  it('deve exibir mensagem de erro quando falha ao carregar carteiras', fakeAsync(() => {
+    walletServiceMock.list.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl?.textContent).toContain('Erro ao carregar carteiras.');
+  }));
+
+  it('deve exibir mensagem de erro quando falha ao carregar posições', fakeAsync(() => {
+    positionServiceMock.list.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl?.textContent).toContain('Erro ao carregar posições.');
+  }));
+
+  it('deve exibir erro no formulário quando falha ao criar posição', fakeAsync(() => {
+    positionServiceMock.create.and.returnValue(
+      throwError(() => new Error('Server error')),
+    );
+
+    fixture.componentInstance.openForm();
+    fixture.componentInstance.form.patchValue({
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 10,
+      averagePrice: '9,80',
+    });
+    fixture.componentInstance.savePosition();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const formError = compiled.querySelector('[data-testid="form-error"]');
+    expect(formError?.textContent).toContain('Erro ao criar posição');
+  }));
+
+  it('deve exibir erro no formulário quando falha ao atualizar posição', fakeAsync(() => {
+    positionServiceMock.update.and.returnValue(
+      throwError(() => new Error('Server error')),
+    );
+
+    fixture.componentInstance.openForm(positions[0]);
+    fixture.detectChanges();
+    fixture.componentInstance.savePosition();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const formError = compiled.querySelector('[data-testid="form-error"]');
+    expect(formError?.textContent).toContain('Erro ao atualizar posição');
+  }));
+
+  it('deve exibir mensagem de erro quando falha ao remover posição', fakeAsync(() => {
+    positionServiceMock.delete.and.returnValue(
+      throwError(() => new Error('Server error')),
+    );
+
+    fixture.componentInstance.deletePosition(positions[0]);
+    fixture.detectChanges();
+    fixture.componentInstance.confirmDelete();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl?.textContent).toContain('Erro ao remover posição.');
+  }));
+
+  it('deve fechar formulário ao pressionar Esc', () => {
+    fixture.componentInstance.openForm();
+    fixture.detectChanges();
+
+    fixture.componentInstance.onEscapeKey();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.formVisible()).toBeFalse();
+  });
+
+  it('deve fechar modal de exclusão ao pressionar Esc', () => {
+    fixture.componentInstance.deletePosition(positions[0]);
+    fixture.detectChanges();
+
+    fixture.componentInstance.onEscapeKey();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.deleteConfirmPosition()).toBeNull();
+  });
+
+  it('deve rejeitar preço médio com formato inválido', () => {
+    fixture.componentInstance.openForm();
+    fixture.componentInstance.form.patchValue({ averagePrice: 'abc' });
+    fixture.componentInstance.form.get('averagePrice')?.markAsTouched();
+    fixture.detectChanges();
+
+    expect(
+      fixture.componentInstance.form
+        .get('averagePrice')
+        ?.hasError('invalidDecimal'),
+    ).toBeTrue();
+  });
+
+  it('deve aceitar preço médio com vírgula como separador decimal', () => {
+    fixture.componentInstance.openForm();
+    fixture.componentInstance.form.patchValue({ averagePrice: '110,50' });
+    fixture.componentInstance.form.get('averagePrice')?.markAsTouched();
+    fixture.detectChanges();
+
+    expect(
+      fixture.componentInstance.form.get('averagePrice')?.valid,
+    ).toBeTrue();
+  });
 });

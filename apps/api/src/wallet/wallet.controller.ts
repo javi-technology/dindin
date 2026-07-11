@@ -36,7 +36,8 @@ export async function listWallets(req: Request, res: Response): Promise<void> {
     const snapshot = await walletsCollection(uid(req)).get();
     const wallets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     res.json(wallets);
-  } catch {
+  } catch (error) {
+    console.error('[listWallets] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -69,7 +70,8 @@ export async function createWallet(req: Request, res: Response): Promise<void> {
 
     const docRef = await walletsCollection(uid(req)).add(walletData);
     res.status(201).json({ id: docRef.id, ...walletData });
-  } catch {
+  } catch (error) {
+    console.error('[createWallet] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -85,7 +87,8 @@ export async function getWallet(req: Request, res: Response): Promise<void> {
     }
 
     res.json({ id: doc.id, ...doc.data() });
-  } catch {
+  } catch (error) {
+    console.error('[getWallet] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -124,7 +127,8 @@ export async function updateWallet(req: Request, res: Response): Promise<void> {
     // Mescla em memória para evitar segunda leitura no Firestore
     const updatedWallet = { id: walletId, ...doc.data(), ...updates };
     res.json(updatedWallet);
-  } catch {
+  } catch (error) {
+    console.error('[updateWallet] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -145,7 +149,8 @@ export async function deleteWallet(req: Request, res: Response): Promise<void> {
     // uma Cloud Function acionada por onDelete para evitar dados órfãos.
     await walletRef.delete();
     res.status(204).send();
-  } catch {
+  } catch (error) {
+    console.error('[deleteWallet] error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
