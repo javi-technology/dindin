@@ -8,7 +8,7 @@ interface HealthResponse {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class HealthService {
   private readonly apiUrl = '/api/health';

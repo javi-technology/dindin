@@ -74,7 +74,9 @@ describe('PositionService', () => {
       expect(response.quantity).toBe(20);
     });
 
-    const req = httpMock.expectOne(`/api/wallets/${walletId}/positions/${positionId}`);
+    const req = httpMock.expectOne(
+      `/api/wallets/${walletId}/positions/${positionId}`,
+    );
     expect(req.request.method).toBe('PUT');
     req.flush({ id: positionId, ...payload });
   });
@@ -86,7 +88,9 @@ describe('PositionService', () => {
       expect(true).toBe(true);
     });
 
-    const req = httpMock.expectOne(`/api/wallets/${walletId}/positions/${positionId}`);
+    const req = httpMock.expectOne(
+      `/api/wallets/${walletId}/positions/${positionId}`,
+    );
     expect(req.request.method).toBe('DELETE');
     req.flush(null, { status: 204, statusText: 'No Content' });
   });

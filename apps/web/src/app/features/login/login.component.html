@@ -5,7 +5,9 @@
 
     <form (ngSubmit)="loginWithEmail()" class="space-y-4">
       <div>
-        <label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>
+        <label for="email" class="block text-sm font-medium text-gray-700"
+          >E-mail</label
+        >
         <input
           id="email"
           type="email"
@@ -17,7 +19,9 @@
       </div>
 
       <div>
-        <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+        <label for="password" class="block text-sm font-medium text-gray-700"
+          >Senha</label
+        >
         <input
           id="password"
           type="password"
@@ -29,7 +33,9 @@
       </div>
 
       @if (error) {
-        <div class="text-sm text-red-600 bg-red-50 rounded-lg p-3">{{ error }}</div>
+        <div class="text-sm text-red-600 bg-red-50 rounded-lg p-3">
+          {{ error }}
+        </div>
       }
 
       <button

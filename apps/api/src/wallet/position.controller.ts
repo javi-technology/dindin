@@ -1,9 +1,9 @@
-import { Request, Response } from "express";
-import * as admin from "firebase-admin";
-import { Position } from "dindin-models";
-import { AuthRequest } from "../middleware/auth.middleware";
+import { Request, Response } from 'express';
+import * as admin from 'firebase-admin';
+import { Position } from 'dindin-models';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-const ASSET_TYPES = new Set(["FII", "STOCK", "ETF", "REIT", "OTHER"]);
+const ASSET_TYPES = new Set(['FII', 'STOCK', 'ETF', 'REIT', 'OTHER']);
 
 function uid(req: Request): string {
   return (req as AuthRequest).user!.uid;
@@ -12,15 +12,15 @@ function uid(req: Request): string {
 function positionsCollection(userId: string, walletId: string) {
   return admin
     .firestore()
-    .collection("users")
+    .collection('users')
     .doc(userId)
-    .collection("wallets")
+    .collection('wallets')
     .doc(walletId)
-    .collection("positions");
+    .collection('positions');
 }
 
 function isValidAssetType(value: unknown): value is string {
-  return typeof value === "string" && ASSET_TYPES.has(value);
+  return typeof value === 'string' && ASSET_TYPES.has(value);
 }
 
 function validatePositionBody(
@@ -30,36 +30,36 @@ function validatePositionBody(
   const { ticker, quantity, averagePrice, assetType, currentPrice } = body;
 
   if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== "string" || ticker.trim().length === 0) {
+    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
       return {
         valid: false,
-        error: "Ticker is required and must be a non-empty string",
+        error: 'Ticker is required and must be a non-empty string',
       };
     }
   }
 
   if (!allowPartial || quantity !== undefined) {
     if (
-      typeof quantity !== "number" ||
+      typeof quantity !== 'number' ||
       quantity <= 0 ||
       !Number.isFinite(quantity)
     ) {
       return {
         valid: false,
-        error: "Quantity is required and must be a positive number",
+        error: 'Quantity is required and must be a positive number',
       };
     }
   }
 
   if (!allowPartial || averagePrice !== undefined) {
     if (
-      typeof averagePrice !== "number" ||
+      typeof averagePrice !== 'number' ||
       averagePrice < 0 ||
       !Number.isFinite(averagePrice)
     ) {
       return {
         valid: false,
-        error: "Average price is required and must be a non-negative number",
+        error: 'Average price is required and must be a non-negative number',
       };
     }
   }
@@ -68,20 +68,20 @@ function validatePositionBody(
     if (!isValidAssetType(assetType)) {
       return {
         valid: false,
-        error: `Asset type is required and must be one of: ${[...ASSET_TYPES].join(", ")}`,
+        error: `Asset type is required and must be one of: ${[...ASSET_TYPES].join(', ')}`,
       };
     }
   }
 
   if (
     currentPrice !== undefined &&
-    (typeof currentPrice !== "number" ||
+    (typeof currentPrice !== 'number' ||
       currentPrice < 0 ||
       !Number.isFinite(currentPrice))
   ) {
     return {
       valid: false,
-      error: "Current price must be a non-negative number",
+      error: 'Current price must be a non-negative number',
     };
   }
 
@@ -101,7 +101,7 @@ export async function listPositions(
     }));
     res.json(positions);
   } catch {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -120,7 +120,7 @@ export async function createPosition(
     }
 
     const now = new Date().toISOString();
-    const positionData: Omit<Position, "id"> = {
+    const positionData: Omit<Position, 'id'> = {
       walletId,
       ticker: body.ticker!.trim().toUpperCase(),
       assetType: body.assetType!,
@@ -139,8 +139,8 @@ export async function createPosition(
     );
     res.status(201).json({ id: docRef.id, ...positionData });
   } catch (error) {
-    console.error("[createPosition] error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error('[createPosition] error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -150,13 +150,13 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: "Position not found" });
+      res.status(404).json({ error: 'Position not found' });
       return;
     }
 
     res.json({ id: doc.id, ...doc.data() });
   } catch {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -170,7 +170,7 @@ export async function updatePosition(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: "Position not found" });
+      res.status(404).json({ error: 'Position not found' });
       return;
     }
 
@@ -199,7 +199,7 @@ export async function updatePosition(
     const updatedPosition = { id, ...doc.data(), ...updates };
     res.json(updatedPosition);
   } catch {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -213,13 +213,13 @@ export async function deletePosition(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: "Position not found" });
+      res.status(404).json({ error: 'Position not found' });
       return;
     }
 
     await positionRef.delete();
     res.status(204).send();
   } catch {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }

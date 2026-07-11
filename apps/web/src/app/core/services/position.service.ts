@@ -27,7 +27,10 @@ export class PositionService {
     return this.http.get<Position[]>(this.apiUrl(walletId));
   }
 
-  create(walletId: string, payload: CreatePositionPayload): Observable<Position> {
+  create(
+    walletId: string,
+    payload: CreatePositionPayload,
+  ): Observable<Position> {
     return this.http.post<Position>(this.apiUrl(walletId), payload);
   }
 
@@ -36,7 +39,10 @@ export class PositionService {
     positionId: string,
     payload: UpdatePositionPayload,
   ): Observable<Position> {
-    return this.http.put<Position>(`${this.apiUrl(walletId)}/${positionId}`, payload);
+    return this.http.put<Position>(
+      `${this.apiUrl(walletId)}/${positionId}`,
+      payload,
+    );
   }
 
   delete(walletId: string, positionId: string): Observable<void> {

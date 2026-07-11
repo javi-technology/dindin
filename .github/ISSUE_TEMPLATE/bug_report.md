@@ -1,9 +1,9 @@
 ---
 name: Relatório de Bug
 about: Crie um relatório para nos ajudar a melhorar
-title: "[Bug] - "
-labels: "bug"
-assignees: ""
+title: '[Bug] - '
+labels: 'bug'
+assignees: ''
 ---
 
 **Contexto:**
