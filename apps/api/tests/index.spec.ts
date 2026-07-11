@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { app } from './index';
+import { app } from '../src/index';
 
 describe('API Health', () => {
   it('deve retornar status ok do projeto', async () => {

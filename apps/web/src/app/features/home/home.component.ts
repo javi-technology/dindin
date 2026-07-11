@@ -1,9 +1,11 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { HealthService } from '../../core/services/health.service';
 
 @Component({
   selector: 'app-home',
   standalone: true,
+  imports: [RouterLink],
   templateUrl: './home.component.html',
 })
 export class HomeComponent implements OnInit {

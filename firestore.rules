@@ -1,8 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Funções auxiliares
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
+
+    // Documento do usuário
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Carteiras do usuário
+      match /wallets/{walletId} {
+        allow read, write: if isOwner(userId);
+
+        // Posições dentro de uma carteira
+        match /positions/{positionId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+
+      // Geladeiras do usuário
+      match /fridges/{fridgeId} {
+        allow read, write: if isOwner(userId);
+
+        // Itens dentro de uma geladeira
+        match /fridgeItems/{itemId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+    }
+
   }
 }
