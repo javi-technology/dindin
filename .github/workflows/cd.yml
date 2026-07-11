@@ -11,7 +11,10 @@ on:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    # O artefato web-dist só é gerado pelo CI em pushes na main. PRs também
+    # disparam o CI na main, mas sem produzir o artefato, então o CD deve
+    # executar apenas quando o CI original foi um push.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
