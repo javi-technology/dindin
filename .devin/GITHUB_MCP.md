@@ -353,7 +353,25 @@ Para uma nova tarefa vinculada à issue #42:
 
 ---
 
-## 6. Validação realizada
+## 6. Mantendo este manual atualizado
+
+Se durante o uso do GitHub MCP forem identificadas:
+
+- Novas ferramentas disponíveis no servidor.
+- Comportamentos diferentes dos documentados aqui.
+- Erros, limitações ou opções de parâmetros não descritos.
+
+O assistente deve:
+
+1. Listar as ferramentas atuais do servidor com `mcp_list_tools`.
+2. Testar a ferramenta ou comportamento em questão.
+3. Atualizar este arquivo (`GITHUB_MCP.md`) para refletir o estado real do MCP.
+
+A ideia é que este manual seja um documento vivo: toda vez que algo mudar no servidor, ele deve ser revisado.
+
+---
+
+## 7. Validação realizada
 
 Em 11/07/2026, todas as ferramentas abaixo foram testadas no repositório `javi-technology/dindin`:
 
@@ -372,7 +390,7 @@ Em 11/07/2026, todas as ferramentas abaixo foram testadas no repositório `javi-
 
 ---
 
-## 7. Limitações conhecidas
+## 8. Limitações conhecidas
 
 - Nem todas as operações do GitHub estão disponíveis (ex.: merge de PR, criação de releases, gerenciamento de projects, exclusão de branches).
 - Operações que exigem permissões elevadas podem falhar se o token do MCP não tiver escopo suficiente.
@@ -381,7 +399,7 @@ Em 11/07/2026, todas as ferramentas abaixo foram testadas no repositório `javi-
 
 ---
 
-## 8. Referências
+## 9. Referências
 
 - Documentação oficial da API do GitHub: https://docs.github.com/pt/rest
 - Repositório do projeto DinDin: https://github.com/javi-technology/dindin

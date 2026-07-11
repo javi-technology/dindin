@@ -34,9 +34,9 @@ Retorna a lista de tópicos e páginas disponíveis na wiki do repositório.
 
 Parâmetros:
 
-| Campo    | Descrição                                  | Obrigatório |
-| -------- | ------------------------------------------ | ----------- |
-| `repoName` | Repositório no formato `owner/repo`        | Sim         |
+| Campo      | Descrição                           | Obrigatório |
+| ---------- | ----------------------------------- | ----------- |
+| `repoName` | Repositório no formato `owner/repo` | Sim         |
 
 **Exemplo:**
 
@@ -74,9 +74,9 @@ Retorna o conteúdo completo da wiki de um repositório.
 
 Parâmetros:
 
-| Campo    | Descrição                                  | Obrigatório |
-| -------- | ------------------------------------------ | ----------- |
-| `repoName` | Repositório no formato `owner/repo`        | Sim         |
+| Campo      | Descrição                           | Obrigatório |
+| ---------- | ----------------------------------- | ----------- |
+| `repoName` | Repositório no formato `owner/repo` | Sim         |
 
 **Exemplo:**
 
@@ -103,10 +103,10 @@ Faz uma pergunta específica sobre o repositório e recebe uma resposta fundamen
 
 Parâmetros:
 
-| Campo      | Descrição                                                            | Obrigatório |
-| ---------- | -------------------------------------------------------------------- | ----------- |
+| Campo      | Descrição                                                              | Obrigatório |
+| ---------- | ---------------------------------------------------------------------- | ----------- |
 | `repoName` | Repositório no formato `owner/repo` ou array de repositórios (máx. 10) | Sim         |
-| `question` | Pergunta em inglês ou português sobre o repositório                  | Sim         |
+| `question` | Pergunta em inglês ou português sobre o repositório                    | Sim         |
 
 **Exemplo:**
 
@@ -165,11 +165,11 @@ Em 11/07/2026, as ferramentas do DeepWiki MCP foram testadas:
 
 ### Repositório `javi-technology/dindin`
 
-| Tool                 | Status | Observação                                      |
-| -------------------- | ------ | ----------------------------------------------- |
-| `read_wiki_structure` | ⚠️ N/A | Repositório não indexado no DeepWiki.           |
-| `read_wiki_contents`  | ⚠️ N/A | Repositório não indexado no DeepWiki.           |
-| `ask_question`        | ⚠️ N/A | Repositório não indexado no DeepWiki.           |
+| Tool                  | Status | Observação                            |
+| --------------------- | ------ | ------------------------------------- |
+| `read_wiki_structure` | ⚠️ N/A | Repositório não indexado no DeepWiki. |
+| `read_wiki_contents`  | ⚠️ N/A | Repositório não indexado no DeepWiki. |
+| `ask_question`        | ⚠️ N/A | Repositório não indexado no DeepWiki. |
 
 **Mensagem de erro:**
 
@@ -180,11 +180,11 @@ Visit https://deepwiki.com/javi-technology/dindin to index it.
 
 ### Repositório `facebook/react` (referência)
 
-| Tool                 | Status | Observação                                      |
-| -------------------- | ------ | ----------------------------------------------- |
-| `read_wiki_structure` | ✅ OK  | Estrutura de tópicos retornada corretamente.     |
-| `read_wiki_contents`  | ✅ OK  | Conteúdo completo da wiki retornado.            |
-| `ask_question`        | ✅ OK  | Resposta fundamentada no código-fonte.          |
+| Tool                  | Status | Observação                                   |
+| --------------------- | ------ | -------------------------------------------- |
+| `read_wiki_structure` | ✅ OK  | Estrutura de tópicos retornada corretamente. |
+| `read_wiki_contents`  | ✅ OK  | Conteúdo completo da wiki retornado.         |
+| `ask_question`        | ✅ OK  | Resposta fundamentada no código-fonte.       |
 
 ---
 
@@ -198,7 +198,25 @@ Visit https://deepwiki.com/javi-technology/dindin to index it.
 
 ---
 
-## 8. Limitações conhecidas
+## 8. Mantendo este manual atualizado
+
+Se durante o uso do DeepWiki MCP forem identificadas:
+
+- Novas ferramentas disponíveis no servidor.
+- Comportamentos diferentes dos documentados aqui.
+- Mudanças no processo de indexação, erros inesperados ou limitações não descritas.
+
+O assistente deve:
+
+1. Listar as ferramentas atuais do servidor com `mcp_list_tools`.
+2. Testar a ferramenta ou comportamento em questão (se possível).
+3. Atualizar este arquivo (`DEEPWIKI_MCP.md`) para refletir o estado real do MCP.
+
+A ideia é que este manual seja um documento vivo: toda vez que algo mudar no servidor ou no processo de indexação, ele deve ser revisado.
+
+---
+
+## 9. Limitações conhecidas
 
 - O repositório precisa estar previamente indexado no DeepWiki.
 - Não é possível indexar repositórios diretamente pelo MCP; a indexação é feita pelo site do DeepWiki.
@@ -207,7 +225,7 @@ Visit https://deepwiki.com/javi-technology/dindin to index it.
 
 ---
 
-## 9. Referências
+## 10. Referências
 
 - Site DeepWiki: https://deepwiki.com
 - Indexação do DinDin: https://deepwiki.com/javi-technology/dindin
