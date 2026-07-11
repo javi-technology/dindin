@@ -117,4 +117,4 @@ jobs:
       # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
       # gerenciados separadamente para evitar alterações acidentais de segurança.
       - name: Deploy to Firebase
-        run: npx firebase deploy --only hosting,functions --project dindin-4e720 --force --debug 2>&1 | grep -E "Error|error|Failed|failed|firebase-functions|functions.yaml|Serving at|Cannot find|MODULE_NOT_FOUND" || true
+        run: npx firebase deploy --only hosting,functions --project dindin-4e720
