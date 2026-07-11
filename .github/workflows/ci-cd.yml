@@ -1,0 +1,121 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test-api:
+    name: Build and Test API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run api:build
+
+      - name: Test API
+        run: npm run test --workspace=apps/api
+
+  build-and-test-web:
+    name: Build and Test Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web
+        run: npm run web:build
+
+      - name: Test Web
+        run: npm run test --workspace=apps/web -- --watch=false --browsers=ChromeHeadless --no-progress
+
+      # Sobe o artefato compilado do Angular para ser reutilizado pelo deploy,
+      # evitando rebuild desnecessário. Executado apenas em push na main.
+      - name: Upload Web artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/dindin-web
+          retention-days: 3
+
+  deploy:
+    name: Deploy to Firebase
+    needs:
+      - build-and-test-api
+      - build-and-test-web
+    # Executa apenas em push direto na main, após CI passar.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # Instala as dependências da raiz (firebase-tools) e dos workspaces.
+        # As Cloud Functions são rebuildadas pelo Firebase CLI a partir do source;
+        # apenas o artefato do frontend é reutilizado do job de build.
+        run: npm ci
+
+      # Reutiliza o artefato do frontend compilado no job build-and-test-web,
+      # evitando rebuild desnecessário no deploy.
+      - name: Download Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/dindin-web
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
+      # gerenciados separadamente para evitar alterações acidentais de segurança.
+      - name: Deploy to Firebase
+        run: npx firebase deploy --only hosting,functions --project dindin-4e720
