@@ -313,4 +313,36 @@
       </div>
     </div>
   }
+
+  @if (deleteConfirmPosition()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      data-testid="delete-confirm-modal"
+    >
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Confirmar exclusão</h2>
+        <p class="text-gray-600 mb-6">
+          Tem certeza que deseja remover
+          <strong>{{ deleteConfirmPosition()?.ticker }}</strong>
+          da carteira?
+        </p>
+        <div class="flex justify-end gap-3">
+          <button
+            type="button"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+            (click)="cancelDelete()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700"
+            (click)="confirmDelete()"
+          >
+            Remover
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </main>

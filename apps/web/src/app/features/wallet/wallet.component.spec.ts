@@ -65,7 +65,6 @@ describe('WalletComponent', () => {
 
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
-    spyOn(window, 'confirm').and.returnValue(true);
 
     await TestBed.configureTestingModule({
       imports: [WalletComponent],
@@ -167,7 +166,22 @@ describe('WalletComponent', () => {
     expect(tickerInput.value).toBe('HGLG11');
   });
 
-  it('deve chamar serviço de exclusão ao confirmar remoção', fakeAsync(() => {
+  it('deve abrir modal de confirmação ao clicar em remover', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const deleteButton = compiled.querySelector(
+      '[data-testid="btn-remover-0"]',
+    ) as HTMLButtonElement;
+    deleteButton.click();
+    fixture.detectChanges();
+
+    const modal = compiled.querySelector(
+      '[data-testid="delete-confirm-modal"]',
+    );
+    expect(modal).toBeTruthy();
+    expect(modal?.textContent).toContain('HGLG11');
+  });
+
+  it('deve chamar serviço de exclusão ao confirmar remoção no modal', fakeAsync(() => {
     positionServiceMock.delete.and.returnValue(of(undefined));
     positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
@@ -176,6 +190,13 @@ describe('WalletComponent', () => {
       '[data-testid="btn-remover-0"]',
     ) as HTMLButtonElement;
     deleteButton.click();
+    tick();
+    fixture.detectChanges();
+
+    const confirmButton = compiled.querySelector(
+      '[data-testid="delete-confirm-modal"] button.bg-red-600',
+    ) as HTMLButtonElement;
+    confirmButton.click();
     tick();
     fixture.detectChanges();
 

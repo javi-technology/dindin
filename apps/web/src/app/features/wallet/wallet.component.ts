@@ -43,6 +43,7 @@ export class WalletComponent implements OnInit {
   editingPosition = signal<Position | null>(null);
   formVisible = signal(false);
   formError = signal<string | null>(null);
+  deleteConfirmPosition = signal<Position | null>(null);
 
   form: FormGroup = this.fb.group({
     ticker: ['', [Validators.required]],
@@ -237,15 +238,25 @@ export class WalletComponent implements OnInit {
   }
 
   deletePosition(position: Position): void {
-    const wallet = this.selectedWallet();
-    if (!wallet) return;
+    this.deleteConfirmPosition.set(position);
+  }
 
-    if (!confirm(`Remover ${position.ticker} da carteira?`)) return;
+  confirmDelete(): void {
+    const position = this.deleteConfirmPosition();
+    const wallet = this.selectedWallet();
+    if (!position || !wallet) return;
 
     this.positionService.delete(wallet.id, position.id).subscribe({
-      next: () => this.loadPositions(wallet.id),
+      next: () => {
+        this.deleteConfirmPosition.set(null);
+        this.loadPositions(wallet.id);
+      },
       error: () => this.error.set('Erro ao remover posição.'),
     });
+  }
+
+  cancelDelete(): void {
+    this.deleteConfirmPosition.set(null);
   }
 
   formatCurrency(value: number): string {
