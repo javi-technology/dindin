@@ -32,11 +32,11 @@ Todo desenvolvimento segue obrigatoriamente o ciclo TDD. Não há exceção.
 
 ### Estrutura de testes
 
-| Camada   | Ferramenta                | Localização                 |
-| -------- | ------------------------- | --------------------------- |
-| API      | Jest                      | `apps/api/src/**/*.spec.ts` |
-| Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts` |
-| E2E      | (a definir)               | -                           |
+| Camada   | Ferramenta                | Localização                   |
+| -------- | ------------------------- | ----------------------------- |
+| API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
+| Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
+| E2E      | (a definir)               | -                             |
 
 ### Comandos de teste
 
@@ -192,7 +192,8 @@ dindin/
 │               ├── features/   # wallet, fridge, dashboard (um módulo por feature)
 │               └── shared/     # componentes, pipes e utilitários reutilizáveis
 ├── packages/
-│   └── shared-types/     # Interfaces TypeScript compartilhadas entre web e api
+│   ├── models/           # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
+│   └── shared-types/     # Outros tipos compartilhados entre web e api (ex: HealthResponse)
 ├── firebase.json
 ├── firestore.rules
 ├── firestore.indexes.json
