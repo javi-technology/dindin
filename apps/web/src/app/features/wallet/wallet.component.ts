@@ -9,11 +9,24 @@ import {
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { Wallet, Position, AssetType } from 'dindin-models';
+import {
+  LucideWallet,
+  LucidePlus,
+  LucidePencil,
+  LucideTrash2,
+} from '@lucide/angular';
 
 @Component({
   selector: 'app-wallet',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    LucideWallet,
+    LucidePlus,
+    LucidePencil,
+    LucideTrash2,
+  ],
   templateUrl: './wallet.component.html',
 })
 export class WalletComponent implements OnInit {

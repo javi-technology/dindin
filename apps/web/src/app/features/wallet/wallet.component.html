@@ -50,9 +50,10 @@
             </p>
             <button
               data-testid="btn-criar-carteira"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
               (click)="createDefaultWallet()"
             >
+              <svg lucideWallet [size]="18" class="mr-2"></svg>
               Criar carteira padrão
             </button>
           </div>
@@ -62,9 +63,10 @@
           <div class="flex justify-end mb-4">
             <button
               data-testid="btn-adicionar"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
               (click)="openForm()"
             >
+              <svg lucidePlus [size]="18" class="mr-2"></svg>
               Adicionar posição
             </button>
           </div>
@@ -123,16 +125,18 @@
                     <td class="py-3 px-4 text-right">
                       <button
                         [attr.data-testid]="'btn-editar-' + i"
-                        class="text-blue-600 hover:text-blue-800 font-medium text-sm mr-3"
+                        class="text-blue-600 hover:text-blue-800 font-medium text-sm mr-3 inline-flex items-center"
                         (click)="openForm(position)"
                       >
+                        <svg lucidePencil [size]="14" class="mr-1"></svg>
                         Editar
                       </button>
                       <button
                         [attr.data-testid]="'btn-remover-' + i"
-                        class="text-red-600 hover:text-red-800 font-medium text-sm"
+                        class="text-red-600 hover:text-red-800 font-medium text-sm inline-flex items-center"
                         (click)="deletePosition(position)"
                       >
+                        <svg lucideTrash2 [size]="14" class="mr-1"></svg>
                         Remover
                       </button>
                     </td>
@@ -169,7 +173,7 @@
         data-testid="position-form"
       >
         <h2 class="text-xl font-bold text-gray-900 mb-4">
-          {{ editingPosition() ? "Editar posição" : "Adicionar posição" }}
+          {{ editingPosition() ? 'Editar posição' : 'Adicionar posição' }}
         </h2>
 
         @if (formError()) {
@@ -198,7 +202,7 @@
               "
               placeholder="HGLG11"
             />
-            @if (form.get("ticker")?.invalid && form.get("ticker")?.touched) {
+            @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
               <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
             }
           </div>
@@ -239,7 +243,7 @@
               "
             />
             @if (
-              form.get("quantity")?.invalid && form.get("quantity")?.touched
+              form.get('quantity')?.invalid && form.get('quantity')?.touched
             ) {
               <p class="text-red-600 text-xs mt-1">
                 Quantidade deve ser maior que zero.
@@ -265,8 +269,8 @@
               "
             />
             @if (
-              form.get("averagePrice")?.invalid &&
-              form.get("averagePrice")?.touched
+              form.get('averagePrice')?.invalid &&
+              form.get('averagePrice')?.touched
             ) {
               <p class="text-red-600 text-xs mt-1">
                 Preço médio deve ser maior ou igual a zero.
