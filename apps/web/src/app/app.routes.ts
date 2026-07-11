@@ -3,6 +3,7 @@ import { authGuard } from './core/guards/auth.guard';
 import { loginGuard } from './core/guards/login.guard';
 import { LoginComponent } from './features/login/login.component';
 import { HomeComponent } from './features/home/home.component';
+import { WalletComponent } from './features/wallet/wallet.component';
 
 export const routes: Routes = [
   {
@@ -14,6 +15,11 @@ export const routes: Routes = [
     path: '',
     canActivate: [authGuard],
     component: HomeComponent,
+  },
+  {
+    path: 'carteira',
+    canActivate: [authGuard],
+    component: WalletComponent,
   },
   { path: '**', redirectTo: '' },
 ];
