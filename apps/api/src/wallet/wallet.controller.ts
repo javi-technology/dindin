@@ -1,7 +1,7 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import * as admin from "firebase-admin";
 import { Wallet } from "dindin-models";
-import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { AuthRequest } from "../middleware/auth.middleware";
 
 // Códigos de moeda ISO 4217 aceitos pela aplicação.
 // Ampliar conforme necessário.
@@ -26,12 +26,14 @@ function walletsCollection(userId: string) {
     .collection("wallets");
 }
 
-export async function listWallets(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
+/** Retorna o uid do usuário autenticado. O authMiddleware garante que sempre está presente. */
+function uid(req: Request): string {
+  return (req as AuthRequest).user!.uid;
+}
+
+export async function listWallets(req: Request, res: Response): Promise<void> {
   try {
-    const snapshot = await walletsCollection(req.user.uid).get();
+    const snapshot = await walletsCollection(uid(req)).get();
     const wallets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     res.json(wallets);
   } catch {
@@ -39,10 +41,7 @@ export async function listWallets(
   }
 }
 
-export async function createWallet(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
+export async function createWallet(req: Request, res: Response): Promise<void> {
   try {
     const { name, description, currency } = req.body as Partial<Wallet>;
 
@@ -60,7 +59,7 @@ export async function createWallet(
 
     const now = new Date().toISOString();
     const walletData: Omit<Wallet, "id"> = {
-      ownerId: req.user.uid,
+      ownerId: uid(req),
       name,
       description: description ?? "",
       currency,
@@ -68,20 +67,17 @@ export async function createWallet(
       updatedAt: now,
     };
 
-    const docRef = await walletsCollection(req.user.uid).add(walletData);
+    const docRef = await walletsCollection(uid(req)).add(walletData);
     res.status(201).json({ id: docRef.id, ...walletData });
   } catch {
     res.status(500).json({ error: "Internal server error" });
   }
 }
 
-export async function getWallet(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
+export async function getWallet(req: Request, res: Response): Promise<void> {
   try {
     const walletId = req.params.id;
-    const doc = await walletsCollection(req.user.uid).doc(walletId).get();
+    const doc = await walletsCollection(uid(req)).doc(walletId).get();
 
     if (!doc.exists) {
       res.status(404).json({ error: "Wallet not found" });
@@ -94,13 +90,10 @@ export async function getWallet(
   }
 }
 
-export async function updateWallet(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
+export async function updateWallet(req: Request, res: Response): Promise<void> {
   try {
     const walletId = req.params.id;
-    const walletRef = walletsCollection(req.user.uid).doc(walletId);
+    const walletRef = walletsCollection(uid(req)).doc(walletId);
     const doc = await walletRef.get();
 
     if (!doc.exists) {
@@ -136,13 +129,10 @@ export async function updateWallet(
   }
 }
 
-export async function deleteWallet(
-  req: AuthenticatedRequest,
-  res: Response,
-): Promise<void> {
+export async function deleteWallet(req: Request, res: Response): Promise<void> {
   try {
     const walletId = req.params.id;
-    const walletRef = walletsCollection(req.user.uid).doc(walletId);
+    const walletRef = walletsCollection(uid(req)).doc(walletId);
     const doc = await walletRef.get();
 
     if (!doc.exists) {
@@ -150,7 +140,7 @@ export async function deleteWallet(
       return;
     }
 
-    // TODO(#10): remover sub-coleção positions/{positionId} antes de deletar a carteira
+    // TODO(#10): remover sub-coleção positions/{positionId} antes de deletar a carteira.
     // O Firestore não apaga documentos filhos automaticamente; use batch delete ou
     // uma Cloud Function acionada por onDelete para evitar dados órfãos.
     await walletRef.delete();
