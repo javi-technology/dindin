@@ -5,8 +5,8 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.spec.ts'],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
-  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts']
+  collectCoverageFrom: ['src/**/*.ts', '!src/index.ts'],
 };

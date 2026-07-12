@@ -8,6 +8,6 @@ export const environment = {
     apiKey: 'local-emulator-key',
     authDomain: 'dindin-4e720.firebaseapp.com',
     messagingSenderId: '000000000000',
-    measurementId: 'G-0000000000'
-  }
+    measurementId: 'G-0000000000',
+  },
 };

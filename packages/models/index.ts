@@ -19,10 +19,10 @@ export interface User {
 /** Carteira de investimentos — subcoleção `wallets` */
 export interface Wallet {
   id: string;
-  ownerId: string;       // users/{userId}
+  ownerId: string; // users/{userId}
   name: string;
   description?: string;
-  currency: string;      // ex: "BRL"
+  currency: string; // ex: "BRL"
   createdAt: string;
   updatedAt: string;
 }
@@ -33,11 +33,11 @@ export type AssetType = 'FII' | 'STOCK' | 'ETF' | 'REIT' | 'OTHER';
 /** Posição de um ativo na carteira — subcoleção `positions` */
 export interface Position {
   id: string;
-  walletId: string;      // wallets/{walletId}
-  ticker: string;        // ex: "HGLG11"
+  walletId: string; // wallets/{walletId}
+  ticker: string; // ex: "HGLG11"
   assetType: AssetType;
   quantity: number;
-  averagePrice: number;  // preço médio de compra (BRL)
+  averagePrice: number; // preço médio de compra (BRL)
   currentPrice?: number; // último preço conhecido
   sector?: string;
   notes?: string;
@@ -48,7 +48,7 @@ export interface Position {
 /** Geladeira (watchlist de oportunidades) — subcoleção `fridges` */
 export interface Fridge {
   id: string;
-  ownerId: string;       // users/{userId}
+  ownerId: string; // users/{userId}
   name: string;
   description?: string;
   createdAt: string;
@@ -58,10 +58,10 @@ export interface Fridge {
 /** Item na geladeira — subcoleção `fridgeItems` */
 export interface FridgeItem {
   id: string;
-  fridgeId: string;      // fridges/{fridgeId}
+  fridgeId: string; // fridges/{fridgeId}
   ticker: string;
   assetType: AssetType;
-  targetPrice?: number;  // preço-alvo para compra
+  targetPrice?: number; // preço-alvo para compra
   currentPrice?: number;
   notes?: string;
   createdAt: string;

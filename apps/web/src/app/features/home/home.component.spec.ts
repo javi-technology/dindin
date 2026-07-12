@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { HealthService } from '../../core/services/health.service';
@@ -12,7 +13,10 @@ describe('HomeComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
-      providers: [{ provide: HealthService, useValue: healthServiceMock }],
+      providers: [
+        provideRouter([]),
+        { provide: HealthService, useValue: healthServiceMock },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(HomeComponent);

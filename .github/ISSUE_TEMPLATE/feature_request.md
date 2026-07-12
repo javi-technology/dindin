@@ -1,9 +1,9 @@
 ---
 name: Solicitação de Funcionalidade
 about: Sugira uma ideia para este projeto
-title: "[Feature] - "
-labels: "enhancement"
-assignees: ""
+title: '[Feature] - '
+labels: 'enhancement'
+assignees: ''
 ---
 
 **Contexto:**
