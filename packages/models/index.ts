@@ -60,9 +60,11 @@ export interface FridgeItem {
   id: string;
   fridgeId: string; // fridges/{fridgeId}
   ticker: string;
-  assetType: AssetType;
-  targetPrice?: number; // preço-alvo para compra
+  quantity: number;
+  transferredPrice: number; // preço de transferência (quando saiu da carteira)
+  targetPrice: number; // preço-alvo para voltar à carteira
   currentPrice?: number;
+  assetType?: AssetType;
   notes?: string;
   createdAt: string;
   updatedAt: string;
