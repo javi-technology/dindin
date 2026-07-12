@@ -33,11 +33,16 @@ function uid(req: Request): string {
 
 export async function listWallets(req: Request, res: Response): Promise<void> {
   try {
-    const snapshot = await walletsCollection(uid(req)).get();
+    const userId = uid(req);
+    const snapshot = await walletsCollection(userId).get();
     const wallets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     res.json(wallets);
   } catch (error) {
-    console.error('[listWallets] error:', error);
+    console.error('[listWallets] error:', {
+      uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -71,7 +76,12 @@ export async function createWallet(req: Request, res: Response): Promise<void> {
     const docRef = await walletsCollection(uid(req)).add(walletData);
     res.status(201).json({ id: docRef.id, ...walletData });
   } catch (error) {
-    console.error('[createWallet] error:', error);
+    console.error('[createWallet] error:', {
+      uid: uid(req),
+      body: req.body,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -88,7 +98,12 @@ export async function getWallet(req: Request, res: Response): Promise<void> {
 
     res.json({ id: doc.id, ...doc.data() });
   } catch (error) {
-    console.error('[getWallet] error:', error);
+    console.error('[getWallet] error:', {
+      uid: uid(req),
+      walletId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -128,7 +143,13 @@ export async function updateWallet(req: Request, res: Response): Promise<void> {
     const updatedWallet = { id: walletId, ...doc.data(), ...updates };
     res.json(updatedWallet);
   } catch (error) {
-    console.error('[updateWallet] error:', error);
+    console.error('[updateWallet] error:', {
+      uid: uid(req),
+      walletId: req.params.id,
+      body: req.body,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -150,7 +171,12 @@ export async function deleteWallet(req: Request, res: Response): Promise<void> {
     await walletRef.delete();
     res.status(204).send();
   } catch (error) {
-    console.error('[deleteWallet] error:', error);
+    console.error('[deleteWallet] error:', {
+      uid: uid(req),
+      walletId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }

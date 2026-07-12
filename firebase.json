@@ -12,6 +12,17 @@
   "hosting": {
     "public": "apps/web/dist/dindin-web/browser",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/**",

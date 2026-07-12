@@ -107,7 +107,12 @@ export async function listPositions(
     }));
     res.json(positions);
   } catch (error) {
-    console.error('[listPositions] error:', error);
+    console.error('[listPositions] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -146,7 +151,13 @@ export async function createPosition(
     );
     res.status(201).json({ id: docRef.id, ...positionData });
   } catch (error) {
-    console.error('[createPosition] error:', error);
+    console.error('[createPosition] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      body: req.body,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -163,7 +174,13 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
 
     res.json({ id: doc.id, ...doc.data() });
   } catch (error) {
-    console.error('[getPosition] error:', error);
+    console.error('[getPosition] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      positionId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -207,7 +224,14 @@ export async function updatePosition(
     const updatedPosition = { id, ...doc.data(), ...updates };
     res.json(updatedPosition);
   } catch (error) {
-    console.error('[updatePosition] error:', error);
+    console.error('[updatePosition] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      positionId: req.params.id,
+      body: req.body,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -229,7 +253,13 @@ export async function deletePosition(
     await positionRef.delete();
     res.status(204).send();
   } catch (error) {
-    console.error('[deletePosition] error:', error);
+    console.error('[deletePosition] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      positionId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
