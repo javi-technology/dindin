@@ -157,21 +157,33 @@ function createFirestoreMock(
           doc: jest.fn((uid: string) => ({
             collection: jest.fn((subPath: string) => {
               if (subPath === 'fridges' && uid === 'user-123') {
-                return {
-                  doc: jest.fn((fridgeId: string) => ({
+                // Combina operações de fridge + navegação para items
+                const fridgeDoc = (fridgeId: string) => {
+                  const base = fridgeMap.has(fridgeId)
+                    ? fridgeMap.get(fridgeId)
+                    : {
+                        id: fridgeId,
+                        exists: false,
+                        data: () => null,
+                        get: jest.fn().mockResolvedValue({ id: fridgeId, exists: false, data: () => null }),
+                        set: jest.fn().mockResolvedValue(undefined),
+                        update: jest.fn().mockRejectedValue(new Error('Document does not exist')),
+                        delete: jest.fn().mockRejectedValue(new Error('Document does not exist')),
+                      };
+                  return {
+                    ...base,
                     collection: jest.fn((itemPath: string) => {
-                      if (
-                        itemPath === 'fridgeItems' &&
-                        fridgeId === 'fridge-1'
-                      ) {
+                      if (itemPath === 'fridgeItems' && fridgeId === 'fridge-1') {
                         return itemsCollection;
                       }
-                      throw new Error(
-                        `Unexpected subcollection: ${itemPath}`,
-                      );
+                      throw new Error(`Unexpected subcollection: ${itemPath}`);
                     }),
-                  })),
-                  ...fridgesCollection,
+                  };
+                };
+                return {
+                  doc: jest.fn((id: string) => fridgeDoc(id)),
+                  add: fridgesCollection.add,
+                  get: fridgesCollection.get,
                 };
               }
               throw new Error(`Unexpected subcollection: ${subPath}`);

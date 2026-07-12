@@ -16,6 +16,18 @@ import {
   listPositions,
   updatePosition,
 } from './wallet/position.controller';
+import {
+  createFridge,
+  deleteFridge,
+  getFridge,
+  listFridges,
+  updateFridge,
+  createItem,
+  deleteItem,
+  getItem,
+  listItems,
+  updateItem,
+} from './wallet/fridge.controller';
 
 admin.initializeApp();
 
@@ -61,6 +73,18 @@ app.post('/api/wallets/:walletId/positions', createPosition);
 app.get('/api/wallets/:walletId/positions/:id', getPosition);
 app.put('/api/wallets/:walletId/positions/:id', updatePosition);
 app.delete('/api/wallets/:walletId/positions/:id', deletePosition);
+
+app.get('/api/fridges', listFridges);
+app.post('/api/fridges', createFridge);
+app.get('/api/fridges/:id', getFridge);
+app.put('/api/fridges/:id', updateFridge);
+app.delete('/api/fridges/:id', deleteFridge);
+
+app.get('/api/fridges/:fridgeId/items', listItems);
+app.post('/api/fridges/:fridgeId/items', createItem);
+app.get('/api/fridges/:fridgeId/items/:id', getItem);
+app.put('/api/fridges/:fridgeId/items/:id', updateItem);
+app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
 
 // Middleware global de tratamento de erros não capturados
 app.use(
