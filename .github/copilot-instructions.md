@@ -158,3 +158,7 @@ rtk discover          # Find missed rtk opportunities
 rtk proxy <cmd>       # Run raw (no filtering) but track usage
 ```
 <!-- /rtk-instructions -->
+
+## Idioma do Agente
+
+- **Sempre responder em português do Brasil (pt-BR)**. Todas as interações, explicações e comentários devem ser feitos neste idioma.
