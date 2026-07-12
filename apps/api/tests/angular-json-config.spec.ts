@@ -16,14 +16,13 @@ describe('apps/web/angular.json – fileReplacements de produção', () => {
 
   it('deve ter fileReplacements na configuração de produção', () => {
     const angularJson = readAngularJson();
-    const production =
+    const production = (
       (
-        (
-          (angularJson.projects as Record<string, unknown>)?.[
-            'dindin-web'
-          ] as Record<string, unknown>
-        )?.architect as Record<string, unknown>
-      )?.build as Record<string, unknown>;
+        (angularJson.projects as Record<string, unknown>)?.[
+          'dindin-web'
+        ] as Record<string, unknown>
+      )?.architect as Record<string, unknown>
+    )?.build as Record<string, unknown>;
     const configurations = production?.configurations as Record<
       string,
       unknown

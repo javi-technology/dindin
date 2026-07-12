@@ -21,6 +21,7 @@ Todo desenvolvimento segue TDD. Não há exceção.
 3. **REFACTOR** — Refatorar sem quebrar os testes.
 
 Regras:
+
 - Nunca escrever código de produção antes de ter um teste falhando.
 - Nunca escrever mais código do que o necessário para o teste passar.
 - Testes mantidos junto ao código que testam (co-location).
@@ -60,6 +61,7 @@ git checkout -b issue-<numero_issue>
 Tipos: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`, `style`.
 
 Exemplos:
+
 ```
 feat(#12): adiciona endpoint GET /api/wallet
 test(#12): adiciona testes do endpoint GET /api/wallet
@@ -67,6 +69,7 @@ fix(#15): corrige cálculo de total da carteira
 ```
 
 Regras:
+
 - Descrição em português, no imperativo ("adiciona", "corrige", "remove").
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
@@ -132,6 +135,7 @@ packages/
 - Em produção, considerar logger estruturado.
 
 <!-- rtk-instructions v2 -->
+
 # RTK — Token-Optimized CLI
 
 **rtk** is a CLI proxy that filters and compresses command outputs, saving 60-90% tokens.
@@ -157,6 +161,7 @@ rtk gain --history    # Per-command savings history
 rtk discover          # Find missed rtk opportunities
 rtk proxy <cmd>       # Run raw (no filtering) but track usage
 ```
+
 <!-- /rtk-instructions -->
 
 ## Idioma do Agente
