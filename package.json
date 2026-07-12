@@ -11,7 +11,7 @@
     "web:build": "npm run build --workspace=apps/web",
     "api:build": "npm run build --workspace=apps/api",
     "api:serve": "npm run serve --workspace=apps/api",
-    "emulators": "npm run api:build && npm run web:build && firebase emulators:start",
+    "emulators": "npm run api:build && npm run build --workspace=apps/web -- --configuration development && firebase emulators:start",
     "deploy": "firebase deploy",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
