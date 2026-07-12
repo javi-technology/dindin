@@ -30,6 +30,10 @@ function createFridgeItemSnapshot(item: FridgeItem) {
     id: item.id,
     exists: true,
     data: () => ({ ...item }),
+    ref: {
+      id: item.id,
+      path: `users/user-123/fridges/${item.fridgeId}/fridgeItems/${item.id}`,
+    },
   };
 }
 
@@ -145,6 +149,11 @@ function createFirestoreMock(fridges: Fridge[] = [], items: FridgeItem[] = []) {
     get: jest.fn().mockResolvedValue(getItemsSnapshot()),
   };
 
+  const batchMock = {
+    delete: jest.fn().mockReturnThis(),
+    commit: jest.fn().mockResolvedValue(undefined),
+  };
+
   return {
     collection: jest.fn((path: string) => {
       if (path === 'users') {
@@ -160,13 +169,11 @@ function createFirestoreMock(fridges: Fridge[] = [], items: FridgeItem[] = []) {
                         id: fridgeId,
                         exists: false,
                         data: () => null,
-                        get: jest
-                          .fn()
-                          .mockResolvedValue({
-                            id: fridgeId,
-                            exists: false,
-                            data: () => null,
-                          }),
+                        get: jest.fn().mockResolvedValue({
+                          id: fridgeId,
+                          exists: false,
+                          data: () => null,
+                        }),
                         set: jest.fn().mockResolvedValue(undefined),
                         update: jest
                           .fn()
@@ -205,6 +212,7 @@ function createFirestoreMock(fridges: Fridge[] = [], items: FridgeItem[] = []) {
       }
       throw new Error(`Unexpected collection: ${path}`);
     }),
+    batch: jest.fn(() => batchMock),
   };
 }
 
@@ -247,6 +255,10 @@ function createFailingFirestoreMock() {
           })),
         })),
       })),
+    })),
+    batch: jest.fn(() => ({
+      delete: jest.fn().mockReturnThis(),
+      commit: jest.fn().mockRejectedValue(new Error('Firestore unavailable')),
     })),
   };
 }
@@ -436,6 +448,33 @@ describe('Fridge CRUD', () => {
       expect(response.status).toBe(204);
     });
 
+    it('deve remover os itens da geladeira em cascata ao deletar', async () => {
+      const item: FridgeItem = {
+        id: 'item-1',
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 5,
+        transferredPrice: 95.0,
+        targetPrice: 110.0,
+        currentPrice: 100.0,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      };
+      firestoreMock = createFirestoreMock([baseFridge], [item]);
+
+      const response = await request(app)
+        .delete('/api/fridges/fridge-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+      // O batch deve ter sido chamado para deletar itens + a geladeira
+      const batch = (firestoreMock as any).batch();
+      expect(batch.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'item-1' }),
+      );
+      expect(batch.commit).toHaveBeenCalled();
+    });
+
     it('deve retornar 404 para geladeira inexistente', async () => {
       firestoreMock = createFirestoreMock([]);
 
@@ -461,6 +500,14 @@ describe('Fridge CRUD', () => {
 
 describe('FridgeItem CRUD', () => {
   const authHeader = 'Bearer valid-token';
+  const baseFridge: Fridge = {
+    id: 'fridge-1',
+    ownerId: 'user-123',
+    name: 'Geladeira Principal',
+    description: 'FIIs aguardando valorização',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
   const baseItem: FridgeItem = {
     id: 'item-1',
     fridgeId: 'fridge-1',
@@ -480,7 +527,7 @@ describe('FridgeItem CRUD', () => {
 
   describe('GET /api/fridges/:fridgeId/items', () => {
     it('deve listar os itens de uma geladeira', async () => {
-      firestoreMock = createFirestoreMock([], [baseItem]);
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
 
       const response = await request(app)
         .get('/api/fridges/fridge-1/items')
@@ -491,11 +538,22 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 401 sem token de autenticação', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app).get('/api/fridges/fridge-1/items');
 
       expect(response.status).toBe(401);
+    });
+
+    it('deve retornar 404 quando a geladeira não existe', async () => {
+      firestoreMock = createFirestoreMock([], [baseItem]);
+
+      const response = await request(app)
+        .get('/api/fridges/fridge-inexistente/items')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Fridge not found');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -512,7 +570,7 @@ describe('FridgeItem CRUD', () => {
 
   describe('POST /api/fridges/:fridgeId/items', () => {
     it('deve criar um item com dados válidos', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -534,7 +592,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve criar um item com currentPrice opcional', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -552,7 +610,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 400 quando ticker não é informado', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -563,7 +621,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 400 quando quantity não é informada', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -574,7 +632,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 400 quando quantity não é um número positivo', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -590,7 +648,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 400 quando transferredPrice não é informado', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -601,7 +659,7 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 400 quando targetPrice não é informado', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .post('/api/fridges/fridge-1/items')
@@ -609,6 +667,23 @@ describe('FridgeItem CRUD', () => {
         .send({ ticker: 'HGLG11', quantity: 5, transferredPrice: 95.0 });
 
       expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 404 quando a geladeira não existe', async () => {
+      firestoreMock = createFirestoreMock([], []);
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-inexistente/items')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          quantity: 5,
+          transferredPrice: 95.0,
+          targetPrice: 110.0,
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Fridge not found');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -631,7 +706,7 @@ describe('FridgeItem CRUD', () => {
 
   describe('GET /api/fridges/:fridgeId/items/:id', () => {
     it('deve retornar um item existente', async () => {
-      firestoreMock = createFirestoreMock([], [baseItem]);
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
 
       const response = await request(app)
         .get('/api/fridges/fridge-1/items/item-1')
@@ -642,13 +717,24 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 404 para item inexistente', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .get('/api/fridges/fridge-1/items/inexistente')
         .set('Authorization', authHeader);
 
       expect(response.status).toBe(404);
+    });
+
+    it('deve retornar 404 quando a geladeira não existe', async () => {
+      firestoreMock = createFirestoreMock([], [baseItem]);
+
+      const response = await request(app)
+        .get('/api/fridges/fridge-inexistente/items/item-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Fridge not found');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -665,7 +751,7 @@ describe('FridgeItem CRUD', () => {
 
   describe('PUT /api/fridges/:fridgeId/items/:id', () => {
     it('deve atualizar um item existente', async () => {
-      firestoreMock = createFirestoreMock([], [baseItem]);
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
 
       const response = await request(app)
         .put('/api/fridges/fridge-1/items/item-1')
@@ -678,8 +764,25 @@ describe('FridgeItem CRUD', () => {
       expect(response.body.id).toBe('item-1');
     });
 
+    it('deve retornar o estado real persistido após atualização', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
+
+      const response = await request(app)
+        .put('/api/fridges/fridge-1/items/item-1')
+        .set('Authorization', authHeader)
+        .send({ quantity: 10, targetPrice: 115.0 });
+
+      expect(response.status).toBe(200);
+      // O estado retornado deve refletir o pós-update, não o pré-update
+      expect(response.body.quantity).toBe(10);
+      expect(response.body.targetPrice).toBe(115.0);
+      // Campos não atualizados devem preservar o valor original
+      expect(response.body.ticker).toBe('HGLG11');
+      expect(response.body.transferredPrice).toBe(95.0);
+    });
+
     it('deve retornar 404 para item inexistente', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .put('/api/fridges/fridge-1/items/inexistente')
@@ -689,13 +792,36 @@ describe('FridgeItem CRUD', () => {
       expect(response.status).toBe(404);
     });
 
-    it('deve retornar 400 para quantity inválida na atualização', async () => {
+    it('deve retornar 404 quando a geladeira não existe', async () => {
       firestoreMock = createFirestoreMock([], [baseItem]);
+
+      const response = await request(app)
+        .put('/api/fridges/fridge-inexistente/items/item-1')
+        .set('Authorization', authHeader)
+        .send({ quantity: 10 });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Fridge not found');
+    });
+
+    it('deve retornar 400 para quantity inválida na atualização', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
 
       const response = await request(app)
         .put('/api/fridges/fridge-1/items/item-1')
         .set('Authorization', authHeader)
         .send({ quantity: -1 });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 quando ticker é apenas espaços na atualização', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
+
+      const response = await request(app)
+        .put('/api/fridges/fridge-1/items/item-1')
+        .set('Authorization', authHeader)
+        .send({ ticker: '   ' });
 
       expect(response.status).toBe(400);
     });
@@ -715,7 +841,7 @@ describe('FridgeItem CRUD', () => {
 
   describe('DELETE /api/fridges/:fridgeId/items/:id', () => {
     it('deve remover um item existente', async () => {
-      firestoreMock = createFirestoreMock([], [baseItem]);
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
 
       const response = await request(app)
         .delete('/api/fridges/fridge-1/items/item-1')
@@ -725,13 +851,24 @@ describe('FridgeItem CRUD', () => {
     });
 
     it('deve retornar 404 para item inexistente', async () => {
-      firestoreMock = createFirestoreMock([], []);
+      firestoreMock = createFirestoreMock([baseFridge], []);
 
       const response = await request(app)
         .delete('/api/fridges/fridge-1/items/inexistente')
         .set('Authorization', authHeader);
 
       expect(response.status).toBe(404);
+    });
+
+    it('deve retornar 404 quando a geladeira não existe', async () => {
+      firestoreMock = createFirestoreMock([], [baseItem]);
+
+      const response = await request(app)
+        .delete('/api/fridges/fridge-inexistente/items/item-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error', 'Fridge not found');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
