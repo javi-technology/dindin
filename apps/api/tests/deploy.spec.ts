@@ -24,6 +24,13 @@ describe('apps/api/package.json – dependências de deploy', () => {
     expect(dependencies).not.toHaveProperty('dindin-models');
   });
 
+  it('não deve declarar dindin-models em devDependencies', () => {
+    const pkg = readApiPackageJson();
+    const devDependencies =
+      (pkg.devDependencies as Record<string, string>) ?? {};
+    expect(devDependencies).not.toHaveProperty('dindin-models');
+  });
+
   it('não deve declarar dindin-shared-types em dependencies', () => {
     const pkg = readApiPackageJson();
     const dependencies = (pkg.dependencies as Record<string, string>) ?? {};
