@@ -21,10 +21,7 @@ function itemsCollection(userId: string, fridgeId: string) {
 
 /* ---------- Fridge CRUD ---------- */
 
-export async function listFridges(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function listFridges(req: Request, res: Response): Promise<void> {
   try {
     const userId = uid(req);
     const snapshot = await fridgesCollection(userId).get();
@@ -43,10 +40,7 @@ export async function listFridges(
   }
 }
 
-export async function createFridge(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function createFridge(req: Request, res: Response): Promise<void> {
   try {
     const { name, description } = req.body as Partial<Fridge>;
 
@@ -99,10 +93,7 @@ export async function getFridge(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function updateFridge(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function updateFridge(req: Request, res: Response): Promise<void> {
   try {
     const fridgeId = req.params.id;
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
@@ -139,10 +130,7 @@ export async function updateFridge(
   }
 }
 
-export async function deleteFridge(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function deleteFridge(req: Request, res: Response): Promise<void> {
   try {
     const fridgeId = req.params.id;
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
@@ -172,7 +160,8 @@ function validateItemBody(
   body: Partial<FridgeItem>,
   allowPartial = false,
 ): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, transferredPrice, targetPrice, currentPrice } = body;
+  const { ticker, quantity, transferredPrice, targetPrice, currentPrice } =
+    body;
 
   if (!allowPartial || ticker !== undefined) {
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
@@ -204,7 +193,8 @@ function validateItemBody(
     ) {
       return {
         valid: false,
-        error: 'Transferred price is required and must be a non-negative number',
+        error:
+          'Transferred price is required and must be a non-negative number',
       };
     }
   }
@@ -257,10 +247,7 @@ export async function listItems(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function createItem(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function createItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId } = req.params;
     const body = req.body as Partial<FridgeItem>;
@@ -323,10 +310,7 @@ export async function getItem(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function updateItem(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function updateItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId, id } = req.params;
     const itemRef = itemsCollection(uid(req), fridgeId).doc(id);
@@ -348,11 +332,14 @@ export async function updateItem(
     const updatedAt = new Date().toISOString();
     const updates: Partial<FridgeItem> & { updatedAt: string } = { updatedAt };
 
-    if (body.ticker !== undefined) updates.ticker = body.ticker.trim().toUpperCase();
+    if (body.ticker !== undefined)
+      updates.ticker = body.ticker.trim().toUpperCase();
     if (body.quantity !== undefined) updates.quantity = body.quantity;
-    if (body.transferredPrice !== undefined) updates.transferredPrice = body.transferredPrice;
+    if (body.transferredPrice !== undefined)
+      updates.transferredPrice = body.transferredPrice;
     if (body.targetPrice !== undefined) updates.targetPrice = body.targetPrice;
-    if (body.currentPrice !== undefined) updates.currentPrice = body.currentPrice;
+    if (body.currentPrice !== undefined)
+      updates.currentPrice = body.currentPrice;
 
     await itemRef.update(updates);
 
@@ -371,10 +358,7 @@ export async function updateItem(
   }
 }
 
-export async function deleteItem(
-  req: Request,
-  res: Response,
-): Promise<void> {
+export async function deleteItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId, id } = req.params;
     const itemRef = itemsCollection(uid(req), fridgeId).doc(id);

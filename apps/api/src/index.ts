@@ -43,9 +43,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   const originalJson = _res.json.bind(_res);
   _res.json = function (body: unknown) {
     const duration = Date.now() - start;
-    console.log(
-      `[${method}] ${path} → ${_res.statusCode} (${duration}ms)`,
-    );
+    console.log(`[${method}] ${path} → ${_res.statusCode} (${duration}ms)`);
     return originalJson(body);
   };
 
@@ -88,12 +86,7 @@ app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
 
 // Middleware global de tratamento de erros não capturados
 app.use(
-  (
-    err: Error,
-    req: Request,
-    res: Response,
-    _next: NextFunction,
-  ): void => {
+  (err: Error, req: Request, res: Response, _next: NextFunction): void => {
     console.error('[unhandledError]', {
       method: req.method,
       path: req.path,

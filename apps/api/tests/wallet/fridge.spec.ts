@@ -33,10 +33,7 @@ function createFridgeItemSnapshot(item: FridgeItem) {
   };
 }
 
-function createFirestoreMock(
-  fridges: Fridge[] = [],
-  items: FridgeItem[] = [],
-) {
+function createFirestoreMock(fridges: Fridge[] = [], items: FridgeItem[] = []) {
   const fridgeMap = new Map<string, any>();
   const itemMap = new Map<string, any>();
 
@@ -46,9 +43,7 @@ function createFirestoreMock(
       id: fridge.id,
       get: jest
         .fn()
-        .mockImplementation(() =>
-          Promise.resolve(createFridgeSnapshot(data)),
-        ),
+        .mockImplementation(() => Promise.resolve(createFridgeSnapshot(data))),
       set: jest.fn().mockImplementation((value: any) => {
         data = { ...data, ...value };
         return Promise.resolve();
@@ -165,15 +160,32 @@ function createFirestoreMock(
                         id: fridgeId,
                         exists: false,
                         data: () => null,
-                        get: jest.fn().mockResolvedValue({ id: fridgeId, exists: false, data: () => null }),
+                        get: jest
+                          .fn()
+                          .mockResolvedValue({
+                            id: fridgeId,
+                            exists: false,
+                            data: () => null,
+                          }),
                         set: jest.fn().mockResolvedValue(undefined),
-                        update: jest.fn().mockRejectedValue(new Error('Document does not exist')),
-                        delete: jest.fn().mockRejectedValue(new Error('Document does not exist')),
+                        update: jest
+                          .fn()
+                          .mockRejectedValue(
+                            new Error('Document does not exist'),
+                          ),
+                        delete: jest
+                          .fn()
+                          .mockRejectedValue(
+                            new Error('Document does not exist'),
+                          ),
                       };
                   return {
                     ...base,
                     collection: jest.fn((itemPath: string) => {
-                      if (itemPath === 'fridgeItems' && fridgeId === 'fridge-1') {
+                      if (
+                        itemPath === 'fridgeItems' &&
+                        fridgeId === 'fridge-1'
+                      ) {
                         return itemsCollection;
                       }
                       throw new Error(`Unexpected subcollection: ${itemPath}`);
@@ -201,12 +213,8 @@ function createFailingFirestoreMock() {
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
         collection: jest.fn(() => ({
-          get: jest
-            .fn()
-            .mockRejectedValue(new Error('Firestore unavailable')),
-          add: jest
-            .fn()
-            .mockRejectedValue(new Error('Firestore unavailable')),
+          get: jest.fn().mockRejectedValue(new Error('Firestore unavailable')),
+          add: jest.fn().mockRejectedValue(new Error('Firestore unavailable')),
           doc: jest.fn(() => ({
             collection: jest.fn(() => ({
               get: jest
