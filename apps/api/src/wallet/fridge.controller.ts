@@ -116,8 +116,8 @@ export async function updateFridge(req: Request, res: Response): Promise<void> {
 
     await fridgeRef.update(updates);
 
-    const updatedFridge = { id: fridgeId, ...doc.data(), ...updates };
-    res.json(updatedFridge);
+    const updatedDoc = await fridgeRef.get();
+    res.json({ id: fridgeId, ...updatedDoc.data() });
   } catch (error) {
     console.error('[updateFridge] error:', {
       uid: uid(req),
@@ -141,7 +141,14 @@ export async function deleteFridge(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    await fridgeRef.delete();
+    // Remove os itens da geladeira em cascata antes de deletar a geladeira.
+    // O Firestore não cascadeia deletes automaticamente.
+    const itemsSnapshot = await fridgeRef.collection('fridgeItems').get();
+    const batch = admin.firestore().batch();
+    itemsSnapshot.docs.forEach((itemDoc) => batch.delete(itemDoc.ref));
+    batch.delete(fridgeRef);
+    await batch.commit();
+
     res.status(204).send();
   } catch (error) {
     console.error('[deleteFridge] error:', {
@@ -155,6 +162,20 @@ export async function deleteFridge(req: Request, res: Response): Promise<void> {
 }
 
 /* ---------- FridgeItem CRUD ---------- */
+
+/** Verifica se a geladeira existe e pertence ao usuário. Retorna true se válida. */
+async function validateFridgeExists(
+  userId: string,
+  fridgeId: string,
+  res: Response,
+): Promise<boolean> {
+  const fridgeDoc = await fridgesCollection(userId).doc(fridgeId).get();
+  if (!fridgeDoc.exists) {
+    res.status(404).json({ error: 'Fridge not found' });
+    return false;
+  }
+  return true;
+}
 
 function validateItemBody(
   body: Partial<FridgeItem>,
@@ -230,7 +251,11 @@ function validateItemBody(
 export async function listItems(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId } = req.params;
-    const snapshot = await itemsCollection(uid(req), fridgeId).get();
+    const userId = uid(req);
+
+    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+
+    const snapshot = await itemsCollection(userId, fridgeId).get();
     const items = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -250,7 +275,10 @@ export async function listItems(req: Request, res: Response): Promise<void> {
 export async function createItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId } = req.params;
+    const userId = uid(req);
     const body = req.body as Partial<FridgeItem>;
+
+    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
     const validation = validateItemBody(body);
     if (!validation.valid) {
@@ -273,7 +301,7 @@ export async function createItem(req: Request, res: Response): Promise<void> {
       itemData.currentPrice = body.currentPrice;
     }
 
-    const docRef = await itemsCollection(uid(req), fridgeId).add(itemData);
+    const docRef = await itemsCollection(userId, fridgeId).add(itemData);
     res.status(201).json({ id: docRef.id, ...itemData });
   } catch (error) {
     console.error('[createItem] error:', {
@@ -290,7 +318,11 @@ export async function createItem(req: Request, res: Response): Promise<void> {
 export async function getItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId, id } = req.params;
-    const doc = await itemsCollection(uid(req), fridgeId).doc(id).get();
+    const userId = uid(req);
+
+    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+
+    const doc = await itemsCollection(userId, fridgeId).doc(id).get();
 
     if (!doc.exists) {
       res.status(404).json({ error: 'Item not found' });
@@ -313,7 +345,11 @@ export async function getItem(req: Request, res: Response): Promise<void> {
 export async function updateItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId, id } = req.params;
-    const itemRef = itemsCollection(uid(req), fridgeId).doc(id);
+    const userId = uid(req);
+
+    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+
+    const itemRef = itemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
@@ -343,8 +379,8 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
 
     await itemRef.update(updates);
 
-    const updatedItem = { id, ...doc.data(), ...updates };
-    res.json(updatedItem);
+    const updatedDoc = await itemRef.get();
+    res.json({ id, ...updatedDoc.data() });
   } catch (error) {
     console.error('[updateItem] error:', {
       uid: uid(req),
@@ -361,7 +397,11 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
 export async function deleteItem(req: Request, res: Response): Promise<void> {
   try {
     const { fridgeId, id } = req.params;
-    const itemRef = itemsCollection(uid(req), fridgeId).doc(id);
+    const userId = uid(req);
+
+    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+
+    const itemRef = itemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
