@@ -86,7 +86,7 @@ describe('authInterceptor', () => {
     req.flush({});
   }));
 
-  it('deve prosseguir sem header quando falhar ao obter token', fakeAsync(() => {
+  it('deve emitir erro 401 quando falhar ao obter token', fakeAsync(() => {
     const userMock = {
       getIdToken: jasmine
         .createSpy('getIdToken')
@@ -94,11 +94,17 @@ describe('authInterceptor', () => {
     } as unknown as User;
     user$.next(userMock);
 
-    httpClient.get('/api/me').subscribe({ error: () => {} });
+    let errorStatus: number | undefined;
+    httpClient.get('/api/me').subscribe({
+      error: (err) => {
+        errorStatus = err.status;
+      },
+    });
     tick();
 
-    const req = httpMock.expectOne('/api/me');
-    expect(req.request.headers.has('Authorization')).toBeFalse();
-    req.flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(errorStatus).toBe(401);
+    // Nenhuma requisição HTTP deve ser feita, pois o erro é emitido
+    // diretamente pelo interceptor.
+    httpMock.expectNone('/api/me');
   }));
 });
