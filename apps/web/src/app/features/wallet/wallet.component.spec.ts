@@ -35,6 +35,7 @@ describe('WalletComponent', () => {
       quantity: 10,
       averagePrice: 110.5,
       currentPrice: 112,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     },
@@ -46,6 +47,7 @@ describe('WalletComponent', () => {
       quantity: 5,
       averagePrice: 130,
       currentPrice: 132,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     },
@@ -214,6 +216,7 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 1.55,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
@@ -247,6 +250,7 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 9.8,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };

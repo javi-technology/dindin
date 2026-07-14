@@ -62,11 +62,45 @@ describe('models – Position', () => {
       assetType: 'FII',
       quantity: 10,
       averagePrice: 150.5,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
     expect(position.ticker).toBe('HGLG11');
     expect(position.assetType).toBe('FII');
+    expect(position.inFridge).toBe(false);
+  });
+
+  it('deve aceitar Position na geladeira com targetPrice', () => {
+    const position: Position = {
+      id: 'pos-2',
+      walletId: 'wallet-1',
+      ticker: 'KNRI11',
+      assetType: 'FII',
+      quantity: 5,
+      averagePrice: 130,
+      inFridge: true,
+      targetPrice: 120,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    expect(position.inFridge).toBe(true);
+    expect(position.targetPrice).toBe(120);
+  });
+
+  it('deve aceitar targetPrice opcional (undefined quando não está na geladeira)', () => {
+    const position: Position = {
+      id: 'pos-3',
+      walletId: 'wallet-1',
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 100,
+      averagePrice: 10,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    expect(position.targetPrice).toBeUndefined();
   });
 
   it('deve aceitar todos os AssetTypes válidos', () => {

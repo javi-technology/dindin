@@ -91,6 +91,25 @@ function validatePositionBody(
     };
   }
 
+  if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
+    return {
+      valid: false,
+      error: 'inFridge must be a boolean',
+    };
+  }
+
+  if (
+    body.targetPrice !== undefined &&
+    (typeof body.targetPrice !== 'number' ||
+      body.targetPrice < 0 ||
+      !Number.isFinite(body.targetPrice))
+  ) {
+    return {
+      valid: false,
+      error: 'Target price must be a non-negative number',
+    };
+  }
+
   return { valid: true };
 }
 
@@ -138,12 +157,17 @@ export async function createPosition(
       assetType: body.assetType!,
       quantity: body.quantity!,
       averagePrice: body.averagePrice!,
+      inFridge: body.inFridge ?? false,
       createdAt: now,
       updatedAt: now,
     };
 
     if (body.currentPrice !== undefined) {
       positionData.currentPrice = body.currentPrice;
+    }
+
+    if (body.targetPrice !== undefined) {
+      positionData.targetPrice = body.targetPrice;
     }
 
     const docRef = await positionsCollection(uid(req), walletId).add(
@@ -218,6 +242,8 @@ export async function updatePosition(
       updates.averagePrice = body.averagePrice;
     if (body.currentPrice !== undefined)
       updates.currentPrice = body.currentPrice;
+    if (body.inFridge !== undefined) updates.inFridge = body.inFridge;
+    if (body.targetPrice !== undefined) updates.targetPrice = body.targetPrice;
 
     await positionRef.update(updates);
 

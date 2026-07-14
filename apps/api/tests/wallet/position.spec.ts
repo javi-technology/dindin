@@ -161,6 +161,7 @@ describe('Position CRUD', () => {
     quantity: 10,
     averagePrice: 110.5,
     currentPrice: 112.0,
+    inFridge: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
