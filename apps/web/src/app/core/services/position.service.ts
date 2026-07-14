@@ -9,6 +9,8 @@ export interface CreatePositionPayload {
   quantity: number;
   averagePrice: number;
   currentPrice?: number;
+  inFridge?: boolean;
+  targetPrice?: number;
 }
 
 export type UpdatePositionPayload = Partial<CreatePositionPayload>;
