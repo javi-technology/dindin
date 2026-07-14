@@ -18,4 +18,10 @@ RUN apt-get update && apt-get install -y wget gnupg && \
 # ── Firebase CLI ──────────────────────────────────────────
 RUN npm install -g firebase-tools
 
+# ── rtk (Rust Token Killer) ──────────────────────────────
+RUN curl -fsSL -o /tmp/rtk.tar.gz \
+    https://github.com/rtk-ai/rtk/releases/latest/download/rtk-aarch64-unknown-linux-gnu.tar.gz && \
+    tar xzf /tmp/rtk.tar.gz -C /usr/local/bin/ rtk && \
+    rm /tmp/rtk.tar.gz
+
 WORKDIR /workspace
