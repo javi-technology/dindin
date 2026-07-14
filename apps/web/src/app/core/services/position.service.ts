@@ -13,7 +13,11 @@ export interface CreatePositionPayload {
   targetPrice?: number;
 }
 
-export type UpdatePositionPayload = Partial<CreatePositionPayload>;
+export type UpdatePositionPayload = Partial<
+  Omit<CreatePositionPayload, 'targetPrice'>
+> & {
+  targetPrice?: number | null;
+};
 
 @Injectable({
   providedIn: 'root',
