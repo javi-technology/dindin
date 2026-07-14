@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { Position, AssetType } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -246,8 +247,7 @@ export async function updatePosition(
     if (body.inFridge !== undefined) updates.inFridge = body.inFridge;
     if (body.targetPrice !== undefined) {
       if (body.targetPrice === null) {
-        (updates as Record<string, unknown>).targetPrice =
-          admin.firestore.FieldValue.delete();
+        (updates as Record<string, unknown>).targetPrice = FieldValue.delete();
       } else {
         updates.targetPrice = body.targetPrice;
       }

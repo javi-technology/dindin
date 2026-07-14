@@ -12,6 +12,12 @@ jest.mock('firebase-admin', () => ({
   firestore: jest.fn(() => firestoreMock),
 }));
 
+jest.mock('firebase-admin/firestore', () => ({
+  FieldValue: {
+    delete: jest.fn(() => '__DELETE_SENTINEL__'),
+  },
+}));
+
 import { app } from '../../src/index';
 import { Position, AssetType } from 'dindin-models';
 
