@@ -100,6 +100,7 @@ function validatePositionBody(
 
   if (
     body.targetPrice !== undefined &&
+    body.targetPrice !== null &&
     (typeof body.targetPrice !== 'number' ||
       body.targetPrice < 0 ||
       !Number.isFinite(body.targetPrice))
@@ -243,7 +244,14 @@ export async function updatePosition(
     if (body.currentPrice !== undefined)
       updates.currentPrice = body.currentPrice;
     if (body.inFridge !== undefined) updates.inFridge = body.inFridge;
-    if (body.targetPrice !== undefined) updates.targetPrice = body.targetPrice;
+    if (body.targetPrice !== undefined) {
+      if (body.targetPrice === null) {
+        (updates as Record<string, unknown>).targetPrice =
+          admin.firestore.FieldValue.delete();
+      } else {
+        updates.targetPrice = body.targetPrice;
+      }
+    }
 
     await positionRef.update(updates);
 
