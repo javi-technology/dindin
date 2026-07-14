@@ -3,6 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "runArgs": ["--name", "dindin-dev"],
   "customizations": {
     "vscode": {
       "extensions": [
