@@ -5,7 +5,10 @@
         class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4"
       >
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Geladeira</h1>
+          <h1 class="text-2xl font-bold text-gray-900 inline-flex items-center">
+            <svg lucideSnowflake [size]="24" class="mr-2"></svg>
+            Geladeira
+          </h1>
           <p class="text-gray-600">
             Acompanhe FIIs na geladeira e seus potenciais de ganho
           </p>
@@ -129,9 +132,7 @@
         class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
         data-testid="target-form"
       >
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
-          Editar preço-alvo
-        </h2>
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Editar preço-alvo</h2>
 
         @if (formError()) {
           <div
@@ -169,9 +170,7 @@
                 <p class="text-red-600 text-xs mt-1">
                   Preço-alvo é obrigatório.
                 </p>
-              } @else if (
-                form.get('targetPrice')?.hasError('invalidDecimal')
-              ) {
+              } @else if (form.get('targetPrice')?.hasError('invalidDecimal')) {
                 <p class="text-red-600 text-xs mt-1">
                   Informe um número válido (ex: 90,00).
                 </p>
@@ -206,9 +205,7 @@
       data-testid="delete-confirm-modal"
     >
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-2">
-          Confirmar exclusão
-        </h2>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Confirmar exclusão</h2>
         <p class="text-gray-600 mb-6">
           Tem certeza que deseja remover
           <strong>{{ deleteConfirmItem()?.ticker }}</strong>

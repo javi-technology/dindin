@@ -1,12 +1,11 @@
-import {
-  Component,
-  HostListener,
-  OnInit,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, HostListener, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { FridgeService } from '../../core/services/fridge.service';
 import { Fridge, FridgeItem } from 'dindin-models';
 import {
@@ -14,11 +13,7 @@ import {
   formatCurrency,
   parseDecimal,
 } from '../../shared/utils/format.util';
-import {
-  LucideSnowflake,
-  LucidePencil,
-  LucideTrash2,
-} from '@lucide/angular';
+import { LucideSnowflake, LucidePencil, LucideTrash2 } from '@lucide/angular';
 
 @Component({
   selector: 'app-fridge',

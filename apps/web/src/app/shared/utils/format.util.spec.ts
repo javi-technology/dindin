@@ -1,9 +1,5 @@
 import { AbstractControl, FormControl } from '@angular/forms';
-import {
-  decimalValidator,
-  formatCurrency,
-  parseDecimal,
-} from './format.util';
+import { decimalValidator, formatCurrency, parseDecimal } from './format.util';
 
 describe('format.util', () => {
   describe('decimalValidator', () => {

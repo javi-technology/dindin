@@ -323,9 +323,9 @@ describe('FridgeComponent', () => {
     fixture.detectChanges();
 
     expect(
-      fixture.componentInstance.form.get('targetPrice')?.hasError(
-        'invalidDecimal',
-      ),
+      fixture.componentInstance.form
+        .get('targetPrice')
+        ?.hasError('invalidDecimal'),
     ).toBeTrue();
   });
 
@@ -335,9 +335,7 @@ describe('FridgeComponent', () => {
     fixture.componentInstance.form.get('targetPrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(
-      fixture.componentInstance.form.get('targetPrice')?.valid,
-    ).toBeTrue();
+    expect(fixture.componentInstance.form.get('targetPrice')?.valid).toBeTrue();
   });
 
   it('deve exibir mensagem quando não houver geladeiras', async () => {
