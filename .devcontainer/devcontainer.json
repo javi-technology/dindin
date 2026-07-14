@@ -1,10 +1,7 @@
 {
   "name": "DinDin Dev Environment",
   "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "CONTAINER_NAME": "dindin-dev"
-    }
+    "dockerfile": "Dockerfile"
   },
   "customizations": {
     "vscode": {
