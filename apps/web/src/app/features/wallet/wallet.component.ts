@@ -8,34 +8,25 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  AbstractControl,
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { Wallet, Position, AssetType } from 'dindin-models';
 import {
+  decimalValidator,
+  formatCurrency,
+  parseDecimal,
+} from '../../shared/utils/format.util';
+import {
   LucideWallet,
   LucidePlus,
   LucidePencil,
   LucideTrash2,
 } from '@lucide/angular';
-
-/** Valida que o valor é um número decimal válido (aceita vírgula ou ponto). */
-function decimalValidator(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const value = control.value;
-    if (value == null || value === '') return null;
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? { invalidDecimal: true } : null;
-  };
-}
 
 @Component({
   selector: 'app-wallet',
@@ -289,19 +280,9 @@ export class WalletComponent implements OnInit {
     }
   }
 
-  formatCurrency(value: number): string {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  }
+  formatCurrency = formatCurrency;
 
   private parseDecimal(value: string | number | null): number | null {
-    if (value == null || value === '') {
-      return null;
-    }
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? null : parsed;
+    return parseDecimal(value);
   }
 }
