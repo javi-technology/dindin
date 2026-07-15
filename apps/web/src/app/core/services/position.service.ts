@@ -9,9 +9,15 @@ export interface CreatePositionPayload {
   quantity: number;
   averagePrice: number;
   currentPrice?: number;
+  inFridge?: boolean;
+  targetPrice?: number;
 }
 
-export type UpdatePositionPayload = Partial<CreatePositionPayload>;
+export type UpdatePositionPayload = Partial<
+  Omit<CreatePositionPayload, 'targetPrice'>
+> & {
+  targetPrice?: number | null;
+};
 
 @Injectable({
   providedIn: 'root',

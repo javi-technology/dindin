@@ -39,6 +39,10 @@ export interface Position {
   quantity: number;
   averagePrice: number; // preço médio de compra (BRL)
   currentPrice?: number; // último preço conhecido
+  /** Indica se a posição está na geladeira (acompanhamento para venda). */
+  inFridge: boolean;
+  /** Preço-alvo para venda quando na geladeira. */
+  targetPrice?: number;
   sector?: string;
   notes?: string;
   createdAt: string;

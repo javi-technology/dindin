@@ -35,6 +35,7 @@ describe('WalletComponent', () => {
       quantity: 10,
       averagePrice: 110.5,
       currentPrice: 112,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     },
@@ -46,6 +47,7 @@ describe('WalletComponent', () => {
       quantity: 5,
       averagePrice: 130,
       currentPrice: 132,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     },
@@ -214,6 +216,7 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 1.55,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
@@ -247,6 +250,7 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 9.8,
+      inFridge: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
@@ -396,6 +400,215 @@ describe('WalletComponent', () => {
 
     expect(
       fixture.componentInstance.form.get('averagePrice')?.valid,
+    ).toBeTrue();
+  });
+
+  // --- Geladeira (toggle, gelar, desgelar, potencial) ---
+
+  it('deve exibir toggle de geladeira', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const toggle = compiled.querySelector('[data-testid="toggle-geladeira"]');
+    expect(toggle).toBeTruthy();
+  });
+
+  it('deve filtrar posições da geladeira ao ativar o toggle', () => {
+    const fridgePositions: Position[] = [
+      {
+        ...positions[0],
+        id: 'pos-fridge',
+        ticker: 'FRIDGE11',
+        inFridge: true,
+        targetPrice: 100,
+      },
+    ];
+    positionServiceMock.list.and.returnValue(
+      of([...positions, ...fridgePositions]),
+    );
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.detectChanges();
+
+    // Antes do toggle: mostra todas
+    let rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      'tbody tr',
+    );
+    expect(rows.length).toBe(3);
+
+    // Ativa toggle geladeira
+    fixture.componentInstance.toggleFridge();
+    fixture.detectChanges();
+
+    rows = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr');
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent).toContain('FRIDGE11');
+  });
+
+  it('deve exibir botão "Gelar" para posições não geladas', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gelarBtn = compiled.querySelector('[data-testid="btn-gelar-0"]');
+    expect(gelarBtn).toBeTruthy();
+    expect(gelarBtn?.textContent).toContain('Gelar');
+  });
+
+  it('deve abrir modal de gelar ao clicar em "Gelar"', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gelarBtn = compiled.querySelector(
+      '[data-testid="btn-gelar-0"]',
+    ) as HTMLButtonElement;
+    gelarBtn.click();
+    fixture.detectChanges();
+
+    const modal = compiled.querySelector('[data-testid="fridge-form"]');
+    expect(modal).toBeTruthy();
+  });
+
+  it('deve chamar update com inFringe=true e targetPrice ao gelar', fakeAsync(() => {
+    positionServiceMock.update.and.returnValue(
+      of({ ...positions[0], inFridge: true, targetPrice: 100 }),
+    );
+    positionServiceMock.list.and.returnValue(of(positions));
+
+    fixture.componentInstance.openFridgeForm(positions[0]);
+    fixture.componentInstance.fridgeForm.patchValue({ targetPrice: '100,00' });
+    fixture.componentInstance.saveFridge();
+    tick();
+    fixture.detectChanges();
+
+    expect(positionServiceMock.update).toHaveBeenCalledWith(
+      'wallet-1',
+      'position-1',
+      {
+        inFridge: true,
+        targetPrice: 100,
+      },
+    );
+  }));
+
+  it('deve exibir botão "Desgelar" para posições geladas', () => {
+    const fridgePosition: Position = {
+      ...positions[0],
+      inFridge: true,
+      targetPrice: 100,
+    };
+    positionServiceMock.list.and.returnValue(of([fridgePosition]));
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const desgelarBtn = compiled.querySelector(
+      '[data-testid="btn-desgelar-0"]',
+    );
+    expect(desgelarBtn).toBeTruthy();
+    expect(desgelarBtn?.textContent).toContain('Desgelar');
+  });
+
+  it('deve chamar update com inFridge=false ao desgelar', fakeAsync(() => {
+    const fridgePosition: Position = {
+      ...positions[0],
+      inFridge: true,
+      targetPrice: 100,
+    };
+    positionServiceMock.list.and.returnValue(of([fridgePosition]));
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.detectChanges();
+
+    positionServiceMock.update.and.returnValue(
+      of({ ...fridgePosition, inFridge: false }),
+    );
+    positionServiceMock.list.and.returnValue(of([positions[0]]));
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const desgelarBtn = compiled.querySelector(
+      '[data-testid="btn-desgelar-0"]',
+    ) as HTMLButtonElement;
+    desgelarBtn.click();
+    tick();
+    fixture.detectChanges();
+
+    expect(positionServiceMock.update).toHaveBeenCalledWith(
+      'wallet-1',
+      'position-1',
+      {
+        inFridge: false,
+        targetPrice: null,
+      },
+    );
+  }));
+
+  it('deve calcular e exibir potencial de ganho para posição gelada', () => {
+    const fridgePosition: Position = {
+      ...positions[0],
+      inFridge: true,
+      targetPrice: 120,
+      currentPrice: 100,
+    };
+    positionServiceMock.list.and.returnValue(of([fridgePosition]));
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.componentInstance.toggleFridge();
+    fixture.detectChanges();
+
+    // potencial = (120 - 100) / 100 * 100 = 20,00%
+    const compiled = fixture.nativeElement as HTMLElement;
+    const row = compiled.querySelector('tbody tr');
+    expect(row?.textContent).toMatch(/20,00\s?%/);
+  });
+
+  it('deve usar averagePrice como fallback quando currentPrice ausente', () => {
+    const fridgePosition: Position = {
+      ...positions[0],
+      inFridge: true,
+      targetPrice: 132.6,
+      currentPrice: undefined,
+      averagePrice: 110.5,
+    };
+    positionServiceMock.list.and.returnValue(of([fridgePosition]));
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.componentInstance.toggleFridge();
+    fixture.detectChanges();
+
+    // potencial = (132.6 - 110.5) / 110.5 * 100 = 20,00%
+    const compiled = fixture.nativeElement as HTMLElement;
+    const row = compiled.querySelector('tbody tr');
+    expect(row?.textContent).toMatch(/20,00\s?%/);
+  });
+
+  it('deve exibir "—" quando targetPrice ou base ausentes', () => {
+    const fridgePosition: Position = {
+      ...positions[0],
+      inFridge: true,
+      targetPrice: undefined,
+      currentPrice: undefined,
+      averagePrice: 0,
+    };
+    positionServiceMock.list.and.returnValue(of([fridgePosition]));
+    fixture.componentInstance.loadPositions('wallet-1');
+    fixture.componentInstance.toggleFridge();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const row = compiled.querySelector('tbody tr');
+    expect(row?.textContent).toContain('—');
+  });
+
+  it('deve fechar modal de gelar ao pressionar Esc', () => {
+    fixture.componentInstance.openFridgeForm(positions[0]);
+    fixture.detectChanges();
+
+    fixture.componentInstance.onEscapeKey();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.fridgeFormVisible()).toBeFalse();
+  });
+
+  it('deve rejeitar preço-alvo da geladeira com formato inválido', () => {
+    fixture.componentInstance.openFridgeForm(positions[0]);
+    fixture.componentInstance.fridgeForm.patchValue({ targetPrice: 'abc' });
+    fixture.componentInstance.fridgeForm.get('targetPrice')?.markAsTouched();
+    fixture.detectChanges();
+
+    expect(
+      fixture.componentInstance.fridgeForm
+        .get('targetPrice')
+        ?.hasError('invalidDecimal'),
     ).toBeTrue();
   });
 });

@@ -8,34 +8,26 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  AbstractControl,
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { Wallet, Position, AssetType } from 'dindin-models';
 import {
+  decimalValidator,
+  formatCurrency,
+  parseDecimal,
+} from '../../shared/utils/format.util';
+import {
   LucideWallet,
   LucidePlus,
   LucidePencil,
   LucideTrash2,
+  LucideSnowflake,
 } from '@lucide/angular';
-
-/** Valida que o valor é um número decimal válido (aceita vírgula ou ponto). */
-function decimalValidator(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const value = control.value;
-    if (value == null || value === '') return null;
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? { invalidDecimal: true } : null;
-  };
-}
 
 @Component({
   selector: 'app-wallet',
@@ -47,6 +39,7 @@ function decimalValidator(): ValidatorFn {
     LucidePlus,
     LucidePencil,
     LucideTrash2,
+    LucideSnowflake,
   ],
   templateUrl: './wallet.component.html',
 })
@@ -65,6 +58,22 @@ export class WalletComponent implements OnInit {
   formVisible = signal(false);
   formError = signal<string | null>(null);
   deleteConfirmPosition = signal<Position | null>(null);
+
+  // --- Geladeira ---
+  viewMode = signal<'all' | 'fridge'>('all');
+  fridgeFormVisible = signal(false);
+  fridgeFormError = signal<string | null>(null);
+  fridgeEditingPosition = signal<Position | null>(null);
+
+  fridgeForm: FormGroup = this.fb.group({
+    targetPrice: ['', [Validators.required, decimalValidator()]],
+  });
+
+  filteredPositions = computed(() =>
+    this.viewMode() === 'fridge'
+      ? this.positions().filter((p) => p.inFridge)
+      : this.positions(),
+  );
 
   form: FormGroup = this.fb.group({
     ticker: ['', [Validators.required]],
@@ -138,7 +147,7 @@ export class WalletComponent implements OnInit {
     }
   }
 
-  private loadPositions(walletId: string): void {
+  loadPositions(walletId: string): void {
     this.loading.set(true);
     this.positionService.list(walletId).subscribe({
       next: (response) => {
@@ -280,28 +289,108 @@ export class WalletComponent implements OnInit {
     this.deleteConfirmPosition.set(null);
   }
 
+  // --- Geladeira ---
+
+  toggleFridge(): void {
+    this.viewMode.update((mode) => (mode === 'all' ? 'fridge' : 'all'));
+  }
+
+  openFridgeForm(position: Position): void {
+    this.fridgeEditingPosition.set(position);
+    this.fridgeFormVisible.set(true);
+    this.fridgeFormError.set(null);
+    this.fridgeForm.patchValue({
+      targetPrice:
+        position.targetPrice != null ? String(position.targetPrice) : '',
+    });
+  }
+
+  closeFridgeForm(): void {
+    this.fridgeFormVisible.set(false);
+    this.fridgeEditingPosition.set(null);
+  }
+
+  saveFridge(): void {
+    if (this.fridgeForm.invalid) {
+      this.fridgeForm.markAllAsTouched();
+      return;
+    }
+
+    const wallet = this.selectedWallet();
+    const position = this.fridgeEditingPosition();
+    if (!wallet || !position) {
+      this.fridgeFormError.set('Nenhuma carteira ou posição selecionada.');
+      return;
+    }
+
+    const targetPrice = parseDecimal(this.fridgeForm.value.targetPrice);
+    if (targetPrice === null || targetPrice < 0) {
+      this.fridgeFormError.set('Informe um preço-alvo válido.');
+      this.fridgeForm.markAllAsTouched();
+      return;
+    }
+
+    this.positionService
+      .update(wallet.id, position.id, { inFridge: true, targetPrice })
+      .subscribe({
+        next: () => {
+          this.closeFridgeForm();
+          this.loadPositions(wallet.id);
+        },
+        error: () => {
+          this.fridgeFormError.set(
+            'Erro ao colocar na geladeira. Tente novamente.',
+          );
+        },
+      });
+  }
+
+  desgelar(position: Position): void {
+    const wallet = this.selectedWallet();
+    if (!wallet) return;
+
+    this.positionService
+      .update(wallet.id, position.id, { inFridge: false, targetPrice: null })
+      .subscribe({
+        next: () => {
+          this.loadPositions(wallet.id);
+        },
+        error: () => this.error.set('Erro ao remover da geladeira.'),
+      });
+  }
+
+  /** Calcula o potencial de ganho em percentual, ou null se não houver base. */
+  potentialGain(position: Position): number | null {
+    if (!position.targetPrice) return null;
+    const base = position.currentPrice ?? position.averagePrice;
+    if (!base || base === 0) return null;
+    return ((position.targetPrice - base) / base) * 100;
+  }
+
+  formatPotential(position: Position): string {
+    const gain = this.potentialGain(position);
+    if (gain === null) return '—';
+    const formatted = gain.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted}%`;
+  }
+
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
     if (this.deleteConfirmPosition()) {
       this.cancelDelete();
+    } else if (this.fridgeFormVisible()) {
+      this.closeFridgeForm();
     } else if (this.formVisible()) {
       this.closeForm();
     }
   }
 
-  formatCurrency(value: number): string {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  }
+  formatCurrency = formatCurrency;
 
   private parseDecimal(value: string | number | null): number | null {
-    if (value == null || value === '') {
-      return null;
-    }
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? null : parsed;
+    return parseDecimal(value);
   }
 }

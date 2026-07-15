@@ -12,6 +12,12 @@ jest.mock('firebase-admin', () => ({
   firestore: jest.fn(() => firestoreMock),
 }));
 
+jest.mock('firebase-admin/firestore', () => ({
+  FieldValue: {
+    delete: jest.fn(() => '__DELETE_SENTINEL__'),
+  },
+}));
+
 import { app } from '../../src/index';
 import { Position, AssetType } from 'dindin-models';
 
@@ -161,6 +167,7 @@ describe('Position CRUD', () => {
     quantity: 10,
     averagePrice: 110.5,
     currentPrice: 112.0,
+    inFridge: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
