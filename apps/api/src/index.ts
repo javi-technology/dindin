@@ -14,6 +14,7 @@ import {
   deletePosition,
   getPosition,
   listPositions,
+  moveToFridge,
   updatePosition,
 } from './wallet/position.controller';
 import {
@@ -71,6 +72,7 @@ app.post('/api/wallets/:walletId/positions', createPosition);
 app.get('/api/wallets/:walletId/positions/:id', getPosition);
 app.put('/api/wallets/:walletId/positions/:id', updatePosition);
 app.delete('/api/wallets/:walletId/positions/:id', deletePosition);
+app.post('/api/wallets/:walletId/positions/:id/move-to-fridge', moveToFridge);
 
 app.get('/api/fridges', listFridges);
 app.post('/api/fridges', createFridge);
