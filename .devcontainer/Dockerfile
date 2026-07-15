@@ -5,6 +5,17 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
+# ── Chromium (nativo ARM64) para testes do frontend ──────
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright
+RUN npm install -g playwright && \
+    playwright install chromium && \
+    playwright install-deps chromium && \
+    CHROME_PATH="$(find "$PLAYWRIGHT_BROWSERS_PATH" -name 'chrome' -type f | head -1)" && \
+    printf '#!/bin/bash\nexec %s --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer "$@"\n' \
+      "$CHROME_PATH" > /usr/local/bin/chromium-browser && \
+    chmod +x /usr/local/bin/chromium-browser
+ENV CHROME_BIN=/usr/local/bin/chromium-browser
+
 # ── JDK 21 (Eclipse Adoptium) ─────────────────────────────
 # Necessário para os emuladores do Firebase (Firestore, Auth)
 RUN apt-get update && apt-get install -y wget gnupg && \

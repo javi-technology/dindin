@@ -4,6 +4,7 @@
     "dockerfile": "Dockerfile"
   },
   "runArgs": ["--name", "dindin-dev"],
+  "mounts": ["source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -31,5 +32,5 @@
   },
   "forwardPorts": [4000, 4200, 5001, 5002, 8080, 9099],
   "remoteUser": "vscode",
-  "postCreateCommand": "npm install"
+  "postCreateCommand": "npm install && chmod 600 /home/vscode/.ssh/id_* 2>/dev/null; ssh-keyscan github.com >> /home/vscode/.ssh/known_hosts 2>/dev/null"
 }
