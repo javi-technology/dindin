@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { PositionService } from './position.service';
-import { Position } from 'dindin-models';
+import { Position, FridgeItem } from 'dindin-models';
 
 describe('PositionService', () => {
   let service: PositionService;
@@ -94,5 +94,38 @@ describe('PositionService', () => {
     );
     expect(req.request.method).toBe('DELETE');
     req.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('deve mover posição para geladeira', () => {
+    const positionId = 'position-1';
+    const payload = { fridgeId: 'fridge-1', targetPrice: 120 };
+
+    service
+      .moveToFridge(walletId, positionId, payload)
+      .subscribe((response) => {
+        expect(response.id).toBe('new-fridge-item-id');
+        expect(response.ticker).toBe('HGLG11');
+        expect(response.transferredPrice).toBe(110.5);
+        expect(response.targetPrice).toBe(120);
+        expect(response.fridgeId).toBe('fridge-1');
+      });
+
+    const req = httpMock.expectOne(
+      `/api/wallets/${walletId}/positions/${positionId}/move-to-fridge`,
+    );
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(payload);
+
+    const fridgeItem: FridgeItem = {
+      id: 'new-fridge-item-id',
+      fridgeId: 'fridge-1',
+      ticker: 'HGLG11',
+      quantity: 10,
+      transferredPrice: 110.5,
+      targetPrice: 120,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    req.flush(fridgeItem, { status: 201, statusText: 'Created' });
   });
 });
