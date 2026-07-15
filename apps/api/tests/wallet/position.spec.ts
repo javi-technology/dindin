@@ -257,7 +257,12 @@ function createFirestoreMockWithFridge(
     ref: any;
     data?: any;
   }> = [];
-  const batchMock = {
+  const batchMock: {
+    delete: jest.Mock;
+    set: jest.Mock;
+    commit: jest.Mock;
+    _operations: typeof batchOperations;
+  } = {
     delete: jest.fn((ref: any) => {
       batchOperations.push({ type: 'delete', ref });
       return batchMock;
