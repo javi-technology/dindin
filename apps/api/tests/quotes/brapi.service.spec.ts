@@ -31,8 +31,10 @@ describe('BrapiService — fetchQuotes', () => {
         results: [
           {
             symbol: 'HGLG11',
-            regularMarketPrice: 165.5,
-            regularMarketTime: '2026-07-15T18:00:00-03:00',
+            data: {
+              regularMarketPrice: 165.5,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
           },
         ],
       });
@@ -51,18 +53,24 @@ describe('BrapiService — fetchQuotes', () => {
         results: [
           {
             symbol: 'HGLG11',
-            regularMarketPrice: 165.5,
-            regularMarketTime: '2026-07-15T18:00:00-03:00',
+            data: {
+              regularMarketPrice: 165.5,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
           },
           {
             symbol: 'MXRF11',
-            regularMarketPrice: 10.32,
-            regularMarketTime: '2026-07-15T18:00:00-03:00',
+            data: {
+              regularMarketPrice: 10.32,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
           },
           {
             symbol: 'KNRI11',
-            regularMarketPrice: 152.0,
-            regularMarketTime: '2026-07-15T18:00:00-03:00',
+            data: {
+              regularMarketPrice: 152.0,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
           },
         ],
       });
@@ -87,7 +95,9 @@ describe('BrapiService — fetchQuotes', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const url = fetchMock.mock.calls[0][0] as string;
-      expect(url).toContain('brapi.dev/api/quote/HGLG11,MXRF11');
+      expect(url).toContain(
+        'brapi.dev/api/v2/stocks/quote?symbols=HGLG11,MXRF11',
+      );
       expect(url).not.toContain('token=');
 
       const options = fetchMock.mock.calls[0][1] as Record<string, unknown>;
@@ -104,13 +114,14 @@ describe('BrapiService — fetchQuotes', () => {
         results: [
           {
             symbol: 'HGLG11',
-            regularMarketPrice: 165.5,
-            regularMarketTime: '2026-07-15T18:00:00-03:00',
+            data: {
+              regularMarketPrice: 165.5,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
           },
           {
             symbol: 'TICKER_INEXISTENTE',
-            regularMarketPrice: null,
-            regularMarketTime: null,
+            data: null,
           },
         ],
       });

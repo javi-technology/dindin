@@ -5,15 +5,17 @@ export interface QuoteResult {
 
 interface BrapiResult {
   symbol: string;
-  regularMarketPrice: number | null;
-  regularMarketTime: string | null;
+  data?: {
+    regularMarketPrice: number | null;
+    regularMarketTime: string | null;
+  };
 }
 
 interface BrapiResponse {
   results: BrapiResult[];
 }
 
-const BRAPI_BASE_URL = 'https://brapi.dev/api/quote';
+const BRAPI_BASE_URL = 'https://brapi.dev/api/v2/stocks/quote';
 
 export async function fetchQuotes(
   tickers: string[],
@@ -24,7 +26,7 @@ export async function fetchQuotes(
 
   const token = process.env.BRAPI_API_KEY;
   const tickerList = tickers.join(',');
-  const url = `${BRAPI_BASE_URL}/${tickerList}`;
+  const url = `${BRAPI_BASE_URL}?symbols=${tickerList}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -54,13 +56,11 @@ export async function fetchQuotes(
   const quoteMap = new Map<string, QuoteResult>();
 
   for (const item of results) {
-    if (
-      item.regularMarketPrice !== null &&
-      item.regularMarketPrice !== undefined
-    ) {
+    const price = item.data?.regularMarketPrice ?? null;
+    if (price !== null && price !== undefined) {
       quoteMap.set(item.symbol, {
-        price: item.regularMarketPrice,
-        updatedAt: item.regularMarketTime ?? new Date().toISOString(),
+        price,
+        updatedAt: item.data?.regularMarketTime ?? new Date().toISOString(),
       });
     }
   }
