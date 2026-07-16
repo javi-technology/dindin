@@ -13,6 +13,11 @@ function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function historyDocId(): string {
+  // Usa timestamp ISO com segundos para evitar sobrescrita no mesmo dia
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+}
+
 export async function saveQuoteHistory(
   ticker: string,
   price: number,
@@ -20,6 +25,7 @@ export async function saveQuoteHistory(
 ): Promise<void> {
   const now = new Date().toISOString();
   const date = todayDate();
+  const docId = historyDocId();
 
   const quoteData: Quote = {
     ticker,
@@ -35,7 +41,7 @@ export async function saveQuoteHistory(
   };
 
   await quotesCollection().doc(ticker).set(quoteData);
-  await historyCollection(ticker).doc(date).set(historyData);
+  await historyCollection(ticker).doc(docId).set(historyData);
 }
 
 export async function getQuoteHistory(

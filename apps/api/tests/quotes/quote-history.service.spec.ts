@@ -51,13 +51,14 @@ describe('QuoteHistoryService', () => {
         source: 'brapi',
       });
 
-      // Deve criar documento no histórico com a data de hoje
+      // Deve criar documento no histórico com ID baseado em timestamp
       expect(historyDoc).toHaveBeenCalled();
       const historyDocId = historyDoc.mock.calls[0][0];
-      expect(historyDocId).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // Formato esperado: YYYY-MM-DDTHH-mm-ss (timestamp sem : e .)
+      expect(historyDocId).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/);
 
       expect(historySet).toHaveBeenCalledWith({
-        date: historyDocId,
+        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         price: 165.5,
         source: 'brapi',
       });
