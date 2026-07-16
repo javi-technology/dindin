@@ -110,7 +110,7 @@ export const api = functions.https.onRequest(app);
 // em process.env dentro da execução. Configurar com:
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
-  { schedule: 'every 24 hours', secrets: ['BRAPI_API_KEY'] },
+  { schedule: '0 0 * * *', secrets: ['BRAPI_API_KEY'] },
   async () => {
     await updateAllQuotes();
   },
