@@ -32,5 +32,17 @@ service cloud.firestore {
       }
     }
 
+    // Cotações — leitura pública (qualquer usuário autenticado),
+    // escrita apenas via Cloud Function (admin SDK bypassa as regras).
+    match /quotes/{ticker} {
+      allow read: if request.auth != null;
+      allow write: if false;
+
+      match /history/{date} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
+
   }
 }
