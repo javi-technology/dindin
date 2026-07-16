@@ -19,13 +19,21 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import { app } from '../../src/index';
-import { Position, AssetType } from 'dindin-models';
+import { Position, AssetType, Fridge } from 'dindin-models';
 
 function createPositionSnapshot(position: Position) {
   return {
     id: position.id,
     exists: true,
     data: () => ({ ...position }),
+  };
+}
+
+function createFridgeSnapshot(fridge: Fridge) {
+  return {
+    id: fridge.id,
+    exists: true,
+    data: () => ({ ...fridge }),
   };
 }
 
@@ -154,6 +162,175 @@ function createFailingFirestoreMock() {
         })),
       })),
     })),
+  };
+}
+
+/**
+ * Cria mock do Firestore com suporte a positions, fridges e batch.
+ * Usado nos testes de moveToFridge.
+ */
+function createFirestoreMockWithFridge(
+  positions: Position[] = [],
+  fridges: Fridge[] = [],
+) {
+  const positionMap = new Map<string, any>();
+  const fridgeMap = new Map<string, any>();
+
+  positions.forEach((position) => {
+    let data = { ...position };
+    positionMap.set(position.id, {
+      id: position.id,
+      ref: { id: position.id, path: `positions/${position.id}` },
+      get: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(createPositionSnapshot(data)),
+        ),
+      set: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      update: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      delete: jest.fn().mockResolvedValue(undefined),
+    });
+  });
+
+  fridges.forEach((fridge) => {
+    let data = { ...fridge };
+    fridgeMap.set(fridge.id, {
+      id: fridge.id,
+      get: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(createFridgeSnapshot(data))),
+      set: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      update: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      delete: jest.fn().mockResolvedValue(undefined),
+    });
+  });
+
+  const positionsCollection = {
+    doc: jest.fn((id: string) => {
+      if (!positionMap.has(id)) {
+        return {
+          id,
+          exists: false,
+          data: () => null,
+          get: jest
+            .fn()
+            .mockResolvedValue({ id, exists: false, data: () => null }),
+          set: jest.fn().mockResolvedValue(undefined),
+          update: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+          delete: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+        };
+      }
+      return positionMap.get(id);
+    }),
+    add: jest.fn().mockResolvedValue({ id: 'new-position-id' }),
+    get: jest.fn().mockResolvedValue({
+      docs: positions.map((p) => createPositionSnapshot(p)),
+      empty: positions.length === 0,
+    }),
+  };
+
+  const fridgeItemsCollection = {
+    doc: jest.fn(() => ({
+      id: 'new-fridge-item-id',
+      set: jest.fn().mockResolvedValue(undefined),
+    })),
+  };
+
+  const batchOperations: Array<{
+    type: 'delete' | 'set';
+    ref: any;
+    data?: any;
+  }> = [];
+  const batchMock: {
+    delete: jest.Mock;
+    set: jest.Mock;
+    commit: jest.Mock;
+    _operations: typeof batchOperations;
+  } = {
+    delete: jest.fn((ref: any) => {
+      batchOperations.push({ type: 'delete', ref });
+      return batchMock;
+    }),
+    set: jest.fn((ref: any, data: any) => {
+      batchOperations.push({ type: 'set', ref, data });
+      return batchMock;
+    }),
+    commit: jest.fn().mockResolvedValue(undefined),
+    _operations: batchOperations,
+  };
+
+  return {
+    collection: jest.fn((path: string) => {
+      if (path === 'users') {
+        return {
+          doc: jest.fn((uid: string) => ({
+            collection: jest.fn((subPath: string) => {
+              if (subPath === 'wallets' && uid === 'user-123') {
+                return {
+                  doc: jest.fn((walletId: string) => ({
+                    collection: jest.fn((positionPath: string) => {
+                      if (
+                        positionPath === 'positions' &&
+                        walletId === 'wallet-1'
+                      ) {
+                        return positionsCollection;
+                      }
+                      throw new Error(
+                        `Unexpected subcollection: ${positionPath}`,
+                      );
+                    }),
+                  })),
+                };
+              }
+              if (subPath === 'fridges' && uid === 'user-123') {
+                return {
+                  doc: jest.fn((fridgeId: string) => {
+                    if (!fridgeMap.has(fridgeId)) {
+                      return {
+                        id: fridgeId,
+                        exists: false,
+                        data: () => null,
+                        get: jest.fn().mockResolvedValue({
+                          id: fridgeId,
+                          exists: false,
+                          data: () => null,
+                        }),
+                        collection: jest.fn(() => fridgeItemsCollection),
+                      };
+                    }
+                    const fridge = fridgeMap.get(fridgeId);
+                    return {
+                      ...fridge,
+                      collection: jest.fn(() => fridgeItemsCollection),
+                    };
+                  }),
+                };
+              }
+              throw new Error(`Unexpected subcollection: ${subPath}`);
+            }),
+          })),
+        };
+      }
+      throw new Error(`Unexpected collection: ${path}`);
+    }),
+    batch: jest.fn(() => batchMock),
+    _batch: batchMock,
   };
 }
 
@@ -418,6 +595,124 @@ describe('Position CRUD', () => {
       const response = await request(app)
         .delete('/api/wallets/wallet-1/positions/position-1')
         .set('Authorization', authHeader);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  describe('POST /api/wallets/:walletId/positions/:id/move-to-fridge', () => {
+    const fridge: Fridge = {
+      id: 'fridge-1',
+      ownerId: 'user-123',
+      name: 'Geladeira Principal',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    it('deve mover posição para geladeira com sucesso', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-1', targetPrice: 120 });
+
+      expect(response.status).toBe(201);
+      expect(response.body.ticker).toBe('HGLG11');
+      expect(response.body.quantity).toBe(10);
+      expect(response.body.transferredPrice).toBe(110.5);
+      expect(response.body.targetPrice).toBe(120);
+      expect(response.body.fridgeId).toBe('fridge-1');
+      expect(response.body.assetType).toBe('FII');
+
+      // Verifica que o batch foi usado
+      const batchOps = firestoreMock._batch._operations;
+      expect(batchOps.length).toBe(2);
+      expect(batchOps[0].type).toBe('delete');
+      expect(batchOps[1].type).toBe('set');
+      expect(batchOps[1].data.ticker).toBe('HGLG11');
+      expect(batchOps[1].data.transferredPrice).toBe(110.5);
+      expect(batchOps[1].data.targetPrice).toBe(120);
+    });
+
+    it('deve retornar 404 se posição não existe', async () => {
+      firestoreMock = createFirestoreMockWithFridge([], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/inexistente/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-1', targetPrice: 120 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toContain('Position not found');
+    });
+
+    it('deve retornar 404 se geladeira não existe', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], []);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-inexistente', targetPrice: 120 });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toContain('Fridge not found');
+    });
+
+    it('deve retornar 400 se fridgeId não informado', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ targetPrice: 120 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('fridgeId');
+    });
+
+    it('deve retornar 400 se targetPrice não informado', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-1' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('targetPrice');
+    });
+
+    it('deve retornar 400 se targetPrice é negativo', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-1', targetPrice: -5 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('targetPrice');
+    });
+
+    it('deve retornar 401 sem token de autenticação', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .send({ fridgeId: 'fridge-1', targetPrice: 120 });
+
+      expect(response.status).toBe(401);
+    });
+
+    it('deve retornar 500 quando o Firestore falha', async () => {
+      firestoreMock = createFailingFirestoreMock();
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+        .set('Authorization', authHeader)
+        .send({ fridgeId: 'fridge-1', targetPrice: 120 });
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');

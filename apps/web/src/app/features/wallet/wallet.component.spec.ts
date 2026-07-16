@@ -8,12 +8,14 @@ import { of, throwError } from 'rxjs';
 import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
-import { Wallet, Position } from 'dindin-models';
+import { FridgeService } from '../../core/services/fridge.service';
+import { Wallet, Position, Fridge, FridgeItem } from 'dindin-models';
 
 describe('WalletComponent', () => {
   let fixture: ComponentFixture<WalletComponent>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let positionServiceMock: jasmine.SpyObj<PositionService>;
+  let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
 
   const wallets: Wallet[] = [
     {
@@ -21,6 +23,16 @@ describe('WalletComponent', () => {
       ownerId: 'user-123',
       name: 'Carteira Principal',
       currency: 'BRL',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  ];
+
+  const fridges: Fridge[] = [
+    {
+      id: 'fridge-1',
+      ownerId: 'user-123',
+      name: 'Geladeira Principal',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     },
@@ -63,16 +75,20 @@ describe('WalletComponent', () => {
       'create',
       'update',
       'delete',
+      'moveToFridge',
     ]);
+    fridgeServiceMock = jasmine.createSpyObj('FridgeService', ['listFridges']);
 
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
+    fridgeServiceMock.listFridges.and.returnValue(of(fridges));
 
     await TestBed.configureTestingModule({
       imports: [WalletComponent],
       providers: [
         { provide: WalletService, useValue: walletServiceMock },
         { provide: PositionService, useValue: positionServiceMock },
+        { provide: FridgeService, useValue: fridgeServiceMock },
       ],
     }).compileComponents();
 
@@ -401,5 +417,169 @@ describe('WalletComponent', () => {
     expect(
       fixture.componentInstance.form.get('averagePrice')?.valid,
     ).toBeTrue();
+  });
+
+  describe('moveToFridge', () => {
+    it('deve exibir botão "Geladeira" em cada linha da tabela', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      const fridgeButtons = compiled.querySelectorAll(
+        '[data-testid^="btn-mover-geladeira-"]',
+      );
+      expect(fridgeButtons.length).toBe(2);
+    });
+
+    it('deve abrir modal de mover ao clicar no botão', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      const fridgeButton = compiled.querySelector(
+        '[data-testid="btn-mover-geladeira-0"]',
+      ) as HTMLButtonElement;
+      fridgeButton.click();
+      fixture.detectChanges();
+
+      const modal = compiled.querySelector(
+        '[data-testid="mover-confirm-modal"]',
+      );
+      expect(modal).toBeTruthy();
+      expect(modal?.textContent).toContain('HGLG11');
+    });
+
+    it('deve listar geladeiras no select do modal', () => {
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const select = compiled.querySelector(
+        '[data-testid="mover-fridge-select"]',
+      ) as HTMLSelectElement;
+      expect(select).toBeTruthy();
+      expect(select.options.length).toBe(1);
+      expect(select.options[0].textContent).toContain('Geladeira Principal');
+    });
+
+    it('deve chamar moveToFridge com dados corretos ao confirmar', fakeAsync(() => {
+      const fridgeItem: FridgeItem = {
+        id: 'new-fridge-item-id',
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 10,
+        transferredPrice: 110.5,
+        targetPrice: 120,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      };
+      positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
+      positionServiceMock.list.and.returnValue(of(positions.slice(1)));
+
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.componentInstance.moveToFridgeForm.patchValue({
+        fridgeId: 'fridge-1',
+        targetPrice: '120',
+      });
+      fixture.componentInstance.confirmMoveToFridge();
+      tick();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.moveToFridge).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-1',
+        { fridgeId: 'fridge-1', targetPrice: 120 },
+      );
+    }));
+
+    it('deve recarregar posições após mover com sucesso', fakeAsync(() => {
+      const fridgeItem: FridgeItem = {
+        id: 'new-fridge-item-id',
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 10,
+        transferredPrice: 110.5,
+        targetPrice: 120,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      };
+      positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
+      positionServiceMock.list.and.returnValue(of(positions.slice(1)));
+
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.componentInstance.moveToFridgeForm.patchValue({
+        fridgeId: 'fridge-1',
+        targetPrice: '120',
+      });
+      fixture.componentInstance.confirmMoveToFridge();
+      tick();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
+      expect(fixture.componentInstance.moveToFridgePosition()).toBeNull();
+    }));
+
+    it('deve exibir erro no modal quando moveToFridge falha', fakeAsync(() => {
+      positionServiceMock.moveToFridge.and.returnValue(
+        throwError(() => new Error('Server error')),
+      );
+
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.componentInstance.moveToFridgeForm.patchValue({
+        fridgeId: 'fridge-1',
+        targetPrice: '120',
+      });
+      fixture.componentInstance.confirmMoveToFridge();
+      tick();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const errorEl = compiled.querySelector('[data-testid="mover-error"]');
+      expect(errorEl?.textContent).toContain('Erro ao mover posição');
+    }));
+
+    it('deve fechar modal ao clicar em Cancelar', () => {
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.detectChanges();
+
+      fixture.componentInstance.closeMoveToFridge();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.moveToFridgePosition()).toBeNull();
+    });
+
+    it('deve fechar modal ao pressionar Esc', () => {
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.detectChanges();
+
+      fixture.componentInstance.onEscapeKey();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.moveToFridgePosition()).toBeNull();
+    });
+
+    it('deve fazer parse de targetPrice com vírgula decimal', fakeAsync(() => {
+      const fridgeItem: FridgeItem = {
+        id: 'new-fridge-item-id',
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 10,
+        transferredPrice: 110.5,
+        targetPrice: 12.5,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      };
+      positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
+      positionServiceMock.list.and.returnValue(of(positions.slice(1)));
+
+      fixture.componentInstance.openMoveToFridge(positions[0]);
+      fixture.componentInstance.moveToFridgeForm.patchValue({
+        fridgeId: 'fridge-1',
+        targetPrice: '12,50',
+      });
+      fixture.componentInstance.confirmMoveToFridge();
+      tick();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.moveToFridge).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-1',
+        { fridgeId: 'fridge-1', targetPrice: 12.5 },
+      );
+    }));
   });
 });
