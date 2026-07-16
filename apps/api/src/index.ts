@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import express, { Request, Response, NextFunction } from 'express';
 import { authMiddleware, AuthRequest } from './middleware/auth.middleware';
@@ -29,6 +30,7 @@ import {
   listItems,
   updateItem,
 } from './wallet/fridge.controller';
+import { updateAllQuotes } from './quotes/update-quotes.handler';
 
 admin.initializeApp();
 
@@ -100,4 +102,12 @@ app.use(
 );
 
 export const api = functions.https.onRequest(app);
+
+// Cloud Function agendada para atualizar cotações diariamente.
+// Ver issue #10 — busca cotações de FIIs via Brapi e atualiza currentPrice
+// em todas as posições do Firestore, além de salvar histórico.
+export const updateQuotesScheduled = onSchedule('every 24 hours', async () => {
+  await updateAllQuotes();
+});
+
 export { app };
