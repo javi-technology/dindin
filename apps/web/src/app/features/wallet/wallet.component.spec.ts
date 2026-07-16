@@ -140,7 +140,7 @@ describe('WalletComponent', () => {
     expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
   }));
 
-  it('deve renderizar tabela com ticker, quantidade, valor unitário e total', () => {
+  it('deve renderizar tabela com ticker, quantidade, preço atual e total', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const rows = compiled.querySelectorAll('tbody tr');
     expect(rows.length).toBe(2);
@@ -148,14 +148,16 @@ describe('WalletComponent', () => {
     const firstRow = rows[0].textContent;
     expect(firstRow).toContain('HGLG11');
     expect(firstRow).toContain('10');
-    expect(firstRow).toMatch(/R\$\s?110,50/);
-    expect(firstRow).toMatch(/R\$\s?1\.105,00/);
+    // Exibe currentPrice (112,00) com indicador ▲ (maior que averagePrice 110,50)
+    expect(firstRow).toMatch(/R\$\s?112,00/);
+    expect(firstRow).toMatch(/R\$\s?1\.120,00/);
   });
 
   it('deve calcular e exibir o total geral', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const totalElement = compiled.querySelector('[data-testid="total-geral"]');
-    expect(totalElement?.textContent).toMatch(/R\$\s?1\.755,00/);
+    // 10 * 112 + 5 * 132 = 1.780,00
+    expect(totalElement?.textContent).toMatch(/R\$\s?1\.780,00/);
   });
 
   it('deve abrir formulário ao clicar em adicionar posição', () => {

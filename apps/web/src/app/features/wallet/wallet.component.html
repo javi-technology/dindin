@@ -91,10 +91,10 @@
                     Quantidade
                   </th>
                   <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Valor unitário
+                    Preço atual
                   </th>
                   <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Total investido
+                    Total
                   </th>
                   <th
                     class="py-3 px-4 text-sm font-semibold text-gray-700 text-right"
@@ -119,7 +119,27 @@
                       {{ position.quantity }}
                     </td>
                     <td class="py-3 px-4 text-gray-700">
-                      {{ formatCurrency(position.averagePrice) }}
+                      {{ formatCurrency(unitPrice(position)) }}
+                      @if (
+                        position.currentPrice != null &&
+                        position.currentPrice !== position.averagePrice
+                      ) {
+                        <span
+                          class="text-xs ml-1"
+                          [class.text-green-600]="
+                            position.currentPrice > position.averagePrice
+                          "
+                          [class.text-red-600]="
+                            position.currentPrice < position.averagePrice
+                          "
+                        >
+                          {{
+                            position.currentPrice > position.averagePrice
+                              ? '▲'
+                              : '▼'
+                          }}
+                        </span>
+                      }
                     </td>
                     <td class="py-3 px-4 text-gray-700">
                       {{ formatCurrency(totalPosition(position)) }}

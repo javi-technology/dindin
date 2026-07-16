@@ -78,15 +78,20 @@ export class WalletComponent implements OnInit {
     currentPrice: ['', [decimalValidator()]],
   });
 
+  /** Retorna o preço unitário atual (mercado) ou o preço médio como fallback. */
+  unitPrice = (position: Position): number =>
+    position.currentPrice ?? position.averagePrice;
+
+  /** Retorna o valor total da posição (quantidade × preço unitário atual). */
+  totalPosition = (position: Position): number =>
+    position.quantity * this.unitPrice(position);
+
   totalGeral = computed(() =>
     this.positions().reduce(
-      (sum, position) => sum + position.quantity * position.averagePrice,
+      (sum, position) => sum + this.totalPosition(position),
       0,
     ),
   );
-
-  totalPosition = (position: Position): number =>
-    position.quantity * position.averagePrice;
 
   ngOnInit(): void {
     this.loadWallets();
