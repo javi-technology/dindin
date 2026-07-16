@@ -1,0 +1,36 @@
+{
+  "name": "DinDin Dev Environment",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "runArgs": ["--name", "dindin-dev"],
+  "mounts": ["source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "angular.ng-template",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-azure-tools.vscode-azure-cli"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "files.autoSave": "onFocusChange",
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[html]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[scss]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        }
+      }
+    }
+  },
+  "forwardPorts": [4000, 4200, 5001, 5002, 8080, 9099],
+  "remoteUser": "vscode",
+  "postCreateCommand": "npm install && chmod 600 /home/vscode/.ssh/id_* 2>/dev/null; ssh-keyscan github.com >> /home/vscode/.ssh/known_hosts 2>/dev/null"
+}

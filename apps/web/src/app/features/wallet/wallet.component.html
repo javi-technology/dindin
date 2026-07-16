@@ -60,7 +60,7 @@
         }
 
         @if (wallets().length > 0) {
-          <div class="flex justify-end mb-4">
+          <div class="flex justify-end items-center mb-4">
             <button
               data-testid="btn-adicionar"
               class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
@@ -109,7 +109,9 @@
                   track position.id;
                   let i = $index
                 ) {
-                  <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <tr
+                    class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  >
                     <td class="py-3 px-4 text-gray-900 font-medium">
                       {{ position.ticker }}
                     </td>
@@ -130,6 +132,14 @@
                       >
                         <svg lucidePencil [size]="14" class="mr-1"></svg>
                         Editar
+                      </button>
+                      <button
+                        [attr.data-testid]="'btn-mover-geladeira-' + i"
+                        class="text-cyan-600 hover:text-cyan-800 font-medium text-sm mr-3 inline-flex items-center"
+                        (click)="openMoveToFridge(position)"
+                      >
+                        <svg lucideRefrigerator [size]="14" class="mr-1"></svg>
+                        Geladeira
                       </button>
                       <button
                         [attr.data-testid]="'btn-remover-' + i"
@@ -362,6 +372,101 @@
             Remover
           </button>
         </div>
+      </div>
+    </div>
+  }
+
+  @if (moveToFridgePosition()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      data-testid="mover-confirm-modal"
+    >
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-2">
+          Mover para geladeira
+        </h2>
+        <p class="text-gray-600 mb-4">
+          Transferir <strong>{{ moveToFridgePosition()?.ticker }}</strong> da
+          carteira para a geladeira.
+        </p>
+
+        @if (moveToFridgeError()) {
+          <div
+            class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
+            data-testid="mover-error"
+          >
+            {{ moveToFridgeError() }}
+          </div>
+        }
+
+        <form
+          [formGroup]="moveToFridgeForm"
+          (ngSubmit)="confirmMoveToFridge()"
+          class="space-y-4"
+        >
+          <div>
+            <label
+              for="mover-fridge-select"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Geladeira de destino</label
+            >
+            <select
+              id="mover-fridge-select"
+              formControlName="fridgeId"
+              data-testid="mover-fridge-select"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              @for (fridge of fridges(); track fridge.id) {
+                <option [value]="fridge.id">{{ fridge.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label
+              for="mover-target-price"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Preço-alvo</label
+            >
+            <input
+              id="mover-target-price"
+              type="text"
+              inputmode="decimal"
+              formControlName="targetPrice"
+              data-testid="mover-target-price"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              [class.border-red-500]="
+                moveToFridgeForm.get('targetPrice')?.invalid &&
+                moveToFridgeForm.get('targetPrice')?.touched
+              "
+            />
+            @if (
+              moveToFridgeForm.get('targetPrice')?.invalid &&
+              moveToFridgeForm.get('targetPrice')?.touched
+            ) {
+              <p class="text-red-600 text-xs mt-1">
+                Informe um preço-alvo válido.
+              </p>
+            }
+          </div>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+              (click)="closeMoveToFridge()"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50"
+              [disabled]="moveToFridgeForm.invalid"
+            >
+              Mover
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   }

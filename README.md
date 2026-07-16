@@ -1,4 +1,4 @@
-# DinDin 
+# DinDin
 
 [![CI](https://github.com/javi-technology/dindin/actions/workflows/ci.yml/badge.svg)](https://github.com/javi-technology/dindin/actions/workflows/ci.yml)
 

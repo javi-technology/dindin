@@ -5,6 +5,8 @@
 //   users/{userId}/wallets/{walletId}/positions/{positionId}
 //   users/{userId}/fridges/{fridgeId}
 //   users/{userId}/fridges/{fridgeId}/fridgeItems/{itemId}
+//   quotes/{ticker}
+//   quotes/{ticker}/history/{date}
 
 /** Documento raiz do usuário — coleção `users` */
 export interface User {
@@ -39,6 +41,10 @@ export interface Position {
   quantity: number;
   averagePrice: number; // preço médio de compra (BRL)
   currentPrice?: number; // último preço conhecido
+  /** Indica se a posição está na geladeira (acompanhamento para venda). */
+  inFridge: boolean;
+  /** Preço-alvo para venda quando na geladeira. */
+  targetPrice?: number;
   sector?: string;
   notes?: string;
   createdAt: string;
@@ -60,10 +66,27 @@ export interface FridgeItem {
   id: string;
   fridgeId: string; // fridges/{fridgeId}
   ticker: string;
-  assetType: AssetType;
-  targetPrice?: number; // preço-alvo para compra
+  quantity: number;
+  transferredPrice: number; // preço de transferência (quando saiu da carteira)
+  targetPrice: number; // preço-alvo para voltar à carteira
   currentPrice?: number;
+  assetType?: AssetType;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Cotação atual de um ticker — documento principal em `quotes` */
+export interface Quote {
+  ticker: string;
+  price: number;
+  updatedAt: string; // ISO-8601
+  source: string; // ex: "brapi"
+}
+
+/** Registro histórico de cotação — subcoleção `quotes/{ticker}/history` */
+export interface QuoteHistory {
+  date: string; // YYYY-MM-DD
+  price: number;
+  source: string;
 }

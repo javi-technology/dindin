@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Position, AssetType } from 'dindin-models';
+import { FieldValue } from 'firebase-admin/firestore';
+import { Position, AssetType, FridgeItem } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const ASSET_TYPES = new Set<AssetType>([
@@ -91,6 +92,26 @@ function validatePositionBody(
     };
   }
 
+  if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
+    return {
+      valid: false,
+      error: 'inFridge must be a boolean',
+    };
+  }
+
+  if (
+    body.targetPrice !== undefined &&
+    body.targetPrice !== null &&
+    (typeof body.targetPrice !== 'number' ||
+      body.targetPrice < 0 ||
+      !Number.isFinite(body.targetPrice))
+  ) {
+    return {
+      valid: false,
+      error: 'Target price must be a non-negative number',
+    };
+  }
+
   return { valid: true };
 }
 
@@ -138,12 +159,17 @@ export async function createPosition(
       assetType: body.assetType!,
       quantity: body.quantity!,
       averagePrice: body.averagePrice!,
+      inFridge: body.inFridge ?? false,
       createdAt: now,
       updatedAt: now,
     };
 
     if (body.currentPrice !== undefined) {
       positionData.currentPrice = body.currentPrice;
+    }
+
+    if (body.targetPrice !== undefined) {
+      positionData.targetPrice = body.targetPrice;
     }
 
     const docRef = await positionsCollection(uid(req), walletId).add(
@@ -218,6 +244,14 @@ export async function updatePosition(
       updates.averagePrice = body.averagePrice;
     if (body.currentPrice !== undefined)
       updates.currentPrice = body.currentPrice;
+    if (body.inFridge !== undefined) updates.inFridge = body.inFridge;
+    if (body.targetPrice !== undefined) {
+      if (body.targetPrice === null) {
+        (updates as Record<string, unknown>).targetPrice = FieldValue.delete();
+      } else {
+        updates.targetPrice = body.targetPrice;
+      }
+    }
 
     await positionRef.update(updates);
 
@@ -257,6 +291,97 @@ export async function deletePosition(
       uid: uid(req),
       walletId: req.params.walletId,
       positionId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function moveToFridge(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = uid(req);
+    const { walletId, id: positionId } = req.params;
+    const { fridgeId, targetPrice } = req.body as {
+      fridgeId?: string;
+      targetPrice?: number;
+    };
+
+    // Validação dos campos obrigatórios
+    if (!fridgeId || typeof fridgeId !== 'string') {
+      res.status(400).json({ error: 'fridgeId is required' });
+      return;
+    }
+
+    if (
+      targetPrice === undefined ||
+      targetPrice === null ||
+      typeof targetPrice !== 'number' ||
+      targetPrice < 0 ||
+      !Number.isFinite(targetPrice)
+    ) {
+      res.status(400).json({
+        error: 'targetPrice is required and must be a non-negative number',
+      });
+      return;
+    }
+
+    // Verifica se a posição existe
+    const positionRef = positionsCollection(userId, walletId).doc(positionId);
+    const positionDoc = await positionRef.get();
+
+    if (!positionDoc.exists) {
+      res.status(404).json({ error: 'Position not found' });
+      return;
+    }
+
+    const positionData = positionDoc.data() as Position;
+
+    // Verifica se a geladeira existe
+    const fridgeRef = admin
+      .firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('fridges')
+      .doc(fridgeId);
+    const fridgeDoc = await fridgeRef.get();
+
+    if (!fridgeDoc.exists) {
+      res.status(404).json({ error: 'Fridge not found' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const fridgeItemRef = fridgeRef.collection('fridgeItems').doc();
+
+    const fridgeItemData: Omit<FridgeItem, 'id'> = {
+      fridgeId,
+      ticker: positionData.ticker,
+      quantity: positionData.quantity,
+      transferredPrice: positionData.averagePrice,
+      targetPrice,
+      assetType: positionData.assetType,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (positionData.currentPrice !== undefined) {
+      fridgeItemData.currentPrice = positionData.currentPrice;
+    }
+
+    // Operação atômica: remove posição e cria item na geladeira
+    const batch = admin.firestore().batch();
+    batch.delete(positionRef);
+    batch.set(fridgeItemRef, fridgeItemData);
+    await batch.commit();
+
+    res.status(201).json({ id: fridgeItemRef.id, ...fridgeItemData });
+  } catch (error) {
+    console.error('[moveToFridge] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      positionId: req.params.id,
+      body: req.body,
       message: (error as Error).message,
       stack: (error as Error).stack,
     });

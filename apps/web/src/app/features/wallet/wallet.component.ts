@@ -8,34 +8,27 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  AbstractControl,
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
-  ValidationErrors,
-  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
-import { Wallet, Position, AssetType } from 'dindin-models';
+import { FridgeService } from '../../core/services/fridge.service';
+import { Wallet, Position, AssetType, Fridge } from 'dindin-models';
+import {
+  decimalValidator,
+  formatCurrency,
+  parseDecimal,
+} from '../../shared/utils/format.util';
 import {
   LucideWallet,
   LucidePlus,
   LucidePencil,
   LucideTrash2,
+  LucideRefrigerator,
 } from '@lucide/angular';
-
-/** Valida que o valor é um número decimal válido (aceita vírgula ou ponto). */
-function decimalValidator(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const value = control.value;
-    if (value == null || value === '') return null;
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? { invalidDecimal: true } : null;
-  };
-}
 
 @Component({
   selector: 'app-wallet',
@@ -47,12 +40,14 @@ function decimalValidator(): ValidatorFn {
     LucidePlus,
     LucidePencil,
     LucideTrash2,
+    LucideRefrigerator,
   ],
   templateUrl: './wallet.component.html',
 })
 export class WalletComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly positionService = inject(PositionService);
+  private readonly fridgeService = inject(FridgeService);
   private readonly fb = inject(FormBuilder);
 
   wallets = signal<Wallet[]>([]);
@@ -65,6 +60,15 @@ export class WalletComponent implements OnInit {
   formVisible = signal(false);
   formError = signal<string | null>(null);
   deleteConfirmPosition = signal<Position | null>(null);
+
+  fridges = signal<Fridge[]>([]);
+  moveToFridgePosition = signal<Position | null>(null);
+  moveToFridgeError = signal<string | null>(null);
+
+  moveToFridgeForm: FormGroup = this.fb.group({
+    fridgeId: ['', [Validators.required]],
+    targetPrice: ['0', [Validators.required, decimalValidator()]],
+  });
 
   form: FormGroup = this.fb.group({
     ticker: ['', [Validators.required]],
@@ -86,6 +90,14 @@ export class WalletComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadWallets();
+    this.loadFridges();
+  }
+
+  private loadFridges(): void {
+    this.fridgeService.listFridges().subscribe({
+      next: (response) => this.fridges.set(response),
+      error: () => {},
+    });
   }
 
   private loadWallets(): void {
@@ -138,7 +150,7 @@ export class WalletComponent implements OnInit {
     }
   }
 
-  private loadPositions(walletId: string): void {
+  loadPositions(walletId: string): void {
     this.loading.set(true);
     this.positionService.list(walletId).subscribe({
       next: (response) => {
@@ -280,28 +292,69 @@ export class WalletComponent implements OnInit {
     this.deleteConfirmPosition.set(null);
   }
 
+  openMoveToFridge(position: Position): void {
+    this.moveToFridgePosition.set(position);
+    this.moveToFridgeError.set(null);
+    this.moveToFridgeForm.reset({
+      fridgeId: this.fridges().length > 0 ? this.fridges()[0].id : '',
+      targetPrice: '0',
+    });
+  }
+
+  closeMoveToFridge(): void {
+    this.moveToFridgePosition.set(null);
+    this.moveToFridgeError.set(null);
+  }
+
+  confirmMoveToFridge(): void {
+    if (this.moveToFridgeForm.invalid) {
+      this.moveToFridgeForm.markAllAsTouched();
+      return;
+    }
+
+    const position = this.moveToFridgePosition();
+    const wallet = this.selectedWallet();
+    if (!position || !wallet) return;
+
+    const fridgeId = this.moveToFridgeForm.value.fridgeId as string;
+    const targetPrice = this.parseDecimal(
+      this.moveToFridgeForm.value.targetPrice,
+    );
+
+    if (!fridgeId || targetPrice === null || targetPrice < 0) {
+      this.moveToFridgeError.set('Preencha todos os campos corretamente.');
+      return;
+    }
+
+    this.positionService
+      .moveToFridge(wallet.id, position.id, { fridgeId, targetPrice })
+      .subscribe({
+        next: () => {
+          this.closeMoveToFridge();
+          this.loadPositions(wallet.id);
+        },
+        error: () => {
+          this.moveToFridgeError.set(
+            'Erro ao mover posição para a geladeira. Tente novamente.',
+          );
+        },
+      });
+  }
+
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
-    if (this.deleteConfirmPosition()) {
+    if (this.moveToFridgePosition()) {
+      this.closeMoveToFridge();
+    } else if (this.deleteConfirmPosition()) {
       this.cancelDelete();
     } else if (this.formVisible()) {
       this.closeForm();
     }
   }
 
-  formatCurrency(value: number): string {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  }
+  formatCurrency = formatCurrency;
 
   private parseDecimal(value: string | number | null): number | null {
-    if (value == null || value === '') {
-      return null;
-    }
-    const normalized = String(value).trim().replace(/,/g, '.');
-    const parsed = Number(normalized);
-    return Number.isNaN(parsed) ? null : parsed;
+    return parseDecimal(value);
   }
 }

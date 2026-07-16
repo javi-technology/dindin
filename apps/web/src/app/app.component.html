@@ -1,5 +1,9 @@
 <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-  <h1 class="text-xl font-bold text-gray-900">DinDin</h1>
+  <a
+    routerLink="/"
+    class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+    >DinDin</a
+  >
   <div class="flex items-center gap-4">
     @if (user(); as currentUser) {
       <span class="text-sm text-gray-700">{{ currentUser.email }}</span>
