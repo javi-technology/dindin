@@ -5,6 +5,8 @@
 //   users/{userId}/wallets/{walletId}/positions/{positionId}
 //   users/{userId}/fridges/{fridgeId}
 //   users/{userId}/fridges/{fridgeId}/fridgeItems/{itemId}
+//   quotes/{ticker}
+//   quotes/{ticker}/history/{date}
 
 /** Documento raiz do usuário — coleção `users` */
 export interface User {
@@ -72,4 +74,19 @@ export interface FridgeItem {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Cotação atual de um ticker — documento principal em `quotes` */
+export interface Quote {
+  ticker: string;
+  price: number;
+  updatedAt: string; // ISO-8601
+  source: string; // ex: "brapi"
+}
+
+/** Registro histórico de cotação — subcoleção `quotes/{ticker}/history` */
+export interface QuoteHistory {
+  date: string; // YYYY-MM-DD
+  price: number;
+  source: string;
 }
