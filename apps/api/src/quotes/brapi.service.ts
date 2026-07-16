@@ -24,9 +24,16 @@ export async function fetchQuotes(
 
   const token = process.env.BRAPI_API_KEY;
   const tickerList = tickers.join(',');
-  const url = `${BRAPI_BASE_URL}/${tickerList}?token=${token}`;
+  const url = `${BRAPI_BASE_URL}/${tickerList}`;
 
-  const response = await fetch(url);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { headers });
 
   if (!response.ok) {
     throw new Error(`Brapi API returned status ${response.status}`);

@@ -75,7 +75,7 @@ describe('BrapiService — fetchQuotes', () => {
       expect(result.get('KNRI11')?.price).toBe(152.0);
     });
 
-    it('deve chamar a URL correta com os tickers e token', async () => {
+    it('deve chamar a URL correta com os tickers e Authorization header', async () => {
       const fetchMock = jest.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -88,7 +88,13 @@ describe('BrapiService — fetchQuotes', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const url = fetchMock.mock.calls[0][0] as string;
       expect(url).toContain('brapi.dev/api/quote/HGLG11,MXRF11');
-      expect(url).toContain('token=test-api-key');
+      expect(url).not.toContain('token=');
+
+      const options = fetchMock.mock.calls[0][1] as Record<string, unknown>;
+      expect(options).toBeDefined();
+      expect((options.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer test-api-key',
+      );
     });
   });
 
