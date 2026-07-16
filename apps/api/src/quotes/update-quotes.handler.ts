@@ -5,6 +5,7 @@ import { saveQuoteHistory } from './quote-history.service';
 interface QuoteUpdateResult {
   ticker: string;
   positionsUpdated: number;
+  fridgeItemsUpdated: number;
 }
 
 async function updatePositionsForTicker(
@@ -31,27 +32,55 @@ async function updatePositionsForTicker(
   return positionsForTicker.docs.length;
 }
 
+async function updateFridgeItemsForTicker(
+  ticker: string,
+  price: number,
+): Promise<number> {
+  const itemsForTicker = await admin
+    .firestore()
+    .collectionGroup('fridgeItems')
+    .where('ticker', '==', ticker)
+    .get();
+
+  if (itemsForTicker.docs.length === 0) {
+    return 0;
+  }
+
+  const batch = admin.firestore().batch();
+  const now = new Date().toISOString();
+
+  for (const doc of itemsForTicker.docs) {
+    batch.update(doc.ref, {
+      currentPrice: price,
+      updatedAt: now,
+    });
+  }
+
+  await batch.commit();
+  return itemsForTicker.docs.length;
+}
+
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
 ): Promise<QuoteUpdateResult> {
   try {
-    const positionsUpdated = await updatePositionsForTicker(
-      ticker,
-      quote.price,
-    );
+    const [positionsUpdated, fridgeItemsUpdated] = await Promise.all([
+      updatePositionsForTicker(ticker, quote.price),
+      updateFridgeItemsForTicker(ticker, quote.price),
+    ]);
     await saveQuoteHistory(ticker, quote.price, 'brapi');
 
     console.log(
-      `[updateAllQuotes] ${ticker}: ${positionsUpdated} posição(ões) atualizada(s) para R$ ${quote.price}.`,
+      `[updateAllQuotes] ${ticker}: ${positionsUpdated} posição(ões) e ${fridgeItemsUpdated} item(ns) na geladeira atualizado(s) para R$ ${quote.price}.`,
     );
 
-    return { ticker, positionsUpdated };
+    return { ticker, positionsUpdated, fridgeItemsUpdated };
   } catch (error) {
     console.error(`[updateAllQuotes] Erro ao atualizar ${ticker}:`, {
       message: (error as Error).message,
     });
-    return { ticker, positionsUpdated: 0 };
+    return { ticker, positionsUpdated: 0, fridgeItemsUpdated: 0 };
   }
 }
 
@@ -95,22 +124,42 @@ export async function updateAllQuotes(): Promise<void> {
       return;
     }
 
+    const tickerEntries = [...quotes.entries()];
     const results: QuoteUpdateResult[] = [];
-    for (const [ticker, quote] of quotes) {
-      const result = await processTickerQuote(ticker, quote);
-      results.push(result);
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
+      const batch = tickerEntries.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(([ticker, quote]) => processTickerQuote(ticker, quote)),
+      );
+
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          console.error('[updateAllQuotes] Erro em lote de tickers:', {
+            message: result.reason?.message ?? String(result.reason),
+          });
+        }
+      }
     }
 
-    const totalUpdated = results.reduce(
+    const totalPositionsUpdated = results.reduce(
       (sum, r) => sum + r.positionsUpdated,
       0,
     );
+    const totalFridgeUpdated = results.reduce(
+      (sum, r) => sum + r.fridgeItemsUpdated,
+      0,
+    );
     console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} ticker(s) atualizado(s), ${totalUpdated} posição(ões) afetada(s).`,
+      `[updateAllQuotes] Concluído. ${quotes.size} ticker(s) atualizado(s), ${totalPositionsUpdated} posição(ões) e ${totalFridgeUpdated} item(ns) na geladeira afetado(s).`,
     );
   } catch (error) {
     console.error('[updateAllQuotes] error:', {
       message: (error as Error).message,
     });
+    throw error;
   }
 }

@@ -39,7 +39,26 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
     };
   }
 
-  function mockCollectionGroup(docs: ReturnType<typeof createPositionDoc>[]) {
+  function createFridgeItemDoc(ticker: string, currentPrice?: number) {
+    return {
+      id: `fridge-${ticker}`,
+      ref: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      data: () => ({
+        ticker,
+        quantity: 5,
+        transferredPrice: 90,
+        targetPrice: 100,
+        currentPrice,
+      }),
+    };
+  }
+
+  function mockCollectionGroup(
+    positionDocs: ReturnType<typeof createPositionDoc>[],
+    fridgeDocs: ReturnType<typeof createFridgeItemDoc>[] = [],
+  ) {
     const batchCommit = jest.fn().mockResolvedValue(undefined);
     const batchUpdate = jest.fn();
     const batchMock = {
@@ -51,10 +70,20 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       collectionGroup: jest.fn((name: string) => {
         if (name === 'positions') {
           return {
-            get: jest.fn().mockResolvedValue({ docs }),
+            get: jest.fn().mockResolvedValue({ docs: positionDocs }),
             where: jest.fn((field: string, _op: string, value: string) => ({
               get: jest.fn().mockResolvedValue({
-                docs: docs.filter((d) => d.data().ticker === value),
+                docs: positionDocs.filter((d) => d.data().ticker === value),
+              }),
+            })),
+          };
+        }
+        if (name === 'fridgeItems') {
+          return {
+            get: jest.fn().mockResolvedValue({ docs: fridgeDocs }),
+            where: jest.fn((field: string, _op: string, value: string) => ({
+              get: jest.fn().mockResolvedValue({
+                docs: fridgeDocs.filter((d) => d.data().ticker === value),
               }),
             })),
           };
@@ -111,9 +140,13 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(tickers).toContain('MXRF11');
     });
 
-    it('deve atualizar currentPrice em todas as posições do ticker', async () => {
+    it('deve atualizar currentPrice em posições e fridgeItems do ticker', async () => {
       const docs = [createPositionDoc('HGLG11'), createPositionDoc('HGLG11')];
-      const { batchUpdate, batchCommit } = mockCollectionGroup(docs);
+      const fridgeDocs = [createFridgeItemDoc('HGLG11')];
+      const { batchUpdate, batchCommit } = mockCollectionGroup(
+        docs,
+        fridgeDocs,
+      );
       mockFetchQuotes.mockResolvedValue(
         new Map([
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
@@ -122,7 +155,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
       await updateAllQuotes();
 
-      expect(batchUpdate).toHaveBeenCalledTimes(2);
+      // 2 posições + 1 fridgeItem = 3 updates no batch
+      expect(batchUpdate).toHaveBeenCalledTimes(3);
       expect(batchCommit).toHaveBeenCalled();
     });
 
