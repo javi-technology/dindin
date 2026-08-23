@@ -272,6 +272,68 @@ describe('Firestore rules – fridgeItems', () => {
 });
 
 // ---------------------------------------------------------------------------
+// dividends
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – dividends', () => {
+  it('deve permitir que usuário leia seus próprios dividends', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const ref = doc(alice.firestore(), 'users/alice/dividends/div-1');
+
+    await assertSucceeds(
+      setDoc(ref, {
+        ticker: 'HGLG11',
+        amountPerShare: 0.82,
+        quantity: 100,
+        totalAmount: 82,
+        paymentDate: '2026-01-15',
+      }),
+    );
+    const snapshot = await assertSucceeds(getDoc(ref));
+
+    expect(snapshot.data()?.ticker).toBe('HGLG11');
+  });
+
+  it('deve negar que usuário leia dividends de outro usuário', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const bob = testEnv.authenticatedContext('bob');
+
+    await assertSucceeds(
+      setDoc(doc(alice.firestore(), 'users/alice/dividends/div-1'), {
+        ticker: 'HGLG11',
+        amountPerShare: 0.82,
+        quantity: 100,
+        totalAmount: 82,
+        paymentDate: '2026-01-15',
+      }),
+    );
+    await assertFails(
+      getDoc(doc(bob.firestore(), 'users/alice/dividends/div-1')),
+    );
+  });
+
+  it('deve negar que usuário escreva em dividends de outro usuário', async () => {
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(
+      setDoc(doc(bob.firestore(), 'users/alice/dividends/div-1'), {
+        ticker: 'HGLG11',
+        amountPerShare: 0.82,
+        quantity: 100,
+        totalAmount: 82,
+        paymentDate: '2026-01-15',
+      }),
+    );
+  });
+
+  it('deve negar acesso não autenticado a dividends', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(
+      getDoc(doc(unauth.firestore(), 'users/alice/dividends/div-1')),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 

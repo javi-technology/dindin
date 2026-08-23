@@ -5,6 +5,7 @@ import {
   Fridge,
   FridgeItem,
   AssetType,
+  Dividend,
 } from 'dindin-models';
 
 // ---------------------------------------------------------------------------
@@ -144,5 +145,40 @@ describe('models – FridgeItem', () => {
     };
     expect(item.ticker).toBe('XPML11');
     expect(item.targetPrice).toBe(100.0);
+  });
+});
+
+describe('models – Dividend', () => {
+  it('deve aceitar um objeto Dividend válido', () => {
+    const dividend: Dividend = {
+      id: 'div-1',
+      userId: 'user-1',
+      ticker: 'HGLG11',
+      assetType: 'FII',
+      amountPerShare: 0.82,
+      quantity: 100,
+      totalAmount: 82,
+      paymentDate: '2026-01-15',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    expect(dividend.ticker).toBe('HGLG11');
+    expect(dividend.amountPerShare).toBe(0.82);
+    expect(dividend.totalAmount).toBe(82);
+  });
+
+  it('deve aceitar assetType opcional', () => {
+    const dividend: Dividend = {
+      id: 'div-2',
+      userId: 'user-1',
+      ticker: 'MXRF11',
+      amountPerShare: 0.1,
+      quantity: 500,
+      totalAmount: 50,
+      paymentDate: '2026-02-10',
+      createdAt: '2026-02-01T00:00:00Z',
+      updatedAt: '2026-02-01T00:00:00Z',
+    };
+    expect(dividend.assetType).toBeUndefined();
   });
 });
