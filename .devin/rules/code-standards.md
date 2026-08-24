@@ -1,5 +1,5 @@
 ---
-description: "Padrões de UX e código do DinDin: ícones, formatação, locale, confirmações e logs"
+description: 'Padrões de UX e código do DinDin: ícones, formatação, locale, confirmações e logs'
 trigger: always_on
 ---
 

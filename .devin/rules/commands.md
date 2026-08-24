@@ -1,5 +1,5 @@
 ---
-description: "Comandos principais do monorepo DinDin (build, testes, emuladores, deploy)"
+description: 'Comandos principais do monorepo DinDin (build, testes, emuladores, deploy)'
 trigger: always_on
 ---
 
