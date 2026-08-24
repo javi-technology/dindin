@@ -235,6 +235,247 @@ function createPositionSnapshot(position: Position) {
   };
 }
 
+function createWalletSnapshot(
+  walletId: string,
+  wallet: {
+    id: string;
+    ownerId: string;
+    name: string;
+    currency: string;
+    createdAt: string;
+    updatedAt: string;
+  },
+  positionsCollection: any,
+) {
+  return {
+    id: wallet.id,
+    exists: true,
+    data: () => ({ ...wallet }),
+    ref: {
+      collection: jest.fn((positionPath: string) => {
+        if (positionPath !== 'positions') {
+          throw new Error(`Unexpected subcollection: ${positionPath}`);
+        }
+        return positionsCollection;
+      }),
+    },
+  };
+}
+
+function createFirestoreMockWithWalletsAndPositions(
+  wallets: {
+    id: string;
+    ownerId: string;
+    name: string;
+    currency: string;
+    createdAt: string;
+    updatedAt: string;
+  }[] = [],
+  positionsByWallet: Record<string, Position[]> = {},
+  dividends: Dividend[] = [],
+) {
+  const dividendMap = new Map<string, any>();
+  const positionsCollections: Record<string, any> = {};
+
+  dividends.forEach((dividend) => {
+    let data = { ...dividend };
+    dividendMap.set(dividend.id, {
+      id: dividend.id,
+      get: jest.fn().mockResolvedValue(createDividendSnapshot(data)),
+      set: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      update: jest.fn().mockImplementation((value: any) => {
+        data = { ...data, ...value };
+        return Promise.resolve();
+      }),
+      delete: jest.fn().mockResolvedValue(undefined),
+    });
+  });
+
+  Object.entries(positionsByWallet).forEach(([walletId, positions]) => {
+    const positionMap = new Map<string, any>();
+    positions.forEach((position) => {
+      let data = { ...position };
+      positionMap.set(position.id, {
+        id: position.id,
+        exists: true,
+        data: () => ({ ...data }),
+        get: jest.fn().mockResolvedValue(createPositionSnapshot(data)),
+        set: jest.fn().mockImplementation((value: any) => {
+          data = { ...data, ...value };
+          return Promise.resolve();
+        }),
+        update: jest.fn().mockImplementation((value: any) => {
+          data = { ...data, ...value };
+          return Promise.resolve();
+        }),
+        delete: jest.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    positionsCollections[walletId] = {
+      doc: jest.fn((positionId: string) => {
+        if (!positionMap.has(positionId)) {
+          return {
+            id: positionId,
+            exists: false,
+            data: () => null,
+            get: jest.fn().mockResolvedValue({
+              id: positionId,
+              exists: false,
+              data: () => null,
+            }),
+            set: jest.fn().mockResolvedValue(undefined),
+            update: jest
+              .fn()
+              .mockRejectedValue(new Error('Document does not exist')),
+            delete: jest
+              .fn()
+              .mockRejectedValue(new Error('Document does not exist')),
+          };
+        }
+        return positionMap.get(positionId);
+      }),
+      add: jest.fn().mockResolvedValue({ id: 'new-position-id' }),
+      get: jest.fn().mockResolvedValue({
+        docs: Array.from(positionMap.values()).map((doc: any) => ({
+          id: doc.id,
+          exists: true,
+          data: doc.data,
+        })),
+        empty: positionMap.size === 0,
+      }),
+    };
+  });
+
+  function getPositionsCollection(walletId: string) {
+    return (
+      positionsCollections[walletId] || {
+        doc: jest.fn((positionId: string) => ({
+          id: positionId,
+          exists: false,
+          data: () => null,
+          get: jest.fn().mockResolvedValue({
+            id: positionId,
+            exists: false,
+            data: () => null,
+          }),
+          set: jest.fn().mockResolvedValue(undefined),
+          update: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+          delete: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+        })),
+        add: jest.fn().mockResolvedValue({ id: 'new-position-id' }),
+        get: jest.fn().mockResolvedValue({ docs: [], empty: true }),
+      }
+    );
+  }
+
+  const dividendsCollection = {
+    doc: jest.fn((id: string) => {
+      if (!dividendMap.has(id)) {
+        return {
+          id,
+          exists: false,
+          data: () => null,
+          get: jest
+            .fn()
+            .mockResolvedValue({ id, exists: false, data: () => null }),
+          set: jest.fn().mockResolvedValue(undefined),
+          update: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+          delete: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+        };
+      }
+      return dividendMap.get(id);
+    }),
+    add: jest.fn().mockResolvedValue({ id: 'new-dividend-id' }),
+    get: jest.fn().mockResolvedValue({
+      docs: dividends.map((dividend) => createDividendSnapshot(dividend)),
+      empty: dividends.length === 0,
+    }),
+  };
+
+  function getWalletDoc(walletId: string) {
+    const wallet = wallets.find((w) => w.id === walletId);
+    return {
+      id: walletId,
+      exists: !!wallet,
+      data: () => (wallet ? { ...wallet } : null),
+      get: jest.fn().mockResolvedValue(
+        wallet
+          ? createWalletSnapshot(
+              walletId,
+              wallet,
+              getPositionsCollection(walletId),
+            )
+          : {
+              id: walletId,
+              exists: false,
+              data: () => null,
+            },
+      ),
+      set: jest.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+      collection: jest.fn((positionPath: string) => {
+        if (positionPath !== 'positions') {
+          throw new Error(`Unexpected subcollection: ${positionPath}`);
+        }
+        return getPositionsCollection(walletId);
+      }),
+    };
+  }
+
+  const walletsCollection = {
+    doc: jest.fn((id: string) => getWalletDoc(id)),
+    get: jest.fn().mockResolvedValue({
+      docs: wallets.map((wallet) =>
+        createWalletSnapshot(
+          wallet.id,
+          wallet,
+          getPositionsCollection(wallet.id),
+        ),
+      ),
+      empty: wallets.length === 0,
+    }),
+  };
+
+  return {
+    collection: jest.fn((path: string) => {
+      if (path === 'users') {
+        return {
+          doc: jest.fn((uid: string) => {
+            if (uid !== 'user-123') {
+              throw new Error(`Unexpected uid: ${uid}`);
+            }
+            return {
+              collection: jest.fn((subPath: string) => {
+                if (subPath === 'dividends') {
+                  return dividendsCollection;
+                }
+                if (subPath === 'wallets') {
+                  return walletsCollection;
+                }
+                throw new Error(`Unexpected subcollection: ${subPath}`);
+              }),
+            };
+          }),
+        };
+      }
+      throw new Error(`Unexpected collection: ${path}`);
+    }),
+  };
+}
+
 function createFailingFirestoreMock() {
   return {
     collection: jest.fn(() => ({
@@ -645,7 +886,40 @@ describe('Dividend CRUD', () => {
   });
 
   describe('GET /api/dividends/projection', () => {
-    it('deve calcular projeção mensal com base no último provento de cada ticker', async () => {
+    const wallet = {
+      id: 'wallet-1',
+      ownerId: 'user-123',
+      name: 'Carteira Principal',
+      currency: 'BRL',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const hglgPosition: Position = {
+      id: 'position-hglg',
+      walletId: 'wallet-1',
+      ticker: 'HGLG11',
+      assetType: 'FII',
+      quantity: 200,
+      averagePrice: 110,
+      currentPrice: 112,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const xplgPosition: Position = {
+      id: 'position-xplg',
+      walletId: 'wallet-1',
+      ticker: 'XPLG11',
+      assetType: 'FII',
+      quantity: 75,
+      averagePrice: 90,
+      currentPrice: 92,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    it('deve calcular projeção mensal com base na quantidade atual da posição', async () => {
       const olderHglg: Dividend = {
         ...baseDividend,
         id: 'dividend-older',
@@ -674,7 +948,11 @@ describe('Dividend CRUD', () => {
         totalAmount: 35,
       };
 
-      firestoreMock = createFirestoreMock([olderHglg, newerHglg, xplg]);
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [wallet],
+        { 'wallet-1': [hglgPosition, xplgPosition] },
+        [olderHglg, newerHglg, xplg],
+      );
 
       const response = await request(app)
         .get('/api/dividends/projection')
@@ -682,23 +960,71 @@ describe('Dividend CRUD', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.projections).toHaveLength(2);
-      expect(response.body.total).toBe(170);
+      // 0.9 * 200 + 0.7 * 75 = 180 + 52.5 = 232.5
+      expect(response.body.total).toBeCloseTo(232.5, 2);
 
       const hglg = response.body.projections.find(
         (p: { ticker: string }) => p.ticker === 'HGLG11',
       );
       expect(hglg.amountPerShare).toBe(0.9);
-      expect(hglg.quantity).toBe(150);
-      expect(hglg.monthlyAmount).toBe(135);
+      expect(hglg.quantity).toBe(200);
+      expect(hglg.monthlyAmount).toBeCloseTo(180, 2);
 
       const xplgProjection = response.body.projections.find(
         (p: { ticker: string }) => p.ticker === 'XPLG11',
       );
-      expect(xplgProjection.monthlyAmount).toBe(35);
+      expect(xplgProjection.quantity).toBe(75);
+      expect(xplgProjection.monthlyAmount).toBeCloseTo(52.5, 2);
+    });
+
+    it('deve agrupar proventos e posições de forma case-insensitive', async () => {
+      const dividendLowerCase: Dividend = {
+        ...baseDividend,
+        id: 'dividend-lower',
+        ticker: 'hglg11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 0.9,
+        quantity: 100,
+        totalAmount: 90,
+      };
+
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [wallet],
+        { 'wallet-1': [hglgPosition] },
+        [dividendLowerCase],
+      );
+
+      const response = await request(app)
+        .get('/api/dividends/projection')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.projections).toHaveLength(1);
+      expect(response.body.projections[0].ticker).toBe('HGLG11');
+      expect(response.body.projections[0].quantity).toBe(200);
+      expect(response.body.projections[0].monthlyAmount).toBeCloseTo(180, 2);
     });
 
     it('deve retornar projeção vazia quando não há proventos', async () => {
-      firestoreMock = createFirestoreMock([]);
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [wallet],
+        { 'wallet-1': [hglgPosition] },
+        [],
+      );
+
+      const response = await request(app)
+        .get('/api/dividends/projection')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.projections).toEqual([]);
+      expect(response.body.total).toBe(0);
+    });
+
+    it('deve retornar projeção vazia quando não há posições', async () => {
+      firestoreMock = createFirestoreMockWithWalletsAndPositions([wallet], {}, [
+        baseDividend,
+      ]);
 
       const response = await request(app)
         .get('/api/dividends/projection')
@@ -720,6 +1046,15 @@ describe('Dividend CRUD', () => {
       averagePrice: 110.5,
       currentPrice: 112,
       inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    const defaultWallet = {
+      id: 'wallet-1',
+      ownerId: 'user-123',
+      name: 'Carteira Principal',
+      currency: 'BRL',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
@@ -762,9 +1097,10 @@ describe('Dividend CRUD', () => {
         currentPrice: 132,
       };
 
-      firestoreMock = createFirestoreMockWithPositions(
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [basePosition, knriPosition] },
         [olderHglg, newerHglg, knriDividend],
-        [basePosition, knriPosition],
       );
 
       const response = await request(app)
@@ -796,7 +1132,11 @@ describe('Dividend CRUD', () => {
     });
 
     it('deve retornar yields zerados quando não há posições', async () => {
-      firestoreMock = createFirestoreMockWithPositions([], []);
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [] },
+        [],
+      );
 
       const response = await request(app)
         .get('/api/wallets/wallet-1/dividend-yield')
@@ -824,9 +1164,10 @@ describe('Dividend CRUD', () => {
         currentPrice: undefined,
       };
 
-      firestoreMock = createFirestoreMockWithPositions(
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [positionWithoutCurrent] },
         [dividend],
-        [positionWithoutCurrent],
       );
 
       const response = await request(app)
@@ -856,9 +1197,10 @@ describe('Dividend CRUD', () => {
         currentPrice: undefined,
       };
 
-      firestoreMock = createFirestoreMockWithPositions(
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [positionWithoutPrice] },
         [dividend],
-        [positionWithoutPrice],
       );
 
       const response = await request(app)
@@ -871,6 +1213,33 @@ describe('Dividend CRUD', () => {
       expect(hglg.yield).toBe(0);
       expect(response.body.total.yield).toBe(0);
       expect(JSON.stringify(response.body)).not.toContain('NaN');
+    });
+
+    it('deve fazer matching de ticker case-insensitive entre posição e provento', async () => {
+      const dividendLowerCase: Dividend = {
+        ...baseDividend,
+        id: 'dividend-lower',
+        ticker: 'hglg11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 0.9,
+        quantity: 100,
+        totalAmount: 90,
+      };
+
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [basePosition] },
+        [dividendLowerCase],
+      );
+
+      const response = await request(app)
+        .get('/api/wallets/wallet-1/dividend-yield')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      const hglg = response.body.byTicker[0];
+      expect(hglg.annualIncome).toBeCloseTo(0.9 * 10 * 12, 2);
+      expect(hglg.currentValue).toBeCloseTo(1120, 2);
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {

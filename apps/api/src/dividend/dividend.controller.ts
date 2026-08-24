@@ -33,6 +33,26 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('positions');
 }
 
+async function getAllUserPositions(userId: string): Promise<Position[]> {
+  const walletsSnapshot = await admin
+    .firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('wallets')
+    .get();
+
+  const positions: Position[] = [];
+  for (const walletDoc of walletsSnapshot.docs) {
+    const positionsSnapshot = await walletDoc.ref.collection('positions').get();
+    positions.push(
+      ...positionsSnapshot.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+      ),
+    );
+  }
+  return positions;
+}
+
 const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 function isValidAssetType(value: unknown): value is AssetType {
@@ -282,6 +302,10 @@ function isValidDividend(dividend: Dividend): boolean {
   );
 }
 
+function normalizeTicker(ticker: string): string {
+  return ticker.trim().toUpperCase();
+}
+
 function latestDividendByTickerMap(
   dividends: Dividend[],
 ): Map<string, Dividend> {
@@ -302,9 +326,10 @@ function latestDividendByTickerMap(
       continue;
     }
 
-    const current = byTicker.get(dividend.ticker);
+    const normalizedTicker = normalizeTicker(dividend.ticker);
+    const current = byTicker.get(normalizedTicker);
     if (!current) {
-      byTicker.set(dividend.ticker, dividend);
+      byTicker.set(normalizedTicker, dividend);
       continue;
     }
 
@@ -314,24 +339,50 @@ function latestDividendByTickerMap(
       (dividend.createdAt ?? '') > (current.createdAt ?? '');
 
     if (isNewerDate || (sameDate && isNewerCreatedAt)) {
-      byTicker.set(dividend.ticker, dividend);
+      byTicker.set(normalizedTicker, dividend);
     }
   }
 
   return byTicker;
 }
 
+function buildQuantityByTickerMap(positions: Position[]): Map<string, number> {
+  const quantityByTicker = new Map<string, number>();
+
+  for (const position of positions) {
+    const normalizedTicker = normalizeTicker(position.ticker);
+    const current = quantityByTicker.get(normalizedTicker) ?? 0;
+    const quantity =
+      typeof position.quantity === 'number' &&
+      Number.isFinite(position.quantity) &&
+      position.quantity > 0
+        ? position.quantity
+        : 0;
+    quantityByTicker.set(normalizedTicker, current + quantity);
+  }
+
+  return quantityByTicker;
+}
+
 function latestDividendByTicker(
   dividends: Dividend[],
+  positions: Position[],
 ): MonthlyDividendProjection[] {
-  return [...latestDividendByTickerMap(dividends).values()]
-    .sort((a, b) => a.ticker.localeCompare(b.ticker))
-    .map((dividend) => ({
-      ticker: dividend.ticker,
-      amountPerShare: dividend.amountPerShare,
-      quantity: dividend.quantity,
-      monthlyAmount: dividend.amountPerShare * dividend.quantity,
-    }));
+  const latestByTicker = latestDividendByTickerMap(dividends);
+  const quantityByTicker = buildQuantityByTickerMap(positions);
+
+  return [...latestByTicker.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([normalizedTicker, dividend]) => {
+      const quantity = quantityByTicker.get(normalizedTicker) ?? 0;
+      return {
+        ticker: normalizedTicker,
+        amountPerShare: dividend.amountPerShare,
+        quantity,
+        monthlyAmount: dividend.amountPerShare * quantity,
+      };
+    })
+    .filter((projection) => projection.quantity > 0);
 }
 
 export async function getDividendProjection(
@@ -339,11 +390,15 @@ export async function getDividendProjection(
   res: Response,
 ): Promise<void> {
   try {
-    const snapshot = await dividendsCollection(uid(req)).get();
-    const dividends = snapshot.docs.map(
+    const userId = uid(req);
+    const [dividendsSnapshot, positions] = await Promise.all([
+      dividendsCollection(userId).get(),
+      getAllUserPositions(userId),
+    ]);
+    const dividends = dividendsSnapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
     );
-    const projections = latestDividendByTicker(dividends);
+    const projections = latestDividendByTicker(dividends, positions);
     const total = projections.reduce(
       (sum, projection) => sum + projection.monthlyAmount,
       0,
@@ -388,13 +443,13 @@ export async function getDividendYield(
     const { walletId } = req.params;
     const userId = uid(req);
 
-    const [positionsSnapshot, dividendsSnapshot] = await Promise.all([
-      positionsCollection(userId, walletId).get(),
+    const [allPositions, dividendsSnapshot] = await Promise.all([
+      getAllUserPositions(userId),
       dividendsCollection(userId).get(),
     ]);
 
-    const positions = positionsSnapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    const positions = allPositions.filter(
+      (position) => position.walletId === walletId,
     );
     const dividends = dividendsSnapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
@@ -415,7 +470,9 @@ export async function getDividendYield(
           : 0;
       const currentValue = quantity > 0 ? quantity * unitPrice : 0;
 
-      const latestDividend = latestByTicker.get(position.ticker);
+      const latestDividend = latestByTicker.get(
+        normalizeTicker(position.ticker),
+      );
       const amountPerShare =
         latestDividend &&
         typeof latestDividend.amountPerShare === 'number' &&
