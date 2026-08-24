@@ -5,6 +5,7 @@ import { LoginComponent } from './features/login/login.component';
 import { HomeComponent } from './features/home/home.component';
 import { WalletComponent } from './features/wallet/wallet.component';
 import { FridgeComponent } from './features/fridge/fridge.component';
+import { DividendComponent } from './features/dividends/dividend.component';
 
 export const routes: Routes = [
   {
@@ -26,6 +27,11 @@ export const routes: Routes = [
     path: 'geladeira',
     canActivate: [authGuard],
     component: FridgeComponent,
+  },
+  {
+    path: 'proventos',
+    canActivate: [authGuard],
+    component: DividendComponent,
   },
   { path: '**', redirectTo: '' },
 ];
