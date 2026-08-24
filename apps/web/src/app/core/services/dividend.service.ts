@@ -14,6 +14,22 @@ export interface DividendProjectionResponse {
   total: number;
 }
 
+export interface TickerDividendYield {
+  ticker: string;
+  annualIncome: number;
+  currentValue: number;
+  yield: number;
+}
+
+export interface DividendYieldResponse {
+  byTicker: TickerDividendYield[];
+  total: {
+    annualIncome: number;
+    currentValue: number;
+    yield: number;
+  };
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -24,6 +40,12 @@ export class DividendService {
   getProjection(): Observable<DividendProjectionResponse> {
     return this.http.get<DividendProjectionResponse>(
       `${this.apiUrl}/projection`,
+    );
+  }
+
+  getDividendYield(walletId: string): Observable<DividendYieldResponse> {
+    return this.http.get<DividendYieldResponse>(
+      `/api/wallets/${walletId}/dividend-yield`,
     );
   }
 }
