@@ -407,15 +407,28 @@ export async function getDividendYield(
     let totalCurrentValue = 0;
 
     for (const position of positions) {
-      const currentValue =
-        position.quantity * (position.currentPrice ?? position.averagePrice);
+      const unitPrice = position.currentPrice ?? position.averagePrice ?? 0;
+      const quantity =
+        typeof position.quantity === 'number' &&
+        Number.isFinite(position.quantity)
+          ? position.quantity
+          : 0;
+      const currentValue = quantity > 0 ? quantity * unitPrice : 0;
+
       const latestDividend = latestByTicker.get(position.ticker);
-      const monthlyIncome = latestDividend
-        ? latestDividend.amountPerShare * position.quantity
-        : 0;
+      const amountPerShare =
+        latestDividend &&
+        typeof latestDividend.amountPerShare === 'number' &&
+        Number.isFinite(latestDividend.amountPerShare) &&
+        latestDividend.amountPerShare >= 0
+          ? latestDividend.amountPerShare
+          : 0;
+      const monthlyIncome = quantity > 0 ? amountPerShare * quantity : 0;
       const annualIncome = monthlyIncome * 12;
       const dividendYield =
-        currentValue > 0 ? (annualIncome / currentValue) * 100 : 0;
+        currentValue > 0 && Number.isFinite(annualIncome)
+          ? (annualIncome / currentValue) * 100
+          : 0;
 
       byTicker.push({
         ticker: position.ticker,
