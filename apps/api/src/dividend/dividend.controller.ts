@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Dividend, AssetType } from 'dindin-models';
+import { Dividend, Position, AssetType } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const ASSET_TYPES = new Set<AssetType>([
@@ -21,6 +21,16 @@ function dividendsCollection(userId: string) {
     .collection('users')
     .doc(userId)
     .collection('dividends');
+}
+
+function positionsCollection(userId: string, walletId: string) {
+  return admin
+    .firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('wallets')
+    .doc(walletId)
+    .collection('positions');
 }
 
 const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -272,9 +282,7 @@ function isValidDividend(dividend: Dividend): boolean {
   );
 }
 
-function latestDividendByTicker(
-  dividends: Dividend[],
-): MonthlyDividendProjection[] {
+function latestDividendByTickerMap(dividends: Dividend[]): Map<string, Dividend> {
   const byTicker = new Map<string, Dividend>();
 
   for (const dividend of dividends) {
@@ -308,7 +316,13 @@ function latestDividendByTicker(
     }
   }
 
-  return [...byTicker.values()]
+  return byTicker;
+}
+
+function latestDividendByTicker(
+  dividends: Dividend[],
+): MonthlyDividendProjection[] {
+  return [...latestDividendByTickerMap(dividends).values()]
     .sort((a, b) => a.ticker.localeCompare(b.ticker))
     .map((dividend) => ({
       ticker: dividend.ticker,
@@ -337,6 +351,101 @@ export async function getDividendProjection(
   } catch (error) {
     console.error('[getDividendProjection] error:', {
       uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+interface TickerDividendYield {
+  ticker: string;
+  annualIncome: number;
+  currentValue: number;
+  yield: number;
+}
+
+interface WalletDividendYieldResponse {
+  byTicker: TickerDividendYield[];
+  total: {
+    annualIncome: number;
+    currentValue: number;
+    yield: number;
+  };
+}
+
+function roundYield(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export async function getDividendYield(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { walletId } = req.params;
+    const userId = uid(req);
+
+    const [positionsSnapshot, dividendsSnapshot] = await Promise.all([
+      positionsCollection(userId, walletId).get(),
+      dividendsCollection(userId).get(),
+    ]);
+
+    const positions = positionsSnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    );
+    const dividends = dividendsSnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
+    );
+
+    const latestByTicker = latestDividendByTickerMap(dividends);
+
+    const byTicker: TickerDividendYield[] = [];
+    let totalAnnualIncome = 0;
+    let totalCurrentValue = 0;
+
+    for (const position of positions) {
+      const currentValue =
+        position.quantity *
+        (position.currentPrice ?? position.averagePrice);
+      const latestDividend = latestByTicker.get(position.ticker);
+      const monthlyIncome = latestDividend
+        ? latestDividend.amountPerShare * position.quantity
+        : 0;
+      const annualIncome = monthlyIncome * 12;
+      const dividendYield =
+        currentValue > 0 ? (annualIncome / currentValue) * 100 : 0;
+
+      byTicker.push({
+        ticker: position.ticker,
+        annualIncome,
+        currentValue,
+        yield: roundYield(dividendYield),
+      });
+
+      totalAnnualIncome += annualIncome;
+      totalCurrentValue += currentValue;
+    }
+
+    byTicker.sort((a, b) => a.ticker.localeCompare(b.ticker));
+
+    const response: WalletDividendYieldResponse = {
+      byTicker,
+      total: {
+        annualIncome: totalAnnualIncome,
+        currentValue: totalCurrentValue,
+        yield:
+          totalCurrentValue > 0
+            ? roundYield((totalAnnualIncome / totalCurrentValue) * 100)
+            : 0,
+      },
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('[getDividendYield] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
       message: (error as Error).message,
       stack: (error as Error).stack,
     });
