@@ -397,6 +397,52 @@ describe('WalletComponent', () => {
     expect(fixture.componentInstance.positions()[0].ticker).toBe('MXRF11');
   }));
 
+  it('deve resetar loading quando requisição de posições é abortada', fakeAsync(() => {
+    const wallet2: Wallet = {
+      id: 'wallet-2',
+      ownerId: 'user-123',
+      name: 'Carteira Secundária',
+      currency: 'BRL',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const positions2: Position[] = [
+      {
+        id: 'position-3',
+        walletId: 'wallet-2',
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: 100,
+        averagePrice: 10,
+        currentPrice: 10.5,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    walletServiceMock.list.and.returnValue(of([wallets[0], wallet2]));
+
+    positionServiceMock.list.and.callFake((id: string) => {
+      return of(id === 'wallet-1' ? positions : positions2).pipe(
+        delay(id === 'wallet-1' ? 100 : 0),
+      );
+    });
+
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.loading()).toBeFalse();
+
+    fixture.componentInstance.selectWallet(wallet2);
+    tick(50);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.loading()).toBeFalse();
+  }));
+
   it('deve abrir formulário ao clicar em adicionar posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const addButton = compiled.querySelector(

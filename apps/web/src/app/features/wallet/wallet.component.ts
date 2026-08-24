@@ -7,7 +7,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, finalize } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -209,7 +209,11 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.error.set(null);
     this.positionService
       .list(walletId)
-      .pipe(takeUntil(this.destroy$), takeUntil(this.positionsAbort$))
+      .pipe(
+        takeUntil(this.destroy$),
+        takeUntil(this.positionsAbort$),
+        finalize(() => this.loading.set(false)),
+      )
       .subscribe({
         next: (response) => {
           this.positions.set(response);
@@ -217,7 +221,6 @@ export class WalletComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.error.set('Erro ao carregar posições.');
-          this.loading.set(false);
         },
       });
   }
@@ -225,16 +228,17 @@ export class WalletComponent implements OnInit, OnDestroy {
   private loadDividendYield(walletId: string): void {
     this.dividendService
       .getDividendYield(walletId)
-      .pipe(takeUntil(this.dividendYieldAbort$))
+      .pipe(
+        takeUntil(this.dividendYieldAbort$),
+        finalize(() => this.loading.set(false)),
+      )
       .subscribe({
         next: (response) => {
           this.dividendYield.set(response);
           this.error.set(null);
-          this.loading.set(false);
         },
         error: () => {
           this.error.set('Erro ao carregar dividend yield.');
-          this.loading.set(false);
         },
       });
   }
