@@ -16,10 +16,15 @@ import {
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
+import {
+  DividendService,
+  DividendYieldResponse,
+} from '../../core/services/dividend.service';
 import { Wallet, Position, AssetType, Fridge } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
+  formatPercent,
   parseDecimal,
 } from '../../shared/utils/format.util';
 import {
@@ -48,11 +53,13 @@ export class WalletComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly positionService = inject(PositionService);
   private readonly fridgeService = inject(FridgeService);
+  private readonly dividendService = inject(DividendService);
   private readonly fb = inject(FormBuilder);
 
   wallets = signal<Wallet[]>([]);
   selectedWallet = signal<Wallet | null>(null);
   positions = signal<Position[]>([]);
+  dividendYield = signal<DividendYieldResponse | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -92,6 +99,15 @@ export class WalletComponent implements OnInit {
       0,
     ),
   );
+
+  totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
+
+  dividendYieldFor = (position: Position): number => {
+    const found = this
+      .dividendYield()
+      ?.byTicker.find((item) => item.ticker === position.ticker);
+    return found?.yield ?? 0;
+  };
 
   ngOnInit(): void {
     this.loadWallets();
@@ -160,10 +176,23 @@ export class WalletComponent implements OnInit {
     this.positionService.list(walletId).subscribe({
       next: (response) => {
         this.positions.set(response);
-        this.loading.set(false);
+        this.loadDividendYield(walletId);
       },
       error: () => {
         this.error.set('Erro ao carregar posições.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private loadDividendYield(walletId: string): void {
+    this.dividendService.getDividendYield(walletId).subscribe({
+      next: (response) => {
+        this.dividendYield.set(response);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Erro ao carregar dividend yield.');
         this.loading.set(false);
       },
     });
@@ -358,6 +387,7 @@ export class WalletComponent implements OnInit {
   }
 
   formatCurrency = formatCurrency;
+  formatPercent = formatPercent;
 
   private parseDecimal(value: string | number | null): number | null {
     return parseDecimal(value);
