@@ -9,6 +9,7 @@ import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
+import { DividendService } from '../../core/services/dividend.service';
 import { Wallet, Position, Fridge, FridgeItem } from 'dindin-models';
 
 describe('WalletComponent', () => {
@@ -16,6 +17,7 @@ describe('WalletComponent', () => {
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let positionServiceMock: jasmine.SpyObj<PositionService>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
+  let dividendServiceMock: jasmine.SpyObj<DividendService>;
 
   const wallets: Wallet[] = [
     {
@@ -78,10 +80,26 @@ describe('WalletComponent', () => {
       'moveToFridge',
     ]);
     fridgeServiceMock = jasmine.createSpyObj('FridgeService', ['listFridges']);
+    dividendServiceMock = jasmine.createSpyObj('DividendService', [
+      'getDividendYield',
+    ]);
 
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
     fridgeServiceMock.listFridges.and.returnValue(of(fridges));
+    dividendServiceMock.getDividendYield.and.returnValue(
+      of({
+        byTicker: [
+          { ticker: 'HGLG11', annualIncome: 108, currentValue: 1120, yield: 9.64 },
+          { ticker: 'KNRI11', annualIncome: 45, currentValue: 660, yield: 6.82 },
+        ],
+        total: {
+          annualIncome: 153,
+          currentValue: 1780,
+          yield: 8.6,
+        },
+      }),
+    );
 
     await TestBed.configureTestingModule({
       imports: [WalletComponent],
@@ -89,6 +107,7 @@ describe('WalletComponent', () => {
         { provide: WalletService, useValue: walletServiceMock },
         { provide: PositionService, useValue: positionServiceMock },
         { provide: FridgeService, useValue: fridgeServiceMock },
+        { provide: DividendService, useValue: dividendServiceMock },
       ],
     }).compileComponents();
 
@@ -159,6 +178,44 @@ describe('WalletComponent', () => {
     // 10 * 112 + 5 * 132 = 1.780,00
     expect(totalElement?.textContent).toMatch(/R\$\s?1\.780,00/);
   });
+
+  it('deve carregar dividend yield ao selecionar carteira', () => {
+    expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith(
+      'wallet-1',
+    );
+  });
+
+  it('deve exibir coluna de dividend yield para cada posição', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(2);
+
+    const firstRow = rows[0].textContent;
+    expect(firstRow).toContain('9,64%');
+
+    const secondRow = rows[1].textContent;
+    expect(secondRow).toContain('6,82%');
+  });
+
+  it('deve exibir dividend yield total consolidado', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const totalElement = compiled.querySelector('[data-testid="dy-total"]');
+    expect(totalElement?.textContent).toContain('8,60%');
+  });
+
+  it('deve exibir mensagem de erro quando falha ao carregar dividend yield', fakeAsync(() => {
+    dividendServiceMock.getDividendYield.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl?.textContent).toContain('Erro ao carregar dividend yield.');
+  }));
 
   it('deve abrir formulário ao clicar em adicionar posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
