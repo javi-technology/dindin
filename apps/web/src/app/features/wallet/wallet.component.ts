@@ -2,10 +2,12 @@ import {
   Component,
   HostListener,
   OnInit,
+  OnDestroy,
   inject,
   signal,
   computed,
 } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -49,12 +51,14 @@ import {
   ],
   templateUrl: './wallet.component.html',
 })
-export class WalletComponent implements OnInit {
+export class WalletComponent implements OnInit, OnDestroy {
   private readonly walletService = inject(WalletService);
   private readonly positionService = inject(PositionService);
   private readonly fridgeService = inject(FridgeService);
   private readonly dividendService = inject(DividendService);
   private readonly fb = inject(FormBuilder);
+  private readonly destroy$ = new Subject<void>();
+  private dividendYieldAbort$ = new Subject<void>();
 
   wallets = signal<Wallet[]>([]);
   selectedWallet = signal<Wallet | null>(null);
@@ -160,7 +164,20 @@ export class WalletComponent implements OnInit {
 
   selectWallet(wallet: Wallet): void {
     this.selectedWallet.set(wallet);
+    this.abortPendingDividendYieldRequest();
     this.loadPositions(wallet.id);
+  }
+
+  ngOnDestroy(): void {
+    this.abortPendingDividendYieldRequest();
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private abortPendingDividendYieldRequest(): void {
+    this.dividendYieldAbort$.next();
+    this.dividendYieldAbort$.complete();
+    this.dividendYieldAbort$ = new Subject<void>();
   }
 
   onWalletChange(event: Event): void {
@@ -173,6 +190,7 @@ export class WalletComponent implements OnInit {
 
   loadPositions(walletId: string): void {
     this.loading.set(true);
+    this.error.set(null);
     this.positionService.list(walletId).subscribe({
       next: (response) => {
         this.positions.set(response);
@@ -186,16 +204,20 @@ export class WalletComponent implements OnInit {
   }
 
   private loadDividendYield(walletId: string): void {
-    this.dividendService.getDividendYield(walletId).subscribe({
-      next: (response) => {
-        this.dividendYield.set(response);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Erro ao carregar dividend yield.');
-        this.loading.set(false);
-      },
-    });
+    this.dividendService
+      .getDividendYield(walletId)
+      .pipe(takeUntil(this.dividendYieldAbort$))
+      .subscribe({
+        next: (response) => {
+          this.dividendYield.set(response);
+          this.error.set(null);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.error.set('Erro ao carregar dividend yield.');
+          this.loading.set(false);
+        },
+      });
   }
 
   openForm(position: Position | null = null): void {
