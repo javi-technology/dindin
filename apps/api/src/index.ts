@@ -30,6 +30,13 @@ import {
   listItems,
   updateItem,
 } from './wallet/fridge.controller';
+import {
+  createDividend,
+  deleteDividend,
+  getDividend,
+  listDividends,
+  updateDividend,
+} from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
 
 admin.initializeApp();
@@ -87,6 +94,12 @@ app.post('/api/fridges/:fridgeId/items', createItem);
 app.get('/api/fridges/:fridgeId/items/:id', getItem);
 app.put('/api/fridges/:fridgeId/items/:id', updateItem);
 app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
+
+app.get('/api/dividends', listDividends);
+app.post('/api/dividends', createDividend);
+app.get('/api/dividends/:id', getDividend);
+app.put('/api/dividends/:id', updateDividend);
+app.delete('/api/dividends/:id', deleteDividend);
 
 // Middleware global de tratamento de erros não capturados
 app.use(
