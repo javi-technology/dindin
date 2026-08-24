@@ -198,7 +198,11 @@ describe('Dividend CRUD', () => {
       const response = await request(app)
         .post('/api/dividends')
         .set('Authorization', authHeader)
-        .send({ amountPerShare: 0.82, quantity: 100, paymentDate: '2026-01-15' });
+        .send({
+          amountPerShare: 0.82,
+          quantity: 100,
+          paymentDate: '2026-01-15',
+        });
 
       expect(response.status).toBe(400);
     });
