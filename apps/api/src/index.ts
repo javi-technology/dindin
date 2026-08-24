@@ -34,6 +34,7 @@ import {
   createDividend,
   deleteDividend,
   getDividend,
+  getDividendProjection,
   listDividends,
   updateDividend,
 } from './dividend/dividend.controller';
@@ -96,6 +97,7 @@ app.put('/api/fridges/:fridgeId/items/:id', updateItem);
 app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
 
 app.get('/api/dividends', listDividends);
+app.get('/api/dividends/projection', getDividendProjection);
 app.post('/api/dividends', createDividend);
 app.get('/api/dividends/:id', getDividend);
 app.put('/api/dividends/:id', updateDividend);

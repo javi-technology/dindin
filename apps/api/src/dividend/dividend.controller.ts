@@ -251,6 +251,61 @@ export async function updateDividend(
   }
 }
 
+interface MonthlyDividendProjection {
+  ticker: string;
+  amountPerShare: number;
+  quantity: number;
+  monthlyAmount: number;
+}
+
+function latestDividendByTicker(
+  dividends: Dividend[],
+): MonthlyDividendProjection[] {
+  const byTicker = new Map<string, Dividend>();
+
+  for (const dividend of dividends) {
+    const current = byTicker.get(dividend.ticker);
+    if (!current || dividend.paymentDate > current.paymentDate) {
+      byTicker.set(dividend.ticker, dividend);
+    }
+  }
+
+  return [...byTicker.values()]
+    .sort((a, b) => a.ticker.localeCompare(b.ticker))
+    .map((dividend) => ({
+      ticker: dividend.ticker,
+      amountPerShare: dividend.amountPerShare,
+      quantity: dividend.quantity,
+      monthlyAmount: dividend.amountPerShare * dividend.quantity,
+    }));
+}
+
+export async function getDividendProjection(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const snapshot = await dividendsCollection(uid(req)).get();
+    const dividends = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
+    );
+    const projections = latestDividendByTicker(dividends);
+    const total = projections.reduce(
+      (sum, projection) => sum + projection.monthlyAmount,
+      0,
+    );
+
+    res.json({ projections, total });
+  } catch (error) {
+    console.error('[getDividendProjection] error:', {
+      uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 export async function deleteDividend(
   req: Request,
   res: Response,
