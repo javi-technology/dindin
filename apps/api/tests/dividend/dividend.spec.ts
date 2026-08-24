@@ -250,6 +250,72 @@ describe('Dividend CRUD', () => {
       expect(response.status).toBe(400);
     });
 
+    it('deve retornar 400 quando paymentDate não está no formato YYYY-MM-DD', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/dividends')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          amountPerShare: 0.82,
+          quantity: 100,
+          paymentDate: '15/01/2026',
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve remover espaços do paymentDate antes de salvar', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/dividends')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          amountPerShare: 0.82,
+          quantity: 100,
+          paymentDate: '  2026-01-15  ',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.paymentDate).toBe('2026-01-15');
+    });
+
+    it('deve retornar 400 quando assetType é inválido', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/dividends')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          assetType: 'CRYPTO',
+          amountPerShare: 0.82,
+          quantity: 100,
+          paymentDate: '2026-01-15',
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 quando amountPerShare é Infinity', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/dividends')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          amountPerShare: Infinity,
+          quantity: 100,
+          paymentDate: '2026-01-15',
+        });
+
+      expect(response.status).toBe(400);
+    });
+
     it('deve retornar 500 quando o Firestore falha', async () => {
       firestoreMock = createFailingFirestoreMock();
 
@@ -317,6 +383,42 @@ describe('Dividend CRUD', () => {
       expect(response.body.id).toBe('dividend-1');
     });
 
+    it('deve recalcular totalAmount ao alterar apenas amountPerShare', async () => {
+      firestoreMock = createFirestoreMock([baseDividend]);
+
+      const response = await request(app)
+        .put('/api/dividends/dividend-1')
+        .set('Authorization', authHeader)
+        .send({ amountPerShare: 1 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.amountPerShare).toBe(1);
+      expect(response.body.totalAmount).toBe(100);
+    });
+
+    it('deve remover espaços do paymentDate ao atualizar', async () => {
+      firestoreMock = createFirestoreMock([baseDividend]);
+
+      const response = await request(app)
+        .put('/api/dividends/dividend-1')
+        .set('Authorization', authHeader)
+        .send({ paymentDate: '  2026-02-20  ' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.paymentDate).toBe('2026-02-20');
+    });
+
+    it('deve retornar 400 quando paymentDate não está no formato YYYY-MM-DD na atualização', async () => {
+      firestoreMock = createFirestoreMock([baseDividend]);
+
+      const response = await request(app)
+        .put('/api/dividends/dividend-1')
+        .set('Authorization', authHeader)
+        .send({ paymentDate: '20/02/2026' });
+
+      expect(response.status).toBe(400);
+    });
+
     it('deve retornar 404 para provento inexistente', async () => {
       firestoreMock = createFirestoreMock([]);
 
@@ -337,6 +439,22 @@ describe('Dividend CRUD', () => {
         .send({ quantity: -1 });
 
       expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 500 quando o documento existente está com amountPerShare ou quantity corrompidos', async () => {
+      const corruptedDividend = {
+        ...baseDividend,
+        amountPerShare: undefined,
+      } as unknown as Dividend;
+      firestoreMock = createFirestoreMock([corruptedDividend]);
+
+      const response = await request(app)
+        .put('/api/dividends/dividend-1')
+        .set('Authorization', authHeader)
+        .send({ quantity: 200 });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty('error');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
