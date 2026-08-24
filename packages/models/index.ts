@@ -5,6 +5,7 @@
 //   users/{userId}/wallets/{walletId}/positions/{positionId}
 //   users/{userId}/fridges/{fridgeId}
 //   users/{userId}/fridges/{fridgeId}/fridgeItems/{itemId}
+//   users/{userId}/dividends/{dividendId}
 //   quotes/{ticker}
 //   quotes/{ticker}/history/{date}
 
@@ -72,6 +73,20 @@ export interface FridgeItem {
   currentPrice?: number;
   assetType?: AssetType;
   notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Provento recebido — subcoleção `dividends` */
+export interface Dividend {
+  id: string;
+  userId: string; // users/{userId}
+  ticker: string;
+  assetType?: AssetType;
+  amountPerShare: number; // valor por cota/ação
+  quantity: number;
+  totalAmount: number; // amountPerShare * quantity
+  paymentDate: string; // YYYY-MM-DD
   createdAt: string;
   updatedAt: string;
 }

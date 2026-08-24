@@ -30,6 +30,11 @@ service cloud.firestore {
           allow read, write: if isOwner(userId);
         }
       }
+
+      // Proventos do usuário
+      match /dividends/{dividendId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Cotações — leitura pública (qualquer usuário autenticado),
