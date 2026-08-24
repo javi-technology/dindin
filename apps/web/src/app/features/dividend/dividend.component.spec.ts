@@ -64,13 +64,19 @@ describe('DividendComponent', () => {
 
   it('deve exibir mensagem de erro quando falha ao carregar projeção', async () => {
     TestBed.resetTestingModule();
-    dividendServiceMock.getProjection.and.returnValue(
+    const isolatedDividendServiceMock = jasmine.createSpyObj(
+      'DividendService',
+      ['getProjection'],
+    );
+    isolatedDividendServiceMock.getProjection.and.returnValue(
       throwError(() => new Error('Network error')),
     );
 
     await TestBed.configureTestingModule({
       imports: [DividendComponent],
-      providers: [{ provide: DividendService, useValue: dividendServiceMock }],
+      providers: [
+        { provide: DividendService, useValue: isolatedDividendServiceMock },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DividendComponent);
