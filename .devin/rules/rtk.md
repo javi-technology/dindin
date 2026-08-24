@@ -1,5 +1,5 @@
 ---
-description: "rtk — CLI proxy para otimizar tokens em comandos de shell"
+description: 'rtk — CLI proxy para otimizar tokens em comandos de shell'
 trigger: always_on
 ---
 

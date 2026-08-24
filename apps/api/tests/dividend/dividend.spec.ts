@@ -502,4 +502,70 @@ describe('Dividend CRUD', () => {
       expect(response.body).toHaveProperty('error');
     });
   });
+
+  describe('GET /api/dividends/projection', () => {
+    it('deve calcular projeção mensal com base no último provento de cada ticker', async () => {
+      const olderHglg: Dividend = {
+        ...baseDividend,
+        id: 'dividend-older',
+        ticker: 'HGLG11',
+        paymentDate: '2026-01-15',
+        amountPerShare: 0.82,
+        quantity: 100,
+        totalAmount: 82,
+      };
+      const newerHglg: Dividend = {
+        ...baseDividend,
+        id: 'dividend-newer',
+        ticker: 'HGLG11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 0.9,
+        quantity: 150,
+        totalAmount: 135,
+      };
+      const xplg: Dividend = {
+        ...baseDividend,
+        id: 'dividend-xplg',
+        ticker: 'XPLG11',
+        paymentDate: '2026-02-10',
+        amountPerShare: 0.7,
+        quantity: 50,
+        totalAmount: 35,
+      };
+
+      firestoreMock = createFirestoreMock([olderHglg, newerHglg, xplg]);
+
+      const response = await request(app)
+        .get('/api/dividends/projection')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.projections).toHaveLength(2);
+      expect(response.body.total).toBe(170);
+
+      const hglg = response.body.projections.find(
+        (p: { ticker: string }) => p.ticker === 'HGLG11',
+      );
+      expect(hglg.amountPerShare).toBe(0.9);
+      expect(hglg.quantity).toBe(150);
+      expect(hglg.monthlyAmount).toBe(135);
+
+      const xplgProjection = response.body.projections.find(
+        (p: { ticker: string }) => p.ticker === 'XPLG11',
+      );
+      expect(xplgProjection.monthlyAmount).toBe(35);
+    });
+
+    it('deve retornar projeção vazia quando não há proventos', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .get('/api/dividends/projection')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.projections).toEqual([]);
+      expect(response.body.total).toBe(0);
+    });
+  });
 });
