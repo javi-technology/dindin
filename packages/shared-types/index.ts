@@ -14,7 +14,6 @@ export interface DividendCreateRequest {
   assetType?: DividendAssetType;
   amountPerShare: number;
   quantity: number;
-  totalAmount: number;
   paymentDate: string; // YYYY-MM-DD
 }
 
@@ -22,6 +21,7 @@ export interface DividendCreateRequest {
 export interface DividendResponse extends DividendCreateRequest {
   id: string;
   userId: string;
+  totalAmount: number;
   createdAt: string;
   updatedAt: string;
 }

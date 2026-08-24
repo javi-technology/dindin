@@ -7,20 +7,19 @@ import { DividendCreateRequest, DividendResponse } from 'dindin-shared-types';
 // ---------------------------------------------------------------------------
 
 describe('shared-types – DividendCreateRequest', () => {
-  it('deve aceitar um DividendCreateRequest válido', () => {
+  it('deve aceitar um DividendCreateRequest válido sem totalAmount', () => {
     const request: DividendCreateRequest = {
       ticker: 'HGLG11',
       assetType: 'FII',
       amountPerShare: 0.82,
       quantity: 100,
-      totalAmount: 82,
       paymentDate: '2026-01-15',
     };
 
     expect(request.ticker).toBe('HGLG11');
     expect(request.amountPerShare).toBe(0.82);
     expect(request.quantity).toBe(100);
-    expect(request.totalAmount).toBe(82);
+    expect(request.totalAmount).toBeUndefined();
     expect(request.paymentDate).toBe('2026-01-15');
   });
 
@@ -29,7 +28,6 @@ describe('shared-types – DividendCreateRequest', () => {
       ticker: 'MXRF11',
       amountPerShare: 0.1,
       quantity: 500,
-      totalAmount: 50,
       paymentDate: '2026-02-10',
     };
 
