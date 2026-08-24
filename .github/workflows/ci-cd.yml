@@ -126,6 +126,14 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      # Variáveis de ambiente não sensíveis das Functions (ex.: limite de
+      # tickers por requisição na Brapi) são carregadas via arquivo .env
+      # específico do projeto, lido pelo Firebase Functions v2 no deploy.
+      # Ver https://firebase.google.com/docs/functions/config-env
+      - name: Configurar variáveis de ambiente das Functions
+        run: |
+          echo "BRAPI_MAX_SYMBOLS_PER_REQUEST=${{ vars.BRAPI_MAX_SYMBOLS_PER_REQUEST }}" >> apps/api/.env.dindin-4e720
+
       # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
       # gerenciados separadamente para evitar alterações acidentais de segurança.
       - name: Deploy to Firebase

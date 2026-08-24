@@ -17,13 +17,24 @@ interface BrapiResponse {
 
 const BRAPI_BASE_URL = 'https://brapi.dev/api/v2/stocks/quote';
 
-export async function fetchQuotes(
+// O plano gratuito da Brapi permite apenas 1 ativo por requisição
+// (planos pagos permitem mais — ver BRAPI_MAX_SYMBOLS_PER_REQUEST).
+const DEFAULT_MAX_SYMBOLS_PER_REQUEST = 1;
+
+function getMaxSymbolsPerRequest(): number {
+  const parsed = Number(process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST);
+  return Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_MAX_SYMBOLS_PER_REQUEST;
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function fetchQuoteBatch(
   tickers: string[],
 ): Promise<Map<string, QuoteResult>> {
-  if (tickers.length === 0) {
-    return new Map();
-  }
-
   const token = process.env.BRAPI_API_KEY;
   const tickerList = tickers.join(',');
   const url = `${BRAPI_BASE_URL}?symbols=${tickerList}`;
@@ -63,6 +74,40 @@ export async function fetchQuotes(
         updatedAt: item.data?.regularMarketTime ?? new Date().toISOString(),
       });
     }
+  }
+
+  return quoteMap;
+}
+
+export async function fetchQuotes(
+  tickers: string[],
+): Promise<Map<string, QuoteResult>> {
+  if (tickers.length === 0) {
+    return new Map();
+  }
+
+  const batchSize = getMaxSymbolsPerRequest();
+  const quoteMap = new Map<string, QuoteResult>();
+  let lastError: Error | undefined;
+
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    try {
+      const batchQuotes = await fetchQuoteBatch(batch);
+      for (const [symbol, quote] of batchQuotes) {
+        quoteMap.set(symbol, quote);
+      }
+    } catch (error) {
+      lastError = toError(error);
+      console.error('[fetchQuotes] Erro ao buscar lote de tickers:', {
+        tickers: batch,
+        message: lastError.message,
+      });
+    }
+  }
+
+  if (lastError && quoteMap.size === 0) {
+    throw lastError;
   }
 
   return quoteMap;
