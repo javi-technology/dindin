@@ -23,8 +23,14 @@ function dividendsCollection(userId: string) {
     .collection('dividends');
 }
 
+const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 function isValidAssetType(value: unknown): value is AssetType {
   return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
+}
+
+function isValidPaymentDate(value: unknown): value is string {
+  return typeof value === 'string' && PAYMENT_DATE_REGEX.test(value.trim());
 }
 
 function validateDividendBody(
@@ -69,14 +75,10 @@ function validateDividendBody(
   }
 
   if (!allowPartial || paymentDate !== undefined) {
-    if (
-      !paymentDate ||
-      typeof paymentDate !== 'string' ||
-      paymentDate.trim().length === 0
-    ) {
+    if (!isValidPaymentDate(paymentDate)) {
       return {
         valid: false,
-        error: 'Payment date is required and must be a non-empty string',
+        error: 'Payment date is required and must be in YYYY-MM-DD format',
       };
     }
   }
@@ -132,7 +134,7 @@ export async function createDividend(
       amountPerShare: body.amountPerShare!,
       quantity: body.quantity!,
       totalAmount: body.amountPerShare! * body.quantity!,
-      paymentDate: body.paymentDate!,
+      paymentDate: body.paymentDate!.trim(),
       createdAt: now,
       updatedAt: now,
     };
@@ -208,12 +210,29 @@ export async function updateDividend(
     if (body.amountPerShare !== undefined)
       updates.amountPerShare = body.amountPerShare;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
-    if (body.paymentDate !== undefined) updates.paymentDate = body.paymentDate;
+    if (body.paymentDate !== undefined)
+      updates.paymentDate = body.paymentDate.trim();
 
     if (body.amountPerShare !== undefined || body.quantity !== undefined) {
       const amountPerShare = body.amountPerShare ?? current.amountPerShare;
       const quantity = body.quantity ?? current.quantity;
-      updates.totalAmount = amountPerShare * quantity;
+      const totalAmount = amountPerShare * quantity;
+
+      if (
+        typeof amountPerShare !== 'number' ||
+        typeof quantity !== 'number' ||
+        !Number.isFinite(totalAmount)
+      ) {
+        console.error('[updateDividend] documento corrompido:', {
+          uid: uid(req),
+          dividendId: id,
+          current,
+        });
+        res.status(500).json({ error: 'Internal server error' });
+        return;
+      }
+
+      updates.totalAmount = totalAmount;
     }
 
     await dividendRef.update(updates);
