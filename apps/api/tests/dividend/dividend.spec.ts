@@ -142,10 +142,16 @@ function createFirestoreMockWithPositions(
           id,
           exists: false,
           data: () => null,
-          get: jest.fn().mockResolvedValue({ id, exists: false, data: () => null }),
+          get: jest
+            .fn()
+            .mockResolvedValue({ id, exists: false, data: () => null }),
           set: jest.fn().mockResolvedValue(undefined),
-          update: jest.fn().mockRejectedValue(new Error('Document does not exist')),
-          delete: jest.fn().mockRejectedValue(new Error('Document does not exist')),
+          update: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+          delete: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
         };
       }
       return dividendMap.get(id);
@@ -164,10 +170,16 @@ function createFirestoreMockWithPositions(
           id,
           exists: false,
           data: () => null,
-          get: jest.fn().mockResolvedValue({ id, exists: false, data: () => null }),
+          get: jest
+            .fn()
+            .mockResolvedValue({ id, exists: false, data: () => null }),
           set: jest.fn().mockResolvedValue(undefined),
-          update: jest.fn().mockRejectedValue(new Error('Document does not exist')),
-          delete: jest.fn().mockRejectedValue(new Error('Document does not exist')),
+          update: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
+          delete: jest
+            .fn()
+            .mockRejectedValue(new Error('Document does not exist')),
         };
       }
       return positionMap.get(id);

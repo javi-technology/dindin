@@ -103,9 +103,9 @@ export class WalletComponent implements OnInit {
   totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
 
   dividendYieldFor = (position: Position): number => {
-    const found = this
-      .dividendYield()
-      ?.byTicker.find((item) => item.ticker === position.ticker);
+    const found = this.dividendYield()?.byTicker.find(
+      (item) => item.ticker === position.ticker,
+    );
     return found?.yield ?? 0;
   };
 

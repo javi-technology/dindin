@@ -282,7 +282,9 @@ function isValidDividend(dividend: Dividend): boolean {
   );
 }
 
-function latestDividendByTickerMap(dividends: Dividend[]): Map<string, Dividend> {
+function latestDividendByTickerMap(
+  dividends: Dividend[],
+): Map<string, Dividend> {
   const byTicker = new Map<string, Dividend>();
 
   for (const dividend of dividends) {
@@ -406,8 +408,7 @@ export async function getDividendYield(
 
     for (const position of positions) {
       const currentValue =
-        position.quantity *
-        (position.currentPrice ?? position.averagePrice);
+        position.quantity * (position.currentPrice ?? position.averagePrice);
       const latestDividend = latestByTicker.get(position.ticker);
       const monthlyIncome = latestDividend
         ? latestDividend.amountPerShare * position.quantity

@@ -90,8 +90,18 @@ describe('WalletComponent', () => {
     dividendServiceMock.getDividendYield.and.returnValue(
       of({
         byTicker: [
-          { ticker: 'HGLG11', annualIncome: 108, currentValue: 1120, yield: 9.64 },
-          { ticker: 'KNRI11', annualIncome: 45, currentValue: 660, yield: 6.82 },
+          {
+            ticker: 'HGLG11',
+            annualIncome: 108,
+            currentValue: 1120,
+            yield: 9.64,
+          },
+          {
+            ticker: 'KNRI11',
+            annualIncome: 45,
+            currentValue: 660,
+            yield: 6.82,
+          },
         ],
         total: {
           annualIncome: 153,
