@@ -1034,6 +1034,48 @@ describe('Dividend CRUD', () => {
       expect(response.body.projections).toEqual([]);
       expect(response.body.total).toBe(0);
     });
+
+    it('deve ignorar proventos e posições com ticker inválido sem quebrar', async () => {
+      const validDividend: Dividend = {
+        ...baseDividend,
+        id: 'dividend-valid',
+        ticker: 'HGLG11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 0.9,
+        quantity: 100,
+        totalAmount: 90,
+      };
+      const invalidTickerDividend: Dividend = {
+        ...baseDividend,
+        id: 'dividend-invalid',
+        ticker: 123 as unknown as string,
+        paymentDate: '2026-01-15',
+        amountPerShare: 0.82,
+        quantity: 100,
+        totalAmount: 82,
+      };
+
+      const invalidTickerPosition: Position = {
+        ...hglgPosition,
+        id: 'position-invalid',
+        ticker: null as unknown as string,
+      };
+
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [wallet],
+        { 'wallet-1': [hglgPosition, invalidTickerPosition] },
+        [validDividend, invalidTickerDividend],
+      );
+
+      const response = await request(app)
+        .get('/api/dividends/projection')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.projections).toHaveLength(1);
+      expect(response.body.projections[0].ticker).toBe('HGLG11');
+      expect(response.body.projections[0].quantity).toBe(200);
+    });
   });
 
   describe('GET /api/wallets/:walletId/dividend-yield', () => {
@@ -1240,6 +1282,39 @@ describe('Dividend CRUD', () => {
       const hglg = response.body.byTicker[0];
       expect(hglg.annualIncome).toBeCloseTo(0.9 * 10 * 12, 2);
       expect(hglg.currentValue).toBeCloseTo(1120, 2);
+    });
+
+    it('deve calcular yield mesmo quando posição não possui walletId denormalizado', async () => {
+      const dividend: Dividend = {
+        ...baseDividend,
+        id: 'dividend-hglg',
+        ticker: 'HGLG11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 0.9,
+        quantity: 100,
+        totalAmount: 90,
+      };
+      const positionWithoutWalletId: Position = {
+        ...basePosition,
+        walletId: undefined as unknown as string,
+      };
+
+      firestoreMock = createFirestoreMockWithWalletsAndPositions(
+        [defaultWallet],
+        { 'wallet-1': [positionWithoutWalletId] },
+        [dividend],
+      );
+
+      const response = await request(app)
+        .get('/api/wallets/wallet-1/dividend-yield')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body.byTicker).toHaveLength(1);
+      expect(response.body.byTicker[0].annualIncome).toBeCloseTo(
+        0.9 * 10 * 12,
+        2,
+      );
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {

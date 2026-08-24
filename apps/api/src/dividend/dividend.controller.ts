@@ -33,7 +33,17 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('positions');
 }
 
-async function getAllUserPositions(userId: string): Promise<Position[]> {
+async function getAllUserPositions(
+  userId: string,
+  walletId?: string,
+): Promise<Position[]> {
+  if (walletId) {
+    const positionsSnapshot = await positionsCollection(userId, walletId).get();
+    return positionsSnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    );
+  }
+
   const walletsSnapshot = await admin
     .firestore()
     .collection('users')
@@ -41,16 +51,17 @@ async function getAllUserPositions(userId: string): Promise<Position[]> {
     .collection('wallets')
     .get();
 
-  const positions: Position[] = [];
-  for (const walletDoc of walletsSnapshot.docs) {
-    const positionsSnapshot = await walletDoc.ref.collection('positions').get();
-    positions.push(
-      ...positionsSnapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() }) as Position,
-      ),
-    );
-  }
-  return positions;
+  const positionsByWallet = await Promise.all(
+    walletsSnapshot.docs.map((walletDoc) =>
+      walletDoc.ref.collection('positions').get(),
+    ),
+  );
+
+  return positionsByWallet.flatMap((positionsSnapshot) =>
+    positionsSnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    ),
+  );
 }
 
 const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -302,8 +313,8 @@ function isValidDividend(dividend: Dividend): boolean {
   );
 }
 
-function normalizeTicker(ticker: string): string {
-  return ticker.trim().toUpperCase();
+function normalizeTicker(ticker: unknown): string {
+  return typeof ticker === 'string' ? ticker.trim().toUpperCase() : '';
 }
 
 function latestDividendByTickerMap(
@@ -443,14 +454,10 @@ export async function getDividendYield(
     const { walletId } = req.params;
     const userId = uid(req);
 
-    const [allPositions, dividendsSnapshot] = await Promise.all([
-      getAllUserPositions(userId),
+    const [positions, dividendsSnapshot] = await Promise.all([
+      getAllUserPositions(userId, walletId),
       dividendsCollection(userId).get(),
     ]);
-
-    const positions = allPositions.filter(
-      (position) => position.walletId === walletId,
-    );
     const dividends = dividendsSnapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
     );
