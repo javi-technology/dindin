@@ -7,7 +7,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, finalize } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -58,6 +58,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private readonly dividendService = inject(DividendService);
   private readonly fb = inject(FormBuilder);
   private readonly destroy$ = new Subject<void>();
+  private positionsAbort$ = new Subject<void>();
   private dividendYieldAbort$ = new Subject<void>();
 
   wallets = signal<Wallet[]>([]);
@@ -119,36 +120,43 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   private loadFridges(): void {
-    this.fridgeService.listFridges().subscribe({
-      next: (response) => this.fridges.set(response),
-      error: () => {},
-    });
+    this.fridgeService
+      .listFridges()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => this.fridges.set(response),
+        error: () => {},
+      });
   }
 
   private loadWallets(): void {
     this.loading.set(true);
-    this.walletService.list().subscribe({
-      next: (response) => {
-        this.wallets.set(response);
-        if (response.length > 0) {
-          this.selectWallet(response[0]);
-        } else {
-          this.selectedWallet.set(null);
-          this.positions.set([]);
-        }
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Erro ao carregar carteiras.');
-        this.loading.set(false);
-      },
-    });
+    this.walletService
+      .list()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          this.wallets.set(response);
+          if (response.length > 0) {
+            this.selectWallet(response[0]);
+          } else {
+            this.selectedWallet.set(null);
+            this.positions.set([]);
+          }
+          this.loading.set(false);
+        },
+        error: () => {
+          this.error.set('Erro ao carregar carteiras.');
+          this.loading.set(false);
+        },
+      });
   }
 
   createDefaultWallet(): void {
     this.loading.set(true);
     this.walletService
       .create({ name: 'Carteira Principal', currency: 'BRL' })
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (wallet) => {
           this.wallets.set([wallet]);
@@ -164,14 +172,22 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   selectWallet(wallet: Wallet): void {
     this.selectedWallet.set(wallet);
+    this.abortPendingPositionsRequest();
     this.abortPendingDividendYieldRequest();
     this.loadPositions(wallet.id);
   }
 
   ngOnDestroy(): void {
+    this.abortPendingPositionsRequest();
     this.abortPendingDividendYieldRequest();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private abortPendingPositionsRequest(): void {
+    this.positionsAbort$.next();
+    this.positionsAbort$.complete();
+    this.positionsAbort$ = new Subject<void>();
   }
 
   private abortPendingDividendYieldRequest(): void {
@@ -191,31 +207,38 @@ export class WalletComponent implements OnInit, OnDestroy {
   loadPositions(walletId: string): void {
     this.loading.set(true);
     this.error.set(null);
-    this.positionService.list(walletId).subscribe({
-      next: (response) => {
-        this.positions.set(response);
-        this.loadDividendYield(walletId);
-      },
-      error: () => {
-        this.error.set('Erro ao carregar posições.');
-        this.loading.set(false);
-      },
-    });
+    this.positionService
+      .list(walletId)
+      .pipe(
+        takeUntil(this.destroy$),
+        takeUntil(this.positionsAbort$),
+        finalize(() => this.loading.set(false)),
+      )
+      .subscribe({
+        next: (response) => {
+          this.positions.set(response);
+          this.loadDividendYield(walletId);
+        },
+        error: () => {
+          this.error.set('Erro ao carregar posições.');
+        },
+      });
   }
 
   private loadDividendYield(walletId: string): void {
     this.dividendService
       .getDividendYield(walletId)
-      .pipe(takeUntil(this.dividendYieldAbort$))
+      .pipe(
+        takeUntil(this.dividendYieldAbort$),
+        finalize(() => this.loading.set(false)),
+      )
       .subscribe({
         next: (response) => {
           this.dividendYield.set(response);
           this.error.set(null);
-          this.loading.set(false);
         },
         error: () => {
           this.error.set('Erro ao carregar dividend yield.');
-          this.loading.set(false);
         },
       });
   }
@@ -300,29 +323,35 @@ export class WalletComponent implements OnInit, OnDestroy {
 
     const editing = this.editingPosition();
     if (editing) {
-      this.positionService.update(wallet.id, editing.id, payload).subscribe({
-        next: () => {
-          this.closeForm();
-          this.loadPositions(wallet.id);
-        },
-        error: () => {
-          this.formError.set(
-            'Erro ao atualizar posição. Verifique os dados e tente novamente.',
-          );
-        },
-      });
+      this.positionService
+        .update(wallet.id, editing.id, payload)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            this.closeForm();
+            this.loadPositions(wallet.id);
+          },
+          error: () => {
+            this.formError.set(
+              'Erro ao atualizar posição. Verifique os dados e tente novamente.',
+            );
+          },
+        });
     } else {
-      this.positionService.create(wallet.id, payload).subscribe({
-        next: () => {
-          this.closeForm();
-          this.loadPositions(wallet.id);
-        },
-        error: () => {
-          this.formError.set(
-            'Erro ao criar posição. Verifique os dados e tente novamente.',
-          );
-        },
-      });
+      this.positionService
+        .create(wallet.id, payload)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            this.closeForm();
+            this.loadPositions(wallet.id);
+          },
+          error: () => {
+            this.formError.set(
+              'Erro ao criar posição. Verifique os dados e tente novamente.',
+            );
+          },
+        });
     }
   }
 
@@ -335,13 +364,16 @@ export class WalletComponent implements OnInit, OnDestroy {
     const wallet = this.selectedWallet();
     if (!position || !wallet) return;
 
-    this.positionService.delete(wallet.id, position.id).subscribe({
-      next: () => {
-        this.deleteConfirmPosition.set(null);
-        this.loadPositions(wallet.id);
-      },
-      error: () => this.error.set('Erro ao remover posição.'),
-    });
+    this.positionService
+      .delete(wallet.id, position.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.deleteConfirmPosition.set(null);
+          this.loadPositions(wallet.id);
+        },
+        error: () => this.error.set('Erro ao remover posição.'),
+      });
   }
 
   cancelDelete(): void {
@@ -384,6 +416,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
     this.positionService
       .moveToFridge(wallet.id, position.id, { fridgeId, targetPrice })
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
           this.closeMoveToFridge();
