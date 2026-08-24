@@ -28,6 +28,10 @@ function getMaxSymbolsPerRequest(): number {
     : DEFAULT_MAX_SYMBOLS_PER_REQUEST;
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 async function fetchQuoteBatch(
   tickers: string[],
 ): Promise<Map<string, QuoteResult>> {
@@ -94,7 +98,7 @@ export async function fetchQuotes(
         quoteMap.set(symbol, quote);
       }
     } catch (error) {
-      lastError = error as Error;
+      lastError = toError(error);
       console.error('[fetchQuotes] Erro ao buscar lote de tickers:', {
         tickers: batch,
         message: lastError.message,

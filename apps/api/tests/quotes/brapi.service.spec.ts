@@ -11,6 +11,7 @@ describe('BrapiService — fetchQuotes', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     delete process.env.BRAPI_API_KEY;
+    delete process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST;
   });
 
   function mockFetch(response: unknown, status = 200) {
@@ -131,9 +132,24 @@ describe('BrapiService — fetchQuotes', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(fetchMock.mock.calls[0][0]).toContain('symbols=HGLG11,MXRF11');
       expect(fetchMock.mock.calls[1][0]).toContain('symbols=KNRI11');
-
-      delete process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST;
     });
+
+    it.each(['0', '-1', 'abc', '1.5', ''])(
+      'deve usar o padrão (1 ticker por requisição) quando BRAPI_MAX_SYMBOLS_PER_REQUEST for inválido (%s)',
+      async (invalidValue) => {
+        process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = invalidValue;
+        const fetchMock = jest.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ results: [] }),
+        });
+        globalThis.fetch = fetchMock;
+
+        await fetchQuotes(['HGLG11', 'MXRF11']);
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      },
+    );
   });
 
   describe('falha parcial entre lotes', () => {
@@ -231,6 +247,24 @@ describe('BrapiService — fetchQuotes', () => {
       mockFetchReject(new Error('Network error'));
 
       await expect(fetchQuotes(['HGLG11'])).rejects.toThrow('Network error');
+    });
+
+    it('deve lançar erro tratado quando fetch rejeita com um valor que não é Error', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      globalThis.fetch = jest.fn().mockRejectedValue('string de erro qualquer');
+
+      await expect(fetchQuotes(['HGLG11'])).rejects.toThrow();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[fetchQuotes] Erro ao buscar lote de tickers:',
+        expect.objectContaining({
+          tickers: ['HGLG11'],
+          message: expect.any(String),
+        }),
+      );
+
+      consoleErrorSpy.mockRestore();
     });
 
     it('deve lançar erro para resposta HTTP 4xx', async () => {
