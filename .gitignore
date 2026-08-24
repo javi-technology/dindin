@@ -5,3 +5,5 @@ firestore-debug.log
 ui-debug.log
 *.log
 .env
+.env.*
+!.env.example
