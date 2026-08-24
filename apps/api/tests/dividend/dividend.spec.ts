@@ -840,6 +840,39 @@ describe('Dividend CRUD', () => {
       expect(hglg.yield).toBeCloseTo(11.95, 2);
     });
 
+    it('deve retornar yield zerado para posição sem preço e sem gerar NaN', async () => {
+      const dividend: Dividend = {
+        ...baseDividend,
+        id: 'dividend-hglg',
+        ticker: 'HGLG11',
+        paymentDate: '2026-02-15',
+        amountPerShare: 1.1,
+        quantity: 10,
+        totalAmount: 11,
+      };
+      const positionWithoutPrice: Position = {
+        ...basePosition,
+        averagePrice: undefined as unknown as number,
+        currentPrice: undefined,
+      };
+
+      firestoreMock = createFirestoreMockWithPositions(
+        [dividend],
+        [positionWithoutPrice],
+      );
+
+      const response = await request(app)
+        .get('/api/wallets/wallet-1/dividend-yield')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      const hglg = response.body.byTicker[0];
+      expect(hglg.currentValue).toBe(0);
+      expect(hglg.yield).toBe(0);
+      expect(response.body.total.yield).toBe(0);
+      expect(JSON.stringify(response.body)).not.toContain('NaN');
+    });
+
     it('deve retornar 500 quando o Firestore falha', async () => {
       firestoreMock = createFailingFirestoreMock();
 

@@ -4,7 +4,7 @@ import {
   fakeAsync,
   tick,
 } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, throwError, delay } from 'rxjs';
 import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
@@ -225,6 +225,131 @@ describe('WalletComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const errorEl = compiled.querySelector('[data-testid="error-message"]');
     expect(errorEl?.textContent).toContain('Erro ao carregar dividend yield.');
+  }));
+
+  it('deve limpar mensagem de erro após carregar dividend yield com sucesso', fakeAsync(() => {
+    dividendServiceMock.getDividendYield.and.returnValues(
+      throwError(() => new Error('Network error')),
+      of({
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            annualIncome: 108,
+            currentValue: 1120,
+            yield: 9.64,
+          },
+        ],
+        total: {
+          annualIncome: 108,
+          currentValue: 1120,
+          yield: 9.64,
+        },
+      }),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    let errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl?.textContent).toContain('Erro ao carregar dividend yield.');
+
+    // Força recarregamento das posições para que o DY seja buscado novamente
+    fixture.componentInstance.loadPositions('wallet-1');
+    tick();
+    fixture.detectChanges();
+
+    errorEl = compiled.querySelector('[data-testid="error-message"]');
+    expect(errorEl).toBeNull();
+  }));
+
+  it('deve ignorar resposta antiga de dividend yield ao trocar de carteira rapidamente', fakeAsync(() => {
+    const wallet2: Wallet = {
+      id: 'wallet-2',
+      ownerId: 'user-123',
+      name: 'Carteira Secundária',
+      currency: 'BRL',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const positions2: Position[] = [
+      {
+        id: 'position-3',
+        walletId: 'wallet-2',
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: 100,
+        averagePrice: 10,
+        currentPrice: 10.5,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    walletServiceMock.list.and.returnValue(of([wallets[0], wallet2]));
+
+    positionServiceMock.list.and.callFake((id: string) => {
+      return id === 'wallet-1' ? of(positions) : of(positions2);
+    });
+
+    dividendServiceMock.getDividendYield.and.callFake((id: string) => {
+      const response =
+        id === 'wallet-1'
+          ? {
+              byTicker: [
+                {
+                  ticker: 'HGLG11',
+                  annualIncome: 108,
+                  currentValue: 1120,
+                  yield: 9.64,
+                },
+              ],
+              total: {
+                annualIncome: 108,
+                currentValue: 1120,
+                yield: 9.64,
+              },
+            }
+          : {
+              byTicker: [
+                {
+                  ticker: 'MXRF11',
+                  annualIncome: 120,
+                  currentValue: 1050,
+                  yield: 11.43,
+                },
+              ],
+              total: {
+                annualIncome: 120,
+                currentValue: 1050,
+                yield: 11.43,
+              },
+            };
+      // Atraso para wallet-1 simular resposta lenta
+      return of(response).pipe(delay(id === 'wallet-1' ? 100 : 0));
+    });
+
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    // Seleciona wallet-2 imediatamente
+    fixture.componentInstance.selectWallet(wallet2);
+    tick(150);
+    fixture.detectChanges();
+
+    expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith(
+      'wallet-2',
+    );
+    expect(fixture.componentInstance.dividendYield()?.byTicker[0].ticker).toBe(
+      'MXRF11',
+    );
+    expect(
+      fixture.componentInstance.dividendYield()?.byTicker[0].yield,
+    ).toBeCloseTo(11.43, 2);
   }));
 
   it('deve abrir formulário ao clicar em adicionar posição', () => {
