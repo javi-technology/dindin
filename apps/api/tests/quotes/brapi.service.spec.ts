@@ -72,11 +72,9 @@ describe('BrapiService — fetchQuotes', () => {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: jest
-            .fn()
-            .mockResolvedValue({
-              results: [{ symbol, data: quoteBySymbol[symbol] }],
-            }),
+          json: jest.fn().mockResolvedValue({
+            results: [{ symbol, data: quoteBySymbol[symbol] }],
+          }),
         });
       });
       globalThis.fetch = fetchMock;
@@ -104,7 +102,9 @@ describe('BrapiService — fetchQuotes', () => {
 
       const firstUrl = fetchMock.mock.calls[0][0] as string;
       const secondUrl = fetchMock.mock.calls[1][0] as string;
-      expect(firstUrl).toContain('brapi.dev/api/v2/stocks/quote?symbols=HGLG11');
+      expect(firstUrl).toContain(
+        'brapi.dev/api/v2/stocks/quote?symbols=HGLG11',
+      );
       expect(secondUrl).toContain(
         'brapi.dev/api/v2/stocks/quote?symbols=MXRF11',
       );
