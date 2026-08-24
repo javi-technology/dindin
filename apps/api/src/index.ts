@@ -30,6 +30,15 @@ import {
   listItems,
   updateItem,
 } from './wallet/fridge.controller';
+import {
+  createDividend,
+  deleteDividend,
+  getDividend,
+  getDividendProjection,
+  getDividendYield,
+  listDividends,
+  updateDividend,
+} from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
 
 admin.initializeApp();
@@ -69,6 +78,7 @@ app.get('/api/wallets/:id', getWallet);
 app.put('/api/wallets/:id', updateWallet);
 app.delete('/api/wallets/:id', deleteWallet);
 
+app.get('/api/wallets/:walletId/dividend-yield', getDividendYield);
 app.get('/api/wallets/:walletId/positions', listPositions);
 app.post('/api/wallets/:walletId/positions', createPosition);
 app.get('/api/wallets/:walletId/positions/:id', getPosition);
@@ -87,6 +97,13 @@ app.post('/api/fridges/:fridgeId/items', createItem);
 app.get('/api/fridges/:fridgeId/items/:id', getItem);
 app.put('/api/fridges/:fridgeId/items/:id', updateItem);
 app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
+
+app.get('/api/dividends', listDividends);
+app.get('/api/dividends/projection', getDividendProjection);
+app.post('/api/dividends', createDividend);
+app.get('/api/dividends/:id', getDividend);
+app.put('/api/dividends/:id', updateDividend);
+app.delete('/api/dividends/:id', deleteDividend);
 
 // Middleware global de tratamento de erros não capturados
 app.use(

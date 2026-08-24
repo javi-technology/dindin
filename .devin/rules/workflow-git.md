@@ -1,5 +1,5 @@
 ---
-description: "Fluxo de trabalho obrigatório: issues, TDD estrito, branches e commits"
+description: 'Fluxo de trabalho obrigatório: issues, TDD estrito, branches e commits'
 trigger: always_on
 ---
 
@@ -28,7 +28,7 @@ Regras:
 ### Estrutura de Testes
 
 | Camada   | Ferramenta                | Localização                   |
-| -------- | ------------------------- | ------------------------------ |
+| -------- | ------------------------- | ----------------------------- |
 | API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
 | Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
 

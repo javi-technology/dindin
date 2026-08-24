@@ -35,5 +35,6 @@ export async function authMiddleware(
     next();
   } catch (error) {
     res.status(401).json({ error: 'Unauthorized' });
+    return;
   }
 }

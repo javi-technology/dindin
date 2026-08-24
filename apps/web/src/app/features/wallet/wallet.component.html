@@ -96,6 +96,9 @@
                   <th class="py-3 px-4 text-sm font-semibold text-gray-700">
                     Total
                   </th>
+                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                    DY
+                  </th>
                   <th
                     class="py-3 px-4 text-sm font-semibold text-gray-700 text-right"
                   >
@@ -144,6 +147,9 @@
                     <td class="py-3 px-4 text-gray-700">
                       {{ formatCurrency(totalPosition(position)) }}
                     </td>
+                    <td class="py-3 px-4 text-gray-700">
+                      {{ formatPercent(dividendYieldFor(position)) }}
+                    </td>
                     <td class="py-3 px-4 text-right">
                       <button
                         [attr.data-testid]="'btn-editar-' + i"
@@ -181,9 +187,19 @@
                   <td
                     class="py-3 px-4 text-gray-900"
                     data-testid="total-geral"
-                    colspan="2"
+                    colspan="3"
                   >
                     {{ formatCurrency(totalGeral()) }}
+                  </td>
+                </tr>
+                <tr class="bg-gray-50 font-semibold">
+                  <td class="py-3 px-4 text-gray-900" colspan="3">DY total</td>
+                  <td
+                    class="py-3 px-4 text-gray-900"
+                    data-testid="dy-total"
+                    colspan="3"
+                  >
+                    {{ formatPercent(totalDividendYield()) }}
                   </td>
                 </tr>
               </tfoot>

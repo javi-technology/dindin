@@ -1,5 +1,5 @@
 ---
-description: "Visão geral do projeto DinDin: stack e estrutura do monorepo"
+description: 'Visão geral do projeto DinDin: stack e estrutura do monorepo'
 trigger: always_on
 ---
 

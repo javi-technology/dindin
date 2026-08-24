@@ -36,3 +36,15 @@ export function formatCurrency(value: number): string {
     currency: 'BRL',
   }).format(value);
 }
+
+/**
+ * Formata um número como percentual (pt-BR).
+ * O valor deve ser informado em pontos percentuais (ex: 9.64 para 9,64%).
+ */
+export function formatPercent(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
+}
