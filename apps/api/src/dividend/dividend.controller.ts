@@ -258,14 +258,52 @@ interface MonthlyDividendProjection {
   monthlyAmount: number;
 }
 
+function isValidDividend(dividend: Dividend): boolean {
+  return (
+    typeof dividend.ticker === 'string' &&
+    dividend.ticker.length > 0 &&
+    typeof dividend.paymentDate === 'string' &&
+    typeof dividend.amountPerShare === 'number' &&
+    Number.isFinite(dividend.amountPerShare) &&
+    dividend.amountPerShare >= 0 &&
+    typeof dividend.quantity === 'number' &&
+    Number.isFinite(dividend.quantity) &&
+    dividend.quantity > 0
+  );
+}
+
 function latestDividendByTicker(
   dividends: Dividend[],
 ): MonthlyDividendProjection[] {
   const byTicker = new Map<string, Dividend>();
 
   for (const dividend of dividends) {
+    if (!isValidDividend(dividend)) {
+      console.error(
+        '[latestDividendByTicker] dividendo mal formado ignorado:',
+        {
+          id: dividend.id,
+          ticker: dividend.ticker,
+          paymentDate: dividend.paymentDate,
+          amountPerShare: dividend.amountPerShare,
+          quantity: dividend.quantity,
+        },
+      );
+      continue;
+    }
+
     const current = byTicker.get(dividend.ticker);
-    if (!current || dividend.paymentDate > current.paymentDate) {
+    if (!current) {
+      byTicker.set(dividend.ticker, dividend);
+      continue;
+    }
+
+    const isNewerDate = dividend.paymentDate > current.paymentDate;
+    const sameDate = dividend.paymentDate === current.paymentDate;
+    const isNewerCreatedAt =
+      (dividend.createdAt ?? '') > (current.createdAt ?? '');
+
+    if (isNewerDate || (sameDate && isNewerCreatedAt)) {
       byTicker.set(dividend.ticker, dividend);
     }
   }

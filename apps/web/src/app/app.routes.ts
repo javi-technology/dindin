@@ -5,7 +5,7 @@ import { LoginComponent } from './features/login/login.component';
 import { HomeComponent } from './features/home/home.component';
 import { WalletComponent } from './features/wallet/wallet.component';
 import { FridgeComponent } from './features/fridge/fridge.component';
-import { DividendComponent } from './features/dividends/dividend.component';
+import { DividendComponent } from './features/dividend/dividend.component';
 
 export const routes: Routes = [
   {
@@ -29,7 +29,7 @@ export const routes: Routes = [
     component: FridgeComponent,
   },
   {
-    path: 'proventos',
+    path: 'provento',
     canActivate: [authGuard],
     component: DividendComponent,
   },

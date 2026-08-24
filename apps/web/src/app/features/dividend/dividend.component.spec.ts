@@ -63,9 +63,16 @@ describe('DividendComponent', () => {
   });
 
   it('deve exibir mensagem de erro quando falha ao carregar projeção', async () => {
+    TestBed.resetTestingModule();
     dividendServiceMock.getProjection.and.returnValue(
       throwError(() => new Error('Network error')),
     );
+
+    await TestBed.configureTestingModule({
+      imports: [DividendComponent],
+      providers: [{ provide: DividendService, useValue: dividendServiceMock }],
+    }).compileComponents();
+
     fixture = TestBed.createComponent(DividendComponent);
     fixture.detectChanges();
     await fixture.whenStable();
