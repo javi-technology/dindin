@@ -7,3 +7,6 @@ ui-debug.log
 .env
 .env.*
 !.env.example
+sa-key.json
+service-account*.json
+*-sa-key.json
