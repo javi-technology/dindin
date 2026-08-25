@@ -113,7 +113,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
     });
 
-    it('deve usar 0 como dividendo mensal quando a Brapi não retorna o valor', async () => {
+    it('deve preservar dividendo mensal existente quando a Brapi não retorna o valor', async () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
@@ -128,7 +128,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'HGLG11',
         165.5,
-        0,
+        undefined,
         'brapi',
       );
     });
@@ -207,7 +207,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'HGLG11',
         165.5,
-        0,
+        undefined,
         'brapi',
       );
 

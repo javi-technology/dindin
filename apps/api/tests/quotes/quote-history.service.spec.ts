@@ -90,6 +90,40 @@ describe('QuoteHistoryService', () => {
         expect.objectContaining({ source: 'brapi' }),
       );
     });
+
+    it('deve preservar monthlyDividend existente quando não informado', async () => {
+      const historySet = jest.fn().mockResolvedValue(undefined);
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            ticker: 'MXRF11',
+            price: 10.32,
+            monthlyDividend: 0.07,
+            updatedAt: '2026-07-15T18:00:00Z',
+            source: 'brapi',
+          }),
+        }),
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: historySet })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('MXRF11', 10.32, undefined);
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyDividend: 0.07 }),
+      );
+      expect(historySet).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyDividend: 0.07 }),
+      );
+    });
   });
 
   describe('getQuoteHistory', () => {

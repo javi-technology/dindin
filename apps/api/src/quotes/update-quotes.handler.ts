@@ -11,7 +11,7 @@ const BATCH_SIZE = 10;
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
-  monthlyDividend: number,
+  monthlyDividend: number | undefined,
 ): Promise<void> {
   try {
     await saveQuoteHistory(ticker, quote.price, monthlyDividend, 'brapi');
@@ -79,7 +79,11 @@ export async function updateAllQuotes(): Promise<void> {
       const batch = tickerEntries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map(([ticker, quote]) =>
-          processTickerQuote(ticker, quote, dividends.get(ticker) ?? 0),
+          processTickerQuote(
+            ticker,
+            quote,
+            dividends.has(ticker) ? dividends.get(ticker) : undefined,
+          ),
         ),
       );
     }

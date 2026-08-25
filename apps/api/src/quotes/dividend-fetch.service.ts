@@ -70,7 +70,7 @@ async function fetchFiiDividendBatch(
   tickers: string[],
 ): Promise<MonthlyDividendResult[]> {
   const symbols = tickers.join(',');
-  const url = `${BRAPI_FII_DIVIDENDS_URL}?symbols=${symbols}`;
+  const url = `${BRAPI_FII_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
@@ -98,12 +98,13 @@ async function fetchFiiDividendBatch(
     if (typeof event.rate !== 'number' || !Number.isFinite(event.rate))
       continue;
 
-    const current = byTicker.get(event.symbol);
+    const symbol = event.symbol.toUpperCase();
+    const current = byTicker.get(symbol);
     if (
       !current ||
       latestEventDate(current.paymentDate, event.paymentDate) > 0
     ) {
-      byTicker.set(event.symbol, event);
+      byTicker.set(symbol, event);
     }
   }
 
@@ -117,7 +118,7 @@ async function fetchStocksDividendBatch(
   tickers: string[],
 ): Promise<MonthlyDividendResult[]> {
   const symbols = tickers.join(',');
-  const url = `${BRAPI_STOCKS_DIVIDENDS_URL}?symbols=${symbols}`;
+  const url = `${BRAPI_STOCKS_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
@@ -151,7 +152,10 @@ async function fetchStocksDividendBatch(
     if (typeof latest.rate !== 'number' || !Number.isFinite(latest.rate)) {
       continue;
     }
-    output.push({ ticker: item.symbol, monthlyDividend: latest.rate });
+    output.push({
+      ticker: item.symbol.toUpperCase(),
+      monthlyDividend: latest.rate,
+    });
   }
 
   return output;
