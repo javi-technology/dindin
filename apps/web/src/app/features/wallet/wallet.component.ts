@@ -22,6 +22,7 @@ import { AssetService } from '../../core/services/asset.service';
 import {
   DividendService,
   DividendYieldResponse,
+  MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
 import { Wallet, Position, AssetType, Asset, Fridge } from 'dindin-models';
 import {
@@ -62,6 +63,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private positionsAbort$ = new Subject<void>();
   private dividendYieldAbort$ = new Subject<void>();
+  private monthlyIncomeAbort$ = new Subject<void>();
 
   wallets = signal<Wallet[]>([]);
   selectedWallet = signal<Wallet | null>(null);
@@ -69,6 +71,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   assets = signal<Asset[]>([]);
   assetsError = signal<string | null>(null);
   dividendYield = signal<DividendYieldResponse | null>(null);
+  monthlyIncome = signal<MonthlyIncomeResponse | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -110,9 +113,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
 
-  totalProventos = computed(
-    () => this.dividendYield()?.total?.annualIncome ?? 0,
-  );
+  totalProventos = computed(() => this.monthlyIncome()?.total ?? 0);
 
   dividendYieldFor = (position: Position): number => {
     const found = this.dividendYield()?.byTicker.find(
@@ -122,10 +123,10 @@ export class WalletComponent implements OnInit, OnDestroy {
   };
 
   totalProventosFor = (position: Position): number => {
-    const found = this.dividendYield()?.byTicker.find(
+    const found = this.monthlyIncome()?.byTicker.find(
       (item) => item.ticker === position.ticker,
     );
-    return found?.annualIncome ?? 0;
+    return found?.monthlyIncome ?? 0;
   };
 
   ngOnInit(): void {
@@ -206,12 +207,14 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.selectedWallet.set(wallet);
     this.abortPendingPositionsRequest();
     this.abortPendingDividendYieldRequest();
+    this.abortPendingMonthlyIncomeRequest();
     this.loadPositions(wallet.id);
   }
 
   ngOnDestroy(): void {
     this.abortPendingPositionsRequest();
     this.abortPendingDividendYieldRequest();
+    this.abortPendingMonthlyIncomeRequest();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -226,6 +229,12 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.dividendYieldAbort$.next();
     this.dividendYieldAbort$.complete();
     this.dividendYieldAbort$ = new Subject<void>();
+  }
+
+  private abortPendingMonthlyIncomeRequest(): void {
+    this.monthlyIncomeAbort$.next();
+    this.monthlyIncomeAbort$.complete();
+    this.monthlyIncomeAbort$ = new Subject<void>();
   }
 
   onWalletChange(event: Event): void {
@@ -250,6 +259,7 @@ export class WalletComponent implements OnInit, OnDestroy {
         next: (response) => {
           this.positions.set(response);
           this.loadDividendYield(walletId);
+          this.loadMonthlyIncome(walletId);
         },
         error: () => {
           this.error.set('Erro ao carregar posições.');
@@ -271,6 +281,23 @@ export class WalletComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.error.set('Erro ao carregar dividend yield.');
+        },
+      });
+  }
+
+  private loadMonthlyIncome(walletId: string): void {
+    this.dividendService
+      .getMonthlyIncome(walletId)
+      .pipe(
+        takeUntil(this.monthlyIncomeAbort$),
+        finalize(() => this.loading.set(false)),
+      )
+      .subscribe({
+        next: (response) => {
+          this.monthlyIncome.set(response);
+        },
+        error: () => {
+          this.error.set('Erro ao carregar renda mensal.');
         },
       });
   }

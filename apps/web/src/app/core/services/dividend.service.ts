@@ -30,6 +30,18 @@ export interface DividendYieldResponse {
   };
 }
 
+export interface MonthlyIncomeItem {
+  ticker: string;
+  quantity: number;
+  monthlyDividend: number;
+  monthlyIncome: number;
+}
+
+export interface MonthlyIncomeResponse {
+  byTicker: MonthlyIncomeItem[];
+  total: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -46,6 +58,12 @@ export class DividendService {
   getDividendYield(walletId: string): Observable<DividendYieldResponse> {
     return this.http.get<DividendYieldResponse>(
       `/api/wallets/${walletId}/dividend-yield`,
+    );
+  }
+
+  getMonthlyIncome(walletId: string): Observable<MonthlyIncomeResponse> {
+    return this.http.get<MonthlyIncomeResponse>(
+      `/api/wallets/${walletId}/monthly-income`,
     );
   }
 }
