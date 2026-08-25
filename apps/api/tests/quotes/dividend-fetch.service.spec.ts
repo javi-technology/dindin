@@ -1,16 +1,29 @@
 import { fetchMonthlyDividends } from '../../src/quotes/dividend-fetch.service';
 import { ActiveAsset } from '../../src/assets/asset.service';
+import YahooFinance from 'yahoo-finance2';
+
+jest.mock('yahoo-finance2', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
 
 describe('DividendFetchService — fetchMonthlyDividends', () => {
   const originalFetch = globalThis.fetch;
+  const historicalMock = jest.fn();
+  const YahooFinanceMock = YahooFinance as jest.Mock;
 
   beforeEach(() => {
     process.env.BRAPI_API_KEY = 'test-api-key';
+    historicalMock.mockReset();
+    YahooFinanceMock.mockImplementation(() => ({
+      historical: historicalMock,
+    }));
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     delete process.env.BRAPI_API_KEY;
+    YahooFinanceMock.mockReset();
   });
 
   function mockFetch(response: unknown, status = 200) {
@@ -231,6 +244,143 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       expect(result.size).toBe(0);
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('fallback Yahoo Finance', () => {
+    it('deve buscar dividendos no Yahoo Finance quando a Brapi falhar', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      historicalMock.mockImplementation((ticker: string) => {
+        if (ticker === 'PETR4.SA') {
+          return Promise.resolve([
+            {
+              date: new Date('2026-06-15T03:00:00.000Z'),
+              dividends: 1.1,
+            },
+            {
+              date: new Date('2026-07-15T03:00:00.000Z'),
+              dividends: 1.25,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toBe(1.25);
+      expect(historicalMock).toHaveBeenCalledWith(
+        'PETR4.SA',
+        expect.objectContaining({ events: 'dividends' }),
+      );
+    });
+
+    it('deve buscar FIIs no Yahoo Finance quando a Brapi não retornar resultado', async () => {
+      mockFetch({ dividends: [] });
+      historicalMock.mockImplementation((ticker: string) => {
+        if (ticker === 'HGLG11.SA') {
+          return Promise.resolve([
+            {
+              date: new Date('2026-06-12T03:00:00.000Z'),
+              dividends: 0.9,
+            },
+            {
+              date: new Date('2026-07-14T03:00:00.000Z'),
+              dividends: 0.92,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+      ]);
+
+      expect(result.get('HGLG11')).toBe(0.92);
+    });
+
+    it('deve complementar resultados parciais da Brapi com dados do Yahoo Finance', async () => {
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/v2/fii/dividends')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: jest.fn().mockResolvedValue({
+              dividends: [
+                {
+                  symbol: 'HGLG11',
+                  label: 'RENDIMENTO',
+                  rate: 0.9,
+                  paymentDate: '2026-07-14T00:00:00.000Z',
+                },
+              ],
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({ results: [] }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+      historicalMock.mockImplementation((ticker: string) => {
+        if (ticker === 'PETR4.SA') {
+          return Promise.resolve([
+            {
+              date: new Date('2026-07-15T03:00:00.000Z'),
+              dividends: 1.25,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('HGLG11')).toBe(0.9);
+      expect(result.get('PETR4')).toBe(1.25);
+    });
+
+    it('deve ignorar ticker quando Yahoo Finance retornar lista vazia', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      historicalMock.mockResolvedValue([]);
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.has('PETR4')).toBe(false);
+    });
+
+    it('deve ignorar ticker quando Yahoo Finance lançar erro', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      historicalMock.mockRejectedValue(new Error('Timeout'));
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.has('PETR4')).toBe(false);
+    });
+
+    it('deve ignorar dividendos inválidos do Yahoo Finance', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      historicalMock.mockResolvedValue([
+        { date: new Date('2026-07-15T03:00:00.000Z'), dividends: NaN },
+      ]);
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.has('PETR4')).toBe(false);
     });
   });
 
