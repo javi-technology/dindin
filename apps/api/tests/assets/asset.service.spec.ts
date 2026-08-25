@@ -10,9 +10,11 @@ import {
   listActiveAssetTickers,
 } from '../../src/assets/asset.service';
 
+type TestAsset = { ticker: string; assetType?: string; active?: boolean };
+
 function mockAssetsCollection(
-  activeTickers: string[],
-  allTickers: string[] = activeTickers,
+  activeAssets: TestAsset[],
+  allAssets: TestAsset[] = activeAssets,
 ) {
   firestoreMock = {
     collection: jest.fn((path: string) => {
@@ -20,18 +22,22 @@ function mockAssetsCollection(
       return {
         doc: jest.fn((ticker: string) => ({
           get: jest.fn().mockResolvedValue({
-            exists: allTickers.includes(ticker),
-            data: () =>
-              allTickers.includes(ticker)
-                ? { ticker, active: activeTickers.includes(ticker) }
-                : undefined,
+            exists: allAssets.some((a) => a.ticker === ticker),
+            data: () => {
+              const asset = allAssets.find((a) => a.ticker === ticker);
+              if (!asset) return undefined;
+              const isActive = activeAssets.some(
+                (a) => a.ticker === asset.ticker,
+              );
+              return { ...asset, active: isActive };
+            },
           }),
         })),
         where: jest.fn(() => ({
           get: jest.fn().mockResolvedValue({
-            docs: activeTickers.map((ticker) => ({
-              id: ticker,
-              data: () => ({ ticker, active: true }),
+            docs: activeAssets.map((asset) => ({
+              id: asset.ticker,
+              data: () => ({ ...asset, active: true }),
             })),
           }),
         })),
@@ -43,27 +49,30 @@ function mockAssetsCollection(
 describe('asset.service', () => {
   describe('assetExists', () => {
     it('deve retornar true quando o ticker existe e está ativo', async () => {
-      mockAssetsCollection(['HGLG11']);
+      mockAssetsCollection([{ ticker: 'HGLG11', assetType: 'FII' }]);
       await expect(assetExists('HGLG11')).resolves.toBe(true);
     });
 
     it('deve retornar false quando o ticker não existe no catálogo', async () => {
-      mockAssetsCollection(['HGLG11']);
+      mockAssetsCollection([{ ticker: 'HGLG11', assetType: 'FII' }]);
       await expect(assetExists('INEXISTENTE11')).resolves.toBe(false);
     });
 
     it('deve retornar false quando o ticker existe mas está inativo', async () => {
-      mockAssetsCollection([], ['OLDX11']);
+      mockAssetsCollection([], [{ ticker: 'OLDX11', assetType: 'FII' }]);
       await expect(assetExists('OLDX11')).resolves.toBe(false);
     });
   });
 
   describe('listActiveAssetTickers', () => {
-    it('deve retornar os tickers de todos os ativos ativos do catálogo', async () => {
-      mockAssetsCollection(['HGLG11', 'MXRF11']);
+    it('deve retornar ticker e assetType de todos os ativos ativos do catálogo', async () => {
+      mockAssetsCollection([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
       await expect(listActiveAssetTickers()).resolves.toEqual([
-        'HGLG11',
-        'MXRF11',
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
     });
 
@@ -87,7 +96,9 @@ describe('asset.service', () => {
         }),
       };
 
-      await expect(listActiveAssetTickers()).resolves.toEqual(['HGLG11']);
+      await expect(listActiveAssetTickers()).resolves.toEqual([
+        { ticker: 'HGLG11', assetType: 'OTHER' },
+      ]);
     });
   });
 });

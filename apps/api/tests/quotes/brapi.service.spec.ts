@@ -130,7 +130,7 @@ describe('BrapiService — fetchQuotes', () => {
       await fetchQuotes(['HGLG11', 'MXRF11', 'KNRI11']);
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(fetchMock.mock.calls[0][0]).toContain('symbols=HGLG11,MXRF11');
+      expect(fetchMock.mock.calls[0][0]).toContain('symbols=HGLG11%2CMXRF11');
       expect(fetchMock.mock.calls[1][0]).toContain('symbols=KNRI11');
     });
 
