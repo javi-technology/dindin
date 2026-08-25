@@ -20,5 +20,10 @@ export async function assetExists(ticker: string): Promise<boolean> {
 /** Lista os tickers de todos os ativos ativos do catálogo. */
 export async function listActiveAssetTickers(): Promise<string[]> {
   const snapshot = await assetsCollection().where('active', '==', true).get();
-  return snapshot.docs.map((doc) => (doc.data() as Asset).ticker);
+  return snapshot.docs.map((doc) => {
+    const data = doc.data() as Partial<Asset> | undefined;
+    // Usa doc.id como fallback caso o campo `ticker` esteja ausente no
+    // documento — o id do documento é sempre o próprio ticker.
+    return data?.ticker ?? doc.id;
+  });
 }

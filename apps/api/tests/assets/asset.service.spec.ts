@@ -71,5 +71,23 @@ describe('asset.service', () => {
       mockAssetsCollection([]);
       await expect(listActiveAssetTickers()).resolves.toEqual([]);
     });
+
+    it('deve usar o id do documento como fallback quando o campo ticker estiver ausente', async () => {
+      firestoreMock = {
+        collection: jest.fn((path: string) => {
+          if (path !== 'assets')
+            throw new Error(`Unexpected collection: ${path}`);
+          return {
+            where: jest.fn(() => ({
+              get: jest.fn().mockResolvedValue({
+                docs: [{ id: 'HGLG11', data: () => ({ active: true }) }],
+              }),
+            })),
+          };
+        }),
+      };
+
+      await expect(listActiveAssetTickers()).resolves.toEqual(['HGLG11']);
+    });
   });
 });
