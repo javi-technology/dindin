@@ -41,13 +41,14 @@ describe('QuoteHistoryService', () => {
         }),
       };
 
-      await saveQuoteHistory('HGLG11', 165.5, 'brapi');
+      await saveQuoteHistory('HGLG11', 165.5, 0.92, 'brapi');
 
       // Deve criar/atualizar o documento principal quotes/HGLG11
       expect(quotesCollection.doc).toHaveBeenCalledWith('HGLG11');
       expect(quoteSet).toHaveBeenCalledWith({
         ticker: 'HGLG11',
         price: 165.5,
+        monthlyDividend: 0.92,
         updatedAt: expect.any(String),
         source: 'brapi',
       });
@@ -61,6 +62,7 @@ describe('QuoteHistoryService', () => {
       expect(historySet).toHaveBeenCalledWith({
         date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         price: 165.5,
+        monthlyDividend: 0.92,
         source: 'brapi',
       });
     });
@@ -79,7 +81,7 @@ describe('QuoteHistoryService', () => {
         collection: jest.fn(() => ({ doc: quoteDoc })),
       };
 
-      await saveQuoteHistory('MXRF11', 10.32);
+      await saveQuoteHistory('MXRF11', 10.32, 0.07);
 
       expect(quoteSet).toHaveBeenCalledWith(
         expect.objectContaining({ source: 'brapi' }),
@@ -95,11 +97,21 @@ describe('QuoteHistoryService', () => {
       const historyDocs = [
         {
           id: '2026-07-15',
-          data: () => ({ date: '2026-07-15', price: 165.5, source: 'brapi' }),
+          data: () => ({
+            date: '2026-07-15',
+            price: 165.5,
+            monthlyDividend: 0.92,
+            source: 'brapi',
+          }),
         },
         {
           id: '2026-07-14',
-          data: () => ({ date: '2026-07-14', price: 164.0, source: 'brapi' }),
+          data: () => ({
+            date: '2026-07-14',
+            price: 164.0,
+            monthlyDividend: 0.91,
+            source: 'brapi',
+          }),
         },
       ];
 
@@ -127,11 +139,13 @@ describe('QuoteHistoryService', () => {
       expect(result[0]).toEqual({
         date: '2026-07-15',
         price: 165.5,
+        monthlyDividend: 0.92,
         source: 'brapi',
       });
       expect(result[1]).toEqual({
         date: '2026-07-14',
         price: 164.0,
+        monthlyDividend: 0.91,
         source: 'brapi',
       });
     });
@@ -184,6 +198,7 @@ describe('QuoteHistoryService', () => {
           data: () => ({
             ticker: 'HGLG11',
             price: 165.5,
+            monthlyDividend: 0.92,
             updatedAt: '2026-07-15T18:00:00Z',
             source: 'brapi',
           }),
