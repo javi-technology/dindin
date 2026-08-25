@@ -273,7 +273,11 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       expect(result.get('PETR4')).toBe(1.25);
       expect(historicalMock).toHaveBeenCalledWith(
         'PETR4.SA',
-        expect.objectContaining({ events: 'dividends' }),
+        expect.objectContaining({
+          period1: expect.any(Date),
+          period2: expect.any(Date),
+          events: 'dividends',
+        }),
       );
     });
 
