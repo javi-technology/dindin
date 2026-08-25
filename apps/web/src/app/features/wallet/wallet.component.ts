@@ -67,6 +67,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   selectedWallet = signal<Wallet | null>(null);
   positions = signal<Position[]>([]);
   assets = signal<Asset[]>([]);
+  assetsError = signal<string | null>(null);
   dividendYield = signal<DividendYieldResponse | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
@@ -127,8 +128,15 @@ export class WalletComponent implements OnInit, OnDestroy {
       .list()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (response) => this.assets.set(response),
-        error: () => {},
+        next: (response) => {
+          this.assets.set(response);
+          this.assetsError.set(null);
+        },
+        error: () => {
+          this.assetsError.set(
+            'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
+          );
+        },
       });
   }
 

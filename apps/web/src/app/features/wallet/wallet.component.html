@@ -256,6 +256,11 @@
             @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
               <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
             }
+            @if (assetsError()) {
+              <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
+                {{ assetsError() }}
+              </p>
+            }
           </div>
 
           <div>

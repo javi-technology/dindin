@@ -475,6 +475,25 @@ describe('WalletComponent', () => {
     expect(fixture.componentInstance.loading()).toBeFalse();
   }));
 
+  it('deve exibir mensagem de erro no formulário quando falha ao carregar catálogo de ativos', fakeAsync(() => {
+    assetServiceMock.list.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openForm();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const assetsError = compiled.querySelector('[data-testid="assets-error"]');
+    expect(assetsError?.textContent).toContain(
+      'Erro ao carregar catálogo de ativos.',
+    );
+  }));
+
   it('deve abrir formulário ao clicar em adicionar posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const addButton = compiled.querySelector(

@@ -199,6 +199,11 @@
                 </option>
               }
             </select>
+            @if (assetsError()) {
+              <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
+                {{ assetsError() }}
+              </p>
+            }
           </div>
 
           <div>
