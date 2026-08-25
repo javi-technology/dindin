@@ -334,6 +334,44 @@ describe('Firestore rules – dividends', () => {
 });
 
 // ---------------------------------------------------------------------------
+// assets (catálogo de ativos suportados)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – assets', () => {
+  it('deve permitir que usuário autenticado leia o catálogo de ativos', async () => {
+    // Escrita direta pelo client não é permitida; popula via contexto admin
+    // simulando o seed/admin SDK, que ignora as regras de segurança.
+    const admin = testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), 'assets/HGLG11'), {
+        ticker: 'HGLG11',
+        name: 'CSHG Logística',
+        assetType: 'FII',
+        active: true,
+      }),
+    );
+    await admin;
+
+    const alice = testEnv.authenticatedContext('alice');
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), 'assets/HGLG11')),
+    );
+    expect(snapshot.data()?.ticker).toBe('HGLG11');
+  });
+
+  it('deve negar escrita de assets por qualquer usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), 'assets/HGLG11'), { ticker: 'HGLG11' }),
+    );
+  });
+
+  it('deve negar acesso não autenticado a assets', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauth.firestore(), 'assets/HGLG11')));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 
