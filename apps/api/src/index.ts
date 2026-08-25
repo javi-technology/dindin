@@ -2,7 +2,11 @@ import * as functions from 'firebase-functions';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import express, { Request, Response, NextFunction } from 'express';
-import { authMiddleware, AuthRequest } from './middleware/auth.middleware';
+import {
+  authMiddleware,
+  adminAuthMiddleware,
+  AuthRequest,
+} from './middleware/auth.middleware';
 import {
   createWallet,
   deleteWallet,
@@ -40,7 +44,7 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
-import { listAssets } from './assets/asset.controller';
+import { createAsset, listAssets } from './assets/asset.controller';
 
 admin.initializeApp();
 
@@ -70,10 +74,11 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.use('/api/*', authMiddleware);
 
 app.get('/api/me', (req: AuthRequest, res: Response) => {
-  res.json({ uid: req.user?.uid });
+  res.json({ uid: req.user?.uid, admin: req.user?.admin });
 });
 
 app.get('/api/assets', listAssets);
+app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);
