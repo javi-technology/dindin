@@ -37,7 +37,47 @@ function createFridgeSnapshot(fridge: Fridge) {
   };
 }
 
-function createFirestoreMock(positions: Position[] = []) {
+/**
+ * Cria stubs simples para as collections `assets` e `quotes`, usadas para
+ * validar o ticker no cadastro e resolver `currentPrice` na leitura.
+ * Por padrão, `HGLG11` é um ativo ativo com cotação igual à de
+ * `basePosition.currentPrice`, o que preserva o comportamento dos testes
+ * existentes que comparam o corpo da resposta com o fixture completo.
+ */
+function createCatalogStubs(
+  activeTickers: string[] = ['HGLG11'],
+  pricesByTicker: Record<string, number> = { HGLG11: 112.0 },
+) {
+  const assetsCollection = {
+    doc: jest.fn((ticker: string) => ({
+      get: jest.fn().mockResolvedValue({
+        exists: activeTickers.includes(ticker),
+        data: () =>
+          activeTickers.includes(ticker) ? { ticker, active: true } : undefined,
+      }),
+    })),
+  };
+
+  const quotesCollection = {
+    doc: jest.fn((ticker: string) => ({
+      get: jest.fn().mockResolvedValue(
+        pricesByTicker[ticker] !== undefined
+          ? {
+              exists: true,
+              data: () => ({ ticker, price: pricesByTicker[ticker] }),
+            }
+          : { exists: false, data: () => undefined },
+      ),
+    })),
+  };
+
+  return { assetsCollection, quotesCollection };
+}
+
+function createFirestoreMock(
+  positions: Position[] = [],
+  catalog = createCatalogStubs(),
+) {
   const positionMap = new Map<string, any>();
 
   positions.forEach((position) => {
@@ -128,6 +168,8 @@ function createFirestoreMock(positions: Position[] = []) {
           })),
         };
       }
+      if (path === 'assets') return catalog.assetsCollection;
+      if (path === 'quotes') return catalog.quotesCollection;
       throw new Error(`Unexpected collection: ${path}`);
     }),
   };
@@ -172,6 +214,7 @@ function createFailingFirestoreMock() {
 function createFirestoreMockWithFridge(
   positions: Position[] = [],
   fridges: Fridge[] = [],
+  catalog = createCatalogStubs(),
 ) {
   const positionMap = new Map<string, any>();
   const fridgeMap = new Map<string, any>();
@@ -327,6 +370,8 @@ function createFirestoreMockWithFridge(
           })),
         };
       }
+      if (path === 'assets') return catalog.assetsCollection;
+      if (path === 'quotes') return catalog.quotesCollection;
       throw new Error(`Unexpected collection: ${path}`);
     }),
     batch: jest.fn(() => batchMock),
@@ -385,6 +430,21 @@ describe('Position CRUD', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
+    });
+
+    it('deve resolver currentPrice a partir da collection quotes, não do valor gravado na posição', async () => {
+      const staleStoredPrice = { ...basePosition, currentPrice: 999 };
+      firestoreMock = createFirestoreMock(
+        [staleStoredPrice],
+        createCatalogStubs(['HGLG11'], { HGLG11: 150.75 }),
+      );
+
+      const response = await request(app)
+        .get('/api/wallets/wallet-1/positions')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body[0].currentPrice).toBe(150.75);
     });
   });
 
@@ -483,6 +543,41 @@ describe('Position CRUD', () => {
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
     });
+
+    it('deve retornar 400 quando o ticker não existe no catálogo de ativos', async () => {
+      firestoreMock = createFirestoreMock([], createCatalogStubs(['HGLG11']));
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'INEXISTENTE11',
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: 'FII',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('catálogo');
+    });
+
+    it('deve ignorar currentPrice enviado no corpo da requisição', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: 'FII',
+          currentPrice: 999,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.currentPrice).toBeUndefined();
+    });
   });
 
   describe('GET /api/wallets/:walletId/positions/:id', () => {
@@ -553,6 +648,21 @@ describe('Position CRUD', () => {
         .send({ quantity: -1 });
 
       expect(response.status).toBe(400);
+    });
+
+    it('deve retornar 400 quando o novo ticker não existe no catálogo de ativos', async () => {
+      firestoreMock = createFirestoreMock(
+        [basePosition],
+        createCatalogStubs(['HGLG11']),
+      );
+
+      const response = await request(app)
+        .put('/api/wallets/wallet-1/positions/position-1')
+        .set('Authorization', authHeader)
+        .send({ ticker: 'INEXISTENTE11' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('catálogo');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {

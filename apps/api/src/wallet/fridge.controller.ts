@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import { Fridge, FridgeItem } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { assetExists } from '../assets/asset.service';
+import { getQuotePrice } from '../quotes/quote-history.service';
 
 function uid(req: Request): string {
   return (req as AuthRequest).user!.uid;
@@ -17,6 +19,26 @@ function fridgesCollection(userId: string) {
 
 function itemsCollection(userId: string, fridgeId: string) {
   return fridgesCollection(userId).doc(fridgeId).collection('fridgeItems');
+}
+
+/**
+ * Resolve o `currentPrice` de cada item a partir da collection `quotes`
+ * no momento da leitura, em vez de depender de um valor denormalizado
+ * gravado em cada item pelo job agendado (ver issue #86).
+ */
+async function withCurrentPrices(items: FridgeItem[]): Promise<FridgeItem[]> {
+  const tickers = [...new Set(items.map((item) => item.ticker))];
+  const prices = await Promise.all(
+    tickers.map((ticker) => getQuotePrice(ticker)),
+  );
+  const priceByTicker = new Map(
+    tickers.map((ticker, i) => [ticker, prices[i]]),
+  );
+
+  return items.map((item) => {
+    const price = priceByTicker.get(item.ticker);
+    return price !== undefined ? { ...item, currentPrice: price } : item;
+  });
 }
 
 /* ---------- Fridge CRUD ---------- */
@@ -256,11 +278,10 @@ export async function listItems(req: Request, res: Response): Promise<void> {
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
     const snapshot = await itemsCollection(userId, fridgeId).get();
-    const items = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    res.json(items);
+    const items = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as FridgeItem,
+    );
+    res.json(await withCurrentPrices(items));
   } catch (error) {
     console.error('[listItems] error:', {
       uid: uid(req),
@@ -286,20 +307,26 @@ export async function createItem(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const ticker = body.ticker!.trim().toUpperCase();
+    if (!(await assetExists(ticker))) {
+      res.status(400).json({
+        error: 'Ticker não encontrado no catálogo de ativos suportados',
+      });
+      return;
+    }
+
     const now = new Date().toISOString();
+    // currentPrice não é mais aceito na criação: o preço é resolvido a
+    // partir da collection `quotes` no momento da leitura (ver issue #86).
     const itemData: Omit<FridgeItem, 'id'> = {
       fridgeId,
-      ticker: body.ticker!.trim().toUpperCase(),
+      ticker,
       quantity: body.quantity!,
       transferredPrice: body.transferredPrice!,
       targetPrice: body.targetPrice!,
       createdAt: now,
       updatedAt: now,
     };
-
-    if (body.currentPrice !== undefined) {
-      itemData.currentPrice = body.currentPrice;
-    }
 
     const docRef = await itemsCollection(userId, fridgeId).add(itemData);
     res.status(201).json({ id: docRef.id, ...itemData });
@@ -329,7 +356,9 @@ export async function getItem(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.json({ id: doc.id, ...doc.data() });
+    const item = { id: doc.id, ...doc.data() } as FridgeItem;
+    const [withPrice] = await withCurrentPrices([item]);
+    res.json(withPrice);
   } catch (error) {
     console.error('[getItem] error:', {
       uid: uid(req),
@@ -365,17 +394,27 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    let ticker: string | undefined;
+    if (body.ticker !== undefined) {
+      ticker = body.ticker.trim().toUpperCase();
+      if (!(await assetExists(ticker))) {
+        res.status(400).json({
+          error: 'Ticker não encontrado no catálogo de ativos suportados',
+        });
+        return;
+      }
+    }
+
     const updatedAt = new Date().toISOString();
     const updates: Partial<FridgeItem> & { updatedAt: string } = { updatedAt };
 
-    if (body.ticker !== undefined)
-      updates.ticker = body.ticker.trim().toUpperCase();
+    // currentPrice não é mais aceito na atualização: o preço é resolvido
+    // a partir da collection `quotes` no momento da leitura (issue #86).
+    if (ticker !== undefined) updates.ticker = ticker;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
     if (body.transferredPrice !== undefined)
       updates.transferredPrice = body.transferredPrice;
     if (body.targetPrice !== undefined) updates.targetPrice = body.targetPrice;
-    if (body.currentPrice !== undefined)
-      updates.currentPrice = body.currentPrice;
 
     await itemRef.update(updates);
 

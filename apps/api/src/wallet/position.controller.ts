@@ -3,6 +3,8 @@ import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { Position, AssetType, FridgeItem } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { assetExists } from '../assets/asset.service';
+import { getQuotePrice } from '../quotes/quote-history.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -28,6 +30,30 @@ function positionsCollection(userId: string, walletId: string) {
 
 function isValidAssetType(value: unknown): value is AssetType {
   return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
+}
+
+/**
+ * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
+ * no momento da leitura, em vez de depender de um valor denormalizado
+ * gravado em cada posição pelo job agendado. Isso elimina a necessidade
+ * de escrever em toda posição de todo usuário a cada atualização de
+ * cotação (ver issue #86).
+ */
+async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
+  const tickers = [...new Set(positions.map((position) => position.ticker))];
+  const prices = await Promise.all(
+    tickers.map((ticker) => getQuotePrice(ticker)),
+  );
+  const priceByTicker = new Map(
+    tickers.map((ticker, i) => [ticker, prices[i]]),
+  );
+
+  return positions.map((position) => {
+    const price = priceByTicker.get(position.ticker);
+    return price !== undefined
+      ? { ...position, currentPrice: price }
+      : position;
+  });
 }
 
 function validatePositionBody(
@@ -122,11 +148,10 @@ export async function listPositions(
   try {
     const walletId = req.params.walletId;
     const snapshot = await positionsCollection(uid(req), walletId).get();
-    const positions = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    res.json(positions);
+    const positions = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    );
+    res.json(await withCurrentPrices(positions));
   } catch (error) {
     console.error('[listPositions] error:', {
       uid: uid(req),
@@ -152,10 +177,20 @@ export async function createPosition(
       return;
     }
 
+    const ticker = body.ticker!.trim().toUpperCase();
+    if (!(await assetExists(ticker))) {
+      res.status(400).json({
+        error: 'Ticker não encontrado no catálogo de ativos suportados',
+      });
+      return;
+    }
+
     const now = new Date().toISOString();
+    // currentPrice não é mais aceito na criação: o preço é resolvido a
+    // partir da collection `quotes` no momento da leitura (ver issue #86).
     const positionData: Omit<Position, 'id'> = {
       walletId,
-      ticker: body.ticker!.trim().toUpperCase(),
+      ticker,
       assetType: body.assetType!,
       quantity: body.quantity!,
       averagePrice: body.averagePrice!,
@@ -163,10 +198,6 @@ export async function createPosition(
       createdAt: now,
       updatedAt: now,
     };
-
-    if (body.currentPrice !== undefined) {
-      positionData.currentPrice = body.currentPrice;
-    }
 
     if (body.targetPrice !== undefined) {
       positionData.targetPrice = body.targetPrice;
@@ -198,7 +229,9 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    res.json({ id: doc.id, ...doc.data() });
+    const position = { id: doc.id, ...doc.data() } as Position;
+    const [withPrice] = await withCurrentPrices([position]);
+    res.json(withPrice);
   } catch (error) {
     console.error('[getPosition] error:', {
       uid: uid(req),
@@ -232,18 +265,28 @@ export async function updatePosition(
       return;
     }
 
+    let ticker: string | undefined;
+    if (body.ticker !== undefined) {
+      ticker = body.ticker.trim().toUpperCase();
+      if (!(await assetExists(ticker))) {
+        res.status(400).json({
+          error: 'Ticker não encontrado no catálogo de ativos suportados',
+        });
+        return;
+      }
+    }
+
     const updates: Partial<Position> & { updatedAt: string } = {
       updatedAt: new Date().toISOString(),
     };
 
-    if (body.ticker !== undefined)
-      updates.ticker = body.ticker.trim().toUpperCase();
+    // currentPrice não é mais aceito na atualização: o preço é resolvido
+    // a partir da collection `quotes` no momento da leitura (issue #86).
+    if (ticker !== undefined) updates.ticker = ticker;
     if (body.assetType !== undefined) updates.assetType = body.assetType;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
     if (body.averagePrice !== undefined)
       updates.averagePrice = body.averagePrice;
-    if (body.currentPrice !== undefined)
-      updates.currentPrice = body.currentPrice;
     if (body.inFridge !== undefined) updates.inFridge = body.inFridge;
     if (body.targetPrice !== undefined) {
       if (body.targetPrice === null) {
@@ -365,9 +408,8 @@ export async function moveToFridge(req: Request, res: Response): Promise<void> {
       updatedAt: now,
     };
 
-    if (positionData.currentPrice !== undefined) {
-      fridgeItemData.currentPrice = positionData.currentPrice;
-    }
+    // currentPrice não é mais carregado da posição: passa a ser resolvido
+    // a partir da collection `quotes` no momento da leitura (issue #86).
 
     // Operação atômica: remove posição e cria item na geladeira
     const batch = admin.firestore().batch();
