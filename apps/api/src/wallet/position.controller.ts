@@ -48,19 +48,20 @@ async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
     tickers.map((ticker, i) => [ticker, prices[i]]),
   );
 
-  return positions.map((position) => {
-    const price = priceByTicker.get(position.ticker);
-    return price !== undefined
-      ? { ...position, currentPrice: price }
-      : position;
-  });
+  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes`
+  // (ou undefined, removido do JSON de resposta), mesmo que a posição
+  // ainda tenha um valor antigo denormalizado no Firestore.
+  return positions.map((position) => ({
+    ...position,
+    currentPrice: priceByTicker.get(position.ticker),
+  }));
 }
 
 function validatePositionBody(
   body: Partial<Position>,
   allowPartial = false,
 ): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, averagePrice, assetType, currentPrice } = body;
+  const { ticker, quantity, averagePrice, assetType } = body;
 
   if (!allowPartial || ticker !== undefined) {
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
@@ -106,17 +107,10 @@ function validatePositionBody(
     }
   }
 
-  if (
-    currentPrice !== undefined &&
-    (typeof currentPrice !== 'number' ||
-      currentPrice < 0 ||
-      !Number.isFinite(currentPrice))
-  ) {
-    return {
-      valid: false,
-      error: 'Current price must be a non-negative number',
-    };
-  }
+  // currentPrice não é mais aceito no cadastro/atualização de posições:
+  // é resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
+  // valor enviado pelo cliente é silenciosamente ignorado por
+  // createPosition/updatePosition, então não é validado aqui.
 
   if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
     return {
@@ -298,8 +292,9 @@ export async function updatePosition(
 
     await positionRef.update(updates);
 
-    const updatedPosition = { id, ...doc.data(), ...updates };
-    res.json(updatedPosition);
+    const updatedPosition = { id, ...doc.data(), ...updates } as Position;
+    const [withPrice] = await withCurrentPrices([updatedPosition]);
+    res.json(withPrice);
   } catch (error) {
     console.error('[updatePosition] error:', {
       uid: uid(req),

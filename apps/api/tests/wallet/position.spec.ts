@@ -628,6 +628,22 @@ describe('Position CRUD', () => {
       expect(response.body.id).toBe('position-1');
     });
 
+    it('deve retornar currentPrice resolvido a partir da collection quotes, não o valor gravado', async () => {
+      const staleStoredPrice = { ...basePosition, currentPrice: 999 };
+      firestoreMock = createFirestoreMock(
+        [staleStoredPrice],
+        createCatalogStubs(['HGLG11'], { HGLG11: 150.75 }),
+      );
+
+      const response = await request(app)
+        .put('/api/wallets/wallet-1/positions/position-1')
+        .set('Authorization', authHeader)
+        .send({ quantity: 20 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.currentPrice).toBe(150.75);
+    });
+
     it('deve retornar 404 para posição inexistente', async () => {
       firestoreMock = createFirestoreMock([]);
 

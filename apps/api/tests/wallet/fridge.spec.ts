@@ -861,6 +861,23 @@ describe('FridgeItem CRUD', () => {
       expect(response.body.transferredPrice).toBe(95.0);
     });
 
+    it('deve retornar currentPrice resolvido a partir da collection quotes, não o valor gravado', async () => {
+      const staleStoredPrice = { ...baseItem, currentPrice: 999 };
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [staleStoredPrice],
+        createCatalogStubs(['HGLG11'], { HGLG11: 150.75 }),
+      );
+
+      const response = await request(app)
+        .put('/api/fridges/fridge-1/items/item-1')
+        .set('Authorization', authHeader)
+        .send({ quantity: 10 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.currentPrice).toBe(150.75);
+    });
+
     it('deve retornar 400 quando o novo ticker não existe no catálogo de ativos', async () => {
       firestoreMock = createFirestoreMock(
         [baseFridge],

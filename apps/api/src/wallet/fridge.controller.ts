@@ -35,10 +35,13 @@ async function withCurrentPrices(items: FridgeItem[]): Promise<FridgeItem[]> {
     tickers.map((ticker, i) => [ticker, prices[i]]),
   );
 
-  return items.map((item) => {
-    const price = priceByTicker.get(item.ticker);
-    return price !== undefined ? { ...item, currentPrice: price } : item;
-  });
+  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes`
+  // (ou undefined, removido do JSON de resposta), mesmo que o item ainda
+  // tenha um valor antigo denormalizado no Firestore.
+  return items.map((item) => ({
+    ...item,
+    currentPrice: priceByTicker.get(item.ticker),
+  }));
 }
 
 /* ---------- Fridge CRUD ---------- */
@@ -203,8 +206,7 @@ function validateItemBody(
   body: Partial<FridgeItem>,
   allowPartial = false,
 ): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, transferredPrice, targetPrice, currentPrice } =
-    body;
+  const { ticker, quantity, transferredPrice, targetPrice } = body;
 
   if (!allowPartial || ticker !== undefined) {
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
@@ -255,17 +257,10 @@ function validateItemBody(
     }
   }
 
-  if (
-    currentPrice !== undefined &&
-    (typeof currentPrice !== 'number' ||
-      currentPrice < 0 ||
-      !Number.isFinite(currentPrice))
-  ) {
-    return {
-      valid: false,
-      error: 'Current price must be a non-negative number',
-    };
-  }
+  // currentPrice não é mais aceito no cadastro/atualização de itens: é
+  // resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
+  // valor enviado pelo cliente é silenciosamente ignorado por
+  // createItem/updateItem, então não é validado aqui.
 
   return { valid: true };
 }
@@ -419,7 +414,9 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
     await itemRef.update(updates);
 
     const updatedDoc = await itemRef.get();
-    res.json({ id, ...updatedDoc.data() });
+    const item = { id, ...updatedDoc.data() } as FridgeItem;
+    const [withPrice] = await withCurrentPrices([item]);
+    res.json(withPrice);
   } catch (error) {
     console.error('[updateItem] error:', {
       uid: uid(req),
