@@ -210,9 +210,23 @@ async function fetchBatches(
   return resultMap;
 }
 
-interface YahooFinanceDividend {
+interface YahooFinanceChartDividendEvent {
+  amount: number;
   date: Date;
-  dividends: number;
+}
+
+function isYahooFinanceDividendEvent(
+  value: unknown,
+): value is YahooFinanceChartDividendEvent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'amount' in value &&
+    typeof (value as { amount: unknown }).amount === 'number' &&
+    Number.isFinite((value as { amount: number }).amount) &&
+    'date' in value &&
+    (value as { date: unknown }).date instanceof Date
+  );
 }
 
 function buildYahooTicker(ticker: string): string {
@@ -234,34 +248,32 @@ async function fetchYahooFinanceDividends(
 
   for (const ticker of tickers.slice(0, YAHOO_MAX_TICKERS)) {
     try {
-      const dividends = (await yahooFinance.historical(
-        buildYahooTicker(ticker),
-        {
-          period1: startDate,
-          period2: new Date(),
-          events: 'dividends',
-        },
-      )) as YahooFinanceDividend[];
+      const chart = await yahooFinance.chart(buildYahooTicker(ticker), {
+        period1: startDate,
+        period2: new Date(),
+        events: 'div',
+      });
 
-      if (!Array.isArray(dividends) || dividends.length === 0) {
+      const dividends = chart.events?.dividends;
+      if (!dividends || typeof dividends !== 'object') {
         continue;
       }
 
-      const sorted = [...dividends].sort(
+      const events = Object.values(dividends).filter(
+        isYahooFinanceDividendEvent,
+      );
+      if (events.length === 0) {
+        continue;
+      }
+
+      const sorted = [...events].sort(
         (a, b) => b.date.getTime() - a.date.getTime(),
       );
       const latest = sorted[0];
 
-      if (
-        typeof latest.dividends !== 'number' ||
-        !Number.isFinite(latest.dividends)
-      ) {
-        continue;
-      }
-
       output.push({
         ticker: ticker.toUpperCase(),
-        monthlyDividend: latest.dividends,
+        monthlyDividend: latest.amount,
       });
     } catch (error) {
       console.error(
