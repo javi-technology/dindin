@@ -238,6 +238,7 @@ async function fetchYahooFinanceDividends(
         buildYahooTicker(ticker),
         {
           period1: startDate,
+          period2: new Date(),
           events: 'dividends',
         },
       )) as YahooFinanceDividend[];
