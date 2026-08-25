@@ -97,6 +97,9 @@
                     Total
                   </th>
                   <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                    Total Proventos
+                  </th>
+                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
                     DY
                   </th>
                   <th
@@ -148,6 +151,9 @@
                       {{ formatCurrency(totalPosition(position)) }}
                     </td>
                     <td class="py-3 px-4 text-gray-700">
+                      {{ formatCurrency(totalProventosFor(position)) }}
+                    </td>
+                    <td class="py-3 px-4 text-gray-700">
                       {{ formatPercent(dividendYieldFor(position)) }}
                     </td>
                     <td class="py-3 px-4 text-right">
@@ -187,9 +193,21 @@
                   <td
                     class="py-3 px-4 text-gray-900"
                     data-testid="total-geral"
-                    colspan="3"
+                    colspan="4"
                   >
                     {{ formatCurrency(totalGeral()) }}
+                  </td>
+                </tr>
+                <tr class="bg-gray-50 font-semibold">
+                  <td class="py-3 px-4 text-gray-900" colspan="3">
+                    Total proventos
+                  </td>
+                  <td
+                    class="py-3 px-4 text-gray-900"
+                    data-testid="total-proventos"
+                    colspan="4"
+                  >
+                    {{ formatCurrency(totalProventos()) }}
                   </td>
                 </tr>
                 <tr class="bg-gray-50 font-semibold">
@@ -197,7 +215,7 @@
                   <td
                     class="py-3 px-4 text-gray-900"
                     data-testid="dy-total"
-                    colspan="3"
+                    colspan="4"
                   >
                     {{ formatPercent(totalDividendYield()) }}
                   </td>

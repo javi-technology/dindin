@@ -227,6 +227,18 @@ describe('WalletComponent', () => {
     );
   });
 
+  it('deve exibir coluna de total proventos para cada posição', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(2);
+
+    const firstRow = rows[0].textContent;
+    expect(firstRow).toMatch(/R\$\s?108,00/);
+
+    const secondRow = rows[1].textContent;
+    expect(secondRow).toMatch(/R\$\s?45,00/);
+  });
+
   it('deve exibir coluna de dividend yield para cada posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const rows = compiled.querySelectorAll('tbody tr');
@@ -237,6 +249,14 @@ describe('WalletComponent', () => {
 
     const secondRow = rows[1].textContent;
     expect(secondRow).toContain('6,82%');
+  });
+
+  it('deve exibir total de proventos consolidado no rodapé', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const totalElement = compiled.querySelector(
+      '[data-testid="total-proventos"]',
+    );
+    expect(totalElement?.textContent).toMatch(/R\$\s?153,00/);
   });
 
   it('deve exibir dividend yield total consolidado', () => {

@@ -110,11 +110,22 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
 
+  totalProventos = computed(
+    () => this.dividendYield()?.total?.annualIncome ?? 0,
+  );
+
   dividendYieldFor = (position: Position): number => {
     const found = this.dividendYield()?.byTicker.find(
       (item) => item.ticker === position.ticker,
     );
     return found?.yield ?? 0;
+  };
+
+  totalProventosFor = (position: Position): number => {
+    const found = this.dividendYield()?.byTicker.find(
+      (item) => item.ticker === position.ticker,
+    );
+    return found?.annualIncome ?? 0;
   };
 
   ngOnInit(): void {
