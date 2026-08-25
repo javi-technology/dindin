@@ -1,4 +1,5 @@
 import { AssetType } from 'dindin-models';
+import YahooFinance from 'yahoo-finance2';
 import { ActiveAsset } from '../assets/asset.service';
 
 export interface MonthlyDividendResult {
@@ -46,6 +47,12 @@ const FII_BATCH_SIZE = 20;
 // Endpoint de ações — usamos um limite conservador para evitar problemas
 // de planos com restrições similares.
 const STOCKS_BATCH_SIZE = 20;
+
+// Yahoo Finance não possui endpoint de lote para dividendos; consultamos
+// símbolo a símbolo. O limite evita chamadas excessivas em carteiras muito
+// grandes caso a Brapi falhe completamente.
+const YAHOO_MAX_TICKERS = 50;
+const YAHOO_LOOKBACK_DAYS = 365;
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -203,6 +210,72 @@ async function fetchBatches(
   return resultMap;
 }
 
+interface YahooFinanceDividend {
+  date: Date;
+  dividends: number;
+}
+
+function buildYahooTicker(ticker: string): string {
+  return `${ticker}.SA`;
+}
+
+function yahooLookbackStartDate(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - YAHOO_LOOKBACK_DAYS);
+  return date;
+}
+
+async function fetchYahooFinanceDividends(
+  tickers: string[],
+): Promise<MonthlyDividendResult[]> {
+  const output: MonthlyDividendResult[] = [];
+  const startDate = yahooLookbackStartDate();
+  const yahooFinance = new YahooFinance();
+
+  for (const ticker of tickers.slice(0, YAHOO_MAX_TICKERS)) {
+    try {
+      const dividends = (await yahooFinance.historical(
+        buildYahooTicker(ticker),
+        {
+          period1: startDate,
+          events: 'dividends',
+        },
+      )) as YahooFinanceDividend[];
+
+      if (!Array.isArray(dividends) || dividends.length === 0) {
+        continue;
+      }
+
+      const sorted = [...dividends].sort(
+        (a, b) => b.date.getTime() - a.date.getTime(),
+      );
+      const latest = sorted[0];
+
+      if (
+        typeof latest.dividends !== 'number' ||
+        !Number.isFinite(latest.dividends)
+      ) {
+        continue;
+      }
+
+      output.push({
+        ticker: ticker.toUpperCase(),
+        monthlyDividend: latest.dividends,
+      });
+    } catch (error) {
+      console.error(
+        '[fetchYahooFinanceDividends] Erro ao buscar dividendos no Yahoo Finance:',
+        {
+          ticker,
+          message: toError(error).message,
+        },
+      );
+    }
+  }
+
+  return output;
+}
+
 export async function fetchMonthlyDividends(
   assets: ActiveAsset[],
 ): Promise<Map<string, number>> {
@@ -237,6 +310,18 @@ export async function fetchMonthlyDividends(
   const merged = new Map<string, number>();
   for (const [ticker, value] of fiiMap) merged.set(ticker, value);
   for (const [ticker, value] of stocksMap) merged.set(ticker, value);
+
+  const allTickers = new Set([...fiiTickers, ...stockTickers]);
+  const missingTickers = [...allTickers].filter(
+    (ticker) => !merged.has(ticker.toUpperCase()),
+  );
+
+  if (missingTickers.length > 0) {
+    const yahooResults = await fetchYahooFinanceDividends(missingTickers);
+    for (const { ticker, monthlyDividend } of yahooResults) {
+      merged.set(ticker, monthlyDividend);
+    }
+  }
 
   return merged;
 }
