@@ -114,6 +114,32 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
     });
   });
 
+  describe('catálogo maior que o tamanho do lote', () => {
+    it('deve processar todos os tickers mesmo havendo mais do que um lote', async () => {
+      const tickers = Array.from({ length: 25 }, (_, i) => `TICKER${i}11`);
+      mockListActiveAssetTickers.mockResolvedValue(tickers);
+      mockFetchQuotes.mockResolvedValue(
+        new Map(
+          tickers.map((ticker, i) => [
+            ticker,
+            { price: 10 + i, updatedAt: '2026-07-15T18:00:00Z' },
+          ]),
+        ),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(tickers.length);
+      for (let i = 0; i < tickers.length; i++) {
+        expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+          tickers[i],
+          10 + i,
+          'brapi',
+        );
+      }
+    });
+  });
+
   describe('erro na Brapi', () => {
     it('deve logar erro e não quebrar quando a Brapi falha', async () => {
       const consoleErrorSpy = jest

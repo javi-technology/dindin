@@ -2,6 +2,11 @@ import { fetchQuotes, QuoteResult } from './brapi.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 
+// Processa os tickers com cotação em lotes, para não disparar centenas de
+// escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
+// conforme o catálogo de ativos crescer.
+const BATCH_SIZE = 10;
+
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
@@ -56,11 +61,13 @@ export async function updateAllQuotes(): Promise<void> {
       return;
     }
 
-    await Promise.allSettled(
-      [...quotes.entries()].map(([ticker, quote]) =>
-        processTickerQuote(ticker, quote),
-      ),
-    );
+    const tickerEntries = [...quotes.entries()];
+    for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
+      const batch = tickerEntries.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(([ticker, quote]) => processTickerQuote(ticker, quote)),
+      );
+    }
 
     console.log(
       `[updateAllQuotes] Concluído. ${quotes.size} de ${tickerList.length} ticker(s) do catálogo atualizado(s).`,
