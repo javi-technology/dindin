@@ -10,7 +10,7 @@ jest.mock('yahoo-finance2', () => ({
 describe('DividendFetchService — fetchMonthlyDividends', () => {
   const originalFetch = globalThis.fetch;
   const historicalMock = jest.fn();
-  const YahooFinanceMock = YahooFinance as jest.Mock;
+  const YahooFinanceMock = YahooFinance as unknown as jest.Mock;
 
   beforeEach(() => {
     process.env.BRAPI_API_KEY = 'test-api-key';
