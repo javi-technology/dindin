@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HealthService } from '../../core/services/health.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-home',
@@ -10,12 +11,16 @@ import { HealthService } from '../../core/services/health.service';
 })
 export class HomeComponent implements OnInit {
   private readonly healthService = inject(HealthService);
+  private readonly authService = inject(AuthService);
 
   healthStatus: string | null = null;
   healthProject: string | null = null;
   healthError: string | null = null;
+  isAdmin = signal(false);
 
   ngOnInit(): void {
+    this.authService.isAdmin().then((isAdmin) => this.isAdmin.set(isAdmin));
+
     this.healthService.check().subscribe({
       next: (response) => {
         this.healthStatus = response.status;

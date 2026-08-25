@@ -1,0 +1,193 @@
+<main class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <div
+        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4"
+      >
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Administração</h1>
+          <p class="text-gray-600">Cadastrar ativos no catálogo</p>
+        </div>
+        <a
+          routerLink="/"
+          class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          <svg lucideArrowLeft [size]="16" class="mr-1"></svg>
+          Voltar
+        </a>
+      </div>
+
+      @if (error()) {
+        <div
+          class="bg-red-50 text-red-800 rounded-lg p-4 mb-4"
+          data-testid="error-message"
+        >
+          {{ error() }}
+        </div>
+      }
+
+      @if (successMessage()) {
+        <div
+          class="bg-green-50 text-green-800 rounded-lg p-4 mb-4"
+          data-testid="success-message"
+        >
+          {{ successMessage() }}
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="saveAsset()" class="space-y-4 mb-8">
+        @if (formError()) {
+          <div
+            class="bg-red-50 text-red-800 rounded-lg p-3 text-sm"
+            data-testid="form-error"
+          >
+            {{ formError() }}
+          </div>
+        }
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label
+              for="ticker"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Ticker</label
+            >
+            <input
+              id="ticker"
+              type="text"
+              formControlName="ticker"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [class.border-red-500]="
+                form.get('ticker')?.invalid && form.get('ticker')?.touched
+              "
+            />
+            @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
+              <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
+            }
+          </div>
+
+          <div>
+            <label
+              for="name"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Nome</label
+            >
+            <input
+              id="name"
+              type="text"
+              formControlName="name"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [class.border-red-500]="
+                form.get('name')?.invalid && form.get('name')?.touched
+              "
+            />
+            @if (form.get('name')?.invalid && form.get('name')?.touched) {
+              <p class="text-red-600 text-xs mt-1">Nome é obrigatório.</p>
+            }
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label
+              for="assetType"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Tipo</label
+            >
+            <select
+              id="assetType"
+              formControlName="assetType"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              @for (type of assetTypes; track type.value) {
+                <option [value]="type.value">{{ type.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="flex items-end">
+            <label class="inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                formControlName="active"
+                class="sr-only peer"
+              />
+              <div
+                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"
+              ></div>
+              <span class="ms-3 text-sm font-medium text-gray-700">Ativo</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button
+            type="submit"
+            class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            [disabled]="form.invalid"
+          >
+            <svg lucidePlus [size]="18" class="mr-2"></svg>
+            Cadastrar ativo
+          </button>
+        </div>
+      </form>
+
+      <h2 class="text-lg font-semibold text-gray-800 mb-3">
+        Ativos cadastrados
+      </h2>
+
+      @if (loading()) {
+        <p class="text-gray-600">Carregando...</p>
+      }
+
+      @if (!loading() && assets().length === 0) {
+        <p class="text-gray-500">Nenhum ativo cadastrado no catálogo.</p>
+      }
+
+      @if (!loading() && assets().length > 0) {
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Ticker
+                </th>
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Nome
+                </th>
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Tipo
+                </th>
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (asset of assets(); track asset.ticker) {
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="py-3 px-4 text-gray-900 font-medium">
+                    {{ asset.ticker }}
+                  </td>
+                  <td class="py-3 px-4 text-gray-700">{{ asset.name }}</td>
+                  <td class="py-3 px-4 text-gray-700">{{ asset.assetType }}</td>
+                  <td class="py-3 px-4">
+                    <span
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                      [class.bg-green-100]="asset.active"
+                      [class.text-green-800]="asset.active"
+                      [class.bg-gray-100]="!asset.active"
+                      [class.text-gray-800]="!asset.active"
+                    >
+                      {{ asset.active ? 'Ativo' : 'Inativo' }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</main>
