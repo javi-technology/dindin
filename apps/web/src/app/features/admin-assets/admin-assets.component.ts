@@ -63,6 +63,7 @@ export class AdminAssetsComponent implements OnInit {
   private loadAssets(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.formError.set(null);
     this.assetService
       .list()
       .pipe(takeUntil(this.destroy$))

@@ -19,7 +19,10 @@ export class HomeComponent implements OnInit {
   isAdmin = signal(false);
 
   ngOnInit(): void {
-    this.authService.isAdmin().then((isAdmin) => this.isAdmin.set(isAdmin));
+    this.authService
+      .isAdmin()
+      .then((isAdmin) => this.isAdmin.set(isAdmin))
+      .catch(() => this.isAdmin.set(false));
 
     this.healthService.check().subscribe({
       next: (response) => {

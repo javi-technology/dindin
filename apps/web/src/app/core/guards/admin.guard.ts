@@ -1,22 +1,19 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { of } from 'rxjs';
-import { map, switchMap, take } from 'rxjs/operators';
+import { Auth } from '@angular/fire/auth';
 import { AuthService } from '../services/auth.service';
 
-export const adminGuard: CanActivateFn = () => {
+export const adminGuard: CanActivateFn = async () => {
+  const auth = inject(Auth);
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  return authService.user$.pipe(
-    take(1),
-    switchMap((user) => {
-      if (!user) {
-        return of(router.parseUrl('/login'));
-      }
-      return authService
-        .isAdmin()
-        .then((isAdmin) => (isAdmin ? true : router.parseUrl('/')));
-    }),
-  );
+  await auth.authStateReady();
+
+  if (!auth.currentUser) {
+    return router.parseUrl('/login');
+  }
+
+  const isAdmin = await authService.isAdmin();
+  return isAdmin ? true : router.parseUrl('/');
 };

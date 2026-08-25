@@ -26,15 +26,31 @@ export async function listAssets(req: Request, res: Response): Promise<void> {
   }
 }
 
-function validateAssetBody(body: Record<string, unknown>): {
-  valid: boolean;
+interface AssetBodyValid {
+  valid: true;
+  data: {
+    ticker: string;
+    name: string;
+    assetType: AssetType;
+    active?: boolean;
+  };
+}
+
+interface AssetBodyInvalid {
+  valid: false;
   errors: string[];
-} {
+}
+
+type AssetBodyValidation = AssetBodyValid | AssetBodyInvalid;
+
+function validateAssetBody(body: Record<string, unknown>): AssetBodyValidation {
   const errors: string[] = [];
   const { ticker, name, assetType, active } = body ?? {};
 
   if (!ticker || typeof ticker !== 'string' || !ticker.trim()) {
     errors.push('ticker is required');
+  } else if (!/^[A-Za-z0-9]+$/.test(ticker.trim())) {
+    errors.push('ticker must contain only letters and numbers');
   }
   if (!name || typeof name !== 'string' || !name.trim()) {
     errors.push('name is required');
@@ -46,7 +62,19 @@ function validateAssetBody(body: Record<string, unknown>): {
     errors.push('active must be a boolean');
   }
 
-  return { valid: errors.length === 0, errors };
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    data: {
+      ticker: ticker as string,
+      name: name as string,
+      assetType: assetType as AssetType,
+      active: active as boolean | undefined,
+    },
+  };
 }
 
 /**
@@ -62,12 +90,7 @@ export async function createAsset(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { ticker, name, assetType, active } = req.body as {
-      ticker: string;
-      name: string;
-      assetType: AssetType;
-      active?: boolean;
-    };
+    const { ticker, name, assetType, active } = validation.data;
 
     const normalizedTicker = ticker.trim().toUpperCase();
     const docRef = assetsCollection().doc(normalizedTicker);
