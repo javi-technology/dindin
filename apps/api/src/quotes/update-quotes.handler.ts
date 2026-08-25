@@ -1,117 +1,49 @@
-import * as admin from 'firebase-admin';
 import { fetchQuotes, QuoteResult } from './brapi.service';
 import { saveQuoteHistory } from './quote-history.service';
-
-interface QuoteUpdateResult {
-  ticker: string;
-  positionsUpdated: number;
-  fridgeItemsUpdated: number;
-}
-
-async function updatePositionsForTicker(
-  ticker: string,
-  price: number,
-): Promise<number> {
-  const positionsForTicker = await admin
-    .firestore()
-    .collectionGroup('positions')
-    .where('ticker', '==', ticker)
-    .get();
-
-  const batch = admin.firestore().batch();
-  const now = new Date().toISOString();
-
-  for (const doc of positionsForTicker.docs) {
-    batch.update(doc.ref, {
-      currentPrice: price,
-      updatedAt: now,
-    });
-  }
-
-  await batch.commit();
-  return positionsForTicker.docs.length;
-}
-
-async function updateFridgeItemsForTicker(
-  ticker: string,
-  price: number,
-): Promise<number> {
-  const itemsForTicker = await admin
-    .firestore()
-    .collectionGroup('fridgeItems')
-    .where('ticker', '==', ticker)
-    .get();
-
-  if (itemsForTicker.docs.length === 0) {
-    return 0;
-  }
-
-  const batch = admin.firestore().batch();
-  const now = new Date().toISOString();
-
-  for (const doc of itemsForTicker.docs) {
-    batch.update(doc.ref, {
-      currentPrice: price,
-      updatedAt: now,
-    });
-  }
-
-  await batch.commit();
-  return itemsForTicker.docs.length;
-}
+import { listActiveAssetTickers } from '../assets/asset.service';
 
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
-): Promise<QuoteUpdateResult> {
+): Promise<void> {
   try {
-    const [positionsUpdated, fridgeItemsUpdated] = await Promise.all([
-      updatePositionsForTicker(ticker, quote.price),
-      updateFridgeItemsForTicker(ticker, quote.price),
-    ]);
     await saveQuoteHistory(ticker, quote.price, 'brapi');
-
     console.log(
-      `[updateAllQuotes] ${ticker}: ${positionsUpdated} posição(ões) e ${fridgeItemsUpdated} item(ns) na geladeira atualizado(s) para R$ ${quote.price}.`,
+      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price}.`,
     );
-
-    return { ticker, positionsUpdated, fridgeItemsUpdated };
   } catch (error) {
     console.error(`[updateAllQuotes] Erro ao atualizar ${ticker}:`, {
       message: (error as Error).message,
     });
-    return { ticker, positionsUpdated: 0, fridgeItemsUpdated: 0 };
   }
 }
 
+/**
+ * Atualiza as cotações de todos os ativos ativos do catálogo (`assets`).
+ *
+ * Diferente da versão anterior, os tickers a consultar não são mais
+ * descobertos escaneando todas as posições/itens da geladeira de todos os
+ * usuários (`collectionGroup`) — o que fazia o custo e o tempo de execução
+ * crescerem com o número de usuários. Agora eles vêm do catálogo de ativos
+ * suportados, cujo tamanho é fixo e não cresce com a base de usuários.
+ *
+ * A cotação é salva apenas em `quotes/{ticker}` (+ histórico). O preço
+ * exibido em posições e itens da geladeira é resolvido a partir dessa
+ * collection no momento da leitura (ver `withCurrentPrices` nos
+ * controllers), eliminando o fan-out de escritas em cada posição/item de
+ * cada usuário a cada atualização de cotação (ver issue #86).
+ */
 export async function updateAllQuotes(): Promise<void> {
   try {
-    const positionsSnapshot = await admin
-      .firestore()
-      .collectionGroup('positions')
-      .get();
+    const tickerList = await listActiveAssetTickers();
 
-    if (positionsSnapshot.docs.length === 0) {
-      console.log('[updateAllQuotes] Nenhuma posição encontrada.');
+    if (tickerList.length === 0) {
+      console.log('[updateAllQuotes] Nenhum ativo ativo no catálogo.');
       return;
     }
 
-    const tickers = new Set<string>();
-    for (const doc of positionsSnapshot.docs) {
-      const data = doc.data();
-      if (data.ticker) {
-        tickers.add(data.ticker);
-      }
-    }
-
-    if (tickers.size === 0) {
-      console.log('[updateAllQuotes] Nenhum ticker encontrado.');
-      return;
-    }
-
-    const tickerList = [...tickers];
     console.log(
-      `[updateAllQuotes] Buscando cotações para ${tickerList.length} ticker(s).`,
+      `[updateAllQuotes] Buscando cotações para ${tickerList.length} ticker(s) do catálogo.`,
     );
 
     let quotes: Map<string, QuoteResult>;
@@ -124,37 +56,14 @@ export async function updateAllQuotes(): Promise<void> {
       return;
     }
 
-    const tickerEntries = [...quotes.entries()];
-    const results: QuoteUpdateResult[] = [];
-    const BATCH_SIZE = 5;
-
-    for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
-      const batch = tickerEntries.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map(([ticker, quote]) => processTickerQuote(ticker, quote)),
-      );
-
-      for (const result of batchResults) {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        } else {
-          console.error('[updateAllQuotes] Erro em lote de tickers:', {
-            message: result.reason?.message ?? String(result.reason),
-          });
-        }
-      }
-    }
-
-    const totalPositionsUpdated = results.reduce(
-      (sum, r) => sum + r.positionsUpdated,
-      0,
+    await Promise.allSettled(
+      [...quotes.entries()].map(([ticker, quote]) =>
+        processTickerQuote(ticker, quote),
+      ),
     );
-    const totalFridgeUpdated = results.reduce(
-      (sum, r) => sum + r.fridgeItemsUpdated,
-      0,
-    );
+
     console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} ticker(s) atualizado(s), ${totalPositionsUpdated} posição(ões) e ${totalFridgeUpdated} item(ns) na geladeira afetado(s).`,
+      `[updateAllQuotes] Concluído. ${quotes.size} de ${tickerList.length} ticker(s) do catálogo atualizado(s).`,
     );
   } catch (error) {
     console.error('[updateAllQuotes] error:', {

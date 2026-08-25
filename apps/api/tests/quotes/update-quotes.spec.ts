@@ -1,5 +1,6 @@
 const mockFetchQuotes = jest.fn();
 const mockSaveQuoteHistory = jest.fn();
+const mockListActiveAssetTickers = jest.fn();
 
 jest.mock('../../src/quotes/brapi.service', () => ({
   fetchQuotes: mockFetchQuotes,
@@ -9,11 +10,8 @@ jest.mock('../../src/quotes/quote-history.service', () => ({
   saveQuoteHistory: mockSaveQuoteHistory,
 }));
 
-let firestoreMock: any;
-
-jest.mock('firebase-admin', () => ({
-  initializeApp: jest.fn(),
-  firestore: jest.fn(() => firestoreMock),
+jest.mock('../../src/assets/asset.service', () => ({
+  listActiveAssetTickers: mockListActiveAssetTickers,
 }));
 
 import { updateAllQuotes } from '../../src/quotes/update-quotes.handler';
@@ -23,92 +21,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
     jest.clearAllMocks();
   });
 
-  function createPositionDoc(ticker: string, currentPrice?: number) {
-    return {
-      id: `pos-${ticker}`,
-      ref: {
-        update: jest.fn().mockResolvedValue(undefined),
-      },
-      data: () => ({
-        ticker,
-        quantity: 10,
-        averagePrice: 100,
-        currentPrice,
-        assetType: 'FII',
-      }),
-    };
-  }
-
-  function createFridgeItemDoc(ticker: string, currentPrice?: number) {
-    return {
-      id: `fridge-${ticker}`,
-      ref: {
-        update: jest.fn().mockResolvedValue(undefined),
-      },
-      data: () => ({
-        ticker,
-        quantity: 5,
-        transferredPrice: 90,
-        targetPrice: 100,
-        currentPrice,
-      }),
-    };
-  }
-
-  function mockCollectionGroup(
-    positionDocs: ReturnType<typeof createPositionDoc>[],
-    fridgeDocs: ReturnType<typeof createFridgeItemDoc>[] = [],
-  ) {
-    const batchCommit = jest.fn().mockResolvedValue(undefined);
-    const batchUpdate = jest.fn();
-    const batchMock = {
-      update: batchUpdate,
-      commit: batchCommit,
-    };
-
-    firestoreMock = {
-      collectionGroup: jest.fn((name: string) => {
-        if (name === 'positions') {
-          return {
-            get: jest.fn().mockResolvedValue({ docs: positionDocs }),
-            where: jest.fn((field: string, _op: string, value: string) => ({
-              get: jest.fn().mockResolvedValue({
-                docs: positionDocs.filter((d) => d.data().ticker === value),
-              }),
-            })),
-          };
-        }
-        if (name === 'fridgeItems') {
-          return {
-            get: jest.fn().mockResolvedValue({ docs: fridgeDocs }),
-            where: jest.fn((field: string, _op: string, value: string) => ({
-              get: jest.fn().mockResolvedValue({
-                docs: fridgeDocs.filter((d) => d.data().ticker === value),
-              }),
-            })),
-          };
-        }
-        throw new Error(`Unexpected collectionGroup: ${name}`);
-      }),
-      batch: jest.fn(() => batchMock),
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({
-          set: jest.fn().mockResolvedValue(undefined),
-          collection: jest.fn(() => ({
-            doc: jest.fn(() => ({
-              set: jest.fn().mockResolvedValue(undefined),
-            })),
-          })),
-        })),
-      })),
-    };
-
-    return { batchMock, batchUpdate, batchCommit };
-  }
-
-  describe('sem posições', () => {
-    it('não deve chamar a API quando não há posições', async () => {
-      mockCollectionGroup([]);
+  describe('sem ativos no catálogo', () => {
+    it('não deve chamar a Brapi quando não há ativos cadastrados', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([]);
 
       await updateAllQuotes();
 
@@ -116,14 +31,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
     });
   });
 
-  describe('com posições', () => {
-    it('deve buscar cotações apenas para tickers únicos', async () => {
-      const docs = [
-        createPositionDoc('HGLG11'),
-        createPositionDoc('HGLG11'), // duplicado
-        createPositionDoc('MXRF11'),
-      ];
-      mockCollectionGroup(docs);
+  describe('com ativos no catálogo', () => {
+    it('deve buscar cotações para os tickers ativos do catálogo', async () => {
+      mockListActiveAssetTickers.mockResolvedValue(['HGLG11', 'MXRF11']);
       mockFetchQuotes.mockResolvedValue(
         new Map([
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
@@ -134,35 +44,11 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       await updateAllQuotes();
 
       expect(mockFetchQuotes).toHaveBeenCalledTimes(1);
-      const tickers = mockFetchQuotes.mock.calls[0][0];
-      expect(tickers).toHaveLength(2);
-      expect(tickers).toContain('HGLG11');
-      expect(tickers).toContain('MXRF11');
-    });
-
-    it('deve atualizar currentPrice em posições e fridgeItems do ticker', async () => {
-      const docs = [createPositionDoc('HGLG11'), createPositionDoc('HGLG11')];
-      const fridgeDocs = [createFridgeItemDoc('HGLG11')];
-      const { batchUpdate, batchCommit } = mockCollectionGroup(
-        docs,
-        fridgeDocs,
-      );
-      mockFetchQuotes.mockResolvedValue(
-        new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-        ]),
-      );
-
-      await updateAllQuotes();
-
-      // 2 posições + 1 fridgeItem = 3 updates no batch
-      expect(batchUpdate).toHaveBeenCalledTimes(3);
-      expect(batchCommit).toHaveBeenCalled();
+      expect(mockFetchQuotes).toHaveBeenCalledWith(['HGLG11', 'MXRF11']);
     });
 
     it('deve salvar histórico para cada ticker atualizado', async () => {
-      const docs = [createPositionDoc('HGLG11'), createPositionDoc('MXRF11')];
-      mockCollectionGroup(docs);
+      mockListActiveAssetTickers.mockResolvedValue(['HGLG11', 'MXRF11']);
       mockFetchQuotes.mockResolvedValue(
         new Map([
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
@@ -185,12 +71,11 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
     });
 
-    it('não deve quebrar quando um ticker não tem cotação na Brapi', async () => {
-      const docs = [
-        createPositionDoc('HGLG11'),
-        createPositionDoc('TICKER_INEXISTENTE'),
-      ];
-      mockCollectionGroup(docs);
+    it('não deve quebrar quando um ticker do catálogo não tem cotação na Brapi', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        'HGLG11',
+        'TICKER_INEXISTENTE',
+      ]);
       mockFetchQuotes.mockResolvedValue(
         new Map([
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
@@ -199,7 +84,6 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
       await updateAllQuotes();
 
-      // Deve atualizar apenas HGLG11
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(1);
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'HGLG11',
@@ -208,9 +92,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
     });
 
-    it('deve continuar processando outros tickers quando um falha', async () => {
-      const docs = [createPositionDoc('HGLG11'), createPositionDoc('MXRF11')];
-      mockCollectionGroup(docs);
+    it('deve continuar processando outros tickers quando um falha ao salvar', async () => {
+      mockListActiveAssetTickers.mockResolvedValue(['HGLG11', 'MXRF11']);
       mockFetchQuotes.mockResolvedValue(
         new Map([
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
@@ -218,12 +101,10 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         ]),
       );
 
-      // Faz o saveQuoteHistory falhar para HGLG11
       mockSaveQuoteHistory.mockRejectedValueOnce(new Error('Firestore error'));
 
       await updateAllQuotes();
 
-      // MXRF11 deve ter sido salvo mesmo com falha no HGLG11
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(2);
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -238,8 +119,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      const docs = [createPositionDoc('HGLG11')];
-      mockCollectionGroup(docs);
+      mockListActiveAssetTickers.mockResolvedValue(['HGLG11']);
       mockFetchQuotes.mockRejectedValue(new Error('Brapi API error'));
 
       await updateAllQuotes();
