@@ -37,7 +37,7 @@ async function fetchQuoteBatch(
 ): Promise<Map<string, QuoteResult>> {
   const token = process.env.BRAPI_API_KEY;
   const tickerList = tickers.join(',');
-  const url = `${BRAPI_BASE_URL}?symbols=${tickerList}`;
+  const url = `${BRAPI_BASE_URL}?symbols=${encodeURIComponent(tickerList)}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ async function fetchQuoteBatch(
   for (const item of results) {
     const price = item.data?.regularMarketPrice ?? null;
     if (price !== null && price !== undefined) {
-      quoteMap.set(item.symbol, {
+      quoteMap.set(item.symbol.toUpperCase(), {
         price,
         updatedAt: item.data?.regularMarketTime ?? new Date().toISOString(),
       });

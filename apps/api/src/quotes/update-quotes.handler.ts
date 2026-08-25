@@ -1,4 +1,5 @@
 import { fetchQuotes, QuoteResult } from './brapi.service';
+import { fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 
@@ -10,9 +11,10 @@ const BATCH_SIZE = 10;
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
+  monthlyDividend: number | undefined,
 ): Promise<void> {
   try {
-    await saveQuoteHistory(ticker, quote.price, 'brapi');
+    await saveQuoteHistory(ticker, quote.price, monthlyDividend, 'brapi');
     console.log(
       `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price}.`,
     );
@@ -40,17 +42,18 @@ async function processTickerQuote(
  */
 export async function updateAllQuotes(): Promise<void> {
   try {
-    const tickerList = await listActiveAssetTickers();
+    const assetList = await listActiveAssetTickers();
 
-    if (tickerList.length === 0) {
+    if (assetList.length === 0) {
       console.log('[updateAllQuotes] Nenhum ativo ativo no catálogo.');
       return;
     }
 
     console.log(
-      `[updateAllQuotes] Buscando cotações para ${tickerList.length} ticker(s) do catálogo.`,
+      `[updateAllQuotes] Buscando cotações para ${assetList.length} ticker(s) do catálogo.`,
     );
 
+    const tickerList = assetList.map((asset) => asset.ticker);
     let quotes: Map<string, QuoteResult>;
     try {
       quotes = await fetchQuotes(tickerList);
@@ -61,16 +64,32 @@ export async function updateAllQuotes(): Promise<void> {
       return;
     }
 
+    let dividends: Map<string, number>;
+    try {
+      dividends = await fetchMonthlyDividends(assetList);
+    } catch (error) {
+      console.error('[updateAllQuotes] error ao buscar dividendos:', {
+        message: (error as Error).message,
+      });
+      dividends = new Map();
+    }
+
     const tickerEntries = [...quotes.entries()];
     for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
       const batch = tickerEntries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
-        batch.map(([ticker, quote]) => processTickerQuote(ticker, quote)),
+        batch.map(([ticker, quote]) =>
+          processTickerQuote(
+            ticker,
+            quote,
+            dividends.has(ticker) ? dividends.get(ticker) : undefined,
+          ),
+        ),
       );
     }
 
     console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} de ${tickerList.length} ticker(s) do catálogo atualizado(s).`,
+      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s).`,
     );
   } catch (error) {
     console.error('[updateAllQuotes] error:', {

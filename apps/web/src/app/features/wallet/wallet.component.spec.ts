@@ -112,6 +112,7 @@ describe('WalletComponent', () => {
     assetServiceMock = jasmine.createSpyObj('AssetService', ['list']);
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getDividendYield',
+      'getMonthlyIncome',
     ]);
 
     walletServiceMock.list.and.returnValue(of(wallets));
@@ -139,6 +140,25 @@ describe('WalletComponent', () => {
           currentValue: 1780,
           yield: 8.6,
         },
+      }),
+    );
+    dividendServiceMock.getMonthlyIncome.and.returnValue(
+      of({
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            quantity: 10,
+            monthlyDividend: 0.9,
+            monthlyIncome: 9,
+          },
+          {
+            ticker: 'KNRI11',
+            quantity: 5,
+            monthlyDividend: 0.75,
+            monthlyIncome: 3.75,
+          },
+        ],
+        total: 12.75,
       }),
     );
 
@@ -227,6 +247,18 @@ describe('WalletComponent', () => {
     );
   });
 
+  it('deve exibir coluna de proventos mensais para cada posição', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(2);
+
+    const firstRow = rows[0].textContent;
+    expect(firstRow).toMatch(/R\$\s?9,00/);
+
+    const secondRow = rows[1].textContent;
+    expect(secondRow).toMatch(/R\$\s?3,75/);
+  });
+
   it('deve exibir coluna de dividend yield para cada posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const rows = compiled.querySelectorAll('tbody tr');
@@ -239,6 +271,14 @@ describe('WalletComponent', () => {
     expect(secondRow).toContain('6,82%');
   });
 
+  it('deve exibir total de proventos mensais no rodapé', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const totalElement = compiled.querySelector(
+      '[data-testid="total-proventos"]',
+    );
+    expect(totalElement?.textContent).toMatch(/R\$\s?12,75/);
+  });
+
   it('deve exibir dividend yield total consolidado', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const totalElement = compiled.querySelector('[data-testid="dy-total"]');
@@ -248,6 +288,19 @@ describe('WalletComponent', () => {
   it('deve exibir mensagem de erro quando falha ao carregar dividend yield', fakeAsync(() => {
     dividendServiceMock.getDividendYield.and.returnValue(
       throwError(() => new Error('Network error')),
+    );
+    dividendServiceMock.getMonthlyIncome.and.returnValue(
+      of({
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            quantity: 10,
+            monthlyDividend: 0.9,
+            monthlyIncome: 9,
+          },
+        ],
+        total: 9,
+      }),
     );
     fixture = TestBed.createComponent(WalletComponent);
     fixture.detectChanges();

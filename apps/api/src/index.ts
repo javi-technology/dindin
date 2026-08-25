@@ -40,6 +40,7 @@ import {
   getDividend,
   getDividendProjection,
   getDividendYield,
+  getMonthlyIncome,
   listDividends,
   updateDividend,
 } from './dividend/dividend.controller';
@@ -87,6 +88,7 @@ app.put('/api/wallets/:id', updateWallet);
 app.delete('/api/wallets/:id', deleteWallet);
 
 app.get('/api/wallets/:walletId/dividend-yield', getDividendYield);
+app.get('/api/wallets/:walletId/monthly-income', getMonthlyIncome);
 app.get('/api/wallets/:walletId/positions', listPositions);
 app.post('/api/wallets/:walletId/positions', createPosition);
 app.get('/api/wallets/:walletId/positions/:id', getPosition);

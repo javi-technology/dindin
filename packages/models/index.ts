@@ -111,6 +111,7 @@ export interface Dividend {
 export interface Quote {
   ticker: string;
   price: number;
+  monthlyDividend: number; // último provento/rendimento por cota/ação
   updatedAt: string; // ISO-8601
   source: string; // ex: "brapi"
 }
@@ -119,5 +120,6 @@ export interface Quote {
 export interface QuoteHistory {
   date: string; // YYYY-MM-DD
   price: number;
+  monthlyDividend: number;
   source: string;
 }

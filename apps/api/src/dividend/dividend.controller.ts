@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Dividend, Position, AssetType } from 'dindin-models';
+import { Dividend, Position, AssetType, Quote } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const ASSET_TYPES = new Set<AssetType>([
@@ -522,6 +522,79 @@ export async function getDividendYield(
     res.json(response);
   } catch (error) {
     console.error('[getDividendYield] error:', {
+      uid: uid(req),
+      walletId: req.params.walletId,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+interface MonthlyIncomeItem {
+  ticker: string;
+  quantity: number;
+  monthlyDividend: number;
+  monthlyIncome: number;
+}
+
+interface MonthlyIncomeResponse {
+  byTicker: MonthlyIncomeItem[];
+  total: number;
+}
+
+export async function getMonthlyIncome(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const { walletId } = req.params;
+    const userId = uid(req);
+
+    const [positionsSnapshot, quotesSnapshot] = await Promise.all([
+      positionsCollection(userId, walletId).get(),
+      admin.firestore().collection('quotes').get(),
+    ]);
+
+    const quoteByTicker = new Map<string, number>();
+    for (const doc of quotesSnapshot.docs) {
+      const data = doc.data() as Quote;
+      if (typeof data.monthlyDividend === 'number') {
+        quoteByTicker.set(doc.id.toUpperCase(), data.monthlyDividend);
+      }
+    }
+
+    const byTicker: MonthlyIncomeItem[] = [];
+    let total = 0;
+
+    for (const doc of positionsSnapshot.docs) {
+      const position = { id: doc.id, ...doc.data() } as Position;
+      const monthlyDividend =
+        quoteByTicker.get(position.ticker.toUpperCase()) ?? 0;
+      const quantity =
+        typeof position.quantity === 'number' &&
+        Number.isFinite(position.quantity)
+          ? position.quantity
+          : 0;
+      const monthlyIncome = Math.round(quantity * monthlyDividend * 100) / 100;
+
+      byTicker.push({
+        ticker: position.ticker,
+        quantity,
+        monthlyDividend,
+        monthlyIncome,
+      });
+      total += monthlyIncome;
+    }
+
+    total = Math.round(total * 100) / 100;
+
+    byTicker.sort((a, b) => a.ticker.localeCompare(b.ticker));
+
+    const response: MonthlyIncomeResponse = { byTicker, total };
+    res.json(response);
+  } catch (error) {
+    console.error('[getMonthlyIncome] error:', {
       uid: uid(req),
       walletId: req.params.walletId,
       message: (error as Error).message,
