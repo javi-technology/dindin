@@ -9,15 +9,44 @@ import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
+import { AssetService } from '../../core/services/asset.service';
 import { DividendService } from '../../core/services/dividend.service';
-import { Wallet, Position, Fridge, FridgeItem } from 'dindin-models';
+import { Wallet, Position, Asset, Fridge, FridgeItem } from 'dindin-models';
 
 describe('WalletComponent', () => {
   let fixture: ComponentFixture<WalletComponent>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let positionServiceMock: jasmine.SpyObj<PositionService>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
+  let assetServiceMock: jasmine.SpyObj<AssetService>;
   let dividendServiceMock: jasmine.SpyObj<DividendService>;
+
+  const assets: Asset[] = [
+    {
+      ticker: 'HGLG11',
+      name: 'CSHG Logística',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+    {
+      ticker: 'KNRI11',
+      name: 'Kinea Renda Imobiliária',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+    {
+      ticker: 'MXRF11',
+      name: 'Maxi Renda',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  ];
 
   const wallets: Wallet[] = [
     {
@@ -80,6 +109,7 @@ describe('WalletComponent', () => {
       'moveToFridge',
     ]);
     fridgeServiceMock = jasmine.createSpyObj('FridgeService', ['listFridges']);
+    assetServiceMock = jasmine.createSpyObj('AssetService', ['list']);
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getDividendYield',
     ]);
@@ -87,6 +117,7 @@ describe('WalletComponent', () => {
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
     fridgeServiceMock.listFridges.and.returnValue(of(fridges));
+    assetServiceMock.list.and.returnValue(of(assets));
     dividendServiceMock.getDividendYield.and.returnValue(
       of({
         byTicker: [
@@ -117,6 +148,7 @@ describe('WalletComponent', () => {
         { provide: WalletService, useValue: walletServiceMock },
         { provide: PositionService, useValue: positionServiceMock },
         { provide: FridgeService, useValue: fridgeServiceMock },
+        { provide: AssetService, useValue: assetServiceMock },
         { provide: DividendService, useValue: dividendServiceMock },
       ],
     }).compileComponents();
@@ -443,6 +475,25 @@ describe('WalletComponent', () => {
     expect(fixture.componentInstance.loading()).toBeFalse();
   }));
 
+  it('deve exibir mensagem de erro no formulário quando falha ao carregar catálogo de ativos', fakeAsync(() => {
+    assetServiceMock.list.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(WalletComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openForm();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const assetsError = compiled.querySelector('[data-testid="assets-error"]');
+    expect(assetsError?.textContent).toContain(
+      'Erro ao carregar catálogo de ativos.',
+    );
+  }));
+
   it('deve abrir formulário ao clicar em adicionar posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const addButton = compiled.querySelector(
@@ -463,10 +514,10 @@ describe('WalletComponent', () => {
     editButton.click();
     fixture.detectChanges();
 
-    const tickerInput = compiled.querySelector(
-      'input#ticker',
-    ) as HTMLInputElement;
-    expect(tickerInput.value).toBe('HGLG11');
+    const tickerSelect = compiled.querySelector(
+      'select#ticker',
+    ) as HTMLSelectElement;
+    expect(tickerSelect.value).toBe('HGLG11');
   });
 
   it('deve abrir modal de confirmação ao clicar em remover', () => {
@@ -564,7 +615,6 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 9.8,
-      currentPrice: 10,
     });
     fixture.componentInstance.savePosition();
     tick();
@@ -575,7 +625,6 @@ describe('WalletComponent', () => {
       assetType: 'FII',
       quantity: 15,
       averagePrice: 9.8,
-      currentPrice: 10,
     });
   }));
 

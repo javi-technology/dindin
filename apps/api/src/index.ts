@@ -40,6 +40,7 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
+import { listAssets } from './assets/asset.controller';
 
 admin.initializeApp();
 
@@ -71,6 +72,8 @@ app.use('/api/*', authMiddleware);
 app.get('/api/me', (req: AuthRequest, res: Response) => {
   res.json({ uid: req.user?.uid });
 });
+
+app.get('/api/assets', listAssets);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);

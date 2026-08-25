@@ -44,6 +44,20 @@ export async function saveQuoteHistory(
   await historyCollection(ticker).doc(docId).set(historyData);
 }
 
+/**
+ * Retorna o preço mais recente conhecido para o ticker, lido diretamente
+ * de `quotes/{ticker}`. Usado para resolver `currentPrice` em posições e
+ * itens da geladeira no momento da leitura, sem depender de um valor
+ * denormalizado gravado em cada documento.
+ */
+export async function getQuotePrice(
+  ticker: string,
+): Promise<number | undefined> {
+  const doc = await quotesCollection().doc(ticker).get();
+  if (!doc.exists) return undefined;
+  return (doc.data() as Quote).price;
+}
+
 export async function getQuoteHistory(
   ticker: string,
   limit = 30,
