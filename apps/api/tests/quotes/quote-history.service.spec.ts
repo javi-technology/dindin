@@ -8,6 +8,7 @@ jest.mock('firebase-admin', () => ({
 import {
   saveQuoteHistory,
   getQuoteHistory,
+  getQuotePrice,
 } from '../../src/quotes/quote-history.service';
 
 describe('QuoteHistoryService', () => {
@@ -172,6 +173,44 @@ describe('QuoteHistoryService', () => {
       const result = await getQuoteHistory('TICKER_NOVO');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getQuotePrice', () => {
+    it('deve retornar o preço atual quando a cotação existe', async () => {
+      const quoteDoc = jest.fn(() => ({
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            ticker: 'HGLG11',
+            price: 165.5,
+            updatedAt: '2026-07-15T18:00:00Z',
+            source: 'brapi',
+          }),
+        }),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn((path: string) => {
+          if (path === 'quotes') return { doc: quoteDoc };
+          throw new Error(`Unexpected collection: ${path}`);
+        }),
+      };
+
+      await expect(getQuotePrice('HGLG11')).resolves.toBe(165.5);
+      expect(quoteDoc).toHaveBeenCalledWith('HGLG11');
+    });
+
+    it('deve retornar undefined quando não há cotação salva para o ticker', async () => {
+      firestoreMock = {
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({
+            get: jest.fn().mockResolvedValue({ exists: false }),
+          })),
+        })),
+      };
+
+      await expect(getQuotePrice('TICKER_NOVO')).resolves.toBeUndefined();
     });
   });
 });

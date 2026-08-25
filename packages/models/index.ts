@@ -6,6 +6,7 @@
 //   users/{userId}/fridges/{fridgeId}
 //   users/{userId}/fridges/{fridgeId}/fridgeItems/{itemId}
 //   users/{userId}/dividends/{dividendId}
+//   assets/{ticker}
 //   quotes/{ticker}
 //   quotes/{ticker}/history/{date}
 
@@ -32,6 +33,21 @@ export interface Wallet {
 
 /** Tipos de ativo suportados em uma posição */
 export type AssetType = 'FII' | 'STOCK' | 'ETF' | 'REIT' | 'OTHER';
+
+/**
+ * Ativo do catálogo suportado pelo app — coleção `assets`.
+ * Fonte única de verdade sobre quais tickers podem ser cadastrados em
+ * posições/itens da geladeira e quais tickers o job de cotações deve
+ * consultar na Brapi.
+ */
+export interface Asset {
+  ticker: string; // ex: "HGLG11", também usado como id do documento
+  name: string;
+  assetType: AssetType;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /** Posição de um ativo na carteira — subcoleção `positions` */
 export interface Position {

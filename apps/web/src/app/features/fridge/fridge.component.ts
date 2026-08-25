@@ -7,7 +7,8 @@ import {
   Validators,
 } from '@angular/forms';
 import { FridgeService } from '../../core/services/fridge.service';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { AssetService } from '../../core/services/asset.service';
+import { Asset, Fridge, FridgeItem } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
@@ -35,11 +36,14 @@ import {
 })
 export class FridgeComponent implements OnInit {
   private readonly fridgeService = inject(FridgeService);
+  private readonly assetService = inject(AssetService);
   private readonly fb = inject(FormBuilder);
 
   fridges = signal<Fridge[]>([]);
   selectedFridge = signal<Fridge | null>(null);
   items = signal<FridgeItem[]>([]);
+  assets = signal<Asset[]>([]);
+  assetsError = signal<string | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -53,11 +57,25 @@ export class FridgeComponent implements OnInit {
     quantity: [0, [Validators.required, Validators.min(0.0001)]],
     transferredPrice: ['0', [Validators.required, decimalValidator()]],
     targetPrice: ['0', [Validators.required, decimalValidator()]],
-    currentPrice: ['', [decimalValidator()]],
   });
 
   ngOnInit(): void {
     this.loadFridges();
+    this.loadAssets();
+  }
+
+  private loadAssets(): void {
+    this.assetService.list().subscribe({
+      next: (response) => {
+        this.assets.set(response);
+        this.assetsError.set(null);
+      },
+      error: () => {
+        this.assetsError.set(
+          'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
+        );
+      },
+    });
   }
 
   private loadFridges(): void {
@@ -133,8 +151,6 @@ export class FridgeComponent implements OnInit {
         quantity: item.quantity,
         transferredPrice: String(item.transferredPrice),
         targetPrice: String(item.targetPrice),
-        currentPrice:
-          item.currentPrice != null ? String(item.currentPrice) : '',
       });
     } else {
       this.form.reset({
@@ -142,7 +158,6 @@ export class FridgeComponent implements OnInit {
         quantity: 0,
         transferredPrice: '0',
         targetPrice: '0',
-        currentPrice: '',
       });
     }
   }
@@ -172,7 +187,6 @@ export class FridgeComponent implements OnInit {
       this.form.value.transferredPrice,
     );
     const targetPrice = this.parseDecimal(this.form.value.targetPrice);
-    const currentPrice = this.parseDecimal(this.form.value.currentPrice);
 
     if (
       !ticker ||
@@ -190,12 +204,17 @@ export class FridgeComponent implements OnInit {
 
     const editing = this.editingItem();
     if (editing) {
-      const payload: { targetPrice?: number; currentPrice?: number } = {
+      const payload: {
+        ticker: string;
+        quantity: number;
+        transferredPrice: number;
+        targetPrice: number;
+      } = {
+        ticker: ticker.trim().toUpperCase(),
+        quantity,
+        transferredPrice,
         targetPrice,
       };
-      if (currentPrice !== null && currentPrice >= 0) {
-        payload.currentPrice = currentPrice;
-      }
 
       this.fridgeService.updateItem(fridge.id, editing.id, payload).subscribe({
         next: () => {
@@ -214,17 +233,12 @@ export class FridgeComponent implements OnInit {
         quantity: number;
         transferredPrice: number;
         targetPrice: number;
-        currentPrice?: number;
       } = {
         ticker: ticker.trim().toUpperCase(),
         quantity,
         transferredPrice,
         targetPrice,
       };
-
-      if (currentPrice !== null && currentPrice >= 0) {
-        payload.currentPrice = currentPrice;
-      }
 
       this.fridgeService.createItem(fridge.id, payload).subscribe({
         next: () => {

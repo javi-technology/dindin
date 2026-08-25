@@ -15,7 +15,6 @@ export interface CreateFridgeItemPayload {
   quantity: number;
   transferredPrice: number;
   targetPrice: number;
-  currentPrice?: number;
 }
 
 export type UpdateFridgeItemPayload = Partial<CreateFridgeItemPayload>;

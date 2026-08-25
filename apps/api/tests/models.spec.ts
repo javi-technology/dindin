@@ -5,6 +5,7 @@ import {
   Fridge,
   FridgeItem,
   AssetType,
+  Asset,
   Dividend,
 } from 'dindin-models';
 
@@ -145,6 +146,21 @@ describe('models – FridgeItem', () => {
     };
     expect(item.ticker).toBe('XPML11');
     expect(item.targetPrice).toBe(100.0);
+  });
+});
+
+describe('models – Asset', () => {
+  it('deve aceitar um objeto Asset válido', () => {
+    const asset: Asset = {
+      ticker: 'HGLG11',
+      name: 'CSHG Logística',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    expect(asset.ticker).toBe('HGLG11');
+    expect(asset.active).toBe(true);
   });
 });
 
