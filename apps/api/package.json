@@ -11,7 +11,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "seed:assets": "npm run build && node lib/scripts/seed-assets.js"
+    "seed:assets": "npm run build && node lib/scripts/seed-assets.js",
+    "set:admin-claim": "npm run build && node lib/scripts/set-admin-claim.js"
   },
   "engines": {
     "node": "22"

@@ -36,4 +36,12 @@ export class AuthService {
   async logout(): Promise<void> {
     await signOut(this.auth);
   }
+
+  /** Verifica se o usuário logado possui a custom claim `admin: true`. */
+  async isAdmin(): Promise<boolean> {
+    const user = this.auth.currentUser;
+    if (!user) return false;
+    const tokenResult = await user.getIdTokenResult(true);
+    return tokenResult.claims['admin'] === true;
+  }
 }
