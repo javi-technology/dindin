@@ -18,11 +18,12 @@ import {
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
+import { AssetService } from '../../core/services/asset.service';
 import {
   DividendService,
   DividendYieldResponse,
 } from '../../core/services/dividend.service';
-import { Wallet, Position, AssetType, Fridge } from 'dindin-models';
+import { Wallet, Position, AssetType, Asset, Fridge } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
@@ -55,6 +56,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private readonly walletService = inject(WalletService);
   private readonly positionService = inject(PositionService);
   private readonly fridgeService = inject(FridgeService);
+  private readonly assetService = inject(AssetService);
   private readonly dividendService = inject(DividendService);
   private readonly fb = inject(FormBuilder);
   private readonly destroy$ = new Subject<void>();
@@ -64,6 +66,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   wallets = signal<Wallet[]>([]);
   selectedWallet = signal<Wallet | null>(null);
   positions = signal<Position[]>([]);
+  assets = signal<Asset[]>([]);
   dividendYield = signal<DividendYieldResponse | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
@@ -87,7 +90,6 @@ export class WalletComponent implements OnInit, OnDestroy {
     assetType: ['FII', [Validators.required]],
     quantity: [0, [Validators.required, Validators.min(0.0001)]],
     averagePrice: ['0', [Validators.required, decimalValidator()]],
-    currentPrice: ['', [decimalValidator()]],
   });
 
   /** Retorna o preço unitário atual (mercado) ou o preço médio como fallback. */
@@ -117,6 +119,17 @@ export class WalletComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadWallets();
     this.loadFridges();
+    this.loadAssets();
+  }
+
+  private loadAssets(): void {
+    this.assetService
+      .list()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => this.assets.set(response),
+        error: () => {},
+      });
   }
 
   private loadFridges(): void {
@@ -254,8 +267,6 @@ export class WalletComponent implements OnInit, OnDestroy {
         assetType: position.assetType,
         quantity: position.quantity,
         averagePrice: String(position.averagePrice),
-        currentPrice:
-          position.currentPrice != null ? String(position.currentPrice) : '',
       });
     } else {
       this.form.reset({
@@ -263,7 +274,6 @@ export class WalletComponent implements OnInit, OnDestroy {
         assetType: 'FII',
         quantity: 0,
         averagePrice: '0',
-        currentPrice: '',
       });
     }
   }
@@ -290,7 +300,6 @@ export class WalletComponent implements OnInit, OnDestroy {
     const ticker = this.form.value.ticker as string;
     const quantity = Number(this.form.value.quantity);
     const averagePrice = this.parseDecimal(this.form.value.averagePrice);
-    const currentPrice = this.parseDecimal(this.form.value.currentPrice);
 
     if (
       !ticker ||
@@ -309,17 +318,12 @@ export class WalletComponent implements OnInit, OnDestroy {
       assetType: AssetType;
       quantity: number;
       averagePrice: number;
-      currentPrice?: number;
     } = {
       ticker: ticker.trim().toUpperCase(),
       assetType: this.form.value.assetType,
       quantity,
       averagePrice,
     };
-
-    if (currentPrice !== null && currentPrice >= 0) {
-      payload.currentPrice = currentPrice;
-    }
 
     const editing = this.editingPosition();
     if (editing) {

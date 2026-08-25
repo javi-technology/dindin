@@ -7,11 +7,32 @@ import {
 import { of, throwError } from 'rxjs';
 import { FridgeComponent } from './fridge.component';
 import { FridgeService } from '../../core/services/fridge.service';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { AssetService } from '../../core/services/asset.service';
+import { Asset, Fridge, FridgeItem } from 'dindin-models';
 
 describe('FridgeComponent', () => {
   let fixture: ComponentFixture<FridgeComponent>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
+  let assetServiceMock: jasmine.SpyObj<AssetService>;
+
+  const assets: Asset[] = [
+    {
+      ticker: 'HGLG11',
+      name: 'CSHG Logística',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+    {
+      ticker: 'MXRF11',
+      name: 'Maxi Renda',
+      assetType: 'FII',
+      active: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  ];
 
   const fridges: Fridge[] = [
     {
@@ -61,9 +82,15 @@ describe('FridgeComponent', () => {
     fridgeServiceMock.listFridges.and.returnValue(of(fridges));
     fridgeServiceMock.listItems.and.returnValue(of(items));
 
+    assetServiceMock = jasmine.createSpyObj('AssetService', ['list']);
+    assetServiceMock.list.and.returnValue(of(assets));
+
     await TestBed.configureTestingModule({
       imports: [FridgeComponent],
-      providers: [{ provide: FridgeService, useValue: fridgeServiceMock }],
+      providers: [
+        { provide: FridgeService, useValue: fridgeServiceMock },
+        { provide: AssetService, useValue: assetServiceMock },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FridgeComponent);
@@ -183,10 +210,10 @@ describe('FridgeComponent', () => {
     editButton.click();
     fixture.detectChanges();
 
-    const tickerInput = compiled.querySelector(
-      'input#item-ticker',
-    ) as HTMLInputElement;
-    expect(tickerInput.value).toBe('HGLG11');
+    const tickerSelect = compiled.querySelector(
+      'select#item-ticker',
+    ) as HTMLSelectElement;
+    expect(tickerSelect.value).toBe('HGLG11');
   });
 
   it('deve abrir modal de confirmação ao clicar em remover', () => {
@@ -283,7 +310,6 @@ describe('FridgeComponent', () => {
       quantity: 15,
       transferredPrice: '9,80',
       targetPrice: '12,00',
-      currentPrice: '10,00',
     });
     fixture.componentInstance.saveItem();
     tick();
@@ -294,7 +320,6 @@ describe('FridgeComponent', () => {
       quantity: 15,
       transferredPrice: 9.8,
       targetPrice: 12,
-      currentPrice: 10,
     });
   }));
 
@@ -315,7 +340,7 @@ describe('FridgeComponent', () => {
     expect(fridgeServiceMock.updateItem).toHaveBeenCalledWith(
       'fridge-1',
       'item-1',
-      { targetPrice: 130, currentPrice: 112 },
+      { targetPrice: 130 },
     );
   }));
 

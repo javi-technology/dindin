@@ -238,16 +238,21 @@
               class="block text-sm font-medium text-gray-700 mb-1"
               >Ticker</label
             >
-            <input
+            <select
               id="ticker"
-              type="text"
               formControlName="ticker"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               [class.border-red-500]="
                 form.get('ticker')?.invalid && form.get('ticker')?.touched
               "
-              placeholder="HGLG11"
-            />
+            >
+              <option value="" disabled>Selecione um ativo</option>
+              @for (asset of assets(); track asset.ticker) {
+                <option [value]="asset.ticker">
+                  {{ asset.ticker }} — {{ asset.name }}
+                </option>
+              }
+            </select>
             @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
               <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
             }
@@ -329,33 +334,6 @@
                   Informe um número válido (ex: 110,50).
                 </p>
               }
-            }
-          </div>
-
-          <div>
-            <label
-              for="currentPrice"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Preço atual (opcional)</label
-            >
-            <input
-              id="currentPrice"
-              type="text"
-              inputmode="decimal"
-              formControlName="currentPrice"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
-                form.get('currentPrice')?.invalid &&
-                form.get('currentPrice')?.touched
-              "
-            />
-            @if (
-              form.get('currentPrice')?.hasError('invalidDecimal') &&
-              form.get('currentPrice')?.touched
-            ) {
-              <p class="text-red-600 text-xs mt-1">
-                Informe um número válido (ex: 112,00).
-              </p>
             }
           </div>
 
