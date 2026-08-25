@@ -29,6 +29,16 @@
         >
           Acessar proventos
         </a>
+
+        @if (isAdmin()) {
+          <a
+            routerLink="/admin/assets"
+            class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+            data-testid="admin-link"
+          >
+            Admin: ativos
+          </a>
+        }
       </div>
 
       @if (healthStatus) {
