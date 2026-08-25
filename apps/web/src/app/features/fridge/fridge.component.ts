@@ -43,6 +43,7 @@ export class FridgeComponent implements OnInit {
   selectedFridge = signal<Fridge | null>(null);
   items = signal<FridgeItem[]>([]);
   assets = signal<Asset[]>([]);
+  assetsError = signal<string | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -65,8 +66,15 @@ export class FridgeComponent implements OnInit {
 
   private loadAssets(): void {
     this.assetService.list().subscribe({
-      next: (response) => this.assets.set(response),
-      error: () => {},
+      next: (response) => {
+        this.assets.set(response);
+        this.assetsError.set(null);
+      },
+      error: () => {
+        this.assetsError.set(
+          'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
+        );
+      },
     });
   }
 
@@ -196,7 +204,17 @@ export class FridgeComponent implements OnInit {
 
     const editing = this.editingItem();
     if (editing) {
-      const payload: { targetPrice?: number } = { targetPrice };
+      const payload: {
+        ticker: string;
+        quantity: number;
+        transferredPrice: number;
+        targetPrice: number;
+      } = {
+        ticker: ticker.trim().toUpperCase(),
+        quantity,
+        transferredPrice,
+        targetPrice,
+      };
 
       this.fridgeService.updateItem(fridge.id, editing.id, payload).subscribe({
         next: () => {

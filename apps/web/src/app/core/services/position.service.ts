@@ -8,7 +8,6 @@ export interface CreatePositionPayload {
   assetType: AssetType;
   quantity: number;
   averagePrice: number;
-  currentPrice?: number;
   inFridge?: boolean;
   targetPrice?: number;
 }

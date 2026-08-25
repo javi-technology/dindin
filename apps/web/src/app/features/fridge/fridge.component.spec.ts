@@ -190,6 +190,25 @@ describe('FridgeComponent', () => {
     expect(row?.textContent).toContain('—');
   });
 
+  it('deve exibir mensagem de erro no formulário quando falha ao carregar catálogo de ativos', fakeAsync(() => {
+    assetServiceMock.list.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+    fixture = TestBed.createComponent(FridgeComponent);
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openForm();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const assetsError = compiled.querySelector('[data-testid="assets-error"]');
+    expect(assetsError?.textContent).toContain(
+      'Erro ao carregar catálogo de ativos.',
+    );
+  }));
+
   it('deve abrir formulário ao clicar em adicionar item', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const addButton = compiled.querySelector(
@@ -340,7 +359,12 @@ describe('FridgeComponent', () => {
     expect(fridgeServiceMock.updateItem).toHaveBeenCalledWith(
       'fridge-1',
       'item-1',
-      { targetPrice: 130 },
+      {
+        ticker: 'HGLG11',
+        quantity: 10,
+        transferredPrice: 110.5,
+        targetPrice: 130,
+      },
     );
   }));
 
