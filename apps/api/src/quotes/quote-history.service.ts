@@ -21,6 +21,7 @@ function historyDocId(): string {
 export async function saveQuoteHistory(
   ticker: string,
   price: number,
+  monthlyDividend: number,
   source = 'brapi',
 ): Promise<void> {
   const now = new Date().toISOString();
@@ -30,6 +31,7 @@ export async function saveQuoteHistory(
   const quoteData: Quote = {
     ticker,
     price,
+    monthlyDividend,
     updatedAt: now,
     source,
   };
@@ -37,6 +39,7 @@ export async function saveQuoteHistory(
   const historyData: QuoteHistory = {
     date,
     price,
+    monthlyDividend,
     source,
   };
 
