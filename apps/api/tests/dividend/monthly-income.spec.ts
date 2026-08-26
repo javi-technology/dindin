@@ -13,9 +13,18 @@ jest.mock('firebase-admin', () => ({
 }));
 
 import { app } from '../../src/index';
-import { Position, Quote } from 'dindin-models';
+import { Position, Quote, Fridge, FridgeItem } from 'dindin-models';
 
-function createFirestoreMock(positions: Position[] = [], quotes: Quote[] = []) {
+interface TestFridge {
+  id: string;
+  items: FridgeItem[];
+}
+
+function createFirestoreMock(
+  positions: Position[] = [],
+  quotes: Quote[] = [],
+  fridges: TestFridge[] = [],
+) {
   return {
     collection: jest.fn((path: string) => {
       if (path === 'quotes') {
@@ -51,6 +60,32 @@ function createFirestoreMock(positions: Position[] = [], quotes: Quote[] = []) {
                       );
                     }),
                   })),
+                };
+              }
+              if (subPath === 'fridges' && uid === 'user-123') {
+                return {
+                  get: jest.fn().mockResolvedValue({
+                    docs: fridges.map((fridge) => ({
+                      id: fridge.id,
+                      ref: {
+                        collection: jest.fn((innerPath: string) => {
+                          if (innerPath === 'fridgeItems') {
+                            return {
+                              get: jest.fn().mockResolvedValue({
+                                docs: fridge.items.map((item) => ({
+                                  id: item.id,
+                                  data: () => ({ ...item }),
+                                })),
+                              }),
+                            };
+                          }
+                          throw new Error(
+                            `Unexpected inner collection: ${innerPath}`,
+                          );
+                        }),
+                      },
+                    })),
+                  }),
                 };
               }
               throw new Error(`Unexpected subcollection: ${subPath}`);
@@ -117,7 +152,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
       },
     ];
 
-    firestoreMock = createFirestoreMock(positions, quotes);
+    firestoreMock = createFirestoreMock(positions, quotes, []);
 
     const response = await request(app)
       .get('/api/wallets/wallet-1/monthly-income')
@@ -139,6 +174,68 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
       },
     ]);
     expect(response.body.total).toBe(16);
+    expect(response.body.totalFromFridge).toBe(0);
+  });
+
+  it('deve somar proventos da geladeira no total', async () => {
+    const positions: Position[] = [
+      {
+        id: 'position-1',
+        walletId: 'wallet-1',
+        ticker: 'HGLG11',
+        assetType: 'FII',
+        quantity: 10,
+        averagePrice: 110,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const quotes: Quote[] = [
+      {
+        ticker: 'HGLG11',
+        price: 112,
+        monthlyDividend: 0.9,
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+      {
+        ticker: 'XPLG11',
+        price: 95,
+        monthlyDividend: 0.65,
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+    ];
+
+    const fridges: TestFridge[] = [
+      {
+        id: 'fridge-1',
+        items: [
+          {
+            id: 'item-1',
+            fridgeId: 'fridge-1',
+            ticker: 'XPLG11',
+            quantity: 20,
+            transferredPrice: 90,
+            targetPrice: 100,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+    ];
+
+    firestoreMock = createFirestoreMock(positions, quotes, fridges);
+
+    const response = await request(app)
+      .get('/api/wallets/wallet-1/monthly-income')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(22);
+    expect(response.body.totalFromFridge).toBe(13);
   });
 
   it('deve retornar 0 para tickers sem cotação', async () => {
@@ -192,7 +289,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
       },
     ];
 
-    firestoreMock = createFirestoreMock(positions, quotes);
+    firestoreMock = createFirestoreMock(positions, quotes, []);
 
     const response = await request(app)
       .get('/api/wallets/wallet-1/monthly-income')

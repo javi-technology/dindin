@@ -210,6 +210,18 @@
                     {{ formatCurrency(totalProventos()) }}
                   </td>
                 </tr>
+                <tr class="bg-gray-50">
+                  <td class="py-2 px-4 text-gray-600 text-sm" colspan="3">
+                    Sendo da geladeira
+                  </td>
+                  <td
+                    class="py-2 px-4 text-gray-600 text-sm"
+                    data-testid="total-proventos-geladeira"
+                    colspan="4"
+                  >
+                    {{ formatCurrency(totalProventosFromFridge()) }}
+                  </td>
+                </tr>
                 <tr class="bg-gray-50 font-semibold">
                   <td class="py-3 px-4 text-gray-900" colspan="3">DY total</td>
                   <td

@@ -114,6 +114,9 @@ export class WalletComponent implements OnInit, OnDestroy {
   totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
 
   totalProventos = computed(() => this.monthlyIncome()?.total ?? 0);
+  totalProventosFromFridge = computed(
+    () => this.monthlyIncome()?.totalFromFridge ?? 0,
+  );
 
   dividendYieldFor = (position: Position): number => {
     const found = this.dividendYield()?.byTicker.find(
