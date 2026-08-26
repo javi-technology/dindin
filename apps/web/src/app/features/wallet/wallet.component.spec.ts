@@ -159,6 +159,7 @@ describe('WalletComponent', () => {
           },
         ],
         total: 12.75,
+        totalFromFridge: 0,
       }),
     );
 
@@ -300,6 +301,7 @@ describe('WalletComponent', () => {
           },
         ],
         total: 9,
+        totalFromFridge: 0,
       }),
     );
     fixture = TestBed.createComponent(WalletComponent);
