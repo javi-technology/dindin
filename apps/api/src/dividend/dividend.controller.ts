@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Dividend, Position, AssetType, Quote } from 'dindin-models';
+import {
+  Dividend,
+  Position,
+  AssetType,
+  Quote,
+  FridgeItem,
+} from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 const ASSET_TYPES = new Set<AssetType>([
@@ -31,6 +37,14 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('wallets')
     .doc(walletId)
     .collection('positions');
+}
+
+function fridgesCollection(userId: string) {
+  return admin
+    .firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('fridges');
 }
 
 async function getAllUserPositions(
@@ -541,6 +555,21 @@ interface MonthlyIncomeItem {
 interface MonthlyIncomeResponse {
   byTicker: MonthlyIncomeItem[];
   total: number;
+  totalFromFridge: number;
+}
+
+async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
+  const items: FridgeItem[] = [];
+  const fridgesSnapshot = await fridgesCollection(userId).get();
+
+  for (const fridgeDoc of fridgesSnapshot.docs) {
+    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
+    for (const itemDoc of itemsSnapshot.docs) {
+      items.push({ id: itemDoc.id, ...itemDoc.data() } as FridgeItem);
+    }
+  }
+
+  return items;
 }
 
 export async function getMonthlyIncome(
@@ -551,9 +580,10 @@ export async function getMonthlyIncome(
     const { walletId } = req.params;
     const userId = uid(req);
 
-    const [positionsSnapshot, quotesSnapshot] = await Promise.all([
+    const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
       positionsCollection(userId, walletId).get(),
       admin.firestore().collection('quotes').get(),
+      fetchFridgeItems(userId),
     ]);
 
     const quoteByTicker = new Map<string, number>();
@@ -587,11 +617,26 @@ export async function getMonthlyIncome(
       total += monthlyIncome;
     }
 
-    total = Math.round(total * 100) / 100;
+    let totalFromFridge = 0;
+    for (const item of fridgeItems) {
+      const monthlyDividend = quoteByTicker.get(item.ticker.toUpperCase()) ?? 0;
+      const quantity =
+        typeof item.quantity === 'number' && Number.isFinite(item.quantity)
+          ? item.quantity
+          : 0;
+      totalFromFridge += quantity * monthlyDividend;
+    }
+    totalFromFridge = Math.round(totalFromFridge * 100) / 100;
+
+    total = Math.round((total + totalFromFridge) * 100) / 100;
 
     byTicker.sort((a, b) => a.ticker.localeCompare(b.ticker));
 
-    const response: MonthlyIncomeResponse = { byTicker, total };
+    const response: MonthlyIncomeResponse = {
+      byTicker,
+      total,
+      totalFromFridge,
+    };
     res.json(response);
   } catch (error) {
     console.error('[getMonthlyIncome] error:', {

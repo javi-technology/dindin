@@ -40,6 +40,7 @@ export interface MonthlyIncomeItem {
 export interface MonthlyIncomeResponse {
   byTicker: MonthlyIncomeItem[];
   total: number;
+  totalFromFridge: number;
 }
 
 @Injectable({
