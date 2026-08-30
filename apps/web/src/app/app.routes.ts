@@ -3,7 +3,7 @@ import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 import { loginGuard } from './core/guards/login.guard';
 import { LoginComponent } from './features/login/login.component';
-import { HomeComponent } from './features/home/home.component';
+import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { WalletComponent } from './features/wallet/wallet.component';
 import { FridgeComponent } from './features/fridge/fridge.component';
 import { DividendComponent } from './features/dividend/dividend.component';
@@ -18,7 +18,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
-    component: HomeComponent,
+    component: DashboardComponent,
   },
   {
     path: 'carteira',

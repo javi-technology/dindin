@@ -1,0 +1,93 @@
+<main class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-5xl mx-auto">
+    <div
+      class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6"
+    >
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-gray-600">Visão consolidada da sua carteira</p>
+      </div>
+
+      <span
+        class="text-sm"
+        [class.text-green-700]="backendOnline()"
+        [class.text-gray-500]="!backendOnline()"
+        data-testid="backend-status"
+      >
+        {{ backendOnline() ? 'Backend online' : 'Backend indisponível' }}
+      </span>
+    </div>
+
+    @if (error()) {
+      <div
+        class="bg-red-50 text-red-800 rounded-lg p-4 mb-6"
+        data-testid="error-message"
+      >
+        {{ error() }}
+      </div>
+    }
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <a
+        routerLink="/carteira"
+        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        data-testid="card-wallet"
+      >
+        <div class="flex items-center gap-2 text-blue-600 mb-3">
+          <svg lucideWallet [size]="18"></svg>
+          <span class="text-sm font-medium text-gray-700"
+            >Total da carteira</span
+          >
+        </div>
+        <p class="text-3xl font-bold text-gray-900" data-testid="wallet-value">
+          {{ displayValue(totalWallet()) }}
+        </p>
+      </a>
+
+      <a
+        routerLink="/geladeira"
+        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        data-testid="card-fridge"
+      >
+        <div class="flex items-center gap-2 text-cyan-600 mb-3">
+          <svg lucideRefrigerator [size]="18"></svg>
+          <span class="text-sm font-medium text-gray-700"
+            >Total da geladeira</span
+          >
+        </div>
+        <p class="text-3xl font-bold text-gray-900" data-testid="fridge-value">
+          {{ displayValue(totalFridge()) }}
+        </p>
+      </a>
+
+      <a
+        routerLink="/provento"
+        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        data-testid="card-dividends"
+      >
+        <div class="flex items-center gap-2 text-green-600 mb-3">
+          <svg lucideTrendingUp [size]="18"></svg>
+          <span class="text-sm font-medium text-gray-700"
+            >Proventos do mês</span
+          >
+        </div>
+        <p
+          class="text-3xl font-bold text-gray-900"
+          data-testid="dividends-value"
+        >
+          {{ displayValue(totalDividends()) }}
+        </p>
+      </a>
+    </div>
+
+    @if (isAdmin()) {
+      <a
+        routerLink="/admin/assets"
+        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+        data-testid="admin-link"
+      >
+        Admin: ativos
+      </a>
+    }
+  </div>
+</main>

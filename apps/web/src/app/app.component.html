@@ -1,12 +1,43 @@
-<header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+<header
+  class="bg-white shadow-sm px-6 py-4 flex flex-wrap justify-between items-center gap-3"
+>
   <a
     routerLink="/"
     class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
     >DinDin</a
   >
-  <div class="flex items-center gap-4">
+  <div class="flex flex-wrap items-center gap-4">
     @if (user(); as currentUser) {
-      <span class="text-sm text-gray-700">{{ currentUser.email }}</span>
+      <nav class="flex flex-wrap items-center gap-4" data-testid="main-nav">
+        <a
+          routerLink="/"
+          routerLinkActive="!text-blue-600 font-semibold"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >Dashboard</a
+        >
+        <a
+          routerLink="/carteira"
+          routerLinkActive="!text-blue-600 font-semibold"
+          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >Carteira</a
+        >
+        <a
+          routerLink="/geladeira"
+          routerLinkActive="!text-blue-600 font-semibold"
+          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >Geladeira</a
+        >
+        <a
+          routerLink="/provento"
+          routerLinkActive="!text-blue-600 font-semibold"
+          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >Proventos</a
+        >
+      </nav>
+      <span class="text-sm text-gray-700 hidden sm:inline">{{
+        currentUser.email
+      }}</span>
       <button
         (click)="logout()"
         class="text-sm text-red-600 hover:text-red-800 font-medium"
