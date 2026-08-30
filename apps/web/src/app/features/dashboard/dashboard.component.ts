@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
-import { FridgeItem, Position } from 'dindin-models';
+import { FridgeItem, Position, Wallet } from 'dindin-models';
 import {
   LucideRefrigerator,
   LucideTrendingUp,
@@ -62,14 +62,18 @@ export class DashboardComponent implements OnInit {
   }
 
   private loadSummary(): void {
-    forkJoin({
-      totalWallet: this.walletTotal(),
-      totalFridge: this.fridgeTotal(),
-      totalDividends: this.dividendService
-        .getProjection()
-        .pipe(map((response) => response.total)),
-    })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    this.walletService
+      .list()
+      .pipe(
+        switchMap((wallets) =>
+          forkJoin({
+            totalWallet: this.walletTotal(wallets),
+            totalFridge: this.fridgeTotal(),
+            totalDividends: this.dividendsTotal(wallets),
+          }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: ({ totalWallet, totalFridge, totalDividends }) => {
           this.totalWallet.set(totalWallet);
@@ -84,13 +88,10 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  private walletTotal(): Observable<number> {
-    return this.walletService.list().pipe(
-      switchMap((wallets) =>
-        this.combine(
-          wallets.map((wallet) => this.positionService.list(wallet.id)),
-        ),
-      ),
+  private walletTotal(wallets: Wallet[]): Observable<number> {
+    return this.combine(
+      wallets.map((wallet) => this.positionService.list(wallet.id)),
+    ).pipe(
       map((positions) =>
         positions.reduce(
           (sum, position) =>
@@ -98,6 +99,27 @@ export class DashboardComponent implements OnInit {
           0,
         ),
       ),
+    );
+  }
+
+  private dividendsTotal(wallets: Wallet[]): Observable<number> {
+    if (wallets.length === 0) {
+      return of(0);
+    }
+
+    return forkJoin(
+      wallets.map((wallet) => this.dividendService.getMonthlyIncome(wallet.id)),
+    ).pipe(
+      map((responses) => {
+        const fromPositions = responses.reduce(
+          (sum, response) => sum + (response.total - response.totalFromFridge),
+          0,
+        );
+        const fromFridge = Math.max(
+          ...responses.map((response) => response.totalFromFridge),
+        );
+        return Math.round((fromPositions + fromFridge) * 100) / 100;
+      }),
     );
   }
 

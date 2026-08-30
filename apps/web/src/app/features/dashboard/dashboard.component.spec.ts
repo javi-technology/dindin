@@ -74,7 +74,7 @@ describe('DashboardComponent', () => {
       'listItems',
     ]);
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
-      'getProjection',
+      'getMonthlyIncome',
     ]);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
     healthServiceMock = jasmine.createSpyObj('HealthService', ['check']);
@@ -83,8 +83,8 @@ describe('DashboardComponent', () => {
     positionServiceMock.list.and.returnValue(of([]));
     fridgeServiceMock.listFridges.and.returnValue(of([]));
     fridgeServiceMock.listItems.and.returnValue(of([]));
-    dividendServiceMock.getProjection.and.returnValue(
-      of({ projections: [], total: 0 }),
+    dividendServiceMock.getMonthlyIncome.and.returnValue(
+      of({ byTicker: [], total: 0, totalFromFridge: 0 }),
     );
     authServiceMock.isAdmin.and.returnValue(Promise.resolve(false));
     healthServiceMock.check.and.returnValue(
@@ -146,18 +146,44 @@ describe('DashboardComponent', () => {
     expect(fixture.componentInstance.totalFridge()).toBe(1090);
   });
 
-  it('deve exibir os proventos do mês', () => {
-    dividendServiceMock.getProjection.and.returnValue(
-      of({ projections: [], total: 432.1 }),
+  it('deve exibir os proventos do mês da mesma fonte da carteira', () => {
+    walletServiceMock.list.and.returnValue(of([wallet('w1')]));
+    dividendServiceMock.getMonthlyIncome.and.returnValue(
+      of({ byTicker: [], total: 432.1, totalFromFridge: 0 }),
     );
 
     fixture.detectChanges();
 
+    expect(dividendServiceMock.getMonthlyIncome).toHaveBeenCalledWith('w1');
     expect(fixture.componentInstance.totalDividends()).toBe(432.1);
     expect(
       fixture.nativeElement.querySelector('[data-testid="card-dividends"]')
         .textContent,
     ).toContain('432,10');
+  });
+
+  it('deve somar proventos de várias carteiras contando a geladeira uma única vez', () => {
+    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
+    dividendServiceMock.getMonthlyIncome.and.callFake((walletId: string) =>
+      of(
+        walletId === 'w1'
+          ? { byTicker: [], total: 130, totalFromFridge: 30 }
+          : { byTicker: [], total: 80, totalFromFridge: 30 },
+      ),
+    );
+
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.totalDividends()).toBe(180);
+  });
+
+  it('deve exibir proventos zerados quando não há carteiras', () => {
+    walletServiceMock.list.and.returnValue(of([]));
+
+    fixture.detectChanges();
+
+    expect(dividendServiceMock.getMonthlyIncome).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.totalDividends()).toBe(0);
   });
 
   it('deve exibir os três cards de resumo', () => {
