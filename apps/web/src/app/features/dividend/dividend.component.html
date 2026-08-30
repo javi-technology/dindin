@@ -21,13 +21,16 @@
           class="bg-green-50 text-green-800 rounded-lg p-6"
           data-testid="total-projection"
         >
-          <p class="text-sm font-medium">Projeção mensal total</p>
+          <p class="text-sm font-medium">Total proventos/mês</p>
           <p class="text-3xl font-bold" data-testid="total-value">
             {{ formatCurrency(total()) }}
           </p>
+          <p class="text-sm mt-2" data-testid="fridge-value">
+            Geladeira: {{ formatCurrency(totalFromFridge()) }}
+          </p>
         </div>
 
-        @if (projections().length === 0) {
+        @if (byTicker().length === 0) {
           <p class="text-gray-600">Nenhum provento registrado.</p>
         } @else {
           <div class="overflow-x-auto">
@@ -44,24 +47,20 @@
                     Quantidade
                   </th>
                   <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Projeção mensal
+                    Proventos/mês
                   </th>
                 </tr>
               </thead>
               <tbody>
-                @for (projection of projections(); track projection.ticker) {
+                @for (item of byTicker(); track item.ticker) {
                   <tr class="border-b border-gray-100">
+                    <td class="py-3 px-4 text-gray-900">{{ item.ticker }}</td>
                     <td class="py-3 px-4 text-gray-900">
-                      {{ projection.ticker }}
+                      {{ formatCurrency(item.monthlyDividend) }}
                     </td>
+                    <td class="py-3 px-4 text-gray-900">{{ item.quantity }}</td>
                     <td class="py-3 px-4 text-gray-900">
-                      {{ formatCurrency(projection.amountPerShare) }}
-                    </td>
-                    <td class="py-3 px-4 text-gray-900">
-                      {{ projection.quantity }}
-                    </td>
-                    <td class="py-3 px-4 text-gray-900">
-                      {{ formatCurrency(projection.monthlyAmount) }}
+                      {{ formatCurrency(item.monthlyIncome) }}
                     </td>
                   </tr>
                 }
