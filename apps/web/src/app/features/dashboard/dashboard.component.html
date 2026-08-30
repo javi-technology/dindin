@@ -40,7 +40,7 @@
           >
         </div>
         <p class="text-3xl font-bold text-gray-900" data-testid="wallet-value">
-          {{ loading() ? '—' : formatCurrency(totalWallet()) }}
+          {{ displayValue(totalWallet()) }}
         </p>
       </a>
 
@@ -56,7 +56,7 @@
           >
         </div>
         <p class="text-3xl font-bold text-gray-900" data-testid="fridge-value">
-          {{ loading() ? '—' : formatCurrency(totalFridge()) }}
+          {{ displayValue(totalFridge()) }}
         </p>
       </a>
 
@@ -75,7 +75,7 @@
           class="text-3xl font-bold text-gray-900"
           data-testid="dividends-value"
         >
-          {{ loading() ? '—' : formatCurrency(totalDividends()) }}
+          {{ displayValue(totalDividends()) }}
         </p>
       </a>
     </div>

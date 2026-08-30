@@ -1,8 +1,16 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { signal } from '@angular/core';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  tick,
+} from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { Component, signal } from '@angular/core';
 import { AppComponent } from './app.component';
 import { AuthService } from './core/services/auth.service';
+
+@Component({ selector: 'app-stub', standalone: true, template: '' })
+class StubComponent {}
 
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
@@ -20,7 +28,7 @@ describe('AppComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: 'carteira', component: StubComponent }]),
         { provide: AuthService, useValue: authServiceMock },
       ],
     }).compileComponents();
@@ -39,6 +47,21 @@ describe('AppComponent', () => {
 
     expect(links).toEqual(['Dashboard', 'Carteira', 'Geladeira', 'Proventos']);
   });
+
+  it('deve destacar a rota ativa sobrepondo a cor base do link', fakeAsync(() => {
+    authServiceMock.user.set({ email: 'user@dindin.app' });
+    fixture.detectChanges();
+
+    TestBed.inject(Router).navigate(['/carteira']);
+    tick();
+    fixture.detectChanges();
+
+    const active = fixture.nativeElement.querySelector(
+      '[data-testid="main-nav"] a[href="/carteira"]',
+    ) as HTMLAnchorElement;
+
+    expect(active.classList).toContain('!text-blue-600');
+  }));
 
   it('não deve exibir navegação quando não autenticado', () => {
     fixture.detectChanges();

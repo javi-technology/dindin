@@ -39,7 +39,9 @@ export class DashboardComponent implements OnInit {
   isAdmin = signal(false);
   backendOnline = signal(false);
 
-  formatCurrency = formatCurrency;
+  displayValue(value: number): string {
+    return this.loading() || this.error() ? '—' : formatCurrency(value);
+  }
 
   ngOnInit(): void {
     this.authService

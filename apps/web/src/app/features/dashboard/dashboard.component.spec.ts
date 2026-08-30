@@ -212,6 +212,27 @@ describe('DashboardComponent', () => {
     ).toBeTruthy();
   });
 
+  it('não deve exibir valores quando o resumo falha', () => {
+    walletServiceMock.list.and.returnValue(
+      throwError(() => new Error('network error')),
+    );
+
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement;
+    expect(
+      element.querySelector('[data-testid="wallet-value"]').textContent.trim(),
+    ).toBe('—');
+    expect(
+      element.querySelector('[data-testid="fridge-value"]').textContent.trim(),
+    ).toBe('—');
+    expect(
+      element
+        .querySelector('[data-testid="dividends-value"]')
+        .textContent.trim(),
+    ).toBe('—');
+  });
+
   it('deve indicar backend indisponível quando o health check falha', () => {
     healthServiceMock.check.and.returnValue(
       throwError(() => new Error('network error')),
