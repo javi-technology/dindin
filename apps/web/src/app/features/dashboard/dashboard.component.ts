@@ -15,6 +15,7 @@ import { DividendService } from '../../core/services/dividend.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
 import { formatCurrency } from '../../shared/utils/format.util';
+import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -111,18 +112,7 @@ export class DashboardComponent implements OnInit {
 
     return forkJoin(
       wallets.map((wallet) => this.dividendService.getMonthlyIncome(wallet.id)),
-    ).pipe(
-      map((responses) => {
-        const fromPositions = responses.reduce(
-          (sum, response) => sum + (response.total - response.totalFromFridge),
-          0,
-        );
-        const fromFridge = Math.max(
-          ...responses.map((response) => response.totalFromFridge),
-        );
-        return Math.round((fromPositions + fromFridge) * 100) / 100;
-      }),
-    );
+    ).pipe(map((responses) => aggregateMonthlyIncome(responses).total));
   }
 
   private fridgeTotal(): Observable<number> {
