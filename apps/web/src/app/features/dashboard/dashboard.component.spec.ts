@@ -149,6 +149,26 @@ describe('DashboardComponent', () => {
     expect(fixture.componentInstance.totalWallet()).toBe(1200);
   });
 
+  it('deve expor as posições de todas as carteiras para o gráfico de composição', () => {
+    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
+    positionServiceMock.list.and.callFake((walletId: string) =>
+      of(
+        walletId === 'w1'
+          ? [position({ ticker: 'HGLG11' })]
+          : [position({ id: 'pos-2', ticker: 'PETR4' })],
+      ),
+    );
+
+    fixture.detectChanges();
+
+    expect(
+      fixture.componentInstance.positions().map((item) => item.ticker),
+    ).toEqual(['HGLG11', 'PETR4']);
+    expect(
+      fixture.nativeElement.querySelector('app-composition-chart'),
+    ).toBeTruthy();
+  });
+
   it('deve somar o total da geladeira usando preço de transferência como fallback', () => {
     fridgeServiceMock.listFridges.and.returnValue(
       of([fridge('f1'), fridge('f2')]),
