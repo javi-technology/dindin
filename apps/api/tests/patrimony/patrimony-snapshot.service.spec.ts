@@ -258,8 +258,8 @@ describe('PatrimonySnapshotService', () => {
         throw new Error(`Coleção inesperada: ${name}`);
       }),
     };
-    spyOn(console, 'error');
-    spyOn(console, 'log');
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
     await expect(saveAllPatrimonySnapshots()).resolves.toBeUndefined();
 
