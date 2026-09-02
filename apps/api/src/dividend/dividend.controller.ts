@@ -8,6 +8,7 @@ import {
   FridgeItem,
 } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { buildMonthlyDividendReport } from './monthly-report.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -432,6 +433,46 @@ export async function getDividendProjection(
     res.json({ projections, total });
   } catch (error) {
     console.error('[getDividendProjection] error:', {
+      uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function getMonthlyDividendReport(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const queryYear = req.query.year;
+    let year = new Date().getFullYear();
+
+    if (queryYear !== undefined) {
+      const parsedYear =
+        typeof queryYear === 'string' ? Number(queryYear) : Number.NaN;
+      if (
+        !Number.isInteger(parsedYear) ||
+        parsedYear < 1900 ||
+        parsedYear > 2100
+      ) {
+        res
+          .status(400)
+          .json({ error: 'Year must be an integer between 1900 and 2100' });
+        return;
+      }
+      year = parsedYear;
+    }
+
+    const snapshot = await dividendsCollection(uid(req)).get();
+    const dividends = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
+    );
+
+    res.json(buildMonthlyDividendReport(dividends, year));
+  } catch (error) {
+    console.error('[getMonthlyDividendReport] error:', {
       uid: uid(req),
       message: (error as Error).message,
       stack: (error as Error).stack,

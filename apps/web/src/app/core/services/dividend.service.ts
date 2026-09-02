@@ -31,6 +31,25 @@ export interface MonthlyIncomeResponse {
   totalFromFridge: number;
 }
 
+export interface TickerTotal {
+  ticker: string;
+  total: number;
+}
+
+export interface MonthlyDividendReportMonth {
+  month: string;
+  total: number;
+  byTicker: TickerTotal[];
+}
+
+export interface MonthlyDividendReport {
+  year: number;
+  months: MonthlyDividendReportMonth[];
+  byTicker: TickerTotal[];
+  total: number;
+  availableYears: number[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -47,5 +66,12 @@ export class DividendService {
     return this.http.get<MonthlyIncomeResponse>(
       `/api/wallets/${walletId}/monthly-income`,
     );
+  }
+
+  getMonthlyReport(year?: number): Observable<MonthlyDividendReport> {
+    const url = '/api/dividends/monthly-report';
+    return year === undefined
+      ? this.http.get<MonthlyDividendReport>(url)
+      : this.http.get<MonthlyDividendReport>(url, { params: { year } });
   }
 }
