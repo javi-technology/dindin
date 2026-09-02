@@ -40,6 +40,7 @@ import {
   getDividend,
   getDividendProjection,
   getDividendYield,
+  getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
   updateDividend,
@@ -115,6 +116,7 @@ app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
 
 app.get('/api/dividends', listDividends);
 app.get('/api/dividends/projection', getDividendProjection);
+app.get('/api/dividends/monthly-report', getMonthlyDividendReport);
 app.post('/api/dividends', createDividend);
 app.get('/api/dividends/:id', getDividend);
 app.put('/api/dividends/:id', updateDividend);

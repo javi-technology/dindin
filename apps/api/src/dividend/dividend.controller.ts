@@ -8,6 +8,12 @@ import {
   FridgeItem,
 } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import {
+  buildMonthlyDividendReport,
+  isValidPaymentDate,
+  MAX_REPORT_YEAR,
+  MIN_REPORT_YEAR,
+} from './monthly-report.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -78,14 +84,8 @@ async function getAllUserPositions(
   );
 }
 
-const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
 function isValidAssetType(value: unknown): value is AssetType {
   return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
-
-function isValidPaymentDate(value: unknown): value is string {
-  return typeof value === 'string' && PAYMENT_DATE_REGEX.test(value.trim());
 }
 
 function validateDividendBody(
@@ -130,7 +130,11 @@ function validateDividendBody(
   }
 
   if (!allowPartial || paymentDate !== undefined) {
-    if (!isValidPaymentDate(paymentDate)) {
+    if (
+      !isValidPaymentDate(
+        typeof paymentDate === 'string' ? paymentDate.trim() : paymentDate,
+      )
+    ) {
       return {
         valid: false,
         error: 'Payment date is required and must be in YYYY-MM-DD format',
@@ -432,6 +436,46 @@ export async function getDividendProjection(
     res.json({ projections, total });
   } catch (error) {
     console.error('[getDividendProjection] error:', {
+      uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function getMonthlyDividendReport(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const queryYear = req.query.year;
+    let year = new Date().getFullYear();
+
+    if (queryYear !== undefined) {
+      const parsedYear =
+        typeof queryYear === 'string' ? Number(queryYear) : Number.NaN;
+      if (
+        !Number.isInteger(parsedYear) ||
+        parsedYear < MIN_REPORT_YEAR ||
+        parsedYear > MAX_REPORT_YEAR
+      ) {
+        res
+          .status(400)
+          .json({ error: 'Year must be an integer between 1900 and 2100' });
+        return;
+      }
+      year = parsedYear;
+    }
+
+    const snapshot = await dividendsCollection(uid(req)).get();
+    const dividends = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Dividend,
+    );
+
+    res.json(buildMonthlyDividendReport(dividends, year));
+  } catch (error) {
+    console.error('[getMonthlyDividendReport] error:', {
       uid: uid(req),
       message: (error as Error).message,
       stack: (error as Error).stack,
