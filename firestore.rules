@@ -35,6 +35,13 @@ service cloud.firestore {
       match /dividends/{dividendId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Snapshots patrimoniais gerados exclusivamente pelo backend
+      match /patrimonySnapshots/{date} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
     }
 
     // Cotações — leitura pública (qualquer usuário autenticado),

@@ -1,5 +1,10 @@
 import { AbstractControl, FormControl } from '@angular/forms';
-import { decimalValidator, formatCurrency, parseDecimal } from './format.util';
+import {
+  decimalValidator,
+  formatCompactCurrency,
+  formatCurrency,
+  parseDecimal,
+} from './format.util';
 
 describe('format.util', () => {
   describe('decimalValidator', () => {
@@ -86,6 +91,16 @@ describe('format.util', () => {
 
     it('formata valor decimal pequeno', () => {
       expect(formatCurrency(0.95)).toMatch(/R\$\s?0,95/);
+    });
+  });
+
+  describe('formatCompactCurrency', () => {
+    it('formata milhares de forma compacta em pt-BR', () => {
+      expect(formatCompactCurrency(12500)).toMatch(/R\$\s?12,5\s?mil/);
+    });
+
+    it('formata valores pequenos como moeda', () => {
+      expect(formatCompactCurrency(120)).toMatch(/R\$\s?120/);
     });
   });
 });

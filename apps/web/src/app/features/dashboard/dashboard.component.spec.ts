@@ -6,7 +6,13 @@ import {
 } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { Fridge, FridgeItem, Position, Wallet } from 'dindin-models';
+import {
+  Fridge,
+  FridgeItem,
+  PatrimonySnapshot,
+  Position,
+  Wallet,
+} from 'dindin-models';
 import { DashboardComponent } from './dashboard.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
@@ -14,6 +20,7 @@ import { FridgeService } from '../../core/services/fridge.service';
 import { DividendService } from '../../core/services/dividend.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
+import { PatrimonyService } from '../../core/services/patrimony.service';
 
 describe('DashboardComponent', () => {
   let fixture: ComponentFixture<DashboardComponent>;
@@ -23,6 +30,7 @@ describe('DashboardComponent', () => {
   let dividendServiceMock: jasmine.SpyObj<DividendService>;
   let authServiceMock: { isAdmin: jasmine.Spy };
   let healthServiceMock: jasmine.SpyObj<HealthService>;
+  let patrimonyServiceMock: jasmine.SpyObj<PatrimonyService>;
 
   const wallet = (id: string): Wallet => ({
     id,
@@ -66,6 +74,16 @@ describe('DashboardComponent', () => {
     ...overrides,
   });
 
+  const snapshot = (date: string, total: number): PatrimonySnapshot => ({
+    id: date,
+    userId: 'user-1',
+    date,
+    totalWallet: total,
+    totalFridge: 0,
+    total,
+    createdAt: `${date}T00:00:00Z`,
+  });
+
   beforeEach(async () => {
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
     positionServiceMock = jasmine.createSpyObj('PositionService', ['list']);
@@ -78,6 +96,10 @@ describe('DashboardComponent', () => {
     ]);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
     healthServiceMock = jasmine.createSpyObj('HealthService', ['check']);
+    patrimonyServiceMock = jasmine.createSpyObj('PatrimonyService', [
+      'recordSnapshot',
+      'getHistory',
+    ]);
 
     walletServiceMock.list.and.returnValue(of([]));
     positionServiceMock.list.and.returnValue(of([]));
@@ -90,6 +112,10 @@ describe('DashboardComponent', () => {
     healthServiceMock.check.and.returnValue(
       of({ status: 'ok', project: 'dindin' }),
     );
+    patrimonyServiceMock.recordSnapshot.and.returnValue(
+      of({} as PatrimonySnapshot),
+    );
+    patrimonyServiceMock.getHistory.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [DashboardComponent],
@@ -101,6 +127,7 @@ describe('DashboardComponent', () => {
         { provide: DividendService, useValue: dividendServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: HealthService, useValue: healthServiceMock },
+        { provide: PatrimonyService, useValue: patrimonyServiceMock },
       ],
     }).compileComponents();
 
@@ -268,4 +295,50 @@ describe('DashboardComponent', () => {
       fixture.nativeElement.querySelector('[data-testid="admin-link"]'),
     ).toBeFalsy();
   }));
+
+  it('deve registrar snapshot e depois carregar o histórico', () => {
+    const history = [snapshot('2026-08-27', 120)];
+    const calls: string[] = [];
+    patrimonyServiceMock.recordSnapshot.and.callFake(() => {
+      calls.push('record');
+      return of({} as PatrimonySnapshot);
+    });
+    patrimonyServiceMock.getHistory.and.callFake(() => {
+      calls.push('history');
+      return of(history);
+    });
+
+    fixture.detectChanges();
+
+    expect(calls).toEqual(['record', 'history']);
+    expect(fixture.componentInstance.patrimonyHistory()).toEqual(history);
+  });
+
+  it('deve exibir erro quando o histórico falhar', () => {
+    patrimonyServiceMock.getHistory.and.returnValue(
+      throwError(() => new Error('network error')),
+    );
+
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.patrimonyError()).toBe(
+      'Erro ao carregar evolução patrimonial.',
+    );
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="patrimony-error"]'),
+    ).toBeTruthy();
+  });
+
+  it('deve carregar o histórico mesmo quando o registro falhar', () => {
+    const history = [snapshot('2026-08-27', 120)];
+    patrimonyServiceMock.recordSnapshot.and.returnValue(
+      throwError(() => new Error('network error')),
+    );
+    patrimonyServiceMock.getHistory.and.returnValue(of(history));
+
+    fixture.detectChanges();
+
+    expect(patrimonyServiceMock.getHistory).toHaveBeenCalled();
+    expect(fixture.componentInstance.patrimonyHistory()).toEqual(history);
+  });
 });
