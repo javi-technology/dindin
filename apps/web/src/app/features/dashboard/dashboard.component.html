@@ -85,10 +85,12 @@
       class="block mb-6"
     ></app-patrimony-chart>
 
-    <app-composition-chart
-      [positions]="positions()"
-      class="block mb-6"
-    ></app-composition-chart>
+    @if (!loading() && !error()) {
+      <app-composition-chart
+        [positions]="positions()"
+        class="block mb-6"
+      ></app-composition-chart>
+    }
 
     @if (patrimonyError()) {
       <p

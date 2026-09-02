@@ -169,6 +169,18 @@ describe('DashboardComponent', () => {
     ).toBeTruthy();
   });
 
+  it('não deve exibir o gráfico de composição quando o resumo falha', () => {
+    walletServiceMock.list.and.returnValue(
+      throwError(() => new Error('falha')),
+    );
+
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('app-composition-chart'),
+    ).toBeFalsy();
+  });
+
   it('deve somar o total da geladeira usando preço de transferência como fallback', () => {
     fridgeServiceMock.listFridges.and.returnValue(
       of([fridge('f1'), fridge('f2')]),
