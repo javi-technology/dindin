@@ -80,6 +80,27 @@
       </a>
     </div>
 
+    <app-patrimony-chart
+      [snapshots]="patrimonyHistory()"
+      class="block mb-6"
+    ></app-patrimony-chart>
+
+    @if (!loading() && !error()) {
+      <app-composition-chart
+        [positions]="positions()"
+        class="block mb-6"
+      ></app-composition-chart>
+    }
+
+    @if (patrimonyError()) {
+      <p
+        class="text-red-700 bg-red-50 rounded-lg p-4 mb-6"
+        data-testid="patrimony-error"
+      >
+        {{ patrimonyError() }}
+      </p>
+    }
+
     @if (isAdmin()) {
       <a
         routerLink="/admin/assets"

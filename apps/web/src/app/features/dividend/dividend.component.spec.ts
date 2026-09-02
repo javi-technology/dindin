@@ -33,6 +33,7 @@ describe('DividendComponent', () => {
 
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getMonthlyIncome',
+      'getMonthlyReport',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
 
@@ -55,6 +56,32 @@ describe('DividendComponent', () => {
         ],
         total: 176,
         totalFromFridge: 6,
+      }),
+    );
+    dividendServiceMock.getMonthlyReport.and.returnValue(
+      of({
+        year: 2026,
+        months: [
+          {
+            month: '2026-01',
+            total: 180,
+            byTicker: [
+              { ticker: 'HGLG11', total: 150 },
+              { ticker: 'XPLG11', total: 30 },
+            ],
+          },
+          {
+            month: '2026-03',
+            total: 120,
+            byTicker: [{ ticker: 'HGLG11', total: 120 }],
+          },
+        ],
+        byTicker: [
+          { ticker: 'HGLG11', total: 270 },
+          { ticker: 'XPLG11', total: 30 },
+        ],
+        total: 300,
+        availableYears: [2026, 2025],
       }),
     );
   });
@@ -85,7 +112,7 @@ describe('DividendComponent', () => {
     await setup();
 
     const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      'tbody tr',
+      '[data-testid="monthly-income-table"] tbody tr',
     );
     expect(rows.length).toBe(2);
     expect(rows[0].textContent).toContain('HGLG11');
@@ -128,7 +155,7 @@ describe('DividendComponent', () => {
 
     expect(fixture.componentInstance.total()).toBe(45);
     const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      'tbody tr',
+      '[data-testid="monthly-income-table"] tbody tr',
     );
     expect(rows.length).toBe(1);
     expect(rows[0].textContent).toContain('15');
@@ -155,5 +182,97 @@ describe('DividendComponent', () => {
         '[data-testid="error-message"]',
       )?.textContent,
     ).toContain('Erro ao carregar proventos');
+  });
+
+  it('deve exibir uma linha por mês com rótulo e total', async () => {
+    await setup();
+
+    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="report-month-row"]',
+    );
+
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toContain('jan/2026');
+    expect(rows[0].textContent).toContain('R$');
+    expect(rows[0].textContent).toContain('180,00');
+  });
+
+  it('deve exibir os proventos por ticker dentro dos meses', async () => {
+    await setup();
+
+    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="report-ticker-row"]',
+    );
+
+    expect(rows.length).toBe(3);
+    expect(rows[0].textContent).toContain('HGLG11');
+    expect(rows[1].textContent).toContain('XPLG11');
+  });
+
+  it('deve exibir totais por ticker e o total anual', async () => {
+    await setup();
+
+    const tickerRows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="report-ticker-total-row"]',
+    );
+    const total = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="report-total"]',
+    );
+
+    expect(tickerRows.length).toBe(2);
+    expect(tickerRows[0].textContent).toContain('HGLG11');
+    expect(tickerRows[0].textContent).toContain('270,00');
+    expect(total?.textContent).toContain('300,00');
+  });
+
+  it('deve recarregar o relatório ao alterar o ano', async () => {
+    await setup();
+
+    const select = (fixture.nativeElement as HTMLSelectElement).querySelector(
+      '[data-testid="year-select"]',
+    ) as HTMLSelectElement;
+    select.value = '2025';
+    select.dispatchEvent(new Event('change'));
+
+    expect(dividendServiceMock.getMonthlyReport).toHaveBeenCalledWith(2025);
+  });
+
+  it('deve exibir mensagem vazia quando não há proventos no ano', async () => {
+    dividendServiceMock.getMonthlyReport.and.returnValue(
+      of({
+        year: 2026,
+        months: [],
+        byTicker: [],
+        total: 0,
+        availableYears: [2026],
+      }),
+    );
+
+    await setup();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="report-empty"]',
+      )?.textContent,
+    ).toContain('Nenhum provento registrado em');
+  });
+
+  it('deve exibir erro do relatório sem ocultar a seção superior', async () => {
+    dividendServiceMock.getMonthlyReport.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+
+    await setup();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="report-error"]',
+      )?.textContent,
+    ).toContain('Erro ao carregar relatório mensal');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="total-projection"]',
+      ),
+    ).not.toBeNull();
   });
 });

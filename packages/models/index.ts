@@ -6,6 +6,7 @@
 //   users/{userId}/fridges/{fridgeId}
 //   users/{userId}/fridges/{fridgeId}/fridgeItems/{itemId}
 //   users/{userId}/dividends/{dividendId}
+//   users/{userId}/patrimonySnapshots/{date}
 //   assets/{ticker}
 //   quotes/{ticker}
 //   quotes/{ticker}/history/{date}
@@ -122,4 +123,15 @@ export interface QuoteHistory {
   price: number;
   monthlyDividend: number;
   source: string;
+}
+
+/** Snapshot diário do patrimônio do usuário — subcoleção `patrimonySnapshots` (id do doc = date) */
+export interface PatrimonySnapshot {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  totalWallet: number; // soma de quantity * (quote price ?? averagePrice) de todas as posições de todas as carteiras
+  totalFridge: number; // soma de quantity * (quote price ?? transferredPrice) de todos os itens de todas as geladeiras
+  total: number; // totalWallet + totalFridge
+  createdAt: string; // ISO-8601
 }

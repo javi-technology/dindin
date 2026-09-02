@@ -1,8 +1,8 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
-import { FridgeItem, Position, Wallet } from 'dindin-models';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { FridgeItem, PatrimonySnapshot, Position, Wallet } from 'dindin-models';
 import {
   LucideRefrigerator,
   LucideTrendingUp,
@@ -14,13 +14,23 @@ import { FridgeService } from '../../core/services/fridge.service';
 import { DividendService } from '../../core/services/dividend.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
+import { PatrimonyService } from '../../core/services/patrimony.service';
 import { formatCurrency } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
+import { PatrimonyChartComponent } from './patrimony-chart/patrimony-chart.component';
+import { CompositionChartComponent } from './composition-chart/composition-chart.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, LucideWallet, LucideRefrigerator, LucideTrendingUp],
+  imports: [
+    RouterLink,
+    LucideWallet,
+    LucideRefrigerator,
+    LucideTrendingUp,
+    PatrimonyChartComponent,
+    CompositionChartComponent,
+  ],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -30,15 +40,19 @@ export class DashboardComponent implements OnInit {
   private readonly dividendService = inject(DividendService);
   private readonly authService = inject(AuthService);
   private readonly healthService = inject(HealthService);
+  private readonly patrimonyService = inject(PatrimonyService);
   private readonly destroyRef = inject(DestroyRef);
 
   totalWallet = signal(0);
+  positions = signal<Position[]>([]);
   totalFridge = signal(0);
   totalDividends = signal(0);
   loading = signal(true);
   error = signal<string | null>(null);
   isAdmin = signal(false);
   backendOnline = signal(false);
+  patrimonyHistory = signal<PatrimonySnapshot[]>([]);
+  patrimonyError = signal<string | null>(null);
 
   displayValue(value: number): string {
     return this.loading() || this.error() ? '—' : formatCurrency(value);
@@ -52,6 +66,7 @@ export class DashboardComponent implements OnInit {
 
     this.loadSummary();
     this.loadHealth();
+    this.loadPatrimonyHistory();
   }
 
   private loadHealth(): void {
@@ -64,13 +79,32 @@ export class DashboardComponent implements OnInit {
       });
   }
 
+  private loadPatrimonyHistory(): void {
+    this.patrimonyService
+      .recordSnapshot()
+      .pipe(
+        catchError(() => of(null)),
+        switchMap(() => this.patrimonyService.getHistory()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (history) => {
+          this.patrimonyHistory.set(history);
+          this.patrimonyError.set(null);
+        },
+        error: () => {
+          this.patrimonyError.set('Erro ao carregar evolução patrimonial.');
+        },
+      });
+  }
+
   private loadSummary(): void {
     this.walletService
       .list()
       .pipe(
         switchMap((wallets) =>
           forkJoin({
-            totalWallet: this.walletTotal(wallets),
+            positions: this.walletPositions(wallets),
             totalFridge: this.fridgeTotal(),
             totalDividends: this.dividendsTotal(wallets),
           }),
@@ -78,8 +112,15 @@ export class DashboardComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ totalWallet, totalFridge, totalDividends }) => {
-          this.totalWallet.set(totalWallet);
+        next: ({ positions, totalFridge, totalDividends }) => {
+          this.positions.set(positions);
+          this.totalWallet.set(
+            positions.reduce(
+              (sum, position) =>
+                sum + position.quantity * this.positionPrice(position),
+              0,
+            ),
+          );
           this.totalFridge.set(totalFridge);
           this.totalDividends.set(totalDividends);
           this.loading.set(false);
@@ -91,17 +132,9 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  private walletTotal(wallets: Wallet[]): Observable<number> {
+  private walletPositions(wallets: Wallet[]): Observable<Position[]> {
     return this.combine(
       wallets.map((wallet) => this.positionService.list(wallet.id)),
-    ).pipe(
-      map((positions) =>
-        positions.reduce(
-          (sum, position) =>
-            sum + position.quantity * this.positionPrice(position),
-          0,
-        ),
-      ),
     );
   }
 

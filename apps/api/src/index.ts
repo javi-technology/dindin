@@ -40,12 +40,18 @@ import {
   getDividend,
   getDividendProjection,
   getDividendYield,
+  getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
 import { createAsset, listAssets } from './assets/asset.controller';
+import {
+  getPatrimonyHistory,
+  postPatrimonySnapshot,
+} from './patrimony/patrimony.controller';
+import { saveAllPatrimonySnapshots } from './patrimony/patrimony-snapshot.service';
 
 admin.initializeApp();
 
@@ -110,10 +116,14 @@ app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
 
 app.get('/api/dividends', listDividends);
 app.get('/api/dividends/projection', getDividendProjection);
+app.get('/api/dividends/monthly-report', getMonthlyDividendReport);
 app.post('/api/dividends', createDividend);
 app.get('/api/dividends/:id', getDividend);
 app.put('/api/dividends/:id', updateDividend);
 app.delete('/api/dividends/:id', deleteDividend);
+
+app.get('/api/patrimony/history', getPatrimonyHistory);
+app.post('/api/patrimony/snapshots', postPatrimonySnapshot);
 
 // Middleware global de tratamento de erros não capturados
 app.use(
@@ -140,6 +150,18 @@ export const updateQuotesScheduled = onSchedule(
   { schedule: '0 0 * * *', secrets: ['BRAPI_API_KEY'] },
   async () => {
     await updateAllQuotes();
+  },
+);
+
+// Snapshot diário do patrimônio, 1h após a atualização de cotações
+export const savePatrimonySnapshotsScheduled = onSchedule(
+  {
+    schedule: '0 1 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+  },
+  async () => {
+    await saveAllPatrimonySnapshots();
   },
 );
 

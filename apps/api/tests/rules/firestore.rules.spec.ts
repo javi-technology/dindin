@@ -372,6 +372,58 @@ describe('Firestore rules – assets', () => {
 });
 
 // ---------------------------------------------------------------------------
+// patrimonySnapshots
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – patrimonySnapshots', () => {
+  it('deve permitir que o proprietário leia seus snapshots', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const admin = testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(
+        doc(context.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),
+        { total: 100 },
+      ),
+    );
+    await admin;
+
+    await assertSucceeds(
+      getDoc(
+        doc(alice.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),
+      ),
+    );
+  });
+
+  it('deve negar que outro usuário leia snapshots', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    const bob = testEnv.authenticatedContext('bob');
+    const ref = doc(
+      alice.firestore(),
+      'users/alice/patrimonySnapshots/2026-08-27',
+    );
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(
+        doc(context.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),
+        { total: 100 },
+      ),
+    );
+
+    await assertFails(
+      getDoc(doc(bob.firestore(), 'users/alice/patrimonySnapshots/2026-08-27')),
+    );
+  });
+
+  it('deve negar que o proprietário escreva snapshots', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(
+        doc(alice.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),
+        { total: 100 },
+      ),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 
