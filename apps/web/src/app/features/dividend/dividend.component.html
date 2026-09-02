@@ -121,6 +121,12 @@
             </button>
           </div>
 
+          @if (recordError()) {
+            <p class="mb-5 text-sm text-red-700" data-testid="record-error">
+              {{ recordError() }}
+            </p>
+          }
+
           @if (recordSuccess()) {
             <p class="mb-5 text-sm text-green-700" data-testid="record-success">
               {{ recordSuccess() }}

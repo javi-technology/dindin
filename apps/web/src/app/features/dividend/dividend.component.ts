@@ -33,6 +33,7 @@ export class DividendComponent implements OnInit {
   selectedYear = signal<number>(new Date().getFullYear());
   recording = signal(false);
   recordSuccess = signal<string | null>(null);
+  recordError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadMonthlyIncome();
@@ -104,7 +105,7 @@ export class DividendComponent implements OnInit {
   recordMonthly(): void {
     this.recording.set(true);
     this.recordSuccess.set(null);
-    this.reportError.set(null);
+    this.recordError.set(null);
 
     this.dividendService
       .recordMonthlyDividends()
@@ -121,7 +122,7 @@ export class DividendComponent implements OnInit {
         },
         error: () => {
           this.recording.set(false);
-          this.reportError.set('Erro ao registrar proventos do mês');
+          this.recordError.set('Erro ao registrar proventos do mês');
         },
       });
   }

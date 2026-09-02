@@ -319,8 +319,13 @@ describe('DividendComponent', () => {
 
     expect(
       (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="report-error"]',
+        '[data-testid="record-error"]',
       )?.textContent,
     ).toContain('Erro ao registrar proventos do mês');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="record-monthly-button"]',
+      ),
+    ).not.toBeNull();
   });
 });
