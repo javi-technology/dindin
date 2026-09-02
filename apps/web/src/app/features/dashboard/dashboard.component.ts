@@ -18,6 +18,7 @@ import { PatrimonyService } from '../../core/services/patrimony.service';
 import { formatCurrency } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 import { PatrimonyChartComponent } from './patrimony-chart/patrimony-chart.component';
+import { CompositionChartComponent } from './composition-chart/composition-chart.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -28,6 +29,7 @@ import { PatrimonyChartComponent } from './patrimony-chart/patrimony-chart.compo
     LucideRefrigerator,
     LucideTrendingUp,
     PatrimonyChartComponent,
+    CompositionChartComponent,
   ],
   templateUrl: './dashboard.component.html',
 })
@@ -42,6 +44,7 @@ export class DashboardComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   totalWallet = signal(0);
+  positions = signal<Position[]>([]);
   totalFridge = signal(0);
   totalDividends = signal(0);
   loading = signal(true);
@@ -101,7 +104,7 @@ export class DashboardComponent implements OnInit {
       .pipe(
         switchMap((wallets) =>
           forkJoin({
-            totalWallet: this.walletTotal(wallets),
+            positions: this.walletPositions(wallets),
             totalFridge: this.fridgeTotal(),
             totalDividends: this.dividendsTotal(wallets),
           }),
@@ -109,8 +112,15 @@ export class DashboardComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ totalWallet, totalFridge, totalDividends }) => {
-          this.totalWallet.set(totalWallet);
+        next: ({ positions, totalFridge, totalDividends }) => {
+          this.positions.set(positions);
+          this.totalWallet.set(
+            positions.reduce(
+              (sum, position) =>
+                sum + position.quantity * this.positionPrice(position),
+              0,
+            ),
+          );
           this.totalFridge.set(totalFridge);
           this.totalDividends.set(totalDividends);
           this.loading.set(false);
@@ -122,17 +132,9 @@ export class DashboardComponent implements OnInit {
       });
   }
 
-  private walletTotal(wallets: Wallet[]): Observable<number> {
+  private walletPositions(wallets: Wallet[]): Observable<Position[]> {
     return this.combine(
       wallets.map((wallet) => this.positionService.list(wallet.id)),
-    ).pipe(
-      map((positions) =>
-        positions.reduce(
-          (sum, position) =>
-            sum + position.quantity * this.positionPrice(position),
-          0,
-        ),
-      ),
     );
   }
 
