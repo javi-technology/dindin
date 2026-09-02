@@ -34,6 +34,7 @@ describe('DividendComponent', () => {
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getMonthlyIncome',
       'getMonthlyReport',
+      'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
 
@@ -84,6 +85,7 @@ describe('DividendComponent', () => {
         availableYears: [2026, 2025],
       }),
     );
+    dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
   });
 
   it('deve usar a mesma fonte mensal da carteira ao inicializar', async () => {
@@ -274,5 +276,51 @@ describe('DividendComponent', () => {
         '[data-testid="total-projection"]',
       ),
     ).not.toBeNull();
+  });
+
+  it('deve registrar os proventos e recarregar o relatório', async () => {
+    await setup();
+    const reportCallsBefore =
+      dividendServiceMock.getMonthlyReport.calls.count();
+    const button = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="record-monthly-button"]',
+    ) as HTMLButtonElement;
+
+    button.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(dividendServiceMock.recordMonthlyDividends).toHaveBeenCalledWith();
+    expect(dividendServiceMock.getMonthlyReport.calls.count()).toBeGreaterThan(
+      reportCallsBefore,
+    );
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="record-success"]',
+      )?.textContent,
+    ).toContain('Proventos de');
+  });
+
+  it('deve exibir erro ao registrar os proventos', async () => {
+    dividendServiceMock.recordMonthlyDividends.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+
+    await setup();
+    const button = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="record-monthly-button"]',
+    ) as HTMLButtonElement;
+
+    button.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="report-error"]',
+      )?.textContent,
+    ).toContain('Erro ao registrar proventos do mês');
   });
 });

@@ -38,7 +38,7 @@ function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-async function getAllUserPositions(userId: string): Promise<Position[]> {
+export async function getAllUserPositions(userId: string): Promise<Position[]> {
   const walletsSnapshot = await userCollection(userId, 'wallets').get();
   const positionsByWallet = await Promise.all(
     walletsSnapshot.docs.map((walletDoc) =>
@@ -53,7 +53,7 @@ async function getAllUserPositions(userId: string): Promise<Position[]> {
   );
 }
 
-async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
+export async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
   const items: FridgeItem[] = [];
   const fridgesSnapshot = await userCollection(userId, 'fridges').get();
 
