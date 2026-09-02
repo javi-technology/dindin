@@ -153,7 +153,11 @@ export const updateQuotesScheduled = onSchedule(
 
 // Snapshot diário do patrimônio, 1h após a atualização de cotações
 export const savePatrimonySnapshotsScheduled = onSchedule(
-  '0 1 * * *',
+  {
+    schedule: '0 1 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+  },
   async () => {
     await saveAllPatrimonySnapshots();
   },

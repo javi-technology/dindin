@@ -11,8 +11,13 @@ function userCollection(userId: string, collection: string) {
     .collection(collection);
 }
 
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
+export function todayDateInBrazil(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 }
 
 function validQuantity(quantity: unknown): number {
@@ -116,7 +121,7 @@ export async function computeUserPatrimony(
 
 export async function savePatrimonySnapshot(
   userId: string,
-  date = todayDate(),
+  date = todayDateInBrazil(),
 ): Promise<PatrimonySnapshot> {
   const totals = await computeUserPatrimony(userId);
   const snapshot: PatrimonySnapshot = {
@@ -175,4 +180,10 @@ export async function saveAllPatrimonySnapshots(): Promise<void> {
   console.log(
     `[saveAllPatrimonySnapshots] Concluído. ${succeeded} usuário(s) atualizado(s), ${failed} falha(s).`,
   );
+
+  if (failed > 0) {
+    throw new Error(
+      `[saveAllPatrimonySnapshots] ${failed} de ${userDocuments.length} snapshot(s) falharam`,
+    );
+  }
 }
