@@ -7,6 +7,7 @@ import {
   AssetType,
   Asset,
   Dividend,
+  PatrimonySnapshot,
 } from 'dindin-models';
 
 // ---------------------------------------------------------------------------
@@ -196,5 +197,22 @@ describe('models – Dividend', () => {
       updatedAt: '2026-02-01T00:00:00Z',
     };
     expect(dividend.assetType).toBeUndefined();
+  });
+});
+
+describe('models – PatrimonySnapshot', () => {
+  it('deve aceitar um snapshot diário de patrimônio válido', () => {
+    const snapshot: PatrimonySnapshot = {
+      id: '2026-08-27',
+      userId: 'user-1',
+      date: '2026-08-27',
+      totalWallet: 1000,
+      totalFridge: 250,
+      total: 1250,
+      createdAt: '2026-08-27T00:00:00Z',
+    };
+
+    expect(snapshot.id).toBe(snapshot.date);
+    expect(snapshot.total).toBe(snapshot.totalWallet + snapshot.totalFridge);
   });
 });
