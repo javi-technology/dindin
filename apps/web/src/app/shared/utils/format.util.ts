@@ -37,6 +37,16 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Formata um número como moeda compacta em reais (pt-BR). */
+export function formatCompactCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 /**
  * Formata um número como percentual (pt-BR).
  * O valor deve ser informado em pontos percentuais (ex: 9.64 para 9,64%).

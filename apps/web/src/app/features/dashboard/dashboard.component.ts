@@ -1,8 +1,8 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
-import { FridgeItem, Position, Wallet } from 'dindin-models';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { FridgeItem, PatrimonySnapshot, Position, Wallet } from 'dindin-models';
 import {
   LucideRefrigerator,
   LucideTrendingUp,
@@ -14,13 +14,21 @@ import { FridgeService } from '../../core/services/fridge.service';
 import { DividendService } from '../../core/services/dividend.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
+import { PatrimonyService } from '../../core/services/patrimony.service';
 import { formatCurrency } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
+import { PatrimonyChartComponent } from './patrimony-chart/patrimony-chart.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, LucideWallet, LucideRefrigerator, LucideTrendingUp],
+  imports: [
+    RouterLink,
+    LucideWallet,
+    LucideRefrigerator,
+    LucideTrendingUp,
+    PatrimonyChartComponent,
+  ],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -30,6 +38,7 @@ export class DashboardComponent implements OnInit {
   private readonly dividendService = inject(DividendService);
   private readonly authService = inject(AuthService);
   private readonly healthService = inject(HealthService);
+  private readonly patrimonyService = inject(PatrimonyService);
   private readonly destroyRef = inject(DestroyRef);
 
   totalWallet = signal(0);
@@ -39,6 +48,8 @@ export class DashboardComponent implements OnInit {
   error = signal<string | null>(null);
   isAdmin = signal(false);
   backendOnline = signal(false);
+  patrimonyHistory = signal<PatrimonySnapshot[]>([]);
+  patrimonyError = signal<string | null>(null);
 
   displayValue(value: number): string {
     return this.loading() || this.error() ? '—' : formatCurrency(value);
@@ -52,6 +63,7 @@ export class DashboardComponent implements OnInit {
 
     this.loadSummary();
     this.loadHealth();
+    this.loadPatrimonyHistory();
   }
 
   private loadHealth(): void {
@@ -61,6 +73,25 @@ export class DashboardComponent implements OnInit {
       .subscribe({
         next: () => this.backendOnline.set(true),
         error: () => this.backendOnline.set(false),
+      });
+  }
+
+  private loadPatrimonyHistory(): void {
+    this.patrimonyService
+      .recordSnapshot()
+      .pipe(
+        catchError(() => of(null)),
+        switchMap(() => this.patrimonyService.getHistory()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (history) => {
+          this.patrimonyHistory.set(history);
+          this.patrimonyError.set(null);
+        },
+        error: () => {
+          this.patrimonyError.set('Erro ao carregar evolução patrimonial.');
+        },
       });
   }
 
