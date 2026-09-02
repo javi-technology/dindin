@@ -10,6 +10,7 @@ import {
   listPatrimonySnapshots,
   saveAllPatrimonySnapshots,
   savePatrimonySnapshot,
+  todayDateInBrazil,
 } from '../../src/patrimony/patrimony-snapshot.service';
 
 function firestoreDocument(
@@ -98,6 +99,15 @@ function userDataFirestore(options: {
 describe('PatrimonySnapshotService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('deve calcular a data no fuso horário de São Paulo', () => {
+    expect(todayDateInBrazil(new Date('2026-09-02T23:30:00Z'))).toBe(
+      '2026-09-02',
+    );
+    expect(todayDateInBrazil(new Date('2026-09-02T02:30:00Z'))).toBe(
+      '2026-09-01',
+    );
   });
 
   it('deve usar cotação atual e fallback de preço médio ou transferido', async () => {
@@ -261,10 +271,15 @@ describe('PatrimonySnapshotService', () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    await expect(saveAllPatrimonySnapshots()).resolves.toBeUndefined();
+    await expect(saveAllPatrimonySnapshots()).rejects.toThrow(
+      '[saveAllPatrimonySnapshots] 1 de 2 snapshot(s) falharam',
+    );
 
     expect(usersCollection.listDocuments).toHaveBeenCalled();
     expect(set).toHaveBeenCalledTimes(2);
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1' }),
+    );
     expect(console.error).toHaveBeenCalled();
     expect(console.log).toHaveBeenCalled();
   });
