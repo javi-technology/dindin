@@ -19,10 +19,34 @@ export interface MonthlyDividendReport {
   availableYears: number[];
 }
 
+export const MIN_REPORT_YEAR = 1900;
+export const MAX_REPORT_YEAR = 2100;
+
 const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 function roundTotal(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export function isValidPaymentDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !PAYMENT_DATE_REGEX.test(value)) {
+    return false;
+  }
+
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+
+  if (year < MIN_REPORT_YEAR || year > MAX_REPORT_YEAR) {
+    return false;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 export function normalizeTicker(ticker: unknown): string {
@@ -56,8 +80,7 @@ function dividendAmount(dividend: Dividend): number | null {
 
 function isValidDividend(dividend: Dividend): boolean {
   return (
-    typeof dividend.paymentDate === 'string' &&
-    PAYMENT_DATE_REGEX.test(dividend.paymentDate) &&
+    isValidPaymentDate(dividend.paymentDate) &&
     normalizeTicker(dividend.ticker).length > 0 &&
     dividendAmount(dividend) !== null
   );

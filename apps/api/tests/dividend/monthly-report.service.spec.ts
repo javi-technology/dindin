@@ -138,6 +138,23 @@ describe('buildMonthlyDividendReport', () => {
     ]);
   });
 
+  it('ignora datas impossíveis e anos fora do intervalo do relatório', () => {
+    const report = buildMonthlyDividendReport(
+      [
+        dividend({ paymentDate: '2026-13-01' }),
+        dividend({ paymentDate: '2026-02-30' }),
+        dividend({ paymentDate: '1800-01-01' }),
+        dividend({ paymentDate: '2101-01-01' }),
+      ],
+      2026,
+    );
+
+    expect(report.months).toEqual([]);
+    expect(report.byTicker).toEqual([]);
+    expect(report.total).toBe(0);
+    expect(report.availableYears).toEqual([]);
+  });
+
   it('retorna relatório vazio para uma entrada vazia', () => {
     expect(buildMonthlyDividendReport([], 2026)).toEqual({
       year: 2026,

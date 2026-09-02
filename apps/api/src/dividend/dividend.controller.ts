@@ -8,7 +8,12 @@ import {
   FridgeItem,
 } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { buildMonthlyDividendReport } from './monthly-report.service';
+import {
+  buildMonthlyDividendReport,
+  isValidPaymentDate,
+  MAX_REPORT_YEAR,
+  MIN_REPORT_YEAR,
+} from './monthly-report.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -79,14 +84,8 @@ async function getAllUserPositions(
   );
 }
 
-const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
 function isValidAssetType(value: unknown): value is AssetType {
   return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
-
-function isValidPaymentDate(value: unknown): value is string {
-  return typeof value === 'string' && PAYMENT_DATE_REGEX.test(value.trim());
 }
 
 function validateDividendBody(
@@ -131,7 +130,11 @@ function validateDividendBody(
   }
 
   if (!allowPartial || paymentDate !== undefined) {
-    if (!isValidPaymentDate(paymentDate)) {
+    if (
+      !isValidPaymentDate(
+        typeof paymentDate === 'string' ? paymentDate.trim() : paymentDate,
+      )
+    ) {
       return {
         valid: false,
         error: 'Payment date is required and must be in YYYY-MM-DD format',
@@ -454,8 +457,8 @@ export async function getMonthlyDividendReport(
         typeof queryYear === 'string' ? Number(queryYear) : Number.NaN;
       if (
         !Number.isInteger(parsedYear) ||
-        parsedYear < 1900 ||
-        parsedYear > 2100
+        parsedYear < MIN_REPORT_YEAR ||
+        parsedYear > MAX_REPORT_YEAR
       ) {
         res
           .status(400)
