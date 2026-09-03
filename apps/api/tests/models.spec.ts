@@ -198,6 +198,23 @@ describe('models – Dividend', () => {
     };
     expect(dividend.assetType).toBeUndefined();
   });
+
+  it('deve aceitar a origem automática opcional', () => {
+    const dividend: Dividend = {
+      id: 'div-3',
+      userId: 'user-1',
+      ticker: 'HGLG11',
+      amountPerShare: 0.9,
+      quantity: 100,
+      totalAmount: 90,
+      paymentDate: '2026-03-10',
+      source: 'auto',
+      createdAt: '2026-03-01T00:00:00Z',
+      updatedAt: '2026-03-01T00:00:00Z',
+    };
+
+    expect(dividend.source).toBe('auto');
+  });
 });
 
 describe('models – PatrimonySnapshot', () => {
