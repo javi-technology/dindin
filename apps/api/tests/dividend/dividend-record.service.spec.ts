@@ -26,7 +26,10 @@ function setupUserFirestore(options: {
   quotes?: Array<Partial<Quote> & { id?: string }>;
   positions?: Partial<Position>[];
   fridgeItems?: Partial<FridgeItem>[];
-  dividendSet?: jest.Mock;
+  existingDividends?: Array<{
+    id: string;
+    data: Record<string, unknown>;
+  }>;
 }) {
   const positionsCollection = {
     get: jest.fn().mockResolvedValue({
@@ -62,10 +65,18 @@ function setupUserFirestore(options: {
       ],
     }),
   };
-  const dividendSet =
-    options.dividendSet ?? jest.fn().mockResolvedValue(undefined);
+  const existingQuery = {
+    where: jest.fn(),
+    get: jest.fn().mockResolvedValue({
+      docs: (options.existingDividends ?? []).map(({ id, data }) =>
+        firestoreDocument(id, data),
+      ),
+    }),
+  };
+  existingQuery.where.mockReturnValue(existingQuery);
   const dividendsCollection = {
-    doc: jest.fn(() => ({ set: dividendSet })),
+    doc: jest.fn((id: string) => ({ id })),
+    where: jest.fn(() => existingQuery),
   };
   const userDocument = {
     collection: jest.fn((name: string) => {
@@ -76,7 +87,16 @@ function setupUserFirestore(options: {
     }),
   };
 
+  const batchSet = jest.fn();
+  const batchDelete = jest.fn();
+  const batchCommit = jest.fn().mockResolvedValue(undefined);
+
   firestoreMock = {
+    batch: jest.fn(() => ({
+      set: batchSet,
+      delete: batchDelete,
+      commit: batchCommit,
+    })),
     collection: jest.fn((name: string) => {
       if (name === 'quotes') {
         return {
@@ -97,7 +117,7 @@ function setupUserFirestore(options: {
     }),
   };
 
-  return { dividendSet, dividendsCollection };
+  return { batchSet, batchDelete, batchCommit, dividendsCollection };
 }
 
 describe('DividendRecordService', () => {
@@ -111,8 +131,7 @@ describe('DividendRecordService', () => {
   });
 
   it('registra um documento por ticker somando posições e itens da geladeira', async () => {
-    const dividendSet = jest.fn().mockResolvedValue(undefined);
-    const { dividendsCollection } = setupUserFirestore({
+    const { batchSet, batchCommit, dividendsCollection } = setupUserFirestore({
       quotes: [
         { id: 'hglg11', ticker: 'HGLG11', monthlyDividend: 0.923 },
         { id: 'xplg11', ticker: 'XPLG11', monthlyDividend: 0 },
@@ -129,7 +148,6 @@ describe('DividendRecordService', () => {
         { ticker: 'MXRF11', quantity: Number.NaN },
         { ticker: 'SEMQUOTE11', quantity: 10 },
       ],
-      dividendSet,
     });
 
     const result = await recordMonthlyDividends('user-1', '2026-09-15');
@@ -149,17 +167,91 @@ describe('DividendRecordService', () => {
       },
     ]);
     expect(dividendsCollection.doc).toHaveBeenCalledWith('2026-09_HGLG11');
-    expect(dividendSet).toHaveBeenCalledWith({
-      userId: 'user-1',
-      ticker: 'HGLG11',
-      amountPerShare: 0.923,
-      quantity: 130,
-      totalAmount: 119.99,
-      paymentDate: '2026-09-15',
-      source: 'auto',
-      createdAt: expect.any(String),
-      updatedAt: expect.any(String),
+    expect(batchSet).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '2026-09_HGLG11' }),
+      {
+        userId: 'user-1',
+        ticker: 'HGLG11',
+        amountPerShare: 0.923,
+        quantity: 130,
+        totalAmount: 119.99,
+        paymentDate: '2026-09-15',
+        source: 'auto',
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      },
+    );
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('remove registros automáticos antigos que não fazem mais parte da carteira', async () => {
+    const { batchDelete, batchCommit } = setupUserFirestore({
+      quotes: [{ id: 'hglg11', ticker: 'HGLG11', monthlyDividend: 0.9 }],
+      positions: [{ ticker: 'HGLG11', quantity: 100 }],
+      existingDividends: [
+        {
+          id: '2026-09_XPLG11',
+          data: {
+            ticker: 'XPLG11',
+            source: 'auto',
+            paymentDate: '2026-09-15',
+          },
+        },
+      ],
     });
+
+    await recordMonthlyDividends('user-1', '2026-09-15');
+
+    expect(batchDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '2026-09_XPLG11' }),
+    );
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('não cria registro automático quando já existe lançamento manual no mês', async () => {
+    const { batchSet, batchDelete, batchCommit } = setupUserFirestore({
+      quotes: [{ ticker: 'HGLG11', monthlyDividend: 0.9 }],
+      positions: [{ ticker: 'HGLG11', quantity: 100 }],
+      existingDividends: [
+        {
+          id: 'manual-1',
+          data: {
+            ticker: ' hglg11 ',
+            source: 'manual',
+            paymentDate: '2026-09-15',
+          },
+        },
+      ],
+    });
+
+    const result = await recordMonthlyDividends('user-1', '2026-09-15');
+
+    expect(result).toEqual([]);
+    expect(batchSet).not.toHaveBeenCalled();
+    expect(batchDelete).not.toHaveBeenCalled();
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('nunca exclui lançamentos manuais ao reconciliar o mês', async () => {
+    const { batchDelete, batchCommit } = setupUserFirestore({
+      quotes: [{ ticker: 'HGLG11', monthlyDividend: 0.9 }],
+      positions: [],
+      existingDividends: [
+        {
+          id: 'manual-1',
+          data: {
+            ticker: 'HGLG11',
+            source: 'manual',
+            paymentDate: '2026-09-15',
+          },
+        },
+      ],
+    });
+
+    await recordMonthlyDividends('user-1', '2026-09-15');
+
+    expect(batchDelete).not.toHaveBeenCalled();
+    expect(batchCommit).toHaveBeenCalledTimes(1);
   });
 
   it('processa todos os usuários, continua após falha e lança ao final', async () => {
@@ -169,16 +261,24 @@ describe('DividendRecordService', () => {
         if (name === 'users') {
           return {
             listDocuments: jest.fn().mockResolvedValue(userDocuments),
-            doc: jest.fn((userId: string) => ({
-              collection: jest.fn(() => {
-                if (userId === 'user-2') {
-                  throw new Error('falha no usuário');
-                }
-                return {
-                  get: jest.fn().mockResolvedValue({ docs: [] }),
-                };
-              }),
-            })),
+            doc: jest.fn((userId: string) => {
+              const emptyQuery = {
+                where: jest.fn(),
+                get: jest.fn().mockResolvedValue({ docs: [] }),
+              };
+              emptyQuery.where.mockReturnValue(emptyQuery);
+              return {
+                collection: jest.fn((name: string) => {
+                  if (userId === 'user-2') {
+                    throw new Error('falha no usuário');
+                  }
+                  if (name === 'dividends') {
+                    return { where: jest.fn(() => emptyQuery) };
+                  }
+                  return { get: jest.fn().mockResolvedValue({ docs: [] }) };
+                }),
+              };
+            }),
           };
         }
         if (name === 'quotes') {
@@ -186,6 +286,11 @@ describe('DividendRecordService', () => {
         }
         throw new Error(`Coleção inesperada: ${name}`);
       }),
+      batch: jest.fn(() => ({
+        set: jest.fn(),
+        delete: jest.fn(),
+        commit: jest.fn().mockResolvedValue(undefined),
+      })),
     };
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     jest.spyOn(console, 'log').mockImplementation(() => undefined);

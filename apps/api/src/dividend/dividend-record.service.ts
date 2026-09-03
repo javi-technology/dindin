@@ -82,14 +82,38 @@ export async function recordMonthlyDividends(
   const month = monthKey(date);
   const now = new Date().toISOString();
   const dividendsCollection = userCollection(userId, 'dividends');
+  const existingSnapshot = await dividendsCollection
+    .where('paymentDate', '>=', `${month}-01`)
+    .where('paymentDate', '<=', `${month}-31`)
+    .get();
+  const existingAuto = existingSnapshot.docs.filter(
+    (doc: FirebaseFirestore.DocumentSnapshot) => doc.data()?.source === 'auto',
+  );
+  const manualTickers = new Set(
+    existingSnapshot.docs
+      .filter(
+        (doc: FirebaseFirestore.DocumentSnapshot) =>
+          doc.data()?.source !== 'auto',
+      )
+      .map((doc: FirebaseFirestore.DocumentSnapshot) =>
+        normalizeTicker(doc.data()?.ticker),
+      )
+      .filter(Boolean),
+  );
+  const batch = admin.firestore().batch();
   const dividends: Dividend[] = [];
+  const desiredIds = new Set<string>();
 
   for (const ticker of [...quantityByTicker.keys()].sort((a, b) =>
     a.localeCompare(b),
   )) {
     const amountPerShare = monthlyDividendByTicker.get(ticker);
     const quantity = quantityByTicker.get(ticker)!;
-    if (amountPerShare === undefined || quantity === 0) {
+    if (
+      amountPerShare === undefined ||
+      quantity === 0 ||
+      manualTickers.has(ticker)
+    ) {
       continue;
     }
 
@@ -106,10 +130,18 @@ export async function recordMonthlyDividends(
       updatedAt: now,
     };
     const { id: _id, ...data } = dividend;
-    await dividendsCollection.doc(dividend.id).set(data);
+    batch.set(dividendsCollection.doc(dividend.id), data);
+    desiredIds.add(dividend.id);
     dividends.push(dividend);
   }
 
+  for (const existingDoc of existingAuto) {
+    if (!desiredIds.has(existingDoc.id)) {
+      batch.delete(dividendsCollection.doc(existingDoc.id));
+    }
+  }
+
+  await batch.commit();
   return dividends;
 }
 
