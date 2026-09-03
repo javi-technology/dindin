@@ -100,6 +100,7 @@ export interface Dividend {
   userId: string; // users/{userId}
   ticker: string;
   assetType?: AssetType;
+  source?: 'manual' | 'auto';
   amountPerShare: number; // valor por cota/ação
   quantity: number;
   totalAmount: number; // amountPerShare * quantity

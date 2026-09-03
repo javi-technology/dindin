@@ -31,6 +31,9 @@ export class DividendComponent implements OnInit {
   reportLoading = signal(true);
   reportError = signal<string | null>(null);
   selectedYear = signal<number>(new Date().getFullYear());
+  recording = signal(false);
+  recordSuccess = signal<string | null>(null);
+  recordError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadMonthlyIncome();
@@ -97,6 +100,38 @@ export class DividendComponent implements OnInit {
     const year = Number((event.target as HTMLSelectElement).value);
     this.selectedYear.set(year);
     this.loadReport(year);
+  }
+
+  recordMonthly(): void {
+    this.recording.set(true);
+    this.recordSuccess.set(null);
+    this.recordError.set(null);
+
+    this.dividendService
+      .recordMonthlyDividends()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          const currentYear = new Date().getFullYear();
+          this.selectedYear.set(currentYear);
+          this.recordSuccess.set(
+            `Proventos de ${this.formatCurrentMonthYear()} registrados.`,
+          );
+          this.recording.set(false);
+          this.loadReport(currentYear);
+        },
+        error: () => {
+          this.recording.set(false);
+          this.recordError.set('Erro ao registrar proventos do mês');
+        },
+      });
+  }
+
+  private formatCurrentMonthYear(): string {
+    return new Intl.DateTimeFormat('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date());
   }
 
   formatMonth(month: string): string {

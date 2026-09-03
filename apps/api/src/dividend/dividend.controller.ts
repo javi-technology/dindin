@@ -14,6 +14,7 @@ import {
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
+import { recordMonthlyDividends } from './dividend-record.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -476,6 +477,23 @@ export async function getMonthlyDividendReport(
     res.json(buildMonthlyDividendReport(dividends, year));
   } catch (error) {
     console.error('[getMonthlyDividendReport] error:', {
+      uid: uid(req),
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function postMonthlyDividendRecord(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const dividends = await recordMonthlyDividends(uid(req));
+    res.status(201).json(dividends);
+  } catch (error) {
+    console.error('[postMonthlyDividendRecord] error:', {
       uid: uid(req),
       message: (error as Error).message,
       stack: (error as Error).stack,
