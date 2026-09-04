@@ -1,6 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { EMPTY, Subject } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { RecommendedWalletService } from '../../core/services/recommended-wallet.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -37,6 +40,28 @@ export class RecommendedWalletComponent implements OnInit {
   private readonly recommendedWalletService = inject(RecommendedWalletService);
   private readonly walletService = inject(WalletService);
   private readonly authService = inject(AuthService);
+  private readonly compareRequest$ = new Subject<{
+    walletId: string;
+    month: string;
+    tab: WalletTab;
+  }>();
+
+  constructor() {
+    this.compareRequest$
+      .pipe(
+        switchMap(({ walletId, month, tab }) =>
+          this.recommendedWalletService.compare(walletId, month, tab).pipe(
+            catchError(() => {
+              this.comparison.set(null);
+              this.error.set('Erro ao comparar carteiras.');
+              return EMPTY;
+            }),
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((comparison) => this.comparison.set(comparison));
+  }
 
   recommendedWallets = signal<RecommendedWallet[]>([]);
   wallets = signal<Wallet[]>([]);
@@ -219,14 +244,10 @@ export class RecommendedWalletComponent implements OnInit {
     const month = this.selectedMonth();
     if (!walletId || !month) return;
 
-    this.recommendedWalletService
-      .compare(walletId, month, this.selectedTab())
-      .subscribe({
-        next: (comparison) => this.comparison.set(comparison),
-        error: () => {
-          this.comparison.set(null);
-          this.error.set('Erro ao comparar carteiras.');
-        },
-      });
+    this.compareRequest$.next({
+      walletId,
+      month,
+      tab: this.selectedTab(),
+    });
   }
 }

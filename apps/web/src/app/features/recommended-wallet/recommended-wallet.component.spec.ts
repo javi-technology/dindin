@@ -5,7 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   RecommendedWallet,
   RecommendedWalletComparison,
@@ -160,5 +160,27 @@ describe('RecommendedWalletComponent', () => {
     expect(fixture.componentInstance.error()).toBe(
       'Erro ao carregar carteiras recomendadas.',
     );
+  });
+
+  it('deve ignorar resposta atrasada de uma comparação anterior', () => {
+    const firstResponse = new Subject<RecommendedWalletComparison>();
+    const secondResponse = new Subject<RecommendedWalletComparison>();
+    serviceMock.compare.and.callFake((walletId: string) =>
+      walletId === 'wallet-1'
+        ? firstResponse.asObservable()
+        : secondResponse.asObservable(),
+    );
+
+    fixture.detectChanges();
+    fixture.componentInstance.selectWallet('wallet-2');
+
+    const secondComparison = {
+      ...comparison,
+      recommended: { ...wallet, id: 'bb-fii_2026-08', month: '2026-08' },
+    };
+    secondResponse.next(secondComparison);
+    firstResponse.next(comparison);
+
+    expect(fixture.componentInstance.comparison()).toEqual(secondComparison);
   });
 });
