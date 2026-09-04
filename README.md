@@ -79,6 +79,21 @@ Todos os endpoints abaixo exigem autenticação via `Authorization: Bearer <toke
 | `PUT`    | `/api/wallets/:id` | Atualiza uma carteira existente                           |
 | `DELETE` | `/api/wallets/:id` | Remove uma carteira existente                             |
 
+### Carteira recomendada BB (`/api/recommended-wallets/bb-fii`)
+
+Os PDFs mensais da carteira FII do Banco do Brasil são armazenados em
+`wallets/fii-bb/` no Firebase Storage. O job `syncBbWalletScheduled` consulta
+as revisões disponíveis entre os dias 1 e 10 de cada mês, enquanto o trigger de
+upload importa automaticamente um PDF colocado nesse prefixo.
+
+| Método | Rota                                                                    | Descrição                                        |
+| ------ | ----------------------------------------------------------------------- | ------------------------------------------------ |
+| `GET`  | `/api/recommended-wallets/bb-fii`                                       | Lista as carteiras importadas                    |
+| `GET`  | `/api/recommended-wallets/bb-fii/latest?month=YYYY-MM`                  | Retorna a carteira do mês ou a mais recente      |
+| `GET`  | `/api/recommended-wallets/bb-fii/compare/:walletId?wallet=renda\|ganho` | Compara a carteira do usuário com a recomendação |
+| `POST` | `/api/admin/recommended-wallets/bb-fii/import`                          | Importa `{ fileName, contentBase64 }` (admin)    |
+| `PUT`  | `/api/admin/recommended-wallets/bb-fii/:id/confirm`                     | Confirma uma carteira para revisão (admin)       |
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).
