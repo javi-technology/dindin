@@ -4,13 +4,13 @@ import {
   bbFileName,
   parseBbFileName,
   parseBbFiiPdf,
-  parseRendaTable,
+  parseWalletTable,
 } from '../../src/recommended-wallet/bb-pdf.parser';
 
 describe('bb-pdf.parser', () => {
-  describe('parseRendaTable', () => {
+  describe('parseWalletTable', () => {
     it('deve extrair as linhas da carteira Renda e converter números pt-BR', () => {
-      const rows = parseRendaTable(
+      const rows = parseWalletTable(
         [
           'RZTR11Agronegócio1,07%R$ 88,0412,50%',
           'GARE11Outro2,00%R$ 9,9912,50%',
@@ -57,13 +57,13 @@ describe('bb-pdf.parser', () => {
 
     it('deve rejeitar tabela com quantidade de linhas insuficiente', () => {
       expect(() =>
-        parseRendaTable('RZTR11Agronegócio1,07%R$ 88,04100,00%'),
+        parseWalletTable('RZTR11Agronegócio1,07%R$ 88,04100,00%'),
       ).toThrow('entre 4 e 15');
     });
 
     it('deve rejeitar tickers duplicados', () => {
       const row = 'RZTR11Agronegócio1,07%R$ 88,0450,00%';
-      expect(() => parseRendaTable(`${row}\n${row}\n${row}\n${row}`)).toThrow(
+      expect(() => parseWalletTable(`${row}\n${row}\n${row}\n${row}`)).toThrow(
         'ticker duplicado',
       );
     });
@@ -75,7 +75,7 @@ describe('bb-pdf.parser', () => {
         'TRXF11Varejo3,00%R$ 10,0020,00%',
         'KNHF11Papel4,00%R$ 10,0020,00%',
       ];
-      expect(() => parseRendaTable(rows.join('\n'))).toThrow('soma dos pesos');
+      expect(() => parseWalletTable(rows.join('\n'))).toThrow('soma dos pesos');
     });
   });
 

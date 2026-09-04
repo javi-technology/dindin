@@ -2,6 +2,8 @@ import * as admin from 'firebase-admin';
 import {
   RecommendedWallet,
   RecommendedWalletAsset,
+  RecommendedWalletComparison,
+  RecommendedWalletComparisonItem,
   Quote,
 } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
@@ -155,7 +157,7 @@ export async function compareWithWallet(
   walletId: string,
   month?: string,
   wallet: 'renda' | 'ganho' = 'renda',
-) {
+): Promise<RecommendedWalletComparison> {
   const recommended = await getRecommendedWallet(month);
   if (!recommended) {
     const error = new Error('Carteira recomendada não encontrada') as Error & {
@@ -207,20 +209,22 @@ export async function compareWithWallet(
     (sum, position) => sum + position.currentValue,
     0,
   );
-  const items = [...tickers].sort().map((ticker) => {
-    const position = positionsByTicker.get(ticker);
-    const recommendation = recommendedByTicker.get(ticker);
-    const currentValue = position?.currentValue ?? 0;
-    return {
-      ticker,
-      recommendedWeight: recommendation?.weight ?? null,
-      currentWeight:
-        position && totalValue > 0 ? currentValue / totalValue : null,
-      quantity: position?.quantity ?? 0,
-      currentValue,
-      status: recommendation ? (position ? 'match' : 'missing') : 'extra',
-    } as const;
-  });
+  const items: RecommendedWalletComparisonItem[] = [...tickers]
+    .sort()
+    .map((ticker) => {
+      const position = positionsByTicker.get(ticker);
+      const recommendation = recommendedByTicker.get(ticker);
+      const currentValue = position?.currentValue ?? 0;
+      return {
+        ticker,
+        recommendedWeight: recommendation?.weight ?? null,
+        currentWeight:
+          position && totalValue > 0 ? currentValue / totalValue : null,
+        quantity: position?.quantity ?? 0,
+        currentValue,
+        status: recommendation ? (position ? 'match' : 'missing') : 'extra',
+      };
+    });
   return { recommended, items, totalValue };
 }
 
@@ -247,5 +251,3 @@ export async function syncBbWallet(): Promise<void> {
   const sourceFile = await saveBbPdf(found.fileName, found.buffer);
   await importBbWallet(found.buffer, sourceFile);
 }
-
-export const syncBbRendaWallet = syncBbWallet;

@@ -38,7 +38,7 @@ function parsePercentage(value: string): number {
   );
 }
 
-export function parseRendaTable(pageText: string): ParsedRow[] {
+export function parseWalletTable(pageText: string): ParsedRow[] {
   const regex =
     /^([A-Z]{4}11)([^\d%]+?)(-?\d+,\d{2}%)R\$\s?([\d.]+,\d{2})(\d+,\d{2}%)/gm;
   const rows: ParsedRow[] = [];
@@ -56,7 +56,7 @@ export function parseRendaTable(pageText: string): ParsedRow[] {
 
   if (rows.length < 4 || rows.length > 15) {
     throw new Error(
-      `A tabela Carteira Renda deve conter entre 4 e 15 linhas (encontradas: ${rows.length})`,
+      `A tabela de fundos recomendados deve conter entre 4 e 15 linhas (encontradas: ${rows.length})`,
     );
   }
 
@@ -154,8 +154,8 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
 
   return {
     publishedAt: publishedDateFromText(parsed.text) ?? todayDateInBrazil(),
-    renda: parseRendaTable(rendaPage),
-    ganho: ganhoPage ? parseRendaTable(ganhoPage) : [],
+    renda: parseWalletTable(rendaPage),
+    ganho: ganhoPage ? parseWalletTable(ganhoPage) : [],
   };
 }
 

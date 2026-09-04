@@ -50,7 +50,10 @@ export async function getLatestRecommended(
     res.json(wallet);
   } catch (error) {
     console.error('[getLatestRecommended] error:', error);
-    res.status(statusCode(error)).json({ error: 'Internal server error' });
+    const code = statusCode(error);
+    res.status(code).json({
+      error: code === 500 ? 'Internal server error' : (error as Error).message,
+    });
   }
 }
 
@@ -70,7 +73,10 @@ export async function compareRecommended(
     );
   } catch (error) {
     console.error('[compareRecommended] error:', error);
-    res.status(statusCode(error)).json({ error: 'Internal server error' });
+    const code = statusCode(error);
+    res.status(code).json({
+      error: code === 500 ? 'Internal server error' : (error as Error).message,
+    });
   }
 }
 
@@ -96,7 +102,10 @@ export async function importRecommended(
     res.status(201).json(await importBbWallet(buffer, sourceFile));
   } catch (error) {
     console.error('[importRecommended] error:', error);
-    res.status(statusCode(error)).json({ error: 'Internal server error' });
+    const code = statusCode(error);
+    res.status(code).json({
+      error: code === 500 ? 'Internal server error' : (error as Error).message,
+    });
   }
 }
 
@@ -108,6 +117,9 @@ export async function confirmRecommended(
     res.json(await confirmRecommendedWallet(req.params.id));
   } catch (error) {
     console.error('[confirmRecommended] error:', error);
-    res.status(statusCode(error)).json({ error: 'Internal server error' });
+    const code = statusCode(error);
+    res.status(code).json({
+      error: code === 500 ? 'Internal server error' : (error as Error).message,
+    });
   }
 }

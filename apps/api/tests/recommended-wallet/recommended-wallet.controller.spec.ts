@@ -63,6 +63,38 @@ describe('recommended-wallet.controller', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: 'Carteira recomendada não encontrada',
+    });
+  });
+
+  it('deve retornar a mensagem real ao confirmar carteira inexistente', async () => {
+    verifyIdTokenMock.mockResolvedValue({ uid: 'admin-1', admin: true });
+    const error = Object.assign(
+      new Error('Carteira recomendada não encontrada'),
+      { statusCode: 404 },
+    );
+    confirmRecommendedWalletMock.mockRejectedValue(error);
+
+    const response = await request(app)
+      .put('/api/admin/recommended-wallets/bb-fii/bb-fii_2026-09/confirm')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: 'Carteira recomendada não encontrada',
+    });
+  });
+
+  it('deve manter mensagem genérica para erros internos', async () => {
+    getRecommendedWalletMock.mockRejectedValue(new Error('falha interna'));
+
+    const response = await request(app)
+      .get('/api/recommended-wallets/bb-fii/latest')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Internal server error' });
   });
 
   it('deve importar PDF somente para usuário admin', async () => {

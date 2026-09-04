@@ -166,3 +166,18 @@ export interface RecommendedWallet {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface RecommendedWalletComparisonItem {
+  ticker: string;
+  recommendedWeight: number | null;
+  currentWeight: number | null;
+  quantity: number;
+  currentValue: number;
+  status: 'match' | 'missing' | 'extra';
+}
+
+export interface RecommendedWalletComparison {
+  recommended: RecommendedWallet;
+  items: RecommendedWalletComparisonItem[];
+  totalValue: number;
+}
