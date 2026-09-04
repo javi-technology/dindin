@@ -143,14 +143,19 @@ app.use(
 
 export const api = functions.https.onRequest(app);
 
-// Cloud Function agendada para atualizar cotações diariamente.
-// Ver issue #10 — busca cotações de FIIs via Brapi e atualiza currentPrice
-// em todas as posições do Firestore, além de salvar histórico.
+// Cloud Function agendada para atualizar cotações 1x ao dia.
+// Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)
+// e salva em `quotes/{ticker}` + histórico.
 // O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
 // em process.env dentro da execução. Configurar com:
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
-  { schedule: '0 0 * * *', secrets: ['BRAPI_API_KEY'] },
+  {
+    schedule: '0 0 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+    secrets: ['BRAPI_API_KEY'],
+  },
   async () => {
     await updateAllQuotes();
   },
