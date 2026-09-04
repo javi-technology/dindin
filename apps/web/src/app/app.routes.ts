@@ -8,6 +8,7 @@ import { WalletComponent } from './features/wallet/wallet.component';
 import { FridgeComponent } from './features/fridge/fridge.component';
 import { DividendComponent } from './features/dividend/dividend.component';
 import { AdminAssetsComponent } from './features/admin-assets/admin-assets.component';
+import { RecommendedWalletComponent } from './features/recommended-wallet/recommended-wallet.component';
 
 export const routes: Routes = [
   {
@@ -34,6 +35,11 @@ export const routes: Routes = [
     path: 'provento',
     canActivate: [authGuard],
     component: DividendComponent,
+  },
+  {
+    path: 'carteira-recomendada',
+    canActivate: [authGuard],
+    component: RecommendedWalletComponent,
   },
   {
     path: 'admin/assets',

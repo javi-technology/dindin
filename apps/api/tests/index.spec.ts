@@ -1,5 +1,9 @@
 import request from 'supertest';
-import { app } from '../src/index';
+import {
+  app,
+  onBbWalletPdfUploaded,
+  syncBbWalletScheduled,
+} from '../src/index';
 
 describe('API Health', () => {
   it('deve retornar status ok do projeto', async () => {
@@ -7,5 +11,10 @@ describe('API Health', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok', project: 'dindin' });
+  });
+
+  it('deve exportar o agendamento e o trigger da carteira BB', () => {
+    expect(syncBbWalletScheduled).toBeDefined();
+    expect(onBbWalletPdfUploaded).toBeDefined();
   });
 });

@@ -54,11 +54,27 @@ import {
 } from './patrimony/patrimony.controller';
 import { saveAllPatrimonySnapshots } from './patrimony/patrimony-snapshot.service';
 import { recordAllMonthlyDividends } from './dividend/dividend-record.service';
+import { onObjectFinalized } from 'firebase-functions/v2/storage';
+import {
+  compareRecommended,
+  confirmRecommended,
+  getLatestRecommended,
+  importRecommended,
+  listRecommended,
+} from './recommended-wallet/recommended-wallet.controller';
+import {
+  BB_WALLET_PREFIX,
+  downloadBbPdf,
+} from './recommended-wallet/storage.service';
+import {
+  importBbWallet,
+  syncBbWallet,
+} from './recommended-wallet/recommended-wallet.service';
 
 admin.initializeApp();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Middleware de log de requisições para diagnóstico em produção
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -128,6 +144,23 @@ app.delete('/api/dividends/:id', deleteDividend);
 app.get('/api/patrimony/history', getPatrimonyHistory);
 app.post('/api/patrimony/snapshots', postPatrimonySnapshot);
 
+app.get('/api/recommended-wallets/bb-fii', listRecommended);
+app.get('/api/recommended-wallets/bb-fii/latest', getLatestRecommended);
+app.get(
+  '/api/recommended-wallets/bb-fii/compare/:walletId',
+  compareRecommended,
+);
+app.post(
+  '/api/admin/recommended-wallets/bb-fii/import',
+  adminAuthMiddleware,
+  importRecommended,
+);
+app.put(
+  '/api/admin/recommended-wallets/bb-fii/:id/confirm',
+  adminAuthMiddleware,
+  confirmRecommended,
+);
+
 // Middleware global de tratamento de erros não capturados
 app.use(
   (err: Error, req: Request, res: Response, _next: NextFunction): void => {
@@ -143,14 +176,19 @@ app.use(
 
 export const api = functions.https.onRequest(app);
 
-// Cloud Function agendada para atualizar cotações diariamente.
-// Ver issue #10 — busca cotações de FIIs via Brapi e atualiza currentPrice
-// em todas as posições do Firestore, além de salvar histórico.
+// Cloud Function agendada para atualizar cotações 1x ao dia.
+// Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)
+// e salva em `quotes/{ticker}` + histórico.
 // O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
 // em process.env dentro da execução. Configurar com:
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
-  { schedule: '0 0 * * *', secrets: ['BRAPI_API_KEY'] },
+  {
+    schedule: '0 0 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+    secrets: ['BRAPI_API_KEY'],
+  },
   async () => {
     await updateAllQuotes();
   },
@@ -177,6 +215,36 @@ export const recordMonthlyDividendsScheduled = onSchedule(
   },
   async () => {
     await recordAllMonthlyDividends();
+  },
+);
+
+export const syncBbWalletScheduled = onSchedule(
+  {
+    schedule: '0 3 1-10 * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+    memory: '512MiB',
+    timeoutSeconds: 120,
+  },
+  syncBbWallet,
+);
+
+export const onBbWalletPdfUploaded = onObjectFinalized(
+  {
+    bucket:
+      process.env.FIREBASE_STORAGE_BUCKET ?? 'dindin-4e720.firebasestorage.app',
+    memory: '512MiB',
+    timeoutSeconds: 120,
+  },
+  async (event) => {
+    const name = event.data.name;
+    if (
+      !name.startsWith(BB_WALLET_PREFIX) ||
+      !name.toLowerCase().endsWith('.pdf')
+    )
+      return;
+    const buffer = await downloadBbPdf(name);
+    await importBbWallet(buffer, name);
   },
 );
 

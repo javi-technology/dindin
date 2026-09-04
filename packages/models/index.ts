@@ -10,6 +10,7 @@
 //   assets/{ticker}
 //   quotes/{ticker}
 //   quotes/{ticker}/history/{date}
+//   recommendedWallets/{id}
 
 /** Documento raiz do usuário — coleção `users` */
 export interface User {
@@ -135,4 +136,48 @@ export interface PatrimonySnapshot {
   totalFridge: number; // soma de quantity * (quote price ?? transferredPrice) de todos os itens de todas as geladeiras
   total: number; // totalWallet + totalFridge
   createdAt: string; // ISO-8601
+}
+
+/** Ativo de uma carteira recomendada — subcoleção `recommendedWallets`. */
+export interface RecommendedWalletAsset {
+  ticker: string;
+  segment: string;
+  weight: number;
+  closePrice: number;
+  ifixWeight: number;
+  inCatalog: boolean;
+}
+
+export type RecommendedWalletStatus = 'pending_review' | 'confirmed';
+
+/** Carteira recomendada publicada pelo Banco do Brasil. */
+export interface RecommendedWallet {
+  id: string;
+  provider: 'BB';
+  month: string;
+  revision: number;
+  publishedAt: string;
+  sourceFile: string;
+  status: RecommendedWalletStatus;
+  renda: RecommendedWalletAsset[];
+  ganho: RecommendedWalletAsset[];
+  parsedAt: string;
+  confirmedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendedWalletComparisonItem {
+  ticker: string;
+  recommendedWeight: number | null;
+  currentWeight: number | null;
+  quantity: number;
+  currentValue: number;
+  status: 'match' | 'missing' | 'extra';
+}
+
+export interface RecommendedWalletComparison {
+  recommended: RecommendedWallet;
+  items: RecommendedWalletComparisonItem[];
+  totalValue: number;
 }

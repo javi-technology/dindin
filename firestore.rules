@@ -65,5 +65,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Carteiras recomendadas — escrita exclusiva pelo Admin SDK.
+    match /recommendedWallets/{walletId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
   }
 }

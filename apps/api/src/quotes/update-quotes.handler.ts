@@ -1,4 +1,5 @@
 import { fetchQuotes, QuoteResult } from './brapi.service';
+import { fetchYahooQuotes } from './yahoo-quote.service';
 import { fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
@@ -8,21 +9,78 @@ import { listActiveAssetTickers } from '../assets/asset.service';
 // conforme o catálogo de ativos crescer.
 const BATCH_SIZE = 10;
 
+type QuoteSource = 'brapi' | 'yahoo';
+
+interface SourcedQuote extends QuoteResult {
+  source: QuoteSource;
+}
+
 async function processTickerQuote(
   ticker: string,
-  quote: QuoteResult,
+  quote: SourcedQuote,
   monthlyDividend: number | undefined,
 ): Promise<void> {
   try {
-    await saveQuoteHistory(ticker, quote.price, monthlyDividend, 'brapi');
+    await saveQuoteHistory(ticker, quote.price, monthlyDividend, quote.source);
     console.log(
-      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price}.`,
+      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${quote.source}).`,
     );
   } catch (error) {
     console.error(`[updateAllQuotes] Erro ao atualizar ${ticker}:`, {
       message: (error as Error).message,
     });
   }
+}
+
+/**
+ * Busca cotações na Brapi e, para os tickers que ficaram sem preço (ou se a
+ * Brapi falhar por completo), tenta o Yahoo Finance como fallback.
+ *
+ * Lança erro apenas quando a Brapi falhou E nenhuma fonte retornou cotação,
+ * para que o scheduler acione o retry.
+ */
+async function fetchQuotesWithFallback(
+  tickerList: string[],
+): Promise<Map<string, SourcedQuote>> {
+  const quotes = new Map<string, SourcedQuote>();
+  let brapiError: Error | undefined;
+
+  try {
+    for (const [ticker, quote] of await fetchQuotes(tickerList)) {
+      quotes.set(ticker, { ...quote, source: 'brapi' });
+    }
+  } catch (error) {
+    brapiError = error as Error;
+    console.error('[updateAllQuotes] Erro ao buscar cotações na Brapi:', {
+      message: brapiError.message,
+    });
+  }
+
+  const missingTickers = tickerList.filter((ticker) => !quotes.has(ticker));
+  if (missingTickers.length > 0) {
+    const yahooQuotes = await fetchYahooQuotes(missingTickers);
+    for (const [ticker, quote] of yahooQuotes) {
+      quotes.set(ticker, { ...quote, source: 'yahoo' });
+    }
+    console.log(
+      `[updateAllQuotes] Fallback Yahoo: ${yahooQuotes.size} de ${missingTickers.length} ticker(s) recuperado(s).`,
+    );
+  }
+
+  if (brapiError && quotes.size === 0) {
+    throw new Error(
+      `Nenhuma cotação obtida (Brapi e Yahoo Finance falharam): ${brapiError.message}`,
+    );
+  }
+
+  const withoutQuote = tickerList.filter((ticker) => !quotes.has(ticker));
+  if (withoutQuote.length > 0) {
+    console.warn('[updateAllQuotes] Tickers sem cotação em nenhuma fonte:', {
+      tickers: withoutQuote,
+    });
+  }
+
+  return quotes;
 }
 
 /**
@@ -54,15 +112,7 @@ export async function updateAllQuotes(): Promise<void> {
     );
 
     const tickerList = assetList.map((asset) => asset.ticker);
-    let quotes: Map<string, QuoteResult>;
-    try {
-      quotes = await fetchQuotes(tickerList);
-    } catch (error) {
-      console.error('[updateAllQuotes] error:', {
-        message: (error as Error).message,
-      });
-      return;
-    }
+    const quotes = await fetchQuotesWithFallback(tickerList);
 
     let dividends: Map<string, number>;
     try {
@@ -88,8 +138,10 @@ export async function updateAllQuotes(): Promise<void> {
       );
     }
 
+    const bySource = { brapi: 0, yahoo: 0 };
+    for (const quote of quotes.values()) bySource[quote.source]++;
     console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s).`,
+      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s) (brapi: ${bySource.brapi}, yahoo: ${bySource.yahoo}).`,
     );
   } catch (error) {
     console.error('[updateAllQuotes] error:', {
