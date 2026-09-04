@@ -37,4 +37,20 @@ describe('Cloud Functions agendadas', () => {
       expect(options().secrets).toEqual(['BRAPI_API_KEY']);
     });
   });
+
+  describe('syncBbWalletScheduled', () => {
+    const options = () => findScheduleBySchedule('0 3 1-10 * *');
+
+    it('deve rodar entre os dias 1 e 10 no fuso de São Paulo', () => {
+      expect(options().timeZone).toBe('America/Sao_Paulo');
+    });
+
+    it('deve usar retry e recursos adequados para parsear PDFs', () => {
+      expect(options().retryCount).toBe(3);
+      expect(options()).toMatchObject({
+        memory: '512MiB',
+        timeoutSeconds: 120,
+      });
+    });
+  });
 });
