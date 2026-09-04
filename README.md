@@ -94,6 +94,11 @@ upload importa automaticamente um PDF colocado nesse prefixo.
 | `POST` | `/api/admin/recommended-wallets/bb-fii/import`                          | Importa `{ fileName, contentBase64 }` (admin)    |
 | `PUT`  | `/api/admin/recommended-wallets/bb-fii/:id/confirm`                     | Confirma uma carteira para revisão (admin)       |
 
+Na aplicação web, usuários autenticados podem acessar
+`/carteira-recomendada` pelo link **Carteira recomendada** no dashboard. A
+página exibe as abas Renda e Ganho de Capital, permite comparar uma carteira
+do usuário e, para administradores, confirmar ou importar um PDF.
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).
