@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { Fridge, FridgeItem, Position } from 'dindin-models';
 
 export interface CreateFridgePayload {
   name: string;
@@ -78,5 +78,16 @@ export class FridgeService {
 
   deleteItem(fridgeId: string, itemId: string): Observable<void> {
     return this.http.delete<void>(`${this.itemsUrl(fridgeId)}/${itemId}`);
+  }
+
+  unfreezeItem(
+    fridgeId: string,
+    itemId: string,
+    walletId: string,
+  ): Observable<Position> {
+    return this.http.post<Position>(
+      `${this.itemsUrl(fridgeId)}/${itemId}/unfreeze`,
+      { walletId },
+    );
   }
 }

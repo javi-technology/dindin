@@ -13,7 +13,7 @@ jest.mock('firebase-admin', () => ({
 }));
 
 import { app } from '../../src/index';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { Fridge, FridgeItem, Wallet } from 'dindin-models';
 
 /* ---------- Helpers de mock ---------- */
 
@@ -78,9 +78,31 @@ function createFirestoreMock(
   fridges: Fridge[] = [],
   items: FridgeItem[] = [],
   catalog = createCatalogStubs(),
+  wallets: Wallet[] = [],
 ) {
   const fridgeMap = new Map<string, any>();
   const itemMap = new Map<string, any>();
+  const walletMap = new Map<string, any>();
+  const batchOperations: unknown[][] = [];
+
+  wallets.forEach((wallet) => {
+    walletMap.set(wallet.id, {
+      id: wallet.id,
+      collection: jest.fn((path: string) => {
+        if (path !== 'positions') {
+          throw new Error(`Unexpected subcollection: ${path}`);
+        }
+        return {
+          doc: jest.fn(() => ({ id: 'new-position-id' })),
+        };
+      }),
+      get: jest.fn().mockResolvedValue({
+        id: wallet.id,
+        exists: true,
+        data: () => ({ ...wallet }),
+      }),
+    });
+  });
 
   fridges.forEach((fridge) => {
     let data = { ...fridge };
@@ -191,8 +213,16 @@ function createFirestoreMock(
   };
 
   const batchMock = {
-    delete: jest.fn().mockReturnThis(),
+    delete: jest.fn((ref: unknown) => {
+      batchOperations.push(['delete', ref]);
+      return batchMock;
+    }),
+    set: jest.fn((ref: unknown, value: unknown) => {
+      batchOperations.push(['set', ref, value]);
+      return batchMock;
+    }),
     commit: jest.fn().mockResolvedValue(undefined),
+    operations: batchOperations,
   };
 
   return {
@@ -201,6 +231,21 @@ function createFirestoreMock(
         return {
           doc: jest.fn((uid: string) => ({
             collection: jest.fn((subPath: string) => {
+              if (subPath === 'wallets' && uid === 'user-123') {
+                return {
+                  doc: jest.fn((walletId: string) => {
+                    if (walletMap.has(walletId)) return walletMap.get(walletId);
+                    return {
+                      id: walletId,
+                      get: jest.fn().mockResolvedValue({
+                        id: walletId,
+                        exists: false,
+                        data: () => null,
+                      }),
+                    };
+                  }),
+                };
+              }
               if (subPath === 'fridges' && uid === 'user-123') {
                 // Combina operações de fridge + navegação para items
                 const fridgeDoc = (fridgeId: string) => {
@@ -256,6 +301,7 @@ function createFirestoreMock(
       throw new Error(`Unexpected collection: ${path}`);
     }),
     batch: jest.fn(() => batchMock),
+    batchMock,
   };
 }
 
@@ -559,6 +605,14 @@ describe('FridgeItem CRUD', () => {
     transferredPrice: 95.0,
     targetPrice: 110.0,
     currentPrice: 100.0,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+  const baseWallet: Wallet = {
+    id: 'wallet-1',
+    ownerId: 'user-123',
+    name: 'Carteira Principal',
+    currency: 'BRL',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
@@ -993,6 +1047,92 @@ describe('FridgeItem CRUD', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  describe('POST /api/fridges/:fridgeId/items/:id/unfreeze', () => {
+    it('deve mover item da geladeira para uma carteira atomicamente', async () => {
+      const item = { ...baseItem, assetType: 'FII' as const };
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [item],
+        createCatalogStubs(),
+        [baseWallet],
+      );
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-1/items/item-1/unfreeze')
+        .set('Authorization', authHeader)
+        .send({ walletId: 'wallet-1' });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          id: 'new-position-id',
+          walletId: 'wallet-1',
+          ticker: 'HGLG11',
+          assetType: 'FII',
+          quantity: 5,
+          averagePrice: 95,
+          inFridge: false,
+        }),
+      );
+
+      const batch = firestoreMock.batchMock;
+      expect(batch.operations[0][0]).toBe('delete');
+      expect(batch.operations[1][0]).toBe('set');
+      expect(batch.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'item-1' }),
+      );
+      expect(batch.set).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'new-position-id' }),
+        expect.objectContaining({
+          walletId: 'wallet-1',
+          averagePrice: 95,
+          inFridge: false,
+        }),
+      );
+    });
+
+    it('deve retornar 400 quando walletId não é informado', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], [baseItem]);
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-1/items/item-1/unfreeze')
+        .set('Authorization', authHeader)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'walletId is required' });
+    });
+
+    it('deve retornar 404 quando o item não existe', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], []);
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-1/items/item-1/unfreeze')
+        .set('Authorization', authHeader)
+        .send({ walletId: 'wallet-1' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Fridge item not found' });
+    });
+
+    it('deve retornar 404 quando a carteira não existe', async () => {
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [baseItem],
+        createCatalogStubs(),
+        [],
+      );
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-1/items/item-1/unfreeze')
+        .set('Authorization', authHeader)
+        .send({ walletId: 'wallet-inexistente' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Wallet not found' });
     });
   });
 });

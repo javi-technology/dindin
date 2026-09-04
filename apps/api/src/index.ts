@@ -33,6 +33,7 @@ import {
   getItem,
   listItems,
   updateItem,
+  unfreezeItem,
 } from './wallet/fridge.controller';
 import {
   createDividend,
@@ -131,6 +132,7 @@ app.post('/api/fridges/:fridgeId/items', createItem);
 app.get('/api/fridges/:fridgeId/items/:id', getItem);
 app.put('/api/fridges/:fridgeId/items/:id', updateItem);
 app.delete('/api/fridges/:fridgeId/items/:id', deleteItem);
+app.post('/api/fridges/:fridgeId/items/:id/unfreeze', unfreezeItem);
 
 app.get('/api/dividends', listDividends);
 app.get('/api/dividends/projection', getDividendProjection);

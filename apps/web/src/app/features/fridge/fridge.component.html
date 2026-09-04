@@ -131,6 +131,14 @@
                       </td>
                       <td class="py-3 px-4 text-right">
                         <button
+                          [attr.data-testid]="'btn-descongelar-item-' + i"
+                          class="text-emerald-600 hover:text-emerald-800 font-medium text-sm mr-3 inline-flex items-center"
+                          (click)="openUnfreeze(item)"
+                        >
+                          <svg lucideFlame [size]="14" class="mr-1"></svg>
+                          Descongelar
+                        </button>
+                        <button
                           [attr.data-testid]="'btn-editar-item-' + i"
                           class="text-cyan-600 hover:text-cyan-800 font-medium text-sm mr-3 inline-flex items-center"
                           (click)="openForm(item)"
@@ -300,6 +308,66 @@
             Remover
           </button>
         </div>
+      </div>
+    </div>
+  }
+
+  @if (unfreezeItemTarget()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
+        data-testid="unfreeze-modal"
+      >
+        <h2 class="text-lg font-bold text-gray-900 mb-2">Descongelar item</h2>
+        <p class="text-gray-600 mb-6">
+          Mover
+          <strong>{{ unfreezeItemTarget()?.ticker }}</strong> da geladeira para
+          a carteira:
+        </p>
+
+        <form
+          [formGroup]="unfreezeForm"
+          (ngSubmit)="confirmUnfreeze()"
+          class="space-y-4"
+        >
+          @if (wallets().length > 0) {
+            <select
+              formControlName="walletId"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              @for (wallet of wallets(); track wallet.id) {
+                <option [value]="wallet.id">{{ wallet.name }}</option>
+              }
+            </select>
+          } @else {
+            <p class="text-gray-500 text-sm">Nenhuma carteira disponível.</p>
+          }
+
+          @if (unfreezeError()) {
+            <p class="text-red-600 text-sm" data-testid="unfreeze-error">
+              {{ unfreezeError() }}
+            </p>
+          }
+
+          <div class="flex justify-end gap-3">
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              (click)="cancelUnfreeze()"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              [disabled]="wallets().length === 0 || unfreezeForm.invalid"
+            >
+              Descongelar
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   }

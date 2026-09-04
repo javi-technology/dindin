@@ -8,7 +8,8 @@ import {
 } from '@angular/forms';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
-import { Asset, Fridge, FridgeItem } from 'dindin-models';
+import { WalletService } from '../../core/services/wallet.service';
+import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
@@ -19,6 +20,7 @@ import {
   LucidePlus,
   LucidePencil,
   LucideTrash2,
+  LucideFlame,
 } from '@lucide/angular';
 
 @Component({
@@ -31,18 +33,21 @@ import {
     LucidePlus,
     LucidePencil,
     LucideTrash2,
+    LucideFlame,
   ],
   templateUrl: './fridge.component.html',
 })
 export class FridgeComponent implements OnInit {
   private readonly fridgeService = inject(FridgeService);
   private readonly assetService = inject(AssetService);
+  private readonly walletService = inject(WalletService);
   private readonly fb = inject(FormBuilder);
 
   fridges = signal<Fridge[]>([]);
   selectedFridge = signal<Fridge | null>(null);
   items = signal<FridgeItem[]>([]);
   assets = signal<Asset[]>([]);
+  wallets = signal<Wallet[]>([]);
   assetsError = signal<string | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
@@ -51,6 +56,8 @@ export class FridgeComponent implements OnInit {
   formVisible = signal(false);
   formError = signal<string | null>(null);
   deleteConfirmItem = signal<FridgeItem | null>(null);
+  unfreezeItemTarget = signal<FridgeItem | null>(null);
+  unfreezeError = signal<string | null>(null);
 
   form: FormGroup = this.fb.group({
     ticker: ['', [Validators.required]],
@@ -58,10 +65,14 @@ export class FridgeComponent implements OnInit {
     transferredPrice: ['0', [Validators.required, decimalValidator()]],
     targetPrice: ['0', [Validators.required, decimalValidator()]],
   });
+  unfreezeForm: FormGroup = this.fb.group({
+    walletId: ['', Validators.required],
+  });
 
   ngOnInit(): void {
     this.loadFridges();
     this.loadAssets();
+    this.loadWallets();
   }
 
   private loadAssets(): void {
@@ -75,6 +86,13 @@ export class FridgeComponent implements OnInit {
           'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
         );
       },
+    });
+  }
+
+  private loadWallets(): void {
+    this.walletService.list().subscribe({
+      next: (response) => this.wallets.set(response),
+      error: () => this.error.set('Erro ao carregar carteiras.'),
     });
   }
 
@@ -276,6 +294,40 @@ export class FridgeComponent implements OnInit {
     this.deleteConfirmItem.set(null);
   }
 
+  openUnfreeze(item: FridgeItem): void {
+    this.unfreezeItemTarget.set(item);
+    this.unfreezeError.set(null);
+    this.unfreezeForm.reset({
+      walletId: this.wallets()[0]?.id ?? '',
+    });
+  }
+
+  cancelUnfreeze(): void {
+    this.unfreezeItemTarget.set(null);
+    this.unfreezeError.set(null);
+    this.unfreezeForm.reset({ walletId: '' });
+  }
+
+  confirmUnfreeze(): void {
+    const item = this.unfreezeItemTarget();
+    const fridge = this.selectedFridge();
+    if (!item || !fridge || this.unfreezeForm.invalid) {
+      this.unfreezeForm.markAllAsTouched();
+      return;
+    }
+
+    const walletId = this.unfreezeForm.value.walletId as string;
+    this.fridgeService.unfreezeItem(fridge.id, item.id, walletId).subscribe({
+      next: () => {
+        this.items.update((current) =>
+          current.filter((currentItem) => currentItem.id !== item.id),
+        );
+        this.cancelUnfreeze();
+      },
+      error: () => this.unfreezeError.set('Erro ao descongelar item.'),
+    });
+  }
+
   /** Calcula o potencial de ganho em percentual, ou null se não houver base. */
   potentialGain(item: FridgeItem): number | null {
     if (!item.targetPrice) return null;
@@ -300,6 +352,8 @@ export class FridgeComponent implements OnInit {
       this.cancelDelete();
     } else if (this.formVisible()) {
       this.closeForm();
+    } else if (this.unfreezeItemTarget()) {
+      this.cancelUnfreeze();
     }
   }
 

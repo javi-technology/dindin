@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePrice } from '../quotes/quote-history.service';
@@ -19,6 +19,16 @@ function fridgesCollection(userId: string) {
 
 function itemsCollection(userId: string, fridgeId: string) {
   return fridgesCollection(userId).doc(fridgeId).collection('fridgeItems');
+}
+
+function positionsCollection(userId: string, walletId: string) {
+  return admin
+    .firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('wallets')
+    .doc(walletId)
+    .collection('positions');
 }
 
 /**
@@ -452,6 +462,68 @@ export async function deleteItem(req: Request, res: Response): Promise<void> {
       uid: uid(req),
       fridgeId: req.params.fridgeId,
       itemId: req.params.id,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function unfreezeItem(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = uid(req);
+    const { fridgeId, id } = req.params;
+    const { walletId } = req.body as { walletId?: unknown };
+
+    if (!walletId || typeof walletId !== 'string') {
+      res.status(400).json({ error: 'walletId is required' });
+      return;
+    }
+
+    const itemRef = itemsCollection(userId, fridgeId).doc(id);
+    const itemDoc = await itemRef.get();
+    if (!itemDoc.exists) {
+      res.status(404).json({ error: 'Fridge item not found' });
+      return;
+    }
+
+    const walletRef = admin
+      .firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('wallets')
+      .doc(walletId);
+    const walletDoc = await walletRef.get();
+    if (!walletDoc.exists) {
+      res.status(404).json({ error: 'Wallet not found' });
+      return;
+    }
+
+    const item = itemDoc.data() as FridgeItem;
+    const now = new Date().toISOString();
+    const positionData: Omit<Position, 'id'> = {
+      walletId,
+      ticker: item.ticker,
+      assetType: item.assetType ?? 'FII',
+      quantity: item.quantity,
+      averagePrice: item.transferredPrice,
+      inFridge: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const positionRef = positionsCollection(userId, walletId).doc();
+    const batch = admin.firestore().batch();
+    batch.delete(itemRef);
+    batch.set(positionRef, positionData);
+    await batch.commit();
+
+    res.status(201).json({ id: positionRef.id, ...positionData });
+  } catch (error) {
+    console.error('[unfreezeItem] error:', {
+      uid: uid(req),
+      fridgeId: req.params.fridgeId,
+      itemId: req.params.id,
+      body: req.body,
       message: (error as Error).message,
       stack: (error as Error).stack,
     });
