@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { FridgeService } from './fridge.service';
-import { Fridge, FridgeItem } from 'dindin-models';
+import { Fridge, FridgeItem, Position } from 'dindin-models';
 
 describe('FridgeService', () => {
   let service: FridgeService;
@@ -185,5 +185,30 @@ describe('FridgeService', () => {
     const req = httpMock.expectOne('/api/fridges/fridge-1/items/item-1');
     expect(req.request.method).toBe('DELETE');
     req.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('deve descongelar item em uma carteira', () => {
+    const position = {
+      id: 'position-1',
+      walletId: 'wallet-1',
+      ticker: 'HGLG11',
+      assetType: 'FII',
+      quantity: 10,
+      averagePrice: 110.5,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    } as Position;
+
+    service
+      .unfreezeItem('fridge-1', 'item-1', 'wallet-1')
+      .subscribe((response) => expect(response).toEqual(position));
+
+    const req = httpMock.expectOne(
+      '/api/fridges/fridge-1/items/item-1/unfreeze',
+    );
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ walletId: 'wallet-1' });
+    req.flush(position);
   });
 });

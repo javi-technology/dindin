@@ -8,12 +8,14 @@ import { of, throwError } from 'rxjs';
 import { FridgeComponent } from './fridge.component';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
-import { Asset, Fridge, FridgeItem } from 'dindin-models';
+import { WalletService } from '../../core/services/wallet.service';
+import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
 
 describe('FridgeComponent', () => {
   let fixture: ComponentFixture<FridgeComponent>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
+  let walletServiceMock: jasmine.SpyObj<WalletService>;
 
   const assets: Asset[] = [
     {
@@ -68,6 +70,16 @@ describe('FridgeComponent', () => {
       updatedAt: '2026-01-01T00:00:00Z',
     },
   ];
+  const wallets: Wallet[] = [
+    {
+      id: 'wallet-1',
+      ownerId: 'user-123',
+      name: 'Carteira Principal',
+      currency: 'BRL',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  ];
 
   beforeEach(async () => {
     fridgeServiceMock = jasmine.createSpyObj('FridgeService', [
@@ -77,6 +89,7 @@ describe('FridgeComponent', () => {
       'createItem',
       'updateItem',
       'deleteItem',
+      'unfreezeItem',
     ]);
 
     fridgeServiceMock.listFridges.and.returnValue(of(fridges));
@@ -84,12 +97,15 @@ describe('FridgeComponent', () => {
 
     assetServiceMock = jasmine.createSpyObj('AssetService', ['list']);
     assetServiceMock.list.and.returnValue(of(assets));
+    walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
+    walletServiceMock.list.and.returnValue(of(wallets));
 
     await TestBed.configureTestingModule({
       imports: [FridgeComponent],
       providers: [
         { provide: FridgeService, useValue: fridgeServiceMock },
         { provide: AssetService, useValue: assetServiceMock },
+        { provide: WalletService, useValue: walletServiceMock },
       ],
     }).compileComponents();
 
@@ -394,6 +410,92 @@ describe('FridgeComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const errorEl = compiled.querySelector('[data-testid="error-message"]');
     expect(errorEl?.textContent).toContain('Erro ao carregar itens.');
+  }));
+
+  it('deve abrir modal de descongelar com carteira selecionada', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = compiled.querySelector(
+      '[data-testid="btn-descongelar-item-0"]',
+    ) as HTMLButtonElement;
+
+    button.click();
+    fixture.detectChanges();
+
+    const modal = compiled.querySelector(
+      '[data-testid="unfreeze-modal"]',
+    ) as HTMLElement;
+    const walletSelect = modal.querySelector(
+      'select[formControlName="walletId"]',
+    ) as HTMLSelectElement;
+
+    expect(modal).toBeTruthy();
+    expect(modal.textContent).toContain('HGLG11');
+    expect(walletSelect.value).toBe('wallet-1');
+  });
+
+  it('deve descongelar item e removê-lo da tabela', fakeAsync(() => {
+    fridgeServiceMock.unfreezeItem.and.returnValue(
+      of({
+        id: 'position-1',
+        walletId: 'wallet-1',
+        ticker: 'HGLG11',
+        assetType: 'FII',
+        quantity: 10,
+        averagePrice: 110.5,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+    );
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    (
+      compiled.querySelector(
+        '[data-testid="btn-descongelar-item-0"]',
+      ) as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+    (
+      compiled.querySelector(
+        '[data-testid="unfreeze-modal"] button.bg-emerald-600',
+      ) as HTMLButtonElement
+    ).click();
+    tick();
+    fixture.detectChanges();
+
+    expect(fridgeServiceMock.unfreezeItem).toHaveBeenCalledWith(
+      'fridge-1',
+      'item-1',
+      'wallet-1',
+    );
+    expect(fixture.componentInstance.items().map((item) => item.id)).toEqual([
+      'item-2',
+    ]);
+  }));
+
+  it('deve exibir erro quando falha ao descongelar item', fakeAsync(() => {
+    fridgeServiceMock.unfreezeItem.and.returnValue(
+      throwError(() => new Error('Network error')),
+    );
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    (
+      compiled.querySelector(
+        '[data-testid="btn-descongelar-item-0"]',
+      ) as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+    (
+      compiled.querySelector(
+        '[data-testid="unfreeze-modal"] button.bg-emerald-600',
+      ) as HTMLButtonElement
+    ).click();
+    tick();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.unfreezeError()).toBe(
+      'Erro ao descongelar item.',
+    );
   }));
 
   it('deve exibir erro no formulário quando falha ao criar item', fakeAsync(() => {
