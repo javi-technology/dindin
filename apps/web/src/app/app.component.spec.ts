@@ -36,7 +36,7 @@ describe('AppComponent', () => {
     fixture = TestBed.createComponent(AppComponent);
   });
 
-  it('deve exibir navegação entre dashboard, carteira, geladeira e proventos quando autenticado', () => {
+  it('deve exibir navegação entre dashboard, carteira, geladeira, proventos e carteira recomendada quando autenticado', () => {
     authServiceMock.user.set({ email: 'user@dindin.app' });
 
     fixture.detectChanges();
@@ -45,7 +45,13 @@ describe('AppComponent', () => {
       fixture.nativeElement.querySelectorAll('[data-testid="main-nav"] a'),
     ).map((link) => (link as HTMLAnchorElement).textContent?.trim());
 
-    expect(links).toEqual(['Dashboard', 'Carteira', 'Geladeira', 'Proventos']);
+    expect(links).toEqual([
+      'Dashboard',
+      'Carteira',
+      'Geladeira',
+      'Proventos',
+      'Carteira recomendada',
+    ]);
   });
 
   it('deve destacar a rota ativa sobrepondo a cor base do link', fakeAsync(() => {
