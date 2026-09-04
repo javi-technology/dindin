@@ -256,6 +256,17 @@ describe('DashboardComponent', () => {
     ).toBeTruthy();
   });
 
+  it('deve exibir link para a carteira recomendada', () => {
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector(
+      '[data-testid="recommended-wallet-link"]',
+    );
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/carteira-recomendada');
+    expect(link.textContent).toContain('Carteira recomendada');
+  });
+
   it('deve exibir mensagem de erro quando falhar ao carregar o resumo', () => {
     walletServiceMock.list.and.returnValue(
       throwError(() => new Error('network error')),
