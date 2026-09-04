@@ -3,11 +3,12 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { parseBbFileName } from './bb-pdf.parser';
 import { saveBbPdf } from './storage.service';
 import {
+  buildRecommendedWallet,
   compareWithWallet,
   confirmRecommendedWallet,
   getRecommendedWallet,
-  importBbWallet,
   listRecommendedWallets,
+  persistRecommendedWallet,
 } from './recommended-wallet.service';
 
 function uid(req: Request): string {
@@ -98,8 +99,21 @@ export async function importRecommended(
       return;
     }
     const buffer = Buffer.from(contentBase64, 'base64');
+    let wallet;
+    try {
+      wallet = await buildRecommendedWallet(
+        buffer,
+        `wallets/fii-bb/${fileName}`,
+      );
+    } catch (error) {
+      const inputError = error as Error & { statusCode?: number };
+      inputError.statusCode = 400;
+      throw inputError;
+    }
     const sourceFile = await saveBbPdf(fileName, buffer);
-    res.status(201).json(await importBbWallet(buffer, sourceFile));
+    res
+      .status(201)
+      .json(await persistRecommendedWallet({ ...wallet, sourceFile }));
   } catch (error) {
     console.error('[importRecommended] error:', error);
     const code = statusCode(error);

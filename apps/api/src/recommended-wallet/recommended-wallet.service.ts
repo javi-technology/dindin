@@ -9,7 +9,7 @@ import {
 import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
-import { saveBbPdf } from './storage.service';
+import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
 
 function recommendedWalletsCollection() {
   return admin.firestore().collection('recommendedWallets');
@@ -32,11 +32,10 @@ async function mapAssets(rows: ParsedRow[]): Promise<RecommendedWalletAsset[]> {
   );
 }
 
-export async function importBbWallet(
+export async function buildRecommendedWallet(
   buffer: Buffer,
   sourceFile: string,
 ): Promise<RecommendedWallet> {
-  console.log(`[importBbWallet] Iniciando importação: ${sourceFile}`);
   const parsedFile = parseBbFileName(sourceFileName(sourceFile));
   if (!parsedFile) {
     throw new Error(
@@ -52,7 +51,7 @@ export async function importBbWallet(
     : undefined;
   if (existing && existing.revision >= parsedFile.revision) {
     console.log(
-      `[importBbWallet] Ignorada ${sourceFile}: revisão ${parsedFile.revision} já processada`,
+      `[buildRecommendedWallet] Ignorada ${sourceFile}: revisão ${parsedFile.revision} já processada`,
     );
     return { ...existing, id: existing.id ?? id };
   }
@@ -77,9 +76,41 @@ export async function importBbWallet(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
-  await docRef.set(wallet);
-  console.log(`[importBbWallet] Importada ${id} revisão ${wallet.revision}`);
   return wallet;
+}
+
+export async function persistRecommendedWallet(
+  wallet: RecommendedWallet,
+): Promise<RecommendedWallet> {
+  const docRef = recommendedWalletsCollection().doc(wallet.id);
+  return admin.firestore().runTransaction(async (transaction) => {
+    const existingDoc = await transaction.get(docRef);
+    const existing = existingDoc.exists
+      ? (existingDoc.data() as RecommendedWallet)
+      : undefined;
+    if (existing && existing.revision >= wallet.revision) {
+      return { ...existing, id: existing.id ?? wallet.id };
+    }
+
+    const persisted = {
+      ...wallet,
+      createdAt: existing?.createdAt ?? wallet.createdAt,
+    };
+    transaction.set(docRef, persisted);
+    console.log(
+      `[persistRecommendedWallet] Importada ${wallet.id} revisão ${wallet.revision}`,
+    );
+    return persisted;
+  });
+}
+
+export async function importBbWallet(
+  buffer: Buffer,
+  sourceFile: string,
+): Promise<RecommendedWallet> {
+  console.log(`[importBbWallet] Iniciando importação: ${sourceFile}`);
+  const wallet = await buildRecommendedWallet(buffer, sourceFile);
+  return persistRecommendedWallet(wallet);
 }
 
 export async function getRecommendedWallet(
@@ -239,15 +270,8 @@ export async function syncBbWallet(): Promise<void> {
     console.log('[syncBbWallet] Nenhum PDF disponível');
     return;
   }
-  const id = recommendedWalletId(currentMonth);
-  const existing = await recommendedWalletsCollection().doc(id).get();
-  if (
-    existing.exists &&
-    (existing.data() as RecommendedWallet).revision >= found.revision
-  ) {
-    console.log(`[syncBbWallet] Revisão ${found.revision} já processada`);
-    return;
-  }
-  const sourceFile = await saveBbPdf(found.fileName, found.buffer);
-  await importBbWallet(found.buffer, sourceFile);
+  const sourceFile = `${BB_WALLET_PREFIX}${found.fileName}`;
+  const wallet = await buildRecommendedWallet(found.buffer, sourceFile);
+  await saveBbPdf(found.fileName, found.buffer);
+  await persistRecommendedWallet(wallet);
 }

@@ -19,8 +19,10 @@ jest.mock('../../src/recommended-wallet/bb-pdf.parser', () => ({
 }));
 
 import {
+  buildRecommendedWallet,
   compareWithWallet,
   importBbWallet,
+  persistRecommendedWallet,
   recommendedWalletId,
 } from '../../src/recommended-wallet/recommended-wallet.service';
 
@@ -59,19 +61,26 @@ describe('recommended-wallet.service', () => {
   });
 
   it('deve importar uma carteira com renda, ganho e status pendente', async () => {
-    const doc = {
-      exists: false,
-      data: () => undefined,
+    const docRef = {
       get: jest.fn().mockResolvedValue({
         exists: false,
         data: () => undefined,
       }),
-      set: jest.fn().mockResolvedValue(undefined),
+    };
+    const transaction = {
+      get: jest.fn().mockResolvedValue({
+        exists: false,
+        data: () => undefined,
+      }),
+      set: jest.fn(),
     };
     firestoreMock = {
       collection: jest.fn(() => ({
-        doc: jest.fn(() => doc),
+        doc: jest.fn(() => docRef),
       })),
+      runTransaction: jest.fn((callback: (tx: unknown) => unknown) =>
+        callback(transaction),
+      ),
     };
 
     const result = await importBbWallet(
@@ -86,7 +95,86 @@ describe('recommended-wallet.service', () => {
       renda: expect.any(Array),
       ganho: [],
     });
-    expect(doc.set).toHaveBeenCalledWith(result);
+    expect(transaction.set).toHaveBeenCalledWith(docRef, result);
+  });
+
+  it('deve ignorar revisão antiga sem sobrescrever a carteira atual', async () => {
+    const existing = {
+      id: 'bb-fii_2026-09',
+      revision: 3,
+      status: 'confirmed',
+      createdAt: '2026-09-01T00:00:00Z',
+    };
+    const docRef = {};
+    const transaction = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => existing,
+      }),
+      set: jest.fn(),
+    };
+    firestoreMock = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => docRef),
+      })),
+      runTransaction: jest.fn((callback: (tx: unknown) => unknown) =>
+        callback(transaction),
+      ),
+    };
+
+    const result = await persistRecommendedWallet({
+      ...existing,
+      month: '2026-09',
+      provider: 'BB',
+      sourceFile: 'wallets/fii-bb/CartFII_Set26_2.pdf',
+      renda: [],
+      ganho: [],
+      publishedAt: '2026-09-02',
+      parsedAt: '2026-09-04T00:00:00Z',
+      updatedAt: '2026-09-04T00:00:00Z',
+    } as never);
+
+    expect(result).toEqual(existing);
+    expect(transaction.set).not.toHaveBeenCalled();
+  });
+
+  it('deve preservar confirmação ao processar novamente a mesma revisão', async () => {
+    const existing = {
+      id: 'bb-fii_2026-09',
+      revision: 2,
+      status: 'confirmed',
+      createdAt: '2026-09-01T00:00:00Z',
+    };
+    const docRef = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => existing,
+      }),
+    };
+    const transaction = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => existing,
+      }),
+      set: jest.fn(),
+    };
+    firestoreMock = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => docRef),
+      })),
+      runTransaction: jest.fn((callback: (tx: unknown) => unknown) =>
+        callback(transaction),
+      ),
+    };
+
+    const result = await importBbWallet(
+      Buffer.from('pdf'),
+      'wallets/fii-bb/CartFII_Set26_2.pdf',
+    );
+
+    expect(result).toEqual(existing);
+    expect(parseBbFiiPdfMock).not.toHaveBeenCalled();
+    expect(transaction.set).not.toHaveBeenCalled();
   });
 
   it('deve comparar posições atuais com a renda recomendada', async () => {

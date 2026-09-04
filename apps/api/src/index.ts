@@ -238,7 +238,11 @@ export const onBbWalletPdfUploaded = onObjectFinalized(
   },
   async (event) => {
     const name = event.data.name;
-    if (!name.startsWith(BB_WALLET_PREFIX) || !name.endsWith('.pdf')) return;
+    if (
+      !name.startsWith(BB_WALLET_PREFIX) ||
+      !name.toLowerCase().endsWith('.pdf')
+    )
+      return;
     const buffer = await downloadBbPdf(name);
     await importBbWallet(buffer, name);
   },

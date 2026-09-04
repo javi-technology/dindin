@@ -4,7 +4,10 @@ const verifyIdTokenMock = jest.fn();
 const listRecommendedWalletsMock = jest.fn();
 const getRecommendedWalletMock = jest.fn();
 const compareWithWalletMock = jest.fn();
+const buildRecommendedWalletMock = jest.fn();
+const persistRecommendedWalletMock = jest.fn();
 const importBbWalletMock = jest.fn();
+const syncBbWalletMock = jest.fn();
 const confirmRecommendedWalletMock = jest.fn();
 const parseBbFileNameMock = jest.fn();
 const saveBbPdfMock = jest.fn();
@@ -22,7 +25,12 @@ jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
   getRecommendedWallet: (...args: unknown[]) =>
     getRecommendedWalletMock(...args),
   compareWithWallet: (...args: unknown[]) => compareWithWalletMock(...args),
+  buildRecommendedWallet: (...args: unknown[]) =>
+    buildRecommendedWalletMock(...args),
+  persistRecommendedWallet: (...args: unknown[]) =>
+    persistRecommendedWalletMock(...args),
   importBbWallet: (...args: unknown[]) => importBbWalletMock(...args),
+  syncBbWallet: (...args: unknown[]) => syncBbWalletMock(...args),
   confirmRecommendedWallet: (...args: unknown[]) =>
     confirmRecommendedWalletMock(...args),
 }));
@@ -42,6 +50,15 @@ describe('recommended-wallet.controller', () => {
     jest.clearAllMocks();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     saveBbPdfMock.mockResolvedValue('wallets/fii-bb/CartFII_Set26_2.pdf');
+    parseBbFileNameMock.mockReturnValue({ month: '2026-09', revision: 2 });
+    buildRecommendedWalletMock.mockResolvedValue({
+      id: 'bb-fii_2026-09',
+      month: '2026-09',
+      revision: 2,
+    });
+    persistRecommendedWalletMock.mockResolvedValue({
+      id: 'bb-fii_2026-09',
+    });
   });
 
   it('deve listar carteiras recomendadas para usuário autenticado', async () => {
@@ -100,8 +117,6 @@ describe('recommended-wallet.controller', () => {
   it('deve importar PDF somente para usuário admin', async () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'admin-1', admin: true });
     parseBbFileNameMock.mockReturnValue({ month: '2026-09', revision: 2 });
-    importBbWalletMock.mockResolvedValue({ id: 'bb-fii_2026-09' });
-
     const response = await request(app)
       .post('/api/admin/recommended-wallets/bb-fii/import')
       .set('Authorization', 'Bearer token')
@@ -112,10 +127,11 @@ describe('recommended-wallet.controller', () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ id: 'bb-fii_2026-09' });
-    expect(importBbWalletMock).toHaveBeenCalledWith(
+    expect(buildRecommendedWalletMock).toHaveBeenCalledWith(
       Buffer.from('pdf'),
       'wallets/fii-bb/CartFII_Set26_2.pdf',
     );
+    expect(persistRecommendedWalletMock).toHaveBeenCalled();
   });
 
   it('deve rejeitar nome inválido no endpoint de importação', async () => {
@@ -131,6 +147,27 @@ describe('recommended-wallet.controller', () => {
       });
 
     expect(response.status).toBe(400);
-    expect(importBbWalletMock).not.toHaveBeenCalled();
+    expect(buildRecommendedWalletMock).not.toHaveBeenCalled();
+  });
+
+  it('deve validar o PDF antes de salvar no Storage', async () => {
+    verifyIdTokenMock.mockResolvedValue({ uid: 'admin-1', admin: true });
+    const error = new Error(
+      'A tabela de fundos recomendados deve conter entre 4 e 15 linhas',
+    );
+    buildRecommendedWalletMock.mockRejectedValue(error);
+
+    const response = await request(app)
+      .post('/api/admin/recommended-wallets/bb-fii/import')
+      .set('Authorization', 'Bearer token')
+      .send({
+        fileName: 'CartFII_Set26_2.pdf',
+        contentBase64: Buffer.from('pdf').toString('base64'),
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: error.message });
+    expect(saveBbPdfMock).not.toHaveBeenCalled();
+    expect(persistRecommendedWalletMock).not.toHaveBeenCalled();
   });
 });
