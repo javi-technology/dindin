@@ -41,6 +41,7 @@ import { RecommendedWallet, RecommendedWalletComparison } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
   let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
   const comparison = {
     recommended: {
       id: 'bb-fii_2026-09',
@@ -89,6 +90,9 @@ describe('ai-suggestion.service', () => {
     consoleErrorSpy = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
+    consoleWarnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_MODEL;
     global.fetch = jest.fn();
@@ -96,6 +100,7 @@ describe('ai-suggestion.service', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('deve montar o contexto com tickers, pesos e proventos', () => {
@@ -296,50 +301,117 @@ describe('ai-suggestion.service', () => {
     expect(result.disclaimer).toBe('Aviso.');
   });
 
-  it('deve rejeitar compra de item extra', () => {
-    expect(() =>
-      parseSuggestionOutput(
-        JSON.stringify({
-          summary: 'Resumo.',
-          items: [
-            {
-              ticker: 'XPML11',
-              action: 'buy',
-              priority: 1,
-              rationale: 'Compre mais.',
-            },
-          ],
-        }),
-        new Map([['XPML11', 'extra']]),
-      ),
-    ).toThrow('Resposta inválida da IA');
+  it('deve converter compra de item extra em manutenção', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'XPML11',
+            action: 'buy',
+            priority: 1,
+            rationale: 'Compre mais.',
+            suggestedAmount: 250,
+          },
+        ],
+      }),
+      new Map([['XPML11', 'extra']]),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        ticker: 'XPML11',
+        action: 'hold',
+      }),
+    ]);
+    expect(result.items[0]).not.toHaveProperty('suggestedAmount');
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[parseSuggestionOutput] compra em item extra convertida',
+      { ticker: 'XPML11' },
+    );
   });
 
-  it('deve rejeitar compras acima do total disponível', () => {
-    expect(() =>
-      parseSuggestionOutput(
-        JSON.stringify({
-          summary: 'Resumo.',
-          items: [
-            {
-              ticker: 'HGLG11',
-              action: 'buy',
-              priority: 1,
-              rationale: 'Aumente a posição.',
-              suggestedAmount: 101.01,
-            },
-          ],
-        }),
-        new Map([['HGLG11', 'missing']]),
-        100,
-      ),
-    ).toThrow('Resposta inválida da IA');
+  it('deve distribuir compras acima do total disponível', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'buy',
+            priority: 1,
+            rationale: 'Aumente a posição.',
+            suggestedAmount: 70,
+          },
+          {
+            ticker: 'VISC11',
+            action: 'buy',
+            priority: 2,
+            rationale: 'Aumente a posição.',
+            suggestedAmount: 50,
+          },
+        ],
+      }),
+      new Map([
+        ['HGLG11', 'missing'],
+        ['VISC11', 'underweight'],
+      ]),
+      100,
+    );
+
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ticker: 'HGLG11', suggestedAmount: 58.33 }),
+        expect.objectContaining({ ticker: 'VISC11', suggestedAmount: 41.67 }),
+      ]),
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[parseSuggestionOutput] compras ajustadas ao total disponível',
+      {
+        amounts: [
+          { ticker: 'HGLG11', from: 70, to: 58.33 },
+          { ticker: 'VISC11', from: 50, to: 41.67 },
+        ],
+      },
+    );
+  });
+
+  it('deve descartar individualmente itens inválidos', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'hold',
+            priority: 'invalida',
+            rationale: 'Item inválido.',
+          },
+          {
+            ticker: 'VISC11',
+            action: 'hold',
+            priority: 1,
+            rationale: 'Item válido.',
+          },
+        ],
+      }),
+      new Map([
+        ['HGLG11', 'match'],
+        ['VISC11', 'match'],
+      ]),
+    );
+
+    expect(result.items.map((item) => item.ticker)).toEqual(['VISC11']);
   });
 
   it('deve rejeitar JSON inválido', () => {
     expect(() =>
       parseSuggestionOutput('{invalido', new Map([['HGLG11', 'match']])),
     ).toThrow('Resposta inválida da IA');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[parseSuggestionOutput] resposta inválida',
+      { reason: 'JSON inválido', snippet: '{invalido' },
+    );
   });
 
   it('deve aceitar JSON em code fence e campos tolerantes', () => {
