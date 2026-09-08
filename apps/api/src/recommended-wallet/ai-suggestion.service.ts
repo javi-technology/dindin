@@ -25,8 +25,7 @@ export interface AiSuggestionInput {
   items: AiSuggestionInputItem[];
 }
 
-const DEFAULT_DISCLAIMER =
-  'Conteúdo gerado por IA. Não é recomendação de investimento.';
+const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
 export const OPENROUTER_TIMEOUT_MS = 30_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
 
@@ -95,14 +94,19 @@ export function buildSuggestionInput(
 function isValidItem(value: unknown): value is AiSuggestionItem {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
+  const priority =
+    typeof item.priority === 'string' ? Number(item.priority) : item.priority;
+  if (typeof item.priority === 'string') item.priority = priority;
+  if (item.suggestedAmount === null) delete item.suggestedAmount;
   return (
     typeof item.ticker === 'string' &&
     item.ticker.length > 0 &&
     (item.action === 'buy' ||
       item.action === 'hold' ||
       item.action === 'reduce') &&
-    Number.isInteger(item.priority) &&
-    (item.priority as number) >= 1 &&
+    typeof priority === 'number' &&
+    Number.isInteger(priority) &&
+    priority >= 1 &&
     typeof item.rationale === 'string' &&
     (item.suggestedAmount === undefined ||
       (typeof item.suggestedAmount === 'number' &&
@@ -117,7 +121,9 @@ export function parseSuggestionOutput(
   totalAvailable?: number,
 ): { summary: string; items: AiSuggestionItem[]; disclaimer: string } {
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const trimmed = raw.trim();
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    const parsed: unknown = JSON.parse(fenced?.[1] ?? trimmed);
     if (!parsed || typeof parsed !== 'object') throw new Error();
     const data = parsed as Record<string, unknown>;
     if (typeof data.summary !== 'string' || !Array.isArray(data.items)) {
@@ -170,28 +176,46 @@ export async function callOpenRouter(
   if (!apiKey) throw createError('OPENROUTER_API_KEY não configurada', 500);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
-  try {
-    const response = await fetch(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
-          temperature: 0.2,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        }),
-        signal: controller.signal,
+  const requestBody = {
+    model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
+    temperature: 0.2,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  };
+  const request = (body: object) =>
+    fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  const logResponseError = async (response: Response): Promise<void> => {
+    const body =
+      typeof response.text === 'function' ? await response.text() : '';
+    const safeBody = body.split(apiKey).join('[redacted]').slice(0, 500);
+    console.error(
+      '[callOpenRouter] OpenRouter respondeu',
+      response.status,
+      safeBody,
     );
-    if (!response.ok) throw new Error();
+  };
+  try {
+    let response = await request(requestBody);
+    if (!response.ok) {
+      await logResponseError(response);
+      const { response_format: _responseFormat, ...retryBody } = requestBody;
+      response = await request(retryBody);
+      if (!response.ok) {
+        await logResponseError(response);
+        throw createError('Falha ao consultar o provedor de IA', 502);
+      }
+    }
     const data: unknown = await response.json();
     if (
       !data ||
@@ -201,14 +225,27 @@ export async function callOpenRouter(
       typeof (data as { choices: Array<{ message?: { content?: unknown } }> })
         .choices[0]?.message?.content !== 'string'
     ) {
-      throw new Error();
+      const serialized = JSON.stringify(data) ?? String(data);
+      console.error(
+        '[callOpenRouter] resposta inesperada',
+        serialized.slice(0, 500),
+      );
+      throw createError('Falha ao consultar o provedor de IA', 502);
     }
     const result = data as {
       model: string;
       choices: Array<{ message: { content: string } }>;
     };
     return { content: result.choices[0].message.content, model: result.model };
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      (error as StatusError).statusCode === 502
+    ) {
+      throw error;
+    }
+    console.error('[callOpenRouter] falha', error);
     throw createError('Falha ao consultar o provedor de IA', 502);
   } finally {
     clearTimeout(timeout);
