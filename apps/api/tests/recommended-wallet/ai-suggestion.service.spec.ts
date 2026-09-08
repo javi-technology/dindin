@@ -97,6 +97,16 @@ describe('ai-suggestion.service', () => {
     ]);
   });
 
+  it('não deve incluir campos undefined em itens sem dados', () => {
+    const input = buildSuggestionInput(comparison, 'renda', new Map(), 500);
+
+    const extra = input.items.find((item) => item.ticker === 'XPML11');
+    expect(extra).toBeDefined();
+    for (const key of ['segment', 'weight', 'closePrice', 'monthlyDividend']) {
+      expect(extra).not.toHaveProperty(key);
+    }
+  });
+
   it('deve incluir aporte e total disponível no prompt', () => {
     const input = buildSuggestionInput(
       comparison,
