@@ -205,4 +205,5 @@ export interface AiSuggestion {
   createdAt: string;
   contribution?: number;
   projectedDividends?: number;
+  historyMonths?: string[];
 }

@@ -7,6 +7,7 @@ Nunca sugira tickers fora da carteira recomendada do mês. Valores são em BRL.
 Itens com status "extra" só podem receber a ação "hold" ou "reduce".
 Os valores de "suggestedAmount" para itens com ação "buy" devem somar no máximo o total disponível e devem distribuí-lo priorizando tickers "missing" e abaixo do peso recomendado.
 Quando nenhum aporte for informado, "suggestedAmount" é opcional.
+Use o histórico das carteiras recomendadas dos meses anteriores para contextualizar (ex.: ticker recém-incluído, peso crescente ou decrescente, ticker removido).
 Não invente dados e seja objetivo. O conteúdo não é recomendação de investimento.`;
 
 export function buildUserPrompt(input: AiSuggestionInput): string {
@@ -26,6 +27,22 @@ export function buildUserPrompt(input: AiSuggestionInput): string {
     return `- ${fields.join(', ')}`;
   });
 
+  const historyLines =
+    input.history.length > 0
+      ? [
+          'Histórico da carteira recomendada (meses anteriores):',
+          ...input.history.map(
+            (item) =>
+              `- ${item.month}: ${item.assets
+                .map(
+                  (asset) =>
+                    `${asset.ticker} peso=${asset.weight} segmento=${asset.segment}`,
+                )
+                .join('; ')}`,
+          ),
+        ]
+      : ['Histórico da carteira recomendada: indisponível'];
+
   return [
     `Mês: ${input.month}`,
     `Aba: ${input.tab}`,
@@ -41,5 +58,6 @@ export function buildUserPrompt(input: AiSuggestionInput): string {
         ]),
     'Ativos:',
     ...lines,
+    ...historyLines,
   ].join('\n');
 }
