@@ -69,12 +69,17 @@ export function buildSuggestionInput(
   );
   const items = comparison.items.map((item) => {
     const asset = assets.get(item.ticker.toUpperCase());
+    const monthlyDividend = quotesByTicker.get(item.ticker.toUpperCase());
     return {
       ...item,
-      segment: asset?.segment,
-      weight: asset?.weight,
-      closePrice: asset?.closePrice,
-      monthlyDividend: quotesByTicker.get(item.ticker.toUpperCase()),
+      ...(asset
+        ? {
+            segment: asset.segment,
+            weight: asset.weight,
+            closePrice: asset.closePrice,
+          }
+        : {}),
+      ...(monthlyDividend === undefined ? {} : { monthlyDividend }),
     };
   });
   const projectedDividends = items.reduce(
