@@ -106,6 +106,15 @@ describe('RecommendedWalletComponent', () => {
             suggestedQuantity: 1,
             referencePrice: 95,
           },
+          {
+            ticker: 'MXRF11',
+            action: 'buy',
+            priority: 2,
+            rationale: 'Aguarde acumular.',
+            suggestedAmount: 94.3,
+            suggestedQuantity: 0,
+            referencePrice: 96.44,
+          },
         ],
         disclaimer: 'Aviso',
         createdAt: '2026-09-04T12:00:00Z',
@@ -280,6 +289,28 @@ describe('RecommendedWalletComponent', () => {
     expect(card.textContent).toContain('Aporte:');
     expect(card.textContent).toContain('Proventos projetados:');
     expect(card.textContent).toContain('≈ 1 cota a R$\u00a095,00');
+  });
+
+  it('deve sinalizar quando o valor não alcança uma cota', () => {
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+    fixture.detectChanges();
+
+    const item = Array.from(
+      fixture.nativeElement.querySelectorAll('li') as NodeListOf<HTMLElement>,
+    ).find((element) => element.textContent?.includes('MXRF11'));
+    const badge = item?.querySelector('span');
+
+    expect(item!.textContent).toContain('Aguardar');
+    expect(badge?.classList.contains('bg-green-100')).toBeFalse();
+    expect(item!.textContent).toContain(
+      'Valor insuficiente para 1 cota (R$\u00a096,44); aguarde acumular ou redistribua.',
+    );
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-card"]')
+        .textContent,
+    ).toContain('Comprar');
   });
 
   it('deve enviar aporte parseado no formato pt-BR', () => {
