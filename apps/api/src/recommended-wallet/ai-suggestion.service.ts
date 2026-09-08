@@ -44,6 +44,14 @@ function suggestionsCollection(uid: string) {
     .collection('aiSuggestions');
 }
 
+function usageCollection(uid: string) {
+  return admin
+    .firestore()
+    .collection('users')
+    .doc(uid)
+    .collection('aiSuggestionUsage');
+}
+
 function isTab(value: unknown): value is AiSuggestionTab {
   return value === 'renda' || value === 'ganho';
 }
@@ -105,7 +113,8 @@ function isValidItem(value: unknown): value is AiSuggestionItem {
 
 export function parseSuggestionOutput(
   raw: string,
-  allowedTickers: Set<string>,
+  allowed: Map<string, RecommendedWalletComparisonItem['status']>,
+  totalAvailable?: number,
 ): { summary: string; items: AiSuggestionItem[]; disclaimer: string } {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -115,13 +124,31 @@ export function parseSuggestionOutput(
       throw new Error();
     }
     if (!data.items.every(isValidItem)) throw new Error();
-    const normalizedAllowedTickers = new Set(
-      [...allowedTickers].map((ticker) => ticker.toUpperCase()),
+    const normalizedAllowed = new Map(
+      [...allowed.entries()].map(([ticker, status]) => [
+        ticker.toUpperCase(),
+        status,
+      ]),
     );
     const items = (data.items as AiSuggestionItem[])
-      .filter((item) => normalizedAllowedTickers.has(item.ticker.toUpperCase()))
+      .filter((item) => normalizedAllowed.has(item.ticker.toUpperCase()))
       .sort((a, b) => a.priority - b.priority);
     if (items.length === 0) throw new Error();
+    if (
+      items.some(
+        (item) =>
+          normalizedAllowed.get(item.ticker.toUpperCase()) === 'extra' &&
+          item.action === 'buy',
+      )
+    ) {
+      throw new Error();
+    }
+    if (totalAvailable !== undefined) {
+      const buyTotal = items
+        .filter((item) => item.action === 'buy')
+        .reduce((total, item) => total + (item.suggestedAmount ?? 0), 0);
+      if (buyTotal > totalAvailable * 1.01) throw new Error();
+    }
     return {
       summary: data.summary,
       items,
@@ -191,7 +218,7 @@ export async function callOpenRouter(
 export async function checkDailyLimit(uid: string): Promise<void> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  const snapshot = await suggestionsCollection(uid)
+  const snapshot = await usageCollection(uid)
     .where('createdAt', '>=', startOfToday.toISOString())
     .get();
   if (snapshot.size >= DAILY_SUGGESTION_LIMIT) {
@@ -253,14 +280,18 @@ export async function generateSuggestion(
     monthlyDividends,
     contribution,
   );
-  const allowedTickers = new Set(
-    comparison.items.map((item) => item.ticker.toUpperCase()),
+  const allowed = new Map(
+    comparison.items.map((item) => [item.ticker.toUpperCase(), item.status]),
   );
+  const totalAvailable =
+    contribution === undefined
+      ? undefined
+      : contribution + input.projectedDividends;
   const { content, model } = await callOpenRouter(
     SYSTEM_PROMPT,
     buildUserPrompt(input),
   );
-  const output = parseSuggestionOutput(content, allowedTickers);
+  const output = parseSuggestionOutput(content, allowed, totalAvailable);
   const id = suggestionId(walletId, month, tab);
   const createdAt = new Date().toISOString();
   const suggestion: AiSuggestion = {
@@ -277,5 +308,6 @@ export async function generateSuggestion(
   await suggestionsCollection(uid)
     .doc(id)
     .set({ ...suggestion, input });
+  await usageCollection(uid).doc().set({ createdAt, suggestionId: id });
   return suggestion;
 }

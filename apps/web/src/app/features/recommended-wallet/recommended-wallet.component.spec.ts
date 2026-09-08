@@ -249,6 +249,20 @@ describe('RecommendedWalletComponent', () => {
     pending.complete();
   });
 
+  it('deve ignorar resposta atrasada após trocar a seleção', () => {
+    const pending = new Subject<AiSuggestion>();
+    serviceMock.generateSuggestion.and.returnValue(pending);
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+    fixture.componentInstance.selectTab('ganho');
+
+    pending.next({} as AiSuggestion);
+
+    expect(fixture.componentInstance.suggestion()).toBeNull();
+    expect(fixture.componentInstance.suggestionLoading()).toBeFalse();
+  });
+
   it('deve renderizar itens da sugestão com seus badges', () => {
     fixture.detectChanges();
 

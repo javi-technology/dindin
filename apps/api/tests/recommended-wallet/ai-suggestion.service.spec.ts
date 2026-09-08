@@ -126,16 +126,56 @@ describe('ai-suggestion.service', () => {
         ],
         disclaimer: 'Aviso.',
       }),
-      new Set(['HGLG11']),
+      new Map([['HGLG11', 'match']]),
     );
 
     expect(result.items.map((item) => item.ticker)).toEqual(['HGLG11']);
     expect(result.disclaimer).toBe('Aviso.');
   });
 
+  it('deve rejeitar compra de item extra', () => {
+    expect(() =>
+      parseSuggestionOutput(
+        JSON.stringify({
+          summary: 'Resumo.',
+          items: [
+            {
+              ticker: 'XPML11',
+              action: 'buy',
+              priority: 1,
+              rationale: 'Compre mais.',
+            },
+          ],
+        }),
+        new Map([['XPML11', 'extra']]),
+      ),
+    ).toThrow('Resposta inválida da IA');
+  });
+
+  it('deve rejeitar compras acima do total disponível', () => {
+    expect(() =>
+      parseSuggestionOutput(
+        JSON.stringify({
+          summary: 'Resumo.',
+          items: [
+            {
+              ticker: 'HGLG11',
+              action: 'buy',
+              priority: 1,
+              rationale: 'Aumente a posição.',
+              suggestedAmount: 101.01,
+            },
+          ],
+        }),
+        new Map([['HGLG11', 'missing']]),
+        100,
+      ),
+    ).toThrow('Resposta inválida da IA');
+  });
+
   it('deve rejeitar JSON inválido', () => {
     expect(() =>
-      parseSuggestionOutput('{invalido', new Set(['HGLG11'])),
+      parseSuggestionOutput('{invalido', new Map([['HGLG11', 'match']])),
     ).toThrow('Resposta inválida da IA');
   });
 
@@ -193,6 +233,92 @@ describe('ai-suggestion.service', () => {
       statusCode: 429,
       message: 'Limite diário de sugestões atingido',
     });
+  });
+
+  it('deve bloquear a sexta regeneração pelo histórico de uso', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'hold',
+                    priority: 1,
+                    rationale: 'Mantenha.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    let usageCount = 0;
+    const usageDoc = {
+      set: jest.fn().mockImplementation(async () => {
+        usageCount += 1;
+      }),
+    };
+    const usageQuery = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockImplementation(async () => ({ size: usageCount })),
+      doc: jest.fn(() => usageDoc),
+    };
+    const suggestionDoc = {
+      get: jest.fn().mockResolvedValue({ exists: false }),
+      set: jest.fn(),
+    };
+    const userDoc = {
+      collection: jest.fn((name: string) =>
+        name === 'aiSuggestionUsage'
+          ? usageQuery
+          : { doc: jest.fn(() => suggestionDoc) },
+      ),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return {
+            get: jest.fn().mockResolvedValue({
+              docs: [
+                {
+                  id: 'HGLG11',
+                  data: () => ({ monthlyDividend: 1.25 }),
+                },
+              ],
+            }),
+          };
+        }
+        return { doc: jest.fn(() => userDoc) };
+      }),
+    };
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+    }
+
+    await expect(
+      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+    ).rejects.toMatchObject({
+      statusCode: 429,
+      message: 'Limite diário de sugestões atingido',
+    });
+    expect(usageQuery.get).toHaveBeenCalledTimes(6);
+    expect(usageDoc.set).toHaveBeenCalledTimes(5);
+    expect(usageDoc.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        suggestionId: 'wallet-1_2026-09_renda',
+        createdAt: expect.any(String),
+      }),
+    );
   });
 
   it('deve retornar a sugestão salva sem consultar a IA', async () => {

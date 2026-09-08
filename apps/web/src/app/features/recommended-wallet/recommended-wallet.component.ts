@@ -233,6 +233,7 @@ export class RecommendedWalletComponent implements OnInit {
   generateSuggestion(force = false): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
+    const tab = this.selectedTab();
     if (!walletId || !month) return;
 
     this.suggestionError.set(null);
@@ -253,28 +254,40 @@ export class RecommendedWalletComponent implements OnInit {
         ? this.recommendedWalletService.generateSuggestion(
             walletId,
             month,
-            this.selectedTab(),
+            tab,
             force,
           )
         : this.recommendedWalletService.generateSuggestion(
             walletId,
             month,
-            this.selectedTab(),
+            tab,
             force,
             contribution,
           );
     request.subscribe({
       next: (suggestion) => {
-        this.suggestion.set(suggestion);
-        this.suggestionLoading.set(false);
+        if (
+          walletId === this.selectedWalletId() &&
+          month === this.selectedMonth() &&
+          tab === this.selectedTab()
+        ) {
+          this.suggestion.set(suggestion);
+          this.suggestionLoading.set(false);
+        }
       },
       error: (error: { status?: number; error?: { error?: string } }) => {
-        this.suggestionLoading.set(false);
-        this.suggestionError.set(
-          error?.status === 429 && error.error?.error
-            ? error.error.error
-            : 'Não foi possível gerar a sugestão. Tente novamente.',
-        );
+        if (
+          walletId === this.selectedWalletId() &&
+          month === this.selectedMonth() &&
+          tab === this.selectedTab()
+        ) {
+          this.suggestionLoading.set(false);
+          this.suggestionError.set(
+            error?.status === 429 && error.error?.error
+              ? error.error.error
+              : 'Não foi possível gerar a sugestão. Tente novamente.',
+          );
+        }
       },
     });
   }
@@ -317,6 +330,7 @@ export class RecommendedWalletComponent implements OnInit {
     const month = this.selectedMonth();
     this.suggestion.set(null);
     this.suggestionError.set(null);
+    this.suggestionLoading.set(false);
     if (!walletId || !month) return;
 
     this.compareRequest$.next({

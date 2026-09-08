@@ -48,6 +48,10 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /aiSuggestionUsage/{id} {
+        allow read, write: if false;
+      }
+
     }
 
     // Cotações — leitura pública (qualquer usuário autenticado),
