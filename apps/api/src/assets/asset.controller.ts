@@ -26,6 +26,25 @@ export async function listAssets(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function listAllAssets(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const snapshot = await assetsCollection().get();
+    const assets = snapshot.docs
+      .map((doc) => doc.data() as Asset)
+      .sort((a, b) => a.ticker.localeCompare(b.ticker));
+    res.json(assets);
+  } catch (error) {
+    console.error('[listAllAssets] error:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 interface AssetBodyValid {
   valid: true;
   data: {
@@ -162,30 +181,26 @@ export async function updateAsset(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const current = {
-      ...(existing.data() as Asset),
-      ticker: normalizedTicker,
-    };
     const now = new Date().toISOString();
-    const updated: Asset = {
-      ...current,
-      ...(validation.data.name === undefined
-        ? {}
-        : { name: validation.data.name.trim() }),
-      ...(validation.data.assetType === undefined
-        ? {}
-        : { assetType: validation.data.assetType }),
-      ...(validation.data.active === undefined
-        ? {}
-        : { active: validation.data.active }),
-      ...(validation.data.qualifiedInvestor === undefined
-        ? {}
-        : { qualifiedInvestor: validation.data.qualifiedInvestor }),
+    const patch: Partial<Asset> = {
       updatedAt: now,
     };
+    if (validation.data.name !== undefined) {
+      patch.name = validation.data.name.trim();
+    }
+    if (validation.data.assetType !== undefined) {
+      patch.assetType = validation.data.assetType;
+    }
+    if (validation.data.active !== undefined) {
+      patch.active = validation.data.active;
+    }
+    if (validation.data.qualifiedInvestor !== undefined) {
+      patch.qualifiedInvestor = validation.data.qualifiedInvestor;
+    }
 
-    await docRef.set(updated);
-    res.json(updated);
+    await docRef.update(patch);
+    const updated = await docRef.get();
+    res.json(updated.data());
   } catch (error) {
     console.error('[updateAsset] error:', {
       message: (error as Error).message,

@@ -16,6 +16,10 @@ export class AssetService {
     return this.http.get<Asset[]>(this.apiUrl);
   }
 
+  listAll(): Observable<Asset[]> {
+    return this.http.get<Asset[]>(this.adminUrl);
+  }
+
   /**
    * Cria um novo ativo no catálogo. Requer usuário autenticado com
    * permissão de admin.

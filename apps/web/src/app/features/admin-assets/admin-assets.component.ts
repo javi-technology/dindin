@@ -68,7 +68,7 @@ export class AdminAssetsComponent implements OnInit {
     this.error.set(null);
     this.formError.set(null);
     this.assetService
-      .list()
+      .listAll()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {

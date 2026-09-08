@@ -50,6 +50,7 @@ import {
 import { updateAllQuotes } from './quotes/update-quotes.handler';
 import {
   createAsset,
+  listAllAssets,
   listAssets,
   updateAsset,
 } from './assets/asset.controller';
@@ -110,6 +111,7 @@ app.get('/api/me', (req: AuthRequest, res: Response) => {
 });
 
 app.get('/api/assets', listAssets);
+app.get('/api/admin/assets', adminAuthMiddleware, listAllAssets);
 app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
 app.put('/api/admin/assets/:ticker', adminAuthMiddleware, updateAsset);
 
