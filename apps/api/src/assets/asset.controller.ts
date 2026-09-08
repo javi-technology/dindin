@@ -29,10 +29,11 @@ export async function listAssets(req: Request, res: Response): Promise<void> {
 interface AssetBodyValid {
   valid: true;
   data: {
-    ticker: string;
-    name: string;
-    assetType: AssetType;
+    ticker?: string;
+    name?: string;
+    assetType?: AssetType;
     active?: boolean;
+    qualifiedInvestor?: boolean;
   };
 }
 
@@ -43,23 +44,41 @@ interface AssetBodyInvalid {
 
 type AssetBodyValidation = AssetBodyValid | AssetBodyInvalid;
 
-function validateAssetBody(body: Record<string, unknown>): AssetBodyValidation {
+function validateAssetBody(
+  body: Record<string, unknown>,
+  requireIdentity = true,
+): AssetBodyValidation {
   const errors: string[] = [];
-  const { ticker, name, assetType, active } = body ?? {};
+  const { ticker, name, assetType, active, qualifiedInvestor } = body ?? {};
 
-  if (!ticker || typeof ticker !== 'string' || !ticker.trim()) {
+  if (
+    (requireIdentity || ticker !== undefined) &&
+    (!ticker || typeof ticker !== 'string' || !ticker.trim())
+  ) {
     errors.push('ticker is required');
-  } else if (!/^[A-Za-z0-9]+$/.test(ticker.trim())) {
+  } else if (ticker !== undefined && !/^[A-Za-z0-9]+$/.test(ticker.trim())) {
     errors.push('ticker must contain only letters and numbers');
   }
-  if (!name || typeof name !== 'string' || !name.trim()) {
+  if (
+    (requireIdentity || name !== undefined) &&
+    (!name || typeof name !== 'string' || !name.trim())
+  ) {
     errors.push('name is required');
   }
-  if (!assetType || !VALID_ASSET_TYPES.includes(assetType as AssetType)) {
+  if (
+    (requireIdentity || assetType !== undefined) &&
+    (!assetType || !VALID_ASSET_TYPES.includes(assetType as AssetType))
+  ) {
     errors.push(`assetType must be one of: ${VALID_ASSET_TYPES.join(', ')}`);
   }
   if (active !== undefined && typeof active !== 'boolean') {
     errors.push('active must be a boolean');
+  }
+  if (
+    qualifiedInvestor !== undefined &&
+    typeof qualifiedInvestor !== 'boolean'
+  ) {
+    errors.push('qualifiedInvestor must be a boolean');
   }
 
   if (errors.length > 0) {
@@ -69,10 +88,11 @@ function validateAssetBody(body: Record<string, unknown>): AssetBodyValidation {
   return {
     valid: true,
     data: {
-      ticker: ticker as string,
-      name: name as string,
-      assetType: assetType as AssetType,
+      ...(ticker === undefined ? {} : { ticker: ticker as string }),
+      ...(name === undefined ? {} : { name: name as string }),
+      ...(assetType === undefined ? {} : { assetType: assetType as AssetType }),
       active: active as boolean | undefined,
+      qualifiedInvestor: qualifiedInvestor as boolean | undefined,
     },
   };
 }
@@ -90,9 +110,10 @@ export async function createAsset(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { ticker, name, assetType, active } = validation.data;
+    const { ticker, name, assetType, active, qualifiedInvestor } =
+      validation.data;
 
-    const normalizedTicker = ticker.trim().toUpperCase();
+    const normalizedTicker = ticker!.trim().toUpperCase();
     const docRef = assetsCollection().doc(normalizedTicker);
     const existing = await docRef.get();
 
@@ -104,11 +125,12 @@ export async function createAsset(req: Request, res: Response): Promise<void> {
     const now = new Date().toISOString();
     const asset: Asset = {
       ticker: normalizedTicker,
-      name: name.trim(),
-      assetType,
+      name: name!.trim(),
+      assetType: assetType!,
       active: active !== false,
       createdAt: now,
       updatedAt: now,
+      ...(qualifiedInvestor === undefined ? {} : { qualifiedInvestor }),
     };
 
     await docRef.set(asset);
@@ -116,6 +138,56 @@ export async function createAsset(req: Request, res: Response): Promise<void> {
     res.status(201).json(asset);
   } catch (error) {
     console.error('[createAsset] error:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+export async function updateAsset(req: Request, res: Response): Promise<void> {
+  try {
+    const normalizedTicker = req.params.ticker.trim().toUpperCase();
+    const docRef = assetsCollection().doc(normalizedTicker);
+    const existing = await docRef.get();
+
+    if (!existing.exists) {
+      res.status(404).json({ error: 'Asset not found' });
+      return;
+    }
+
+    const validation = validateAssetBody(req.body ?? {}, false);
+    if (!validation.valid) {
+      res.status(400).json({ error: validation.errors.join('; ') });
+      return;
+    }
+
+    const current = {
+      ...(existing.data() as Asset),
+      ticker: normalizedTicker,
+    };
+    const now = new Date().toISOString();
+    const updated: Asset = {
+      ...current,
+      ...(validation.data.name === undefined
+        ? {}
+        : { name: validation.data.name.trim() }),
+      ...(validation.data.assetType === undefined
+        ? {}
+        : { assetType: validation.data.assetType }),
+      ...(validation.data.active === undefined
+        ? {}
+        : { active: validation.data.active }),
+      ...(validation.data.qualifiedInvestor === undefined
+        ? {}
+        : { qualifiedInvestor: validation.data.qualifiedInvestor }),
+      updatedAt: now,
+    };
+
+    await docRef.set(updated);
+    res.json(updated);
+  } catch (error) {
+    console.error('[updateAsset] error:', {
       message: (error as Error).message,
       stack: (error as Error).stack,
     });

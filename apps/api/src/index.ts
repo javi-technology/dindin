@@ -48,7 +48,11 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
-import { createAsset, listAssets } from './assets/asset.controller';
+import {
+  createAsset,
+  listAssets,
+  updateAsset,
+} from './assets/asset.controller';
 import {
   getPatrimonyHistory,
   postPatrimonySnapshot,
@@ -107,6 +111,7 @@ app.get('/api/me', (req: AuthRequest, res: Response) => {
 
 app.get('/api/assets', listAssets);
 app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
+app.put('/api/admin/assets/:ticker', adminAuthMiddleware, updateAsset);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);

@@ -23,4 +23,16 @@ export class AssetService {
   create(asset: Omit<Asset, 'createdAt' | 'updatedAt'>): Observable<Asset> {
     return this.http.post<Asset>(this.adminUrl, asset);
   }
+
+  update(
+    ticker: string,
+    payload: Partial<
+      Pick<Asset, 'name' | 'assetType' | 'active' | 'qualifiedInvestor'>
+    >,
+  ): Observable<Asset> {
+    return this.http.put<Asset>(
+      `${this.adminUrl}/${encodeURIComponent(ticker)}`,
+      payload,
+    );
+  }
 }

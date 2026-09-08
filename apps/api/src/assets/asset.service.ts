@@ -49,3 +49,16 @@ export async function listActiveAssetTickers(): Promise<ActiveAsset[]> {
     };
   });
 }
+
+export async function listQualifiedInvestorTickers(): Promise<Set<string>> {
+  const snapshot = await assetsCollection()
+    .where('qualifiedInvestor', '==', true)
+    .get();
+
+  return new Set(
+    snapshot.docs.map((doc) => {
+      const data = doc.data() as Partial<Asset> | undefined;
+      return (data?.ticker ?? doc.id).toUpperCase();
+    }),
+  );
+}
