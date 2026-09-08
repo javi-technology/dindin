@@ -3,10 +3,14 @@ import {
   AiSuggestion,
   AiSuggestionItem,
   AiSuggestionTab,
+  RecommendedWallet,
   RecommendedWalletComparison,
   RecommendedWalletComparisonItem,
 } from 'dindin-models';
-import { compareWithWallet } from './recommended-wallet.service';
+import {
+  compareWithWallet,
+  getRecommendedWallet,
+} from './recommended-wallet.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
@@ -16,6 +20,17 @@ export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   monthlyDividend?: number;
 }
 
+export interface AiSuggestionHistoryAsset {
+  ticker: string;
+  weight: number;
+  segment: string;
+}
+
+export interface AiSuggestionHistoryMonth {
+  month: string;
+  assets: AiSuggestionHistoryAsset[];
+}
+
 export interface AiSuggestionInput {
   month: string;
   tab: AiSuggestionTab;
@@ -23,6 +38,7 @@ export interface AiSuggestionInput {
   contribution?: number;
   projectedDividends: number;
   items: AiSuggestionInputItem[];
+  history: AiSuggestionHistoryMonth[];
 }
 
 const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
@@ -55,11 +71,37 @@ function isTab(value: unknown): value is AiSuggestionTab {
   return value === 'renda' || value === 'ganho';
 }
 
+export function previousMonths(month: string, count = 3): string[] {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1, 1));
+  return Array.from({ length: count }, () => {
+    date.setUTCMonth(date.getUTCMonth() - 1);
+    return date.toISOString().slice(0, 7);
+  });
+}
+
+export function buildSuggestionHistory(
+  wallets: RecommendedWallet[],
+  tab: AiSuggestionTab,
+): AiSuggestionHistoryMonth[] {
+  return wallets
+    .map((wallet) => ({
+      month: wallet.month,
+      assets: wallet[tab].map(({ ticker, weight, segment }) => ({
+        ticker,
+        weight,
+        segment,
+      })),
+    }))
+    .sort((a, b) => b.month.localeCompare(a.month));
+}
+
 export function buildSuggestionInput(
   comparison: RecommendedWalletComparison,
   tab: AiSuggestionTab,
   quotesByTicker: Map<string, number>,
   contribution?: number,
+  history: AiSuggestionHistoryMonth[] = [],
 ): AiSuggestionInput {
   const assets = new Map(
     comparison.recommended[tab].map((asset) => [
@@ -88,6 +130,7 @@ export function buildSuggestionInput(
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends,
     items,
+    history,
   };
 }
 
@@ -295,12 +338,30 @@ export async function generateSuggestion(
   contribution?: number,
 ): Promise<AiSuggestion> {
   if (!isTab(tab)) throw createError('Aba inválida', 400);
+  const comparison = await compareWithWallet(uid, walletId, month, tab);
+  const historyMonths = previousMonths(comparison.recommended.month);
+  const historyWallets = (
+    await Promise.all(historyMonths.map((item) => getRecommendedWallet(item)))
+  ).filter((wallet): wallet is RecommendedWallet => wallet !== null);
+  const sortedHistoryWallets = historyWallets.sort((a, b) =>
+    b.month.localeCompare(a.month),
+  );
+  const history = buildSuggestionHistory(sortedHistoryWallets, tab);
+  const availableHistoryMonths = sortedHistoryWallets.map(
+    (wallet) => `${wallet.month}:${wallet.revision}`,
+  );
   if (!force) {
     const saved = await getSavedSuggestion(uid, walletId, month, tab);
-    if (saved && saved.contribution === contribution) return saved;
+    if (
+      saved &&
+      saved.contribution === contribution &&
+      JSON.stringify(saved.historyMonths ?? []) ===
+        JSON.stringify(availableHistoryMonths)
+    ) {
+      return saved;
+    }
   }
   await checkDailyLimit(uid);
-  const comparison = await compareWithWallet(uid, walletId, month, tab);
   const quotesSnapshot = await admin.firestore().collection('quotes').get();
   const monthlyDividends = new Map<string, number>(
     quotesSnapshot.docs.flatMap((doc: { id: string; data: () => unknown }) => {
@@ -316,6 +377,7 @@ export async function generateSuggestion(
     tab,
     monthlyDividends,
     contribution,
+    history,
   );
   const allowed = new Map(
     comparison.items.map((item) => [item.ticker.toUpperCase(), item.status]),
@@ -341,6 +403,7 @@ export async function generateSuggestion(
     createdAt,
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,
+    historyMonths: availableHistoryMonths,
   };
   await suggestionsCollection(uid)
     .doc(id)
