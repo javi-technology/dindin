@@ -26,7 +26,7 @@ export interface AiSuggestionInput {
 }
 
 const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
-export const OPENROUTER_TIMEOUT_MS = 30_000;
+export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
 
 type StatusError = Error & { statusCode?: number };

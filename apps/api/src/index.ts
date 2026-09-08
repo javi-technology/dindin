@@ -182,7 +182,10 @@ app.use(
 
 // O segredo OPENROUTER_API_KEY é configurado com:
 //   firebase functions:secrets:set OPENROUTER_API_KEY
-export const api = onRequest({ secrets: ['OPENROUTER_API_KEY'] }, app);
+export const api = onRequest(
+  { secrets: ['OPENROUTER_API_KEY'], timeoutSeconds: 180 },
+  app,
+);
 
 // Cloud Function agendada para atualizar cotações 1x ao dia.
 // Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)
