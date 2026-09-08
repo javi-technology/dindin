@@ -322,14 +322,24 @@
                     <li class="text-gray-800">
                       <span
                         class="inline-flex px-2 py-1 rounded-full text-xs font-medium mr-2"
-                        [class.bg-green-100]="item.action === 'buy'"
-                        [class.text-green-800]="item.action === 'buy'"
+                        [class.bg-green-100]="
+                          item.action === 'buy' && !isUnaffordable(item)
+                        "
+                        [class.text-green-800]="
+                          item.action === 'buy' && !isUnaffordable(item)
+                        "
+                        [class.bg-slate-200]="isUnaffordable(item)"
+                        [class.text-slate-700]="isUnaffordable(item)"
                         [class.bg-gray-100]="item.action === 'hold'"
                         [class.text-gray-800]="item.action === 'hold'"
                         [class.bg-amber-100]="item.action === 'reduce'"
                         [class.text-amber-800]="item.action === 'reduce'"
                       >
-                        {{ actionLabel(item.action) }}
+                        {{
+                          isUnaffordable(item)
+                            ? 'Aguardar'
+                            : actionLabel(item.action)
+                        }}
                       </span>
                       <strong>{{ item.ticker }}</strong>
                       <span class="block ml-6 mt-1 text-sm text-gray-700">
@@ -339,7 +349,13 @@
                         <span class="block ml-6 mt-1 text-sm text-gray-700">
                           Valor sugerido:
                           {{ formatCurrency(item.suggestedAmount) }}
-                          @if (item.suggestedQuantity !== undefined) {
+                          @if (isUnaffordable(item)) {
+                            <span class="text-amber-700">
+                              · Valor insuficiente para 1 cota ({{
+                                formatCurrency(item.referencePrice ?? 0)
+                              }}); aguarde acumular ou redistribua.
+                            </span>
+                          } @else if (item.suggestedQuantity !== undefined) {
                             · ≈ {{ item.suggestedQuantity }}
                             {{ quantityLabel(item.suggestedQuantity) }} a
                             {{ formatCurrency(item.referencePrice ?? 0) }}

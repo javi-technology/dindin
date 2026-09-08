@@ -230,6 +230,10 @@ export class RecommendedWalletComponent implements OnInit {
     return 'Manter';
   }
 
+  isUnaffordable(item: AiSuggestionItem): boolean {
+    return item.action === 'buy' && item.suggestedQuantity === 0;
+  }
+
   quantityLabel(quantity: number): string {
     return quantity === 1 ? 'cota' : 'cotas';
   }
