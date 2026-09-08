@@ -19,6 +19,7 @@ import {
   parseSuggestionOutput,
   suggestionId,
 } from '../../src/recommended-wallet/ai-suggestion.service';
+import { buildUserPrompt } from '../../src/recommended-wallet/ai-suggestion.prompt';
 import { RecommendedWalletComparison } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
@@ -69,8 +70,13 @@ describe('ai-suggestion.service', () => {
       comparison,
       'renda',
       new Map([['HGLG11', 1.25]]),
+      500,
     );
 
+    expect(input).toMatchObject({
+      contribution: 500,
+      projectedDividends: 2.5,
+    });
     expect(input.items).toEqual([
       expect.objectContaining({
         ticker: 'HGLG11',
@@ -81,6 +87,23 @@ describe('ai-suggestion.service', () => {
       }),
       expect.objectContaining({ ticker: 'XPML11', status: 'extra' }),
     ]);
+  });
+
+  it('deve incluir aporte e total disponível no prompt', () => {
+    const input = buildSuggestionInput(
+      comparison,
+      'renda',
+      new Map([['HGLG11', 1.25]]),
+      500,
+    );
+
+    const prompt = buildUserPrompt(input);
+
+    expect(prompt).toContain('Aporte disponível neste mês: R$ 500');
+    expect(prompt).toContain(
+      'Proventos mensais projetados da carteira: R$ 2.5',
+    );
+    expect(prompt).toContain('Total disponível para investir: R$ 502.5');
   });
 
   it('deve validar e ordenar a resposta removendo tickers não permitidos', () => {
@@ -266,9 +289,124 @@ describe('ai-suggestion.service', () => {
       month: '2026-09',
       tab: 'renda',
       summary: 'Resumo',
+      projectedDividends: 2.5,
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(doc.set).toHaveBeenCalled();
+  });
+
+  it('deve reutilizar cache quando o aporte for igual', async () => {
+    const saved = {
+      id: 'wallet-1_2026-09_renda',
+      walletId: 'wallet-1',
+      month: '2026-09',
+      tab: 'renda',
+      contribution: 500,
+    };
+    const doc = {
+      get: jest
+        .fn()
+        .mockResolvedValue({ exists: true, id: saved.id, data: () => saved }),
+    };
+    firestoreMock = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => ({
+          collection: jest.fn(() => ({ doc: jest.fn(() => doc) })),
+        })),
+      })),
+    };
+
+    await expect(
+      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', false, 500),
+    ).resolves.toEqual(saved);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('deve ignorar cache quando o aporte for diferente', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Aporte maior.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+        }),
+      }),
+      set: jest.fn(),
+    };
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return {
+            get: jest.fn().mockResolvedValue({
+              docs: [
+                {
+                  id: 'HGLG11',
+                  data: () => ({ monthlyDividend: 1.25 }),
+                },
+              ],
+            }),
+          };
+        }
+        return {
+          doc: jest.fn(() => ({
+            collection: jest.fn(() => ({
+              ...query,
+              doc: jest.fn(() => savedDoc),
+            })),
+          })),
+        };
+      }),
+    };
+
+    const result = await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      600,
+    );
+
+    expect(result).toMatchObject({
+      summary: 'Novo resumo',
+      contribution: 600,
+      projectedDividends: 2.5,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    expect(savedDoc.set).toHaveBeenCalled();
   });
 
   it('deve gerar ids determinísticos', () => {

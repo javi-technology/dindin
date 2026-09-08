@@ -107,6 +107,8 @@ describe('RecommendedWalletComponent', () => {
         ],
         disclaimer: 'Aviso',
         createdAt: '2026-09-04T12:00:00Z',
+        contribution: 500,
+        projectedDividends: 25,
       } satisfies AiSuggestion),
     );
     walletServiceMock.list.and.returnValue(of([userWallet]));
@@ -259,6 +261,43 @@ describe('RecommendedWalletComponent', () => {
     expect(card.textContent).toContain('Resumo');
     expect(card.textContent).toContain('Comprar');
     expect(card.textContent).toContain('Aumente a posição.');
+    expect(card.textContent).toContain('Aporte:');
+    expect(card.textContent).toContain('Proventos projetados:');
+  });
+
+  it('deve enviar aporte parseado no formato pt-BR', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = '1.500,50';
+    input.dispatchEvent(new Event('input'));
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(serviceMock.generateSuggestion).toHaveBeenCalledWith(
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      1500.5,
+    );
+  });
+
+  it('deve rejeitar aporte inválido sem chamar o serviço', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = '-1';
+    input.dispatchEvent(new Event('input'));
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(fixture.componentInstance.suggestionError()).toBe(
+      'Informe um valor de aporte válido.',
+    );
+    expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
   });
 
   it('deve mostrar mensagem amigável quando a geração falhar', () => {

@@ -3,6 +3,7 @@ import {
   decimalValidator,
   formatCompactCurrency,
   formatCurrency,
+  parseBrlNumber,
   parseDecimal,
 } from './format.util';
 
@@ -73,6 +74,20 @@ describe('format.util', () => {
 
     it('remove espaços em branco antes de converter', () => {
       expect(parseDecimal('  10,5  ')).toBe(10.5);
+    });
+  });
+
+  describe('parseBrlNumber', () => {
+    it('converte milhar e decimal no formato pt-BR', () => {
+      expect(parseBrlNumber('1.500,50')).toBe(1500.5);
+    });
+
+    it('aceita decimal com ponto', () => {
+      expect(parseBrlNumber('500.50')).toBe(500.5);
+    });
+
+    it('retorna null para texto inválido', () => {
+      expect(parseBrlNumber('abc')).toBeNull();
     });
   });
 

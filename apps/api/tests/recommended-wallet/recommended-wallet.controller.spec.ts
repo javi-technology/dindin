@@ -212,6 +212,24 @@ describe('recommended-wallet.controller', () => {
     expect(generateSuggestionMock).not.toHaveBeenCalled();
   });
 
+  it.each([-1, 'abc'])(
+    'deve rejeitar aporte inválido %p',
+    async (contribution) => {
+      const response = await request(app)
+        .post('/api/recommended-wallets/bb-fii/suggestions')
+        .send({
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution,
+        })
+        .set('Authorization', 'Bearer token');
+
+      expect(response.status).toBe(400);
+      expect(generateSuggestionMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('deve gerar sugestão com status 201', async () => {
     generateSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
 
@@ -228,6 +246,58 @@ describe('recommended-wallet.controller', () => {
       '2026-09',
       'renda',
       false,
+      undefined,
+    );
+  });
+
+  it('deve retornar cache quando o aporte for igual', async () => {
+    getSavedSuggestionMock.mockResolvedValue({
+      id: 'suggestion-1',
+      contribution: 500,
+    });
+
+    const response = await request(app)
+      .post('/api/recommended-wallets/bb-fii/suggestions')
+      .send({
+        walletId: 'wallet-1',
+        month: '2026-09',
+        tab: 'renda',
+        contribution: 500,
+      })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(generateSuggestionMock).not.toHaveBeenCalled();
+  });
+
+  it('deve gerar novamente quando o aporte for diferente do cache', async () => {
+    getSavedSuggestionMock.mockResolvedValue({
+      id: 'suggestion-1',
+      contribution: 500,
+    });
+    generateSuggestionMock.mockResolvedValue({
+      id: 'suggestion-2',
+      contribution: 600,
+    });
+
+    const response = await request(app)
+      .post('/api/recommended-wallets/bb-fii/suggestions')
+      .send({
+        walletId: 'wallet-1',
+        month: '2026-09',
+        tab: 'renda',
+        contribution: 600,
+      })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    expect(generateSuggestionMock).toHaveBeenCalledWith(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      600,
     );
   });
 
