@@ -184,10 +184,11 @@ export async function generateSuggestion(
   req: Request,
   res: Response,
 ): Promise<void> {
-  const { walletId, month, tab } = req.body as {
+  const { walletId, month, tab, contribution } = req.body as {
     walletId?: unknown;
     month?: unknown;
     tab?: unknown;
+    contribution?: unknown;
   };
   if (
     typeof walletId !== 'string' ||
@@ -197,12 +198,21 @@ export async function generateSuggestion(
     res.status(400).json({ error: 'walletId, month e tab são obrigatórios' });
     return;
   }
+  if (
+    contribution !== undefined &&
+    (typeof contribution !== 'number' ||
+      !Number.isFinite(contribution) ||
+      contribution < 0)
+  ) {
+    res.status(400).json({ error: 'contribution inválido' });
+    return;
+  }
 
   try {
     const force = req.query.force === 'true';
     if (!force) {
       const saved = await getSavedSuggestion(uid(req), walletId, month, tab);
-      if (saved) {
+      if (saved && saved.contribution === contribution) {
         res.status(200).json(saved);
         return;
       }
@@ -213,6 +223,7 @@ export async function generateSuggestion(
       month,
       tab,
       force,
+      contribution,
     );
     res.status(201).json(suggestion);
   } catch (error) {

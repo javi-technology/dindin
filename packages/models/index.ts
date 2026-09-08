@@ -203,4 +203,6 @@ export interface AiSuggestion {
   items: AiSuggestionItem[];
   disclaimer: string;
   createdAt: string;
+  contribution?: number;
+  projectedDividends?: number;
 }

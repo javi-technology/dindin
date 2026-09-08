@@ -64,6 +64,7 @@ export class RecommendedWalletService {
     month: string,
     tab: AiSuggestionTab,
     force = false,
+    contribution?: number,
   ): Observable<AiSuggestion> {
     let params = new HttpParams();
     if (force) {
@@ -71,7 +72,12 @@ export class RecommendedWalletService {
     }
     return this.http.post<AiSuggestion>(
       `${this.apiUrl}/suggestions`,
-      { walletId, month, tab },
+      {
+        walletId,
+        month,
+        tab,
+        ...(contribution === undefined ? {} : { contribution }),
+      },
       { params },
     );
   }

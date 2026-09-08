@@ -15,7 +15,11 @@ import {
   AiSuggestionItem,
   Wallet,
 } from 'dindin-models';
-import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
+import {
+  formatCurrency,
+  formatPercent,
+  parseBrlNumber,
+} from '../../shared/utils/format.util';
 import {
   LucideArrowLeft,
   LucideCheck,
@@ -81,6 +85,7 @@ export class RecommendedWalletComponent implements OnInit {
   suggestion = signal<AiSuggestion | null>(null);
   suggestionLoading = signal(false);
   suggestionError = signal<string | null>(null);
+  contributionInput = signal('');
   successMessage = signal<string | null>(null);
   isAdmin = signal(false);
   confirmModalOpen = signal(false);
@@ -230,24 +235,48 @@ export class RecommendedWalletComponent implements OnInit {
     const month = this.selectedMonth();
     if (!walletId || !month) return;
 
-    this.suggestionLoading.set(true);
     this.suggestionError.set(null);
-    this.recommendedWalletService
-      .generateSuggestion(walletId, month, this.selectedTab(), force)
-      .subscribe({
-        next: (suggestion) => {
-          this.suggestion.set(suggestion);
-          this.suggestionLoading.set(false);
-        },
-        error: (error: { status?: number; error?: { error?: string } }) => {
-          this.suggestionLoading.set(false);
-          this.suggestionError.set(
-            error?.status === 429 && error.error?.error
-              ? error.error.error
-              : 'Não foi possível gerar a sugestão. Tente novamente.',
+    const rawContribution = this.contributionInput().trim();
+    const contribution =
+      rawContribution === '' ? undefined : parseBrlNumber(rawContribution);
+    if (
+      contribution === null ||
+      (contribution !== undefined && contribution < 0)
+    ) {
+      this.suggestionError.set('Informe um valor de aporte válido.');
+      return;
+    }
+
+    this.suggestionLoading.set(true);
+    const request =
+      contribution === undefined
+        ? this.recommendedWalletService.generateSuggestion(
+            walletId,
+            month,
+            this.selectedTab(),
+            force,
+          )
+        : this.recommendedWalletService.generateSuggestion(
+            walletId,
+            month,
+            this.selectedTab(),
+            force,
+            contribution,
           );
-        },
-      });
+    request.subscribe({
+      next: (suggestion) => {
+        this.suggestion.set(suggestion);
+        this.suggestionLoading.set(false);
+      },
+      error: (error: { status?: number; error?: { error?: string } }) => {
+        this.suggestionLoading.set(false);
+        this.suggestionError.set(
+          error?.status === 429 && error.error?.error
+            ? error.error.error
+            : 'Não foi possível gerar a sugestão. Tente novamente.',
+        );
+      },
+    });
   }
 
   private loadRecommendedWallets(): void {

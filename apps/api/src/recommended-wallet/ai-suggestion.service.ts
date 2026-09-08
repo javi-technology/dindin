@@ -20,6 +20,8 @@ export interface AiSuggestionInput {
   month: string;
   tab: AiSuggestionTab;
   totalValue: number;
+  contribution?: number;
+  projectedDividends: number;
   items: AiSuggestionInputItem[];
 }
 
@@ -50,6 +52,7 @@ export function buildSuggestionInput(
   comparison: RecommendedWalletComparison,
   tab: AiSuggestionTab,
   quotesByTicker: Map<string, number>,
+  contribution?: number,
 ): AiSuggestionInput {
   const assets = new Map(
     comparison.recommended[tab].map((asset) => [
@@ -57,20 +60,27 @@ export function buildSuggestionInput(
       asset,
     ]),
   );
+  const items = comparison.items.map((item) => {
+    const asset = assets.get(item.ticker.toUpperCase());
+    return {
+      ...item,
+      segment: asset?.segment,
+      weight: asset?.weight,
+      closePrice: asset?.closePrice,
+      monthlyDividend: quotesByTicker.get(item.ticker.toUpperCase()),
+    };
+  });
+  const projectedDividends = items.reduce(
+    (total, item) => total + item.quantity * (item.monthlyDividend ?? 0),
+    0,
+  );
   return {
     month: comparison.recommended.month,
     tab,
     totalValue: comparison.totalValue,
-    items: comparison.items.map((item) => {
-      const asset = assets.get(item.ticker.toUpperCase());
-      return {
-        ...item,
-        segment: asset?.segment,
-        weight: asset?.weight,
-        closePrice: asset?.closePrice,
-        monthlyDividend: quotesByTicker.get(item.ticker.toUpperCase()),
-      };
-    }),
+    ...(contribution === undefined ? {} : { contribution }),
+    projectedDividends,
+    items,
   };
 }
 
@@ -218,11 +228,12 @@ export async function generateSuggestion(
   month: string,
   tab: AiSuggestionTab,
   force: boolean,
+  contribution?: number,
 ): Promise<AiSuggestion> {
   if (!isTab(tab)) throw createError('Aba inválida', 400);
   if (!force) {
     const saved = await getSavedSuggestion(uid, walletId, month, tab);
-    if (saved) return saved;
+    if (saved && saved.contribution === contribution) return saved;
   }
   await checkDailyLimit(uid);
   const comparison = await compareWithWallet(uid, walletId, month, tab);
@@ -236,7 +247,12 @@ export async function generateSuggestion(
         : [];
     }),
   );
-  const input = buildSuggestionInput(comparison, tab, monthlyDividends);
+  const input = buildSuggestionInput(
+    comparison,
+    tab,
+    monthlyDividends,
+    contribution,
+  );
   const allowedTickers = new Set(
     comparison.items.map((item) => item.ticker.toUpperCase()),
   );
@@ -255,6 +271,8 @@ export async function generateSuggestion(
     model,
     ...output,
     createdAt,
+    ...(contribution === undefined ? {} : { contribution }),
+    projectedDividends: input.projectedDividends,
   };
   await suggestionsCollection(uid)
     .doc(id)

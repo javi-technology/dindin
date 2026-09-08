@@ -89,15 +89,15 @@ Os PDFs mensais da carteira FII do Banco do Brasil são armazenados em
 as revisões disponíveis entre os dias 1 e 10 de cada mês, enquanto o trigger de
 upload importa automaticamente um PDF colocado nesse prefixo.
 
-| Método | Rota                                                                                      | Descrição                                        |
-| ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `GET`  | `/api/recommended-wallets/bb-fii`                                                         | Lista as carteiras importadas                    |
-| `GET`  | `/api/recommended-wallets/bb-fii/latest?month=YYYY-MM`                                    | Retorna a carteira do mês ou a mais recente      |
-| `GET`  | `/api/recommended-wallets/bb-fii/compare/:walletId?wallet=renda\|ganho`                   | Compara a carteira do usuário com a recomendação |
-| `GET`  | `/api/recommended-wallets/bb-fii/suggestions?walletId=...&month=YYYY-MM&tab=renda\|ganho` | Retorna a sugestão salva                         |
-| `POST` | `/api/recommended-wallets/bb-fii/suggestions`                                             | Gera uma sugestão (`{ walletId, month, tab }`)   |
-| `POST` | `/api/admin/recommended-wallets/bb-fii/import`                                            | Importa `{ fileName, contentBase64 }` (admin)    |
-| `PUT`  | `/api/admin/recommended-wallets/bb-fii/:id/confirm`                                       | Confirma uma carteira para revisão (admin)       |
+| Método | Rota                                                                                      | Descrição                                                     |
+| ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET`  | `/api/recommended-wallets/bb-fii`                                                         | Lista as carteiras importadas                                 |
+| `GET`  | `/api/recommended-wallets/bb-fii/latest?month=YYYY-MM`                                    | Retorna a carteira do mês ou a mais recente                   |
+| `GET`  | `/api/recommended-wallets/bb-fii/compare/:walletId?wallet=renda\|ganho`                   | Compara a carteira do usuário com a recomendação              |
+| `GET`  | `/api/recommended-wallets/bb-fii/suggestions?walletId=...&month=YYYY-MM&tab=renda\|ganho` | Retorna a sugestão salva                                      |
+| `POST` | `/api/recommended-wallets/bb-fii/suggestions`                                             | Gera uma sugestão (`{ walletId, month, tab, contribution? }`) |
+| `POST` | `/api/admin/recommended-wallets/bb-fii/import`                                            | Importa `{ fileName, contentBase64 }` (admin)                 |
+| `PUT`  | `/api/admin/recommended-wallets/bb-fii/:id/confirm`                                       | Confirma uma carteira para revisão (admin)                    |
 
 Na aplicação web, usuários autenticados podem acessar
 `/carteira-recomendada` pelo link **Carteira recomendada** no dashboard. A

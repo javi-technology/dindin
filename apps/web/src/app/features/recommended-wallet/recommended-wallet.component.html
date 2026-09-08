@@ -259,16 +259,32 @@
               <h2 class="text-lg font-semibold text-gray-900">
                 Sugestão do mês
               </h2>
-              <button
-                type="button"
-                class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                [disabled]="!canGenerateSuggestion() || suggestionLoading()"
-                (click)="generateSuggestion()"
-                data-testid="generate-suggestion-button"
-              >
-                <svg lucideSparkles [size]="18" class="mr-2"></svg>
-                {{ suggestionLoading() ? 'Gerando…' : 'Gerar sugestão do mês' }}
-              </button>
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="text-sm text-gray-700">
+                  Aporte mensal (R$)
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="500,00"
+                    class="block mt-1 border border-gray-300 rounded-lg px-3 py-2 w-36"
+                    [value]="contributionInput()"
+                    (input)="contributionInput.set($any($event.target).value)"
+                    data-testid="contribution-input"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  [disabled]="!canGenerateSuggestion() || suggestionLoading()"
+                  (click)="generateSuggestion()"
+                  data-testid="generate-suggestion-button"
+                >
+                  <svg lucideSparkles [size]="18" class="mr-2"></svg>
+                  {{
+                    suggestionLoading() ? 'Gerando…' : 'Gerar sugestão do mês'
+                  }}
+                </button>
+              </div>
             </div>
 
             @if (suggestionError()) {
@@ -286,6 +302,21 @@
                 data-testid="suggestion-card"
               >
                 <p class="text-gray-800">{{ result.summary }}</p>
+                @if (result.contribution !== undefined) {
+                  <p class="mt-3 text-sm text-gray-700">
+                    Aporte: {{ formatCurrency(result.contribution) }}
+                  </p>
+                  <p class="text-sm text-gray-700">
+                    Proventos projetados:
+                    {{ formatCurrency(result.projectedDividends ?? 0) }} ·
+                    Total:
+                    {{
+                      formatCurrency(
+                        result.contribution + (result.projectedDividends ?? 0)
+                      )
+                    }}
+                  </p>
+                }
                 <ol class="mt-4 space-y-3 list-decimal list-inside">
                   @for (item of result.items; track item.ticker) {
                     <li class="text-gray-800">
