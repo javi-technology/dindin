@@ -42,6 +42,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Sugestões geradas pela IA exclusivamente via Cloud Function
+      match /aiSuggestions/{id} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
     }
 
     // Cotações — leitura pública (qualquer usuário autenticado),
