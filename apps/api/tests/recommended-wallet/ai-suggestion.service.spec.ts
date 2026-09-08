@@ -23,6 +23,7 @@ import { buildUserPrompt } from '../../src/recommended-wallet/ai-suggestion.prom
 import { RecommendedWalletComparison } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
+  let consoleErrorSpy: jest.SpyInstance;
   const comparison = {
     recommended: {
       id: 'bb-fii_2026-09',
@@ -60,9 +61,16 @@ describe('ai-suggestion.service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_MODEL;
     global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('deve montar o contexto com tickers, pesos e proventos', () => {
@@ -179,6 +187,39 @@ describe('ai-suggestion.service', () => {
     ).toThrow('Resposta inválida da IA');
   });
 
+  it('deve aceitar JSON em code fence e campos tolerantes', () => {
+    const result = parseSuggestionOutput(
+      [
+        '```json',
+        JSON.stringify({
+          summary: 'Resumo.',
+          items: [
+            {
+              ticker: 'HGLG11',
+              action: 'hold',
+              priority: '2',
+              rationale: 'Mantenha.',
+              suggestedAmount: null,
+            },
+          ],
+        }),
+        '```',
+      ].join('\n'),
+      new Map([['HGLG11', 'match']]),
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        ticker: 'HGLG11',
+        priority: 2,
+        suggestedAmount: undefined,
+      }),
+    ]);
+    expect(result.disclaimer).toBe(
+      'Este conteúdo não é recomendação de investimento.',
+    );
+  });
+
   it('deve usar openrouter/auto quando OPENROUTER_MODEL não está definido', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -224,6 +265,63 @@ describe('ai-suggestion.service', () => {
       JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body),
     ).toEqual(
       expect.objectContaining({ response_format: { type: 'json_object' } }),
+    );
+  });
+
+  it('deve repetir sem response_format quando o provedor rejeitar a primeira chamada', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () => 'response_format não suportado',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          model: 'modelo-real',
+          choices: [{ message: { content: '{"ok":true}' } }],
+        }),
+      });
+
+    await expect(callOpenRouter('sistema', 'usuario')).resolves.toEqual({
+      content: '{"ok":true}',
+      model: 'modelo-real',
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body),
+    ).not.toHaveProperty('response_format');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[callOpenRouter] OpenRouter respondeu',
+      400,
+      'response_format não suportado',
+    );
+  });
+
+  it('deve retornar 502 quando a tentativa e o retry falharem', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () => 'primeiro erro',
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        text: async () => 'segundo erro',
+      });
+
+    await expect(callOpenRouter('sistema', 'usuario')).rejects.toMatchObject({
+      statusCode: 502,
+      message: 'Falha ao consultar o provedor de IA',
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[callOpenRouter] OpenRouter respondeu',
+      422,
+      'segundo erro',
     );
   });
 
