@@ -42,6 +42,10 @@ jest.mock('../../src/recommended-wallet/ai-suggestion.service', () => ({
   generateSuggestion: (...args: unknown[]) => generateSuggestionMock(...args),
 }));
 
+jest.mock('../../src/billing/entitlement.service', () => ({
+  hasEntitlement: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock('../../src/recommended-wallet/bb-pdf.parser', () => ({
   parseBbFileName: (...args: unknown[]) => parseBbFileNameMock(...args),
 }));
