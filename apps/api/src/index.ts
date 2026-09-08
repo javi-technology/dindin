@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import express, { Request, Response, NextFunction } from 'express';
@@ -60,6 +60,8 @@ import {
   compareRecommended,
   confirmRecommended,
   getLatestRecommended,
+  getSuggestion,
+  generateSuggestion,
   importRecommended,
   listRecommended,
 } from './recommended-wallet/recommended-wallet.controller';
@@ -152,6 +154,8 @@ app.get(
   '/api/recommended-wallets/bb-fii/compare/:walletId',
   compareRecommended,
 );
+app.get('/api/recommended-wallets/bb-fii/suggestions', getSuggestion);
+app.post('/api/recommended-wallets/bb-fii/suggestions', generateSuggestion);
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',
   adminAuthMiddleware,
@@ -176,7 +180,11 @@ app.use(
   },
 );
 
-export const api = functions.https.onRequest(app);
+// O segredo OPENROUTER_API_KEY é configurado com:
+//   firebase functions:secrets:set OPENROUTER_API_KEY
+export const api = functions
+  .runWith({ secrets: ['OPENROUTER_API_KEY'] })
+  .https.onRequest(app);
 
 // Cloud Function agendada para atualizar cotações 1x ao dia.
 // Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)

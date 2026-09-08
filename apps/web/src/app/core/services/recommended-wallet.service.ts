@@ -1,7 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { RecommendedWallet, RecommendedWalletComparison } from 'dindin-models';
+import {
+  AiSuggestion,
+  AiSuggestionTab,
+  RecommendedWallet,
+  RecommendedWalletComparison,
+} from 'dindin-models';
 
 @Injectable({
   providedIn: 'root',
@@ -36,6 +41,37 @@ export class RecommendedWalletService {
     }
     return this.http.get<RecommendedWalletComparison>(
       `${this.apiUrl}/compare/${walletId}`,
+      { params },
+    );
+  }
+
+  getSuggestion(
+    walletId: string,
+    month: string,
+    tab: AiSuggestionTab,
+  ): Observable<AiSuggestion> {
+    const params = new HttpParams()
+      .set('walletId', walletId)
+      .set('month', month)
+      .set('tab', tab);
+    return this.http.get<AiSuggestion>(`${this.apiUrl}/suggestions`, {
+      params,
+    });
+  }
+
+  generateSuggestion(
+    walletId: string,
+    month: string,
+    tab: AiSuggestionTab,
+    force = false,
+  ): Observable<AiSuggestion> {
+    let params = new HttpParams();
+    if (force) {
+      params = params.set('force', 'true');
+    }
+    return this.http.post<AiSuggestion>(
+      `${this.apiUrl}/suggestions`,
+      { walletId, month, tab },
       { params },
     );
   }

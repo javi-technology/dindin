@@ -11,12 +11,15 @@ import {
   RecommendedWallet,
   RecommendedWalletAsset,
   RecommendedWalletComparison,
+  AiSuggestion,
+  AiSuggestionItem,
   Wallet,
 } from 'dindin-models';
 import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
 import {
   LucideArrowLeft,
   LucideCheck,
+  LucideSparkles,
   LucideUpload,
   LucideX,
 } from '@lucide/angular';
@@ -31,6 +34,7 @@ type WalletTab = 'renda' | 'ganho';
     RouterLink,
     LucideArrowLeft,
     LucideCheck,
+    LucideSparkles,
     LucideUpload,
     LucideX,
   ],
@@ -60,7 +64,10 @@ export class RecommendedWalletComponent implements OnInit {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((comparison) => this.comparison.set(comparison));
+      .subscribe((comparison) => {
+        this.comparison.set(comparison);
+        this.loadSavedSuggestion();
+      });
   }
 
   recommendedWallets = signal<RecommendedWallet[]>([]);
@@ -71,6 +78,9 @@ export class RecommendedWalletComponent implements OnInit {
   comparison = signal<RecommendedWalletComparison | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
+  suggestion = signal<AiSuggestion | null>(null);
+  suggestionLoading = signal(false);
+  suggestionError = signal<string | null>(null);
   successMessage = signal<string | null>(null);
   isAdmin = signal(false);
   confirmModalOpen = signal(false);
@@ -86,6 +96,9 @@ export class RecommendedWalletComponent implements OnInit {
   );
   currentAssets = computed<RecommendedWalletAsset[]>(
     () => this.recommendedWallet()?.[this.selectedTab()] ?? [],
+  );
+  canGenerateSuggestion = computed(
+    () => !!this.selectedWalletId() && !!this.selectedMonth(),
   );
 
   ngOnInit(): void {
@@ -206,6 +219,37 @@ export class RecommendedWalletComponent implements OnInit {
     return formatPercent(value * 100);
   }
 
+  actionLabel(action: AiSuggestionItem['action']): string {
+    if (action === 'buy') return 'Comprar';
+    if (action === 'reduce') return 'Reduzir';
+    return 'Manter';
+  }
+
+  generateSuggestion(force = false): void {
+    const walletId = this.selectedWalletId();
+    const month = this.selectedMonth();
+    if (!walletId || !month) return;
+
+    this.suggestionLoading.set(true);
+    this.suggestionError.set(null);
+    this.recommendedWalletService
+      .generateSuggestion(walletId, month, this.selectedTab(), force)
+      .subscribe({
+        next: (suggestion) => {
+          this.suggestion.set(suggestion);
+          this.suggestionLoading.set(false);
+        },
+        error: (error: { status?: number; error?: { error?: string } }) => {
+          this.suggestionLoading.set(false);
+          this.suggestionError.set(
+            error?.status === 429 && error.error?.error
+              ? error.error.error
+              : 'Não foi possível gerar a sugestão. Tente novamente.',
+          );
+        },
+      });
+  }
+
   private loadRecommendedWallets(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -242,6 +286,8 @@ export class RecommendedWalletComponent implements OnInit {
   private loadComparison(): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
+    this.suggestion.set(null);
+    this.suggestionError.set(null);
     if (!walletId || !month) return;
 
     this.compareRequest$.next({
@@ -249,5 +295,38 @@ export class RecommendedWalletComponent implements OnInit {
       month,
       tab: this.selectedTab(),
     });
+  }
+
+  private loadSavedSuggestion(): void {
+    const walletId = this.selectedWalletId();
+    const month = this.selectedMonth();
+    const tab = this.selectedTab();
+    if (!walletId || !month) return;
+
+    this.recommendedWalletService
+      .getSuggestion(walletId, month, tab)
+      .subscribe({
+        next: (suggestion) => {
+          if (
+            walletId === this.selectedWalletId() &&
+            month === this.selectedMonth() &&
+            tab === this.selectedTab()
+          ) {
+            this.suggestion.set(suggestion);
+          }
+        },
+        error: (error: { status?: number }) => {
+          if (
+            error?.status !== 404 &&
+            walletId === this.selectedWalletId() &&
+            month === this.selectedMonth() &&
+            tab === this.selectedTab()
+          ) {
+            this.suggestionError.set(
+              'Não foi possível carregar a sugestão salva.',
+            );
+          }
+        },
+      });
   }
 }
