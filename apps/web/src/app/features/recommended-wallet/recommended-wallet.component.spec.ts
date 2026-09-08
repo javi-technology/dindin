@@ -7,6 +7,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import {
+  AiSuggestion,
   RecommendedWallet,
   RecommendedWalletComparison,
   Wallet,
@@ -74,6 +75,8 @@ describe('RecommendedWalletComponent', () => {
       'compare',
       'confirm',
       'import',
+      'getSuggestion',
+      'generateSuggestion',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
@@ -82,6 +85,32 @@ describe('RecommendedWalletComponent', () => {
     serviceMock.compare.and.returnValue(of(comparison));
     serviceMock.confirm.and.returnValue(of({ ...wallet, status: 'confirmed' }));
     serviceMock.import.and.returnValue(of(wallet));
+    serviceMock.getSuggestion.and.returnValue(
+      throwError(() => ({ status: 404 })),
+    );
+    serviceMock.generateSuggestion.and.returnValue(
+      of({
+        id: 'wallet-1_2026-09_renda',
+        walletId: 'wallet-1',
+        month: '2026-09',
+        tab: 'renda',
+        model: 'modelo',
+        summary: 'Resumo',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'buy',
+            priority: 1,
+            rationale: 'Aumente a posição.',
+            suggestedAmount: 100,
+          },
+        ],
+        disclaimer: 'Aviso',
+        createdAt: '2026-09-04T12:00:00Z',
+        contribution: 500,
+        projectedDividends: 25,
+      } satisfies AiSuggestion),
+    );
     walletServiceMock.list.and.returnValue(of([userWallet]));
     authServiceMock.isAdmin.and.returnValue(Promise.resolve(true));
 
@@ -182,5 +211,119 @@ describe('RecommendedWalletComponent', () => {
     firstResponse.next(comparison);
 
     expect(fixture.componentInstance.comparison()).toEqual(secondComparison);
+  });
+
+  it('deve carregar sugestão salva ao iniciar', () => {
+    fixture.detectChanges();
+
+    expect(serviceMock.getSuggestion).toHaveBeenCalledWith(
+      'wallet-1',
+      '2026-09',
+      'renda',
+    );
+  });
+
+  it('deve desabilitar geração sem carteira ou mês selecionados', () => {
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectedWalletId.set(null);
+    expect(fixture.componentInstance.canGenerateSuggestion()).toBeFalse();
+  });
+
+  it('deve mostrar loading enquanto gera sugestão', () => {
+    const pending = new Subject<AiSuggestion>();
+    serviceMock.generateSuggestion.and.returnValue(pending);
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(fixture.componentInstance.suggestionLoading()).toBeTrue();
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector(
+        '[data-testid="generate-suggestion-button"]',
+      ).textContent,
+    ).toContain('Gerando');
+
+    pending.next({} as AiSuggestion);
+    pending.complete();
+  });
+
+  it('deve ignorar resposta atrasada após trocar a seleção', () => {
+    const pending = new Subject<AiSuggestion>();
+    serviceMock.generateSuggestion.and.returnValue(pending);
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+    fixture.componentInstance.selectTab('ganho');
+
+    pending.next({} as AiSuggestion);
+
+    expect(fixture.componentInstance.suggestion()).toBeNull();
+    expect(fixture.componentInstance.suggestionLoading()).toBeFalse();
+  });
+
+  it('deve renderizar itens da sugestão com seus badges', () => {
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector(
+      '[data-testid="suggestion-card"]',
+    );
+    expect(card.textContent).toContain('Resumo');
+    expect(card.textContent).toContain('Comprar');
+    expect(card.textContent).toContain('Aumente a posição.');
+    expect(card.textContent).toContain('Aporte:');
+    expect(card.textContent).toContain('Proventos projetados:');
+  });
+
+  it('deve enviar aporte parseado no formato pt-BR', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = '1.500,50';
+    input.dispatchEvent(new Event('input'));
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(serviceMock.generateSuggestion).toHaveBeenCalledWith(
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      1500.5,
+    );
+  });
+
+  it('deve rejeitar aporte inválido sem chamar o serviço', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = '-1';
+    input.dispatchEvent(new Event('input'));
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(fixture.componentInstance.suggestionError()).toBe(
+      'Informe um valor de aporte válido.',
+    );
+    expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('deve mostrar mensagem amigável quando a geração falhar', () => {
+    serviceMock.generateSuggestion.and.returnValue(
+      throwError(() => ({ status: 500 })),
+    );
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(fixture.componentInstance.suggestionError()).toBe(
+      'Não foi possível gerar a sugestão. Tente novamente.',
+    );
   });
 });
