@@ -339,6 +339,11 @@
                         <span class="block ml-6 mt-1 text-sm text-gray-700">
                           Valor sugerido:
                           {{ formatCurrency(item.suggestedAmount) }}
+                          @if (item.suggestedQuantity !== undefined) {
+                            · ≈ {{ item.suggestedQuantity }}
+                            {{ quantityLabel(item.suggestedQuantity) }} a
+                            {{ formatCurrency(item.referencePrice ?? 0) }}
+                          }
                         </span>
                       }
                     </li>

@@ -9,9 +9,11 @@ import {
 } from 'dindin-models';
 import {
   compareWithWallet,
+  getQuotePrices,
   getRecommendedWallet,
 } from './recommended-wallet.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
+import { computeMonthlyIncome } from '../dividend/monthly-income.service';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -102,6 +104,7 @@ export function buildSuggestionInput(
   quotesByTicker: Map<string, number>,
   contribution?: number,
   history: AiSuggestionHistoryMonth[] = [],
+  projectedDividendsOverride?: number,
 ): AiSuggestionInput {
   const assets = new Map(
     comparison.recommended[tab].map((asset) => [
@@ -124,10 +127,12 @@ export function buildSuggestionInput(
       ...(monthlyDividend === undefined ? {} : { monthlyDividend }),
     };
   });
-  const projectedDividends = items.reduce(
-    (total, item) => total + item.quantity * (item.monthlyDividend ?? 0),
-    0,
-  );
+  const projectedDividends =
+    projectedDividendsOverride ??
+    items.reduce(
+      (total, item) => total + item.quantity * (item.monthlyDividend ?? 0),
+      0,
+    );
   return {
     month: comparison.recommended.month,
     tab,
@@ -137,6 +142,31 @@ export function buildSuggestionInput(
     items,
     history,
   };
+}
+
+export function applySuggestedQuantities(
+  items: AiSuggestionItem[],
+  priceByTicker: Map<string, number>,
+): AiSuggestionItem[] {
+  return items.map((item) => {
+    const suggestedAmount = item.suggestedAmount;
+    const price = priceByTicker.get(item.ticker.toUpperCase());
+    if (
+      typeof suggestedAmount !== 'number' ||
+      !Number.isFinite(suggestedAmount) ||
+      suggestedAmount <= 0 ||
+      typeof price !== 'number' ||
+      !Number.isFinite(price) ||
+      price <= 0
+    ) {
+      return item;
+    }
+    return {
+      ...item,
+      referencePrice: price,
+      suggestedQuantity: Math.floor(suggestedAmount / price),
+    };
+  });
 }
 
 function isValidItem(value: unknown): value is AiSuggestionItem {
@@ -367,22 +397,17 @@ export async function generateSuggestion(
     }
   }
   await checkDailyLimit(uid);
-  const quotesSnapshot = await admin.firestore().collection('quotes').get();
-  const monthlyDividends = new Map<string, number>(
-    quotesSnapshot.docs.flatMap((doc: { id: string; data: () => unknown }) => {
-      const value = (doc.data() as { monthlyDividend?: unknown })
-        .monthlyDividend;
-      return typeof value === 'number' && Number.isFinite(value)
-        ? [[doc.id.toUpperCase(), value]]
-        : [];
-    }),
-  );
+  const [income, quotePrices] = await Promise.all([
+    computeMonthlyIncome(uid, walletId),
+    getQuotePrices(),
+  ]);
   const input = buildSuggestionInput(
     comparison,
     tab,
-    monthlyDividends,
+    income.monthlyDividendByTicker,
     contribution,
     history,
+    income.total,
   );
   const allowed = new Map(
     comparison.items.map((item) => [item.ticker.toUpperCase(), item.status]),
@@ -396,6 +421,18 @@ export async function generateSuggestion(
     buildUserPrompt(input),
   );
   const output = parseSuggestionOutput(content, allowed, totalAvailable);
+  const priceByTicker = new Map(quotePrices);
+  for (const asset of comparison.recommended[tab]) {
+    const ticker = asset.ticker.toUpperCase();
+    if (
+      !priceByTicker.has(ticker) &&
+      typeof asset.closePrice === 'number' &&
+      Number.isFinite(asset.closePrice) &&
+      asset.closePrice > 0
+    ) {
+      priceByTicker.set(ticker, asset.closePrice);
+    }
+  }
   const id = suggestionId(walletId, month, tab);
   const createdAt = new Date().toISOString();
   const suggestion: AiSuggestion = {
@@ -405,6 +442,7 @@ export async function generateSuggestion(
     tab,
     model,
     ...output,
+    items: applySuggestedQuantities(output.items, priceByTicker),
     createdAt,
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,

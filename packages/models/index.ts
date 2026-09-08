@@ -190,6 +190,8 @@ export interface AiSuggestionItem {
   priority: number;
   rationale: string;
   suggestedAmount?: number;
+  suggestedQuantity?: number;
+  referencePrice?: number;
 }
 
 /** Sugestão gerada por IA — subcoleção users/{uid}/aiSuggestions. */

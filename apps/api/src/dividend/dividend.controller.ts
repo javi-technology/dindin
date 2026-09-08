@@ -1,12 +1,6 @@
 import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import {
-  Dividend,
-  Position,
-  AssetType,
-  Quote,
-  FridgeItem,
-} from 'dindin-models';
+import { Dividend, Position, AssetType } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import {
   buildMonthlyDividendReport,
@@ -15,6 +9,7 @@ import {
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
 import { recordMonthlyDividends } from './dividend-record.service';
+import { computeMonthlyIncome } from './monthly-income.service';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -44,14 +39,6 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('wallets')
     .doc(walletId)
     .collection('positions');
-}
-
-function fridgesCollection(userId: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('fridges');
 }
 
 async function getAllUserPositions(
@@ -607,33 +594,6 @@ export async function getDividendYield(
   }
 }
 
-interface MonthlyIncomeItem {
-  ticker: string;
-  quantity: number;
-  monthlyDividend: number;
-  monthlyIncome: number;
-}
-
-interface MonthlyIncomeResponse {
-  byTicker: MonthlyIncomeItem[];
-  total: number;
-  totalFromFridge: number;
-}
-
-async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
-  const items: FridgeItem[] = [];
-  const fridgesSnapshot = await fridgesCollection(userId).get();
-
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({ id: itemDoc.id, ...itemDoc.data() } as FridgeItem);
-    }
-  }
-
-  return items;
-}
-
 export async function getMonthlyIncome(
   req: Request,
   res: Response,
@@ -641,65 +601,11 @@ export async function getMonthlyIncome(
   try {
     const { walletId } = req.params;
     const userId = uid(req);
-
-    const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
-      positionsCollection(userId, walletId).get(),
-      admin.firestore().collection('quotes').get(),
-      fetchFridgeItems(userId),
-    ]);
-
-    const quoteByTicker = new Map<string, number>();
-    for (const doc of quotesSnapshot.docs) {
-      const data = doc.data() as Quote;
-      if (typeof data.monthlyDividend === 'number') {
-        quoteByTicker.set(doc.id.toUpperCase(), data.monthlyDividend);
-      }
-    }
-
-    const byTicker: MonthlyIncomeItem[] = [];
-    let total = 0;
-
-    for (const doc of positionsSnapshot.docs) {
-      const position = { id: doc.id, ...doc.data() } as Position;
-      const monthlyDividend =
-        quoteByTicker.get(position.ticker.toUpperCase()) ?? 0;
-      const quantity =
-        typeof position.quantity === 'number' &&
-        Number.isFinite(position.quantity)
-          ? position.quantity
-          : 0;
-      const monthlyIncome = Math.round(quantity * monthlyDividend * 100) / 100;
-
-      byTicker.push({
-        ticker: position.ticker,
-        quantity,
-        monthlyDividend,
-        monthlyIncome,
-      });
-      total += monthlyIncome;
-    }
-
-    let totalFromFridge = 0;
-    for (const item of fridgeItems) {
-      const monthlyDividend = quoteByTicker.get(item.ticker.toUpperCase()) ?? 0;
-      const quantity =
-        typeof item.quantity === 'number' && Number.isFinite(item.quantity)
-          ? item.quantity
-          : 0;
-      totalFromFridge += quantity * monthlyDividend;
-    }
-    totalFromFridge = Math.round(totalFromFridge * 100) / 100;
-
-    total = Math.round((total + totalFromFridge) * 100) / 100;
-
-    byTicker.sort((a, b) => a.ticker.localeCompare(b.ticker));
-
-    const response: MonthlyIncomeResponse = {
-      byTicker,
-      total,
-      totalFromFridge,
-    };
-    res.json(response);
+    const { byTicker, total, totalFromFridge } = await computeMonthlyIncome(
+      userId,
+      walletId,
+    );
+    res.json({ byTicker, total, totalFromFridge });
   } catch (error) {
     console.error('[getMonthlyIncome] error:', {
       uid: uid(req),
