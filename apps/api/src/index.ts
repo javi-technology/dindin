@@ -7,6 +7,13 @@ import {
   adminAuthMiddleware,
   AuthRequest,
 } from './middleware/auth.middleware';
+import { requireEntitlement } from './middleware/entitlement.middleware';
+import {
+  getSubscription,
+  listEntitlements,
+  toPublicSubscription,
+} from './billing/entitlement.service';
+import { MeResponse } from 'dindin-shared-types';
 import {
   createWallet,
   deleteWallet,
@@ -106,8 +113,22 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 app.use('/api/*', authMiddleware);
 
-app.get('/api/me', (req: AuthRequest, res: Response) => {
-  res.json({ uid: req.user?.uid, admin: req.user?.admin });
+app.get('/api/me', async (req: AuthRequest, res: Response) => {
+  const user = req.user!;
+  const isAdmin = user.admin === true;
+  try {
+    const subscription = await getSubscription(user.uid);
+    const body: MeResponse = {
+      uid: user.uid,
+      admin: isAdmin,
+      subscription: toPublicSubscription(subscription),
+      entitlements: listEntitlements(subscription, isAdmin),
+    };
+    res.json(body);
+  } catch (error) {
+    console.error('[GET /api/me] erro ao carregar assinatura', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/assets', listAssets);
@@ -161,8 +182,16 @@ app.get(
   '/api/recommended-wallets/bb-fii/compare/:walletId',
   compareRecommended,
 );
-app.get('/api/recommended-wallets/bb-fii/suggestions', getSuggestion);
-app.post('/api/recommended-wallets/bb-fii/suggestions', generateSuggestion);
+app.get(
+  '/api/recommended-wallets/bb-fii/suggestions',
+  requireEntitlement('ai'),
+  getSuggestion,
+);
+app.post(
+  '/api/recommended-wallets/bb-fii/suggestions',
+  requireEntitlement('ai'),
+  generateSuggestion,
+);
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',
   adminAuthMiddleware,
