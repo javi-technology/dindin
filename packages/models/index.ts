@@ -181,3 +181,28 @@ export interface RecommendedWalletComparison {
   items: RecommendedWalletComparisonItem[];
   totalValue: number;
 }
+
+export type AiSuggestionTab = 'renda' | 'ganho';
+
+export interface AiSuggestionItem {
+  ticker: string;
+  action: 'buy' | 'hold' | 'reduce';
+  priority: number;
+  rationale: string;
+  suggestedAmount?: number;
+}
+
+/** Sugestão gerada por IA — subcoleção users/{uid}/aiSuggestions. */
+export interface AiSuggestion {
+  id: string;
+  walletId: string;
+  month: string;
+  tab: AiSuggestionTab;
+  model: string;
+  summary: string;
+  items: AiSuggestionItem[];
+  disclaimer: string;
+  createdAt: string;
+  contribution?: number;
+  projectedDividends?: number;
+}

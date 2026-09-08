@@ -29,6 +29,17 @@ export function parseDecimal(value: string | number | null): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/** Converte valores monetários nos formatos pt-BR e decimal internacional. */
+export function parseBrlNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /** Formata um número como moeda em reais (pt-BR). */
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
