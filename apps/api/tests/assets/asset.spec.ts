@@ -19,6 +19,7 @@ interface AssetData {
   name: string;
   assetType: string;
   active: boolean;
+  qualifiedInvestor?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -167,6 +168,44 @@ describe('Assets', () => {
       expect(firestoreMock.getSetCalls()[0].id).toBe('ITUB4');
     });
 
+    it('deve persistir a indicação de investidor qualificado', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/admin/assets')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'ITUB4',
+          name: 'Itaú Unibanco',
+          assetType: 'STOCK',
+          qualifiedInvestor: true,
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.qualifiedInvestor).toBe(true);
+      expect(firestoreMock.getSetCalls()[0].data).toEqual(
+        expect.objectContaining({ qualifiedInvestor: true }),
+      );
+    });
+
+    it('deve rejeitar qualifiedInvestor que não seja booleano', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/admin/assets')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'ITUB4',
+          name: 'Itaú Unibanco',
+          assetType: 'STOCK',
+          qualifiedInvestor: 'sim',
+        });
+
+      expect(response.status).toBe(400);
+    });
+
     it('deve retornar 403 para usuário não-admin', async () => {
       verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
       firestoreMock = createFirestoreMock([]);
@@ -244,6 +283,63 @@ describe('Assets', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  describe('PUT /api/admin/assets/:ticker', () => {
+    it('deve atualizar os campos informados do ativo', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([activeAsset]);
+
+      const response = await request(app)
+        .put('/api/admin/assets/HGLG11')
+        .set('Authorization', authHeader)
+        .send({
+          name: 'CSHG Logística Atualizado',
+          active: false,
+          qualifiedInvestor: true,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        ticker: 'HGLG11',
+        name: 'CSHG Logística Atualizado',
+        assetType: 'FII',
+        active: false,
+        qualifiedInvestor: true,
+      });
+      expect(firestoreMock.getSetCalls()[0].data).toEqual(
+        expect.objectContaining({
+          ticker: 'HGLG11',
+          name: 'CSHG Logística Atualizado',
+          active: false,
+          qualifiedInvestor: true,
+        }),
+      );
+    });
+
+    it('deve retornar 404 ao atualizar ativo inexistente', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .put('/api/admin/assets/INEXISTENTE11')
+        .set('Authorization', authHeader)
+        .send({ active: false });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('deve validar os campos opcionais da atualização', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([activeAsset]);
+
+      const response = await request(app)
+        .put('/api/admin/assets/HGLG11')
+        .set('Authorization', authHeader)
+        .send({ assetType: 'CRYPTO' });
+
+      expect(response.status).toBe(400);
     });
   });
 });

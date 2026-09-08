@@ -66,4 +66,28 @@ describe('AssetService', () => {
     expect(req.request.body).toEqual(payload);
     req.flush(created);
   });
+
+  it('deve atualizar um ativo no catálogo via endpoint admin', () => {
+    const payload = {
+      name: 'Itaú Unibanco Atualizado',
+      assetType: 'STOCK' as const,
+      active: false,
+      qualifiedInvestor: true,
+    };
+    const updated: Asset = {
+      ticker: 'ITUB4',
+      ...payload,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+    };
+
+    service.update('ITUB4', payload).subscribe((response) => {
+      expect(response).toEqual(updated);
+    });
+
+    const req = httpMock.expectOne('/api/admin/assets/ITUB4');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual(payload);
+    req.flush(updated);
+  });
 });

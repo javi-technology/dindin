@@ -3,6 +3,7 @@ const compareWithWalletMock = jest.fn();
 const getRecommendedWalletMock = jest.fn();
 const getQuotePricesMock = jest.fn();
 const computeMonthlyIncomeMock = jest.fn();
+const listQualifiedInvestorTickersMock = jest.fn();
 
 jest.mock('firebase-admin', () => ({
   initializeApp: jest.fn(),
@@ -14,6 +15,11 @@ jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
   getRecommendedWallet: (...args: unknown[]) =>
     getRecommendedWalletMock(...args),
   getQuotePrices: (...args: unknown[]) => getQuotePricesMock(...args),
+}));
+
+jest.mock('../../src/assets/asset.service', () => ({
+  listQualifiedInvestorTickers: (...args: unknown[]) =>
+    listQualifiedInvestorTickersMock(...args),
 }));
 
 jest.mock('../../src/dividend/monthly-income.service', () => ({
@@ -29,6 +35,7 @@ import {
   buildSuggestionHistory,
   previousMonths,
   applySuggestedQuantities,
+  applyQualifiedInvestor,
   getSavedSuggestion,
   parseSuggestionOutput,
   suggestionId,
@@ -81,6 +88,7 @@ describe('ai-suggestion.service', () => {
     jest.clearAllMocks();
     getRecommendedWalletMock.mockResolvedValue(null);
     getQuotePricesMock.mockResolvedValue(new Map());
+    listQualifiedInvestorTickersMock.mockResolvedValue(new Set());
     computeMonthlyIncomeMock.mockResolvedValue({
       byTicker: [],
       total: 2.5,
@@ -193,6 +201,48 @@ describe('ai-suggestion.service', () => {
     expect(items[2]).not.toHaveProperty('referencePrice');
   });
 
+  it('deve marcar ativos de investidores qualificados no contexto', () => {
+    const input = (buildSuggestionInput as any)(
+      comparison,
+      'renda',
+      new Map(),
+      undefined,
+      [],
+      undefined,
+      new Set(['HGLG11']),
+    );
+
+    expect(input.items[0]).toEqual(
+      expect.objectContaining({ ticker: 'HGLG11', qualifiedInvestor: true }),
+    );
+    expect(input.items[1]).not.toHaveProperty('qualifiedInvestor');
+  });
+
+  it('deve aplicar a marca de investidor qualificado à resposta da IA', () => {
+    const items = applyQualifiedInvestor(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+        },
+        {
+          ticker: 'XPML11',
+          action: 'hold',
+          priority: 2,
+          rationale: 'Mantenha.',
+        },
+      ],
+      new Set(['HGLG11']),
+    );
+
+    expect(items[0]).toEqual(
+      expect.objectContaining({ qualifiedInvestor: true }),
+    );
+    expect(items[1]).not.toHaveProperty('qualifiedInvestor');
+  });
+
   it('deve incluir aporte e total disponível no prompt', () => {
     const input = buildSuggestionInput(
       comparison,
@@ -208,6 +258,26 @@ describe('ai-suggestion.service', () => {
       'Proventos mensais projetados da carteira: R$ 2.5',
     );
     expect(prompt).toContain('Total disponível para investir: R$ 502.5');
+  });
+
+  it('deve incluir o status de investidor qualificado no prompt', () => {
+    const input = (buildSuggestionInput as any)(
+      comparison,
+      'renda',
+      new Map(),
+      undefined,
+      [],
+      undefined,
+      new Set(['HGLG11']),
+    );
+
+    const prompt = buildUserPrompt(input);
+
+    expect(prompt).toContain('qualifiedInvestor=sim');
+    expect(prompt).toContain('qualifiedInvestor=não');
+    expect(SYSTEM_PROMPT).toContain(
+      'Tickers com qualifiedInvestor=sim são exclusivos para investidor qualificado',
+    );
   });
 
   it('deve calcular os meses anteriores considerando a virada do ano', () => {
@@ -693,6 +763,7 @@ describe('ai-suggestion.service', () => {
       totalFromFridge: 13,
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
+    listQualifiedInvestorTickersMock.mockResolvedValue(new Set(['HGLG11']));
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -765,6 +836,9 @@ describe('ai-suggestion.service', () => {
       summary: 'Resumo',
       projectedDividends: 15.5,
     });
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({ qualifiedInvestor: true }),
+    );
     expect(global.fetch).toHaveBeenCalled();
     expect(doc.set).toHaveBeenCalled();
   });
