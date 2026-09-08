@@ -210,13 +210,6 @@ export async function generateSuggestion(
 
   try {
     const force = req.query.force === 'true';
-    if (!force) {
-      const saved = await getSavedSuggestion(uid(req), walletId, month, tab);
-      if (saved && saved.contribution === contribution) {
-        res.status(200).json(saved);
-        return;
-      }
-    }
     const suggestion = await generateSuggestionForUser(
       uid(req),
       walletId,

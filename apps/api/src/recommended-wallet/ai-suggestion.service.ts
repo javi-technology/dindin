@@ -343,8 +343,13 @@ export async function generateSuggestion(
   const historyWallets = (
     await Promise.all(historyMonths.map((item) => getRecommendedWallet(item)))
   ).filter((wallet): wallet is RecommendedWallet => wallet !== null);
-  const history = buildSuggestionHistory(historyWallets, tab);
-  const availableHistoryMonths = history.map((item) => item.month);
+  const sortedHistoryWallets = historyWallets.sort((a, b) =>
+    b.month.localeCompare(a.month),
+  );
+  const history = buildSuggestionHistory(sortedHistoryWallets, tab);
+  const availableHistoryMonths = sortedHistoryWallets.map(
+    (wallet) => `${wallet.month}:${wallet.revision}`,
+  );
   if (!force) {
     const saved = await getSavedSuggestion(uid, walletId, month, tab);
     if (
