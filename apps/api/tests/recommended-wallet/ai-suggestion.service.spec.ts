@@ -1,5 +1,6 @@
 let firestoreMock: any;
 const compareWithWalletMock = jest.fn();
+const getRecommendedWalletMock = jest.fn();
 
 jest.mock('firebase-admin', () => ({
   initializeApp: jest.fn(),
@@ -8,6 +9,8 @@ jest.mock('firebase-admin', () => ({
 
 jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
   compareWithWallet: (...args: unknown[]) => compareWithWalletMock(...args),
+  getRecommendedWallet: (...args: unknown[]) =>
+    getRecommendedWalletMock(...args),
 }));
 
 import {
@@ -15,12 +18,17 @@ import {
   callOpenRouter,
   checkDailyLimit,
   generateSuggestion,
+  buildSuggestionHistory,
+  previousMonths,
   getSavedSuggestion,
   parseSuggestionOutput,
   suggestionId,
 } from '../../src/recommended-wallet/ai-suggestion.service';
-import { buildUserPrompt } from '../../src/recommended-wallet/ai-suggestion.prompt';
-import { RecommendedWalletComparison } from 'dindin-models';
+import {
+  buildUserPrompt,
+  SYSTEM_PROMPT,
+} from '../../src/recommended-wallet/ai-suggestion.prompt';
+import { RecommendedWallet, RecommendedWalletComparison } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
   let consoleErrorSpy: jest.SpyInstance;
@@ -61,6 +69,7 @@ describe('ai-suggestion.service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getRecommendedWalletMock.mockResolvedValue(null);
     consoleErrorSpy = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
@@ -112,6 +121,70 @@ describe('ai-suggestion.service', () => {
       'Proventos mensais projetados da carteira: R$ 2.5',
     );
     expect(prompt).toContain('Total disponível para investir: R$ 502.5');
+  });
+
+  it('deve calcular os meses anteriores considerando a virada do ano', () => {
+    expect(previousMonths('2026-01')).toEqual([
+      '2025-12',
+      '2025-11',
+      '2025-10',
+    ]);
+    expect(previousMonths('2026-09', 2)).toEqual(['2026-08', '2026-07']);
+  });
+
+  it('deve montar o histórico ordenado para a aba selecionada', () => {
+    const wallets = [
+      {
+        month: '2026-07',
+        renda: [{ ticker: 'HGLG11', weight: 0.2, segment: 'Logísticos' }],
+        ganho: [],
+      },
+      {
+        month: '2026-08',
+        renda: [{ ticker: 'XPML11', weight: 0.15, segment: 'Shoppings' }],
+        ganho: [],
+      },
+    ] as RecommendedWallet[];
+
+    expect(buildSuggestionHistory(wallets, 'renda')).toEqual([
+      {
+        month: '2026-08',
+        assets: [{ ticker: 'XPML11', weight: 0.15, segment: 'Shoppings' }],
+      },
+      {
+        month: '2026-07',
+        assets: [{ ticker: 'HGLG11', weight: 0.2, segment: 'Logísticos' }],
+      },
+    ]);
+  });
+
+  it('deve incluir o histórico no prompt ou indicar indisponibilidade', () => {
+    const history = [
+      {
+        month: '2026-08',
+        assets: [{ ticker: 'HGLG11', weight: 0.2, segment: 'Logísticos' }],
+      },
+    ];
+    const input = buildSuggestionInput(
+      comparison,
+      'renda',
+      new Map(),
+      undefined,
+      history,
+    );
+
+    const prompt = buildUserPrompt(input);
+
+    expect(prompt).toContain(
+      'Histórico da carteira recomendada (meses anteriores):',
+    );
+    expect(prompt).toContain('- 2026-08: HGLG11 peso=0.2 segmento=Logísticos');
+    expect(SYSTEM_PROMPT).toContain(
+      'Use o histórico das carteiras recomendadas dos meses anteriores',
+    );
+    expect(
+      buildUserPrompt(buildSuggestionInput(comparison, 'renda', new Map())),
+    ).toContain('Histórico da carteira recomendada: indisponível');
   });
 
   it('deve validar e ordenar a resposta removendo tickers não permitidos', () => {
@@ -543,6 +616,7 @@ describe('ai-suggestion.service', () => {
       month: '2026-09',
       tab: 'renda',
       contribution: 500,
+      historyMonths: [],
     };
     const doc = {
       get: jest
@@ -561,6 +635,182 @@ describe('ai-suggestion.service', () => {
       generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', false, 500),
     ).resolves.toEqual(saved);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('deve ignorar cache quando o histórico salvo estiver desatualizado', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    getRecommendedWalletMock.mockResolvedValue({
+      month: '2026-08',
+      renda: [
+        {
+          ticker: 'HGLG11',
+          weight: 0.2,
+          segment: 'Logísticos',
+        },
+      ],
+      ganho: [],
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'hold',
+                    priority: 1,
+                    rationale: 'Mantenha.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+          historyMonths: [],
+        }),
+      }),
+      set: jest.fn(),
+    };
+    const generatedDoc = {
+      get: jest.fn().mockResolvedValue({ exists: false }),
+      set: jest.fn(),
+    };
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return {
+            get: jest.fn().mockResolvedValue({ docs: [] }),
+          };
+        }
+        return {
+          doc: jest.fn((id?: string) => ({
+            get: id ? savedDoc.get : undefined,
+            set: id ? savedDoc.set : undefined,
+            collection: jest.fn((collectionName: string) => {
+              if (collectionName === 'aiSuggestions') {
+                return { doc: jest.fn(() => generatedDoc) };
+              }
+              return {
+                ...query,
+                doc: jest.fn(() => ({ set: jest.fn() })),
+              };
+            }),
+          })),
+        };
+      }),
+    };
+
+    await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      500,
+    );
+
+    expect(global.fetch).toHaveBeenCalled();
+    expect(getRecommendedWalletMock).toHaveBeenCalledWith('2026-08');
+  });
+
+  it('deve persistir os meses do histórico usado na sugestão', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    getRecommendedWalletMock.mockImplementation(async (month: string) =>
+      month === '2026-08'
+        ? ({
+            month,
+            renda: [
+              {
+                ticker: 'HGLG11',
+                weight: 0.2,
+                segment: 'Logísticos',
+              },
+            ],
+            ganho: [],
+          } as RecommendedWallet)
+        : null,
+    );
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'hold',
+                    priority: 1,
+                    rationale: 'Mantenha.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const suggestionDoc = {
+      get: jest.fn().mockResolvedValue({ exists: false }),
+      set: jest.fn(),
+    };
+    const usageDoc = { set: jest.fn() };
+    const usageQuery = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
+      doc: jest.fn(() => usageDoc),
+    };
+    const userDoc = {
+      collection: jest.fn((name: string) =>
+        name === 'aiSuggestionUsage'
+          ? usageQuery
+          : { doc: jest.fn(() => suggestionDoc) },
+      ),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) =>
+        name === 'quotes'
+          ? { get: jest.fn().mockResolvedValue({ docs: [] }) }
+          : { doc: jest.fn(() => userDoc) },
+      ),
+    };
+
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+
+    expect(suggestionDoc.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        historyMonths: ['2026-08'],
+        input: expect.objectContaining({
+          history: [expect.objectContaining({ month: '2026-08' })],
+        }),
+      }),
+    );
   });
 
   it('deve ignorar cache quando o aporte for diferente', async () => {
