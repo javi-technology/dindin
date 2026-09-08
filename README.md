@@ -31,7 +31,7 @@ dindin/
 - Node.js 22
 - Firebase CLI
 - Secret `OPENROUTER_API_KEY` configurado nas Cloud Functions (e,
-  opcionalmente, `OPENROUTER_MODEL`, padrão `openrouter/auto`) com:
+  opcionalmente, `OPENROUTER_MODEL`, padrão `openai/gpt-5.6-luna`) com:
   `firebase functions:secrets:set OPENROUTER_API_KEY`
 - Conta Google e projeto Firebase (`dindin-4e720`)
 
