@@ -250,8 +250,8 @@ describe('recommended-wallet.controller', () => {
     );
   });
 
-  it('deve retornar cache quando o aporte for igual', async () => {
-    getSavedSuggestionMock.mockResolvedValue({
+  it('deve delegar a validação do cache ao serviço', async () => {
+    generateSuggestionMock.mockResolvedValue({
       id: 'suggestion-1',
       contribution: 500,
     });
@@ -266,15 +266,19 @@ describe('recommended-wallet.controller', () => {
       })
       .set('Authorization', 'Bearer token');
 
-    expect(response.status).toBe(200);
-    expect(generateSuggestionMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(getSavedSuggestionMock).not.toHaveBeenCalled();
+    expect(generateSuggestionMock).toHaveBeenCalledWith(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      500,
+    );
   });
 
   it('deve gerar novamente quando o aporte for diferente do cache', async () => {
-    getSavedSuggestionMock.mockResolvedValue({
-      id: 'suggestion-1',
-      contribution: 500,
-    });
     generateSuggestionMock.mockResolvedValue({
       id: 'suggestion-2',
       contribution: 600,
@@ -291,6 +295,7 @@ describe('recommended-wallet.controller', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
+    expect(getSavedSuggestionMock).not.toHaveBeenCalled();
     expect(generateSuggestionMock).toHaveBeenCalledWith(
       'user-1',
       'wallet-1',

@@ -642,6 +642,7 @@ describe('ai-suggestion.service', () => {
     compareWithWalletMock.mockResolvedValue(comparison);
     getRecommendedWalletMock.mockResolvedValue({
       month: '2026-08',
+      revision: 2,
       renda: [
         {
           ticker: 'HGLG11',
@@ -684,7 +685,7 @@ describe('ai-suggestion.service', () => {
           month: '2026-09',
           tab: 'renda',
           contribution: 500,
-          historyMonths: [],
+          historyMonths: ['2026-08:1'],
         }),
       }),
       set: jest.fn(),
@@ -750,6 +751,7 @@ describe('ai-suggestion.service', () => {
               },
             ],
             ganho: [],
+            revision: 2,
           } as RecommendedWallet)
         : null,
     );
@@ -805,7 +807,7 @@ describe('ai-suggestion.service', () => {
 
     expect(suggestionDoc.set).toHaveBeenCalledWith(
       expect.objectContaining({
-        historyMonths: ['2026-08'],
+        historyMonths: ['2026-08:2'],
         input: expect.objectContaining({
           history: [expect.objectContaining({ month: '2026-08' })],
         }),
