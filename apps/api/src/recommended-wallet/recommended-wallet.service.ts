@@ -170,7 +170,7 @@ function positionsCollection(userId: string, walletId: string) {
     .collection('positions');
 }
 
-function quotePriceByTicker(snapshot: {
+export function quotePriceByTicker(snapshot: {
   docs: Array<{ id: string; data: () => unknown }>;
 }): Map<string, number> {
   return new Map(
@@ -181,6 +181,11 @@ function quotePriceByTicker(snapshot: {
         : [];
     }),
   );
+}
+
+export async function getQuotePrices(): Promise<Map<string, number>> {
+  const snapshot = await admin.firestore().collection('quotes').get();
+  return quotePriceByTicker(snapshot);
 }
 
 export async function compareWithWallet(

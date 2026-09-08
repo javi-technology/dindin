@@ -230,6 +230,10 @@ export class RecommendedWalletComponent implements OnInit {
     return 'Manter';
   }
 
+  quantityLabel(quantity: number): string {
+    return quantity === 1 ? 'cota' : 'cotas';
+  }
+
   generateSuggestion(force = false): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
