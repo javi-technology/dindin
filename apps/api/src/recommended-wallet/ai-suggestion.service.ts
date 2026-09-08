@@ -201,47 +201,109 @@ export function parseSuggestionOutput(
   try {
     const trimmed = raw.trim();
     const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-    const parsed: unknown = JSON.parse(fenced?.[1] ?? trimmed);
-    if (!parsed || typeof parsed !== 'object') throw new Error();
-    const data = parsed as Record<string, unknown>;
-    if (typeof data.summary !== 'string' || !Array.isArray(data.items)) {
-      throw new Error();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(fenced?.[1] ?? trimmed);
+    } catch {
+      throw new Error('JSON inválido');
     }
-    if (!data.items.every(isValidItem)) throw new Error();
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Resposta não é um objeto');
+    }
+    const data = parsed as Record<string, unknown>;
+    if (typeof data.summary !== 'string') {
+      throw new Error('Resumo ausente ou inválido');
+    }
+    if (!Array.isArray(data.items)) {
+      throw new Error('Itens ausentes ou inválidos');
+    }
+    const validItems = (data.items as unknown[]).filter(isValidItem);
+    if (validItems.length === 0) {
+      throw new Error('Nenhum item válido');
+    }
     const normalizedAllowed = new Map(
       [...allowed.entries()].map(([ticker, status]) => [
         ticker.toUpperCase(),
         status,
       ]),
     );
-    const items = (data.items as AiSuggestionItem[])
+    const items = validItems
       .filter((item) => normalizedAllowed.has(item.ticker.toUpperCase()))
       .sort((a, b) => a.priority - b.priority);
-    if (items.length === 0) throw new Error();
-    if (
-      items.some(
-        (item) =>
-          normalizedAllowed.get(item.ticker.toUpperCase()) === 'extra' &&
-          item.action === 'buy',
-      )
-    ) {
-      throw new Error();
+    if (items.length === 0) {
+      throw new Error('Nenhum item permitido');
     }
+    let normalizedItems = items.map((item) => {
+      if (
+        normalizedAllowed.get(item.ticker.toUpperCase()) === 'extra' &&
+        item.action === 'buy'
+      ) {
+        const { suggestedAmount: _suggestedAmount, ...itemWithoutAmount } =
+          item;
+        console.warn(
+          '[parseSuggestionOutput] compra em item extra convertida',
+          {
+            ticker: item.ticker,
+          },
+        );
+        return { ...itemWithoutAmount, action: 'hold' as const };
+      }
+      return item;
+    });
     if (totalAvailable !== undefined) {
-      const buyTotal = items
+      const buyTotal = normalizedItems
         .filter((item) => item.action === 'buy')
         .reduce((total, item) => total + (item.suggestedAmount ?? 0), 0);
-      if (buyTotal > totalAvailable * 1.01) throw new Error();
+      if (buyTotal > totalAvailable * 1.01) {
+        const ratio = buyTotal === 0 ? 0 : totalAvailable / buyTotal;
+        const amounts = normalizedItems
+          .filter(
+            (item) =>
+              item.action === 'buy' && typeof item.suggestedAmount === 'number',
+          )
+          .map((item) => {
+            const suggestedAmount = item.suggestedAmount as number;
+            const normalizedAmount =
+              Math.round(suggestedAmount * ratio * 100) / 100;
+            return {
+              ticker: item.ticker,
+              from: suggestedAmount,
+              to: normalizedAmount,
+            };
+          });
+        console.warn(
+          '[parseSuggestionOutput] compras ajustadas ao total disponível',
+          { amounts },
+        );
+        normalizedItems = normalizedItems.map((item) => {
+          if (
+            item.action !== 'buy' ||
+            typeof item.suggestedAmount !== 'number'
+          ) {
+            return item;
+          }
+          return {
+            ...item,
+            suggestedAmount:
+              Math.round(item.suggestedAmount * ratio * 100) / 100,
+          };
+        });
+      }
     }
     return {
       summary: data.summary,
-      items,
+      items: normalizedItems,
       disclaimer:
         typeof data.disclaimer === 'string'
           ? data.disclaimer
           : DEFAULT_DISCLAIMER,
     };
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[parseSuggestionOutput] resposta inválida', {
+      reason,
+      snippet: raw.slice(0, 500),
+    });
     throw new Error('Resposta inválida da IA');
   }
 }
