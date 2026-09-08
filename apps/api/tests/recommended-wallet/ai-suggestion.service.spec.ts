@@ -212,9 +212,9 @@ describe('ai-suggestion.service', () => {
       expect.objectContaining({
         ticker: 'HGLG11',
         priority: 2,
-        suggestedAmount: undefined,
       }),
     ]);
+    expect(result.items[0]).not.toHaveProperty('suggestedAmount');
     expect(result.disclaimer).toBe(
       'Este conteúdo não é recomendação de investimento.',
     );

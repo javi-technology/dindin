@@ -97,7 +97,7 @@ function isValidItem(value: unknown): value is AiSuggestionItem {
   const priority =
     typeof item.priority === 'string' ? Number(item.priority) : item.priority;
   if (typeof item.priority === 'string') item.priority = priority;
-  if (item.suggestedAmount === null) item.suggestedAmount = undefined;
+  if (item.suggestedAmount === null) delete item.suggestedAmount;
   return (
     typeof item.ticker === 'string' &&
     item.ticker.length > 0 &&
