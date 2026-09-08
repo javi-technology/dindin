@@ -4,7 +4,11 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { RecommendedWallet, RecommendedWalletComparison } from 'dindin-models';
+import {
+  AiSuggestion,
+  RecommendedWallet,
+  RecommendedWalletComparison,
+} from 'dindin-models';
 import { RecommendedWalletService } from './recommended-wallet.service';
 
 describe('RecommendedWalletService', () => {
@@ -77,6 +81,43 @@ describe('RecommendedWalletService', () => {
     );
     expect(request.request.method).toBe('GET');
     request.flush(comparison);
+  });
+
+  it('deve buscar uma sugestão salva', () => {
+    const suggestion = { id: 'wallet-1_2026-09_renda' } as AiSuggestion;
+
+    service
+      .getSuggestion('wallet-1', '2026-09', 'renda')
+      .subscribe((result) => expect(result).toEqual(suggestion));
+
+    const request = httpMock.expectOne(
+      (candidate) =>
+        candidate.url === '/api/recommended-wallets/bb-fii/suggestions' &&
+        candidate.params.get('walletId') === 'wallet-1' &&
+        candidate.params.get('month') === '2026-09' &&
+        candidate.params.get('tab') === 'renda',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush(suggestion);
+  });
+
+  it('deve gerar sugestão e enviar force apenas quando solicitado', () => {
+    const suggestion = { id: 'wallet-1_2026-09_renda' } as AiSuggestion;
+
+    service
+      .generateSuggestion('wallet-1', '2026-09', 'renda', true)
+      .subscribe((result) => expect(result).toEqual(suggestion));
+
+    const request = httpMock.expectOne(
+      '/api/recommended-wallets/bb-fii/suggestions?force=true',
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      walletId: 'wallet-1',
+      month: '2026-09',
+      tab: 'renda',
+    });
+    request.flush(suggestion);
   });
 
   it('deve confirmar uma carteira', () => {

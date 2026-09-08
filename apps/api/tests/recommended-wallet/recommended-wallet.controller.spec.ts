@@ -9,6 +9,8 @@ const persistRecommendedWalletMock = jest.fn();
 const importBbWalletMock = jest.fn();
 const syncBbWalletMock = jest.fn();
 const confirmRecommendedWalletMock = jest.fn();
+const getSavedSuggestionMock = jest.fn();
+const generateSuggestionMock = jest.fn();
 const parseBbFileNameMock = jest.fn();
 const saveBbPdfMock = jest.fn();
 
@@ -35,6 +37,11 @@ jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
     confirmRecommendedWalletMock(...args),
 }));
 
+jest.mock('../../src/recommended-wallet/ai-suggestion.service', () => ({
+  getSavedSuggestion: (...args: unknown[]) => getSavedSuggestionMock(...args),
+  generateSuggestion: (...args: unknown[]) => generateSuggestionMock(...args),
+}));
+
 jest.mock('../../src/recommended-wallet/bb-pdf.parser', () => ({
   parseBbFileName: (...args: unknown[]) => parseBbFileNameMock(...args),
 }));
@@ -59,6 +66,7 @@ describe('recommended-wallet.controller', () => {
     persistRecommendedWalletMock.mockResolvedValue({
       id: 'bb-fii_2026-09',
     });
+    getSavedSuggestionMock.mockResolvedValue(undefined);
   });
 
   it('deve listar carteiras recomendadas para usuário autenticado', async () => {
@@ -169,5 +177,79 @@ describe('recommended-wallet.controller', () => {
     expect(response.body).toEqual({ error: error.message });
     expect(saveBbPdfMock).not.toHaveBeenCalled();
     expect(persistRecommendedWalletMock).not.toHaveBeenCalled();
+  });
+
+  it('deve retornar 404 quando não houver sugestão salva', async () => {
+    getSavedSuggestionMock.mockResolvedValue(null);
+
+    const response = await request(app)
+      .get('/api/recommended-wallets/bb-fii/suggestions')
+      .query({ walletId: 'wallet-1', month: '2026-09', tab: 'renda' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(404);
+  });
+
+  it('deve retornar uma sugestão salva', async () => {
+    getSavedSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
+
+    const response = await request(app)
+      .get('/api/recommended-wallets/bb-fii/suggestions')
+      .query({ walletId: 'wallet-1', month: '2026-09', tab: 'renda' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ id: 'suggestion-1' });
+  });
+
+  it('deve rejeitar geração sem dados obrigatórios', async () => {
+    const response = await request(app)
+      .post('/api/recommended-wallets/bb-fii/suggestions')
+      .send({ walletId: 'wallet-1' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(generateSuggestionMock).not.toHaveBeenCalled();
+  });
+
+  it('deve gerar sugestão com status 201', async () => {
+    generateSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
+
+    const response = await request(app)
+      .post('/api/recommended-wallets/bb-fii/suggestions')
+      .send({ walletId: 'wallet-1', month: '2026-09', tab: 'renda' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ id: 'suggestion-1' });
+    expect(generateSuggestionMock).toHaveBeenCalledWith(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+    );
+  });
+
+  it('deve propagar limite e falha do provedor', async () => {
+    for (const error of [
+      Object.assign(new Error('Limite diário de sugestões atingido'), {
+        statusCode: 429,
+      }),
+      Object.assign(new Error('Falha ao consultar o provedor de IA'), {
+        statusCode: 502,
+      }),
+    ]) {
+      generateSuggestionMock.mockRejectedValueOnce(error);
+
+      const response = await request(app)
+        .post('/api/recommended-wallets/bb-fii/suggestions')
+        .query({ force: 'true' })
+        .send({ walletId: 'wallet-1', month: '2026-09', tab: 'renda' })
+        .set('Authorization', 'Bearer token');
+
+      expect(response.status).toBe(error.statusCode);
+      expect(response.body).toEqual({ error: error.message });
+    }
   });
 });
