@@ -103,6 +103,8 @@ describe('RecommendedWalletComponent', () => {
             priority: 1,
             rationale: 'Aumente a posição.',
             suggestedAmount: 100,
+            suggestedQuantity: 1,
+            referencePrice: 95,
           },
         ],
         disclaimer: 'Aviso',
@@ -277,6 +279,7 @@ describe('RecommendedWalletComponent', () => {
     expect(card.textContent).toContain('Aumente a posição.');
     expect(card.textContent).toContain('Aporte:');
     expect(card.textContent).toContain('Proventos projetados:');
+    expect(card.textContent).toContain('≈ 1 cota a R$\u00a095,00');
   });
 
   it('deve enviar aporte parseado no formato pt-BR', () => {

@@ -13,6 +13,7 @@ jest.mock('firebase-admin', () => ({
 }));
 
 import { app } from '../../src/index';
+import { computeMonthlyIncome } from '../../src/dividend/monthly-income.service';
 import { Position, Quote, Fridge, FridgeItem } from 'dindin-models';
 
 interface TestFridge {
@@ -107,6 +108,67 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('deve calcular renda mensal no serviço incluindo a geladeira', async () => {
+    const positions: Position[] = [
+      {
+        id: 'position-1',
+        walletId: 'wallet-1',
+        ticker: 'HGLG11',
+        assetType: 'FII',
+        quantity: 10,
+        averagePrice: 110,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+    const quotes: Quote[] = [
+      {
+        ticker: 'HGLG11',
+        price: 112,
+        monthlyDividend: 0.9,
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+      {
+        ticker: 'XPLG11',
+        price: 95,
+        monthlyDividend: 0.65,
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+    ];
+    const fridges: TestFridge[] = [
+      {
+        id: 'fridge-1',
+        items: [
+          {
+            id: 'item-1',
+            fridgeId: 'fridge-1',
+            ticker: 'XPLG11',
+            quantity: 20,
+            transferredPrice: 90,
+            targetPrice: 100,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+    ];
+    firestoreMock = createFirestoreMock(positions, quotes, fridges);
+
+    await expect(
+      computeMonthlyIncome('user-123', 'wallet-1'),
+    ).resolves.toMatchObject({
+      total: 22,
+      totalFromFridge: 13,
+      monthlyDividendByTicker: new Map([
+        ['HGLG11', 0.9],
+        ['XPLG11', 0.65],
+      ]),
+    });
   });
 
   it('deve calcular renda mensal por ticker com base nas quotes', async () => {

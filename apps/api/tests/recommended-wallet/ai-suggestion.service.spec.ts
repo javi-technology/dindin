@@ -1,6 +1,8 @@
 let firestoreMock: any;
 const compareWithWalletMock = jest.fn();
 const getRecommendedWalletMock = jest.fn();
+const getQuotePricesMock = jest.fn();
+const computeMonthlyIncomeMock = jest.fn();
 
 jest.mock('firebase-admin', () => ({
   initializeApp: jest.fn(),
@@ -11,6 +13,12 @@ jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
   compareWithWallet: (...args: unknown[]) => compareWithWalletMock(...args),
   getRecommendedWallet: (...args: unknown[]) =>
     getRecommendedWalletMock(...args),
+  getQuotePrices: (...args: unknown[]) => getQuotePricesMock(...args),
+}));
+
+jest.mock('../../src/dividend/monthly-income.service', () => ({
+  computeMonthlyIncome: (...args: unknown[]) =>
+    computeMonthlyIncomeMock(...args),
 }));
 
 import {
@@ -20,6 +28,7 @@ import {
   generateSuggestion,
   buildSuggestionHistory,
   previousMonths,
+  applySuggestedQuantities,
   getSavedSuggestion,
   parseSuggestionOutput,
   suggestionId,
@@ -70,6 +79,13 @@ describe('ai-suggestion.service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getRecommendedWalletMock.mockResolvedValue(null);
+    getQuotePricesMock.mockResolvedValue(new Map());
+    computeMonthlyIncomeMock.mockResolvedValue({
+      byTicker: [],
+      total: 2.5,
+      totalFromFridge: 0,
+      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+    });
     consoleErrorSpy = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
@@ -114,6 +130,62 @@ describe('ai-suggestion.service', () => {
     for (const key of ['segment', 'weight', 'closePrice', 'monthlyDividend']) {
       expect(extra).not.toHaveProperty(key);
     }
+  });
+
+  it('deve permitir sobrescrever os proventos projetados', () => {
+    const input = buildSuggestionInput(
+      comparison,
+      'renda',
+      new Map([['HGLG11', 1.25]]),
+      undefined,
+      [],
+      22,
+    );
+
+    expect(input.projectedDividends).toBe(22);
+  });
+
+  it('deve calcular quantidades sugeridas usando o preço de referência', () => {
+    const items = applySuggestedQuantities(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Comprar.',
+          suggestedAmount: 500,
+        },
+        {
+          ticker: 'XPML11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Comprar.',
+          suggestedAmount: 0,
+        },
+        {
+          ticker: 'VISC11',
+          action: 'buy',
+          priority: 3,
+          rationale: 'Comprar.',
+          suggestedAmount: 100,
+        },
+      ],
+      new Map([
+        ['HGLG11', 160],
+        ['VISC11', 0],
+      ]),
+    );
+
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        suggestedQuantity: 3,
+        referencePrice: 160,
+      }),
+    );
+    expect(items[1]).not.toHaveProperty('suggestedQuantity');
+    expect(items[1]).not.toHaveProperty('referencePrice');
+    expect(items[2]).not.toHaveProperty('suggestedQuantity');
+    expect(items[2]).not.toHaveProperty('referencePrice');
   });
 
   it('deve incluir aporte e total disponível no prompt', () => {
@@ -543,6 +615,12 @@ describe('ai-suggestion.service', () => {
   it('deve gerar uma nova sugestão quando force estiver ativo', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue(comparison);
+    computeMonthlyIncomeMock.mockResolvedValue({
+      byTicker: [],
+      total: 15.5,
+      totalFromFridge: 13,
+      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+    });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -613,7 +691,7 @@ describe('ai-suggestion.service', () => {
       month: '2026-09',
       tab: 'renda',
       summary: 'Resumo',
-      projectedDividends: 2.5,
+      projectedDividends: 15.5,
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(doc.set).toHaveBeenCalled();
