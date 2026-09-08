@@ -205,7 +205,11 @@ export async function getSavedSuggestion(
 ): Promise<AiSuggestion | null> {
   const id = suggestionId(walletId, month, tab);
   const doc = await suggestionsCollection(uid).doc(id).get();
-  return doc.exists ? ({ id: doc.id, ...doc.data() } as AiSuggestion) : null;
+  if (!doc.exists) return null;
+  const { input: _input, ...data } = doc.data() as AiSuggestion & {
+    input?: AiSuggestionInput;
+  };
+  return { ...data, id: doc.id };
 }
 
 export async function generateSuggestion(
