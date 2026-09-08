@@ -34,6 +34,8 @@ function createAssetSnapshot(asset: AssetData) {
 
 function createFirestoreMock(assets: AssetData[] = []) {
   const setCalls: Array<{ id: string; data: unknown }> = [];
+  const updateCalls: Array<{ id: string; data: unknown }> = [];
+  const assetsByTicker = new Map(assets.map((asset) => [asset.ticker, asset]));
   const assetsCollection = {
     where: jest.fn((field: string, _op: string, value: unknown) => ({
       get: jest.fn().mockResolvedValue({
@@ -43,17 +45,21 @@ function createFirestoreMock(assets: AssetData[] = []) {
       }),
     })),
     doc: jest.fn((ticker: string) => {
-      const asset = assets.find((a) => a.ticker === ticker);
       return {
-        get: jest
-          .fn()
-          .mockResolvedValue(
-            asset
-              ? createAssetSnapshot(asset)
-              : { id: ticker, exists: false, data: () => null },
-          ),
+        get: jest.fn().mockImplementation(async () => {
+          const asset = assetsByTicker.get(ticker);
+          return asset
+            ? createAssetSnapshot(asset)
+            : { id: ticker, exists: false, data: () => null };
+        }),
         set: jest.fn().mockImplementation((data: unknown) => {
           setCalls.push({ id: ticker, data });
+          return Promise.resolve();
+        }),
+        update: jest.fn().mockImplementation((data: Partial<AssetData>) => {
+          updateCalls.push({ id: ticker, data });
+          const current = assetsByTicker.get(ticker);
+          if (current) assetsByTicker.set(ticker, { ...current, ...data });
           return Promise.resolve();
         }),
       };
@@ -69,6 +75,7 @@ function createFirestoreMock(assets: AssetData[] = []) {
       throw new Error(`Unexpected collection: ${path}`);
     }),
     getSetCalls: () => setCalls,
+    getUpdateCalls: () => updateCalls,
   };
 }
 
@@ -140,6 +147,20 @@ describe('Assets', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
+    });
+  });
+
+  describe('GET /api/admin/assets', () => {
+    it('deve listar todos os ativos ordenados por ticker', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'admin-123', admin: true });
+      firestoreMock = createFirestoreMock([inactiveAsset, activeAsset]);
+
+      const response = await request(app)
+        .get('/api/admin/assets')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([activeAsset, inactiveAsset]);
     });
   });
 
@@ -308,13 +329,19 @@ describe('Assets', () => {
         active: false,
         qualifiedInvestor: true,
       });
-      expect(firestoreMock.getSetCalls()[0].data).toEqual(
-        expect.objectContaining({
-          ticker: 'HGLG11',
-          name: 'CSHG Logística Atualizado',
-          active: false,
-          qualifiedInvestor: true,
-        }),
+      expect(firestoreMock.getUpdateCalls()).toEqual([
+        {
+          id: 'HGLG11',
+          data: expect.objectContaining({
+            name: 'CSHG Logística Atualizado',
+            active: false,
+            qualifiedInvestor: true,
+            updatedAt: expect.any(String),
+          }),
+        },
+      ]);
+      expect(firestoreMock.getUpdateCalls()[0].data).not.toHaveProperty(
+        'ticker',
       );
     });
 

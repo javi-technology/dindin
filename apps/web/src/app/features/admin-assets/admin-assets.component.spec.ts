@@ -27,11 +27,11 @@ describe('AdminAssetsComponent', () => {
 
   beforeEach(async () => {
     assetServiceMock = jasmine.createSpyObj('AssetService', [
-      'list',
+      'listAll',
       'create',
       'update',
     ]);
-    assetServiceMock.list.and.returnValue(of(assets));
+    assetServiceMock.listAll.and.returnValue(of(assets));
     assetServiceMock.create.and.returnValue(of(assets[0]));
     assetServiceMock.update.and.returnValue(of(assets[0]));
 
@@ -54,7 +54,7 @@ describe('AdminAssetsComponent', () => {
   it('deve listar ativos ao inicializar', () => {
     fixture.detectChanges();
 
-    expect(assetServiceMock.list).toHaveBeenCalled();
+    expect(assetServiceMock.listAll).toHaveBeenCalled();
     expect(fixture.componentInstance.assets()).toEqual(assets);
   });
 
