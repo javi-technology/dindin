@@ -44,6 +44,27 @@ describe('AssetService', () => {
     req.flush(assets);
   });
 
+  it('deve listar todos os ativos no endpoint administrativo', () => {
+    const assets: Asset[] = [
+      {
+        ticker: 'OLDX11',
+        name: 'Ativo Descontinuado',
+        assetType: 'FII',
+        active: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    service.listAll().subscribe((response) => {
+      expect(response).toEqual(assets);
+    });
+
+    const req = httpMock.expectOne('/api/admin/assets');
+    expect(req.request.method).toBe('GET');
+    req.flush(assets);
+  });
+
   it('deve criar um ativo no catálogo via endpoint admin', () => {
     const payload = {
       ticker: 'ITUB4',
@@ -65,5 +86,29 @@ describe('AssetService', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(payload);
     req.flush(created);
+  });
+
+  it('deve atualizar um ativo no catálogo via endpoint admin', () => {
+    const payload = {
+      name: 'Itaú Unibanco Atualizado',
+      assetType: 'STOCK' as const,
+      active: false,
+      qualifiedInvestor: true,
+    };
+    const updated: Asset = {
+      ticker: 'ITUB4',
+      ...payload,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-02T00:00:00Z',
+    };
+
+    service.update('ITUB4', payload).subscribe((response) => {
+      expect(response).toEqual(updated);
+    });
+
+    const req = httpMock.expectOne('/api/admin/assets/ITUB4');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual(payload);
+    req.flush(updated);
   });
 });

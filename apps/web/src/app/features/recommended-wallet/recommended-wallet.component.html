@@ -342,9 +342,22 @@
                         }}
                       </span>
                       <strong>{{ item.ticker }}</strong>
+                      @if (item.qualifiedInvestor) {
+                        <span
+                          class="inline-flex ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                        >
+                          Investidor qualificado
+                        </span>
+                      }
                       <span class="block ml-6 mt-1 text-sm text-gray-700">
                         {{ item.rationale }}
                       </span>
+                      @if (item.qualifiedInvestor) {
+                        <span class="block ml-6 mt-1 text-sm text-amber-700">
+                          FII exclusivo para investidor qualificado — pode não
+                          estar disponível para compra na sua corretora.
+                        </span>
+                      }
                       @if (item.suggestedAmount !== undefined) {
                         <span class="block ml-6 mt-1 text-sm text-gray-700">
                           Valor sugerido:

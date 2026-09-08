@@ -6,7 +6,13 @@
       >
         <div>
           <h1 class="text-2xl font-bold text-gray-900">Administração</h1>
-          <p class="text-gray-600">Cadastrar ativos no catálogo</p>
+          <p class="text-gray-600">
+            {{
+              editingTicker()
+                ? 'Editar ativo do catálogo'
+                : 'Cadastrar ativos no catálogo'
+            }}
+          </p>
         </div>
         <a
           routerLink="/"
@@ -120,14 +126,39 @@
           </div>
         </div>
 
+        <label class="inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            formControlName="qualifiedInvestor"
+            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span class="ms-2 text-sm font-medium text-gray-700">
+            Investidor qualificado
+          </span>
+        </label>
+
         <div class="flex justify-end">
+          @if (editingTicker()) {
+            <button
+              type="button"
+              class="mr-3 text-gray-600 hover:text-gray-900 text-sm font-medium"
+              (click)="cancelEditing()"
+            >
+              Cancelar
+            </button>
+          }
           <button
             type="submit"
             class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
             [disabled]="form.invalid"
           >
-            <svg lucidePlus [size]="18" class="mr-2"></svg>
-            Cadastrar ativo
+            @if (editingTicker()) {
+              <svg lucidePencil [size]="18" class="mr-2"></svg>
+              Salvar alterações
+            } @else {
+              <svg lucidePlus [size]="18" class="mr-2"></svg>
+              Cadastrar ativo
+            }
           </button>
         </div>
       </form>
@@ -161,6 +192,12 @@
                 <th class="py-3 px-4 text-sm font-semibold text-gray-700">
                   Status
                 </th>
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Qualificado
+                </th>
+                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -181,6 +218,31 @@
                     >
                       {{ asset.active ? 'Ativo' : 'Inativo' }}
                     </span>
+                  </td>
+                  <td class="py-3 px-4">
+                    @if (asset.qualifiedInvestor) {
+                      <span
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                      >
+                        Sim
+                      </span>
+                    } @else {
+                      <span
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+                      >
+                        —
+                      </span>
+                    }
+                  </td>
+                  <td class="py-3 px-4">
+                    <button
+                      type="button"
+                      class="inline-flex items-center text-blue-700 hover:text-blue-900 text-sm font-medium"
+                      (click)="startEditing(asset)"
+                    >
+                      <svg lucidePencil [size]="16" class="mr-1"></svg>
+                      Editar
+                    </button>
                   </td>
                 </tr>
               }

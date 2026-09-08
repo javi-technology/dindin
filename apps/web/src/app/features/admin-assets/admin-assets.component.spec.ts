@@ -26,9 +26,14 @@ describe('AdminAssetsComponent', () => {
   ];
 
   beforeEach(async () => {
-    assetServiceMock = jasmine.createSpyObj('AssetService', ['list', 'create']);
-    assetServiceMock.list.and.returnValue(of(assets));
+    assetServiceMock = jasmine.createSpyObj('AssetService', [
+      'listAll',
+      'create',
+      'update',
+    ]);
+    assetServiceMock.listAll.and.returnValue(of(assets));
     assetServiceMock.create.and.returnValue(of(assets[0]));
+    assetServiceMock.update.and.returnValue(of(assets[0]));
 
     await TestBed.configureTestingModule({
       imports: [AdminAssetsComponent],
@@ -49,7 +54,7 @@ describe('AdminAssetsComponent', () => {
   it('deve listar ativos ao inicializar', () => {
     fixture.detectChanges();
 
-    expect(assetServiceMock.list).toHaveBeenCalled();
+    expect(assetServiceMock.listAll).toHaveBeenCalled();
     expect(fixture.componentInstance.assets()).toEqual(assets);
   });
 
@@ -59,6 +64,7 @@ describe('AdminAssetsComponent', () => {
       name: 'Itaú Unibanco',
       assetType: 'STOCK',
       active: true,
+      qualifiedInvestor: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
@@ -72,6 +78,7 @@ describe('AdminAssetsComponent', () => {
       name: 'Itaú Unibanco',
       assetType: 'STOCK',
       active: true,
+      qualifiedInvestor: false,
     });
 
     component.saveAsset();
@@ -82,11 +89,40 @@ describe('AdminAssetsComponent', () => {
       name: 'Itaú Unibanco',
       assetType: 'STOCK',
       active: true,
+      qualifiedInvestor: false,
     });
     expect(component.successMessage()).toBe(
       'Ativo ITUB4 cadastrado com sucesso.',
     );
     expect(component.formError()).toBeNull();
+  }));
+
+  it('deve editar um ativo e enviar o payload atualizado', fakeAsync(() => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.startEditing(assets[0]);
+    component.form.patchValue({
+      name: 'CSHG Logística Qualificado',
+      qualifiedInvestor: true,
+    });
+    assetServiceMock.update.and.returnValue(
+      of({
+        ...assets[0],
+        name: 'CSHG Logística Qualificado',
+        qualifiedInvestor: true,
+      }),
+    );
+
+    component.saveAsset();
+    tick();
+
+    expect(assetServiceMock.update).toHaveBeenCalledWith('HGLG11', {
+      name: 'CSHG Logística Qualificado',
+      assetType: 'FII',
+      active: true,
+      qualifiedInvestor: true,
+    });
+    expect(component.editingTicker()).toBeNull();
   }));
 
   it('deve exibir erro quando a criação falhar', fakeAsync(() => {
@@ -101,6 +137,7 @@ describe('AdminAssetsComponent', () => {
       name: 'CSHG Logística',
       assetType: 'FII',
       active: true,
+      qualifiedInvestor: false,
     });
 
     component.saveAsset();

@@ -12,6 +12,7 @@ import {
   getQuotePrices,
   getRecommendedWallet,
 } from './recommended-wallet.service';
+import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
 
@@ -20,6 +21,7 @@ export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   weight?: number;
   closePrice?: number;
   monthlyDividend?: number;
+  qualifiedInvestor?: boolean;
 }
 
 export interface AiSuggestionHistoryAsset {
@@ -105,6 +107,7 @@ export function buildSuggestionInput(
   contribution?: number,
   history: AiSuggestionHistoryMonth[] = [],
   projectedDividendsOverride?: number,
+  qualifiedTickers: Set<string> = new Set(),
 ): AiSuggestionInput {
   const assets = new Map(
     comparison.recommended[tab].map((asset) => [
@@ -115,6 +118,7 @@ export function buildSuggestionInput(
   const items = comparison.items.map((item) => {
     const asset = assets.get(item.ticker.toUpperCase());
     const monthlyDividend = quotesByTicker.get(item.ticker.toUpperCase());
+    const qualifiedInvestor = qualifiedTickers.has(item.ticker.toUpperCase());
     return {
       ...item,
       ...(asset
@@ -125,6 +129,7 @@ export function buildSuggestionInput(
           }
         : {}),
       ...(monthlyDividend === undefined ? {} : { monthlyDividend }),
+      ...(qualifiedInvestor ? { qualifiedInvestor: true } : {}),
     };
   });
   const projectedDividends =
@@ -166,6 +171,18 @@ export function applySuggestedQuantities(
       referencePrice: price,
       suggestedQuantity: Math.floor(suggestedAmount / price),
     };
+  });
+}
+
+export function applyQualifiedInvestor(
+  items: AiSuggestionItem[],
+  qualifiedTickers: Set<string>,
+): AiSuggestionItem[] {
+  return items.map((item) => {
+    const { qualifiedInvestor: _qualifiedInvestor, ...withoutFlag } = item;
+    return qualifiedTickers.has(item.ticker.toUpperCase())
+      ? { ...withoutFlag, qualifiedInvestor: true }
+      : withoutFlag;
   });
 }
 
@@ -459,9 +476,10 @@ export async function generateSuggestion(
     }
   }
   await checkDailyLimit(uid);
-  const [income, quotePrices] = await Promise.all([
+  const [income, quotePrices, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
     getQuotePrices(),
+    listQualifiedInvestorTickers(),
   ]);
   const input = buildSuggestionInput(
     comparison,
@@ -470,6 +488,7 @@ export async function generateSuggestion(
     contribution,
     history,
     income.total,
+    qualifiedTickers,
   );
   const allowed = new Map(
     comparison.items.map((item) => [item.ticker.toUpperCase(), item.status]),
@@ -504,7 +523,10 @@ export async function generateSuggestion(
     tab,
     model,
     ...output,
-    items: applySuggestedQuantities(output.items, priceByTicker),
+    items: applyQualifiedInvestor(
+      applySuggestedQuantities(output.items, priceByTicker),
+      qualifiedTickers,
+    ),
     createdAt,
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,

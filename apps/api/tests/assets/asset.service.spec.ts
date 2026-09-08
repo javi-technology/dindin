@@ -8,6 +8,7 @@ jest.mock('firebase-admin', () => ({
 import {
   assetExists,
   listActiveAssetTickers,
+  listQualifiedInvestorTickers,
 } from '../../src/assets/asset.service';
 
 type TestAsset = { ticker: string; assetType?: string; active?: boolean };
@@ -99,6 +100,33 @@ describe('asset.service', () => {
       await expect(listActiveAssetTickers()).resolves.toEqual([
         { ticker: 'HGLG11', assetType: 'OTHER' },
       ]);
+    });
+  });
+
+  describe('listQualifiedInvestorTickers', () => {
+    it('deve retornar tickers qualificados em maiúsculas', async () => {
+      mockAssetsCollection([
+        { ticker: 'hglg11', assetType: 'FII', active: true },
+        { ticker: 'ITUB4', assetType: 'STOCK', active: true },
+      ]);
+      firestoreMock.collection('assets').where = jest.fn(() => ({
+        get: jest.fn().mockResolvedValue({
+          docs: [
+            {
+              id: 'hglg11',
+              data: () => ({ ticker: 'hglg11', qualifiedInvestor: true }),
+            },
+            {
+              id: 'ITUB4',
+              data: () => ({ qualifiedInvestor: true }),
+            },
+          ],
+        }),
+      }));
+
+      await expect(listQualifiedInvestorTickers()).resolves.toEqual(
+        new Set(['HGLG11', 'ITUB4']),
+      );
     });
   });
 });

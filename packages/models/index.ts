@@ -47,6 +47,7 @@ export interface Asset {
   name: string;
   assetType: AssetType;
   active: boolean;
+  qualifiedInvestor?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -192,6 +193,7 @@ export interface AiSuggestionItem {
   suggestedAmount?: number;
   suggestedQuantity?: number;
   referencePrice?: number;
+  qualifiedInvestor?: boolean;
 }
 
 /** Sugestão gerada por IA — subcoleção users/{uid}/aiSuggestions. */

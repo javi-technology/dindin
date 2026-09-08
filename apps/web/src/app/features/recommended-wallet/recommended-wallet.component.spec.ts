@@ -115,6 +115,13 @@ describe('RecommendedWalletComponent', () => {
             suggestedQuantity: 0,
             referencePrice: 96.44,
           },
+          {
+            ticker: 'VISC11',
+            action: 'hold',
+            priority: 3,
+            rationale: 'Mantenha se disponível.',
+            qualifiedInvestor: true,
+          },
         ],
         disclaimer: 'Aviso',
         createdAt: '2026-09-04T12:00:00Z',
@@ -289,6 +296,15 @@ describe('RecommendedWalletComponent', () => {
     expect(card.textContent).toContain('Aporte:');
     expect(card.textContent).toContain('Proventos projetados:');
     expect(card.textContent).toContain('≈ 1 cota a R$\u00a095,00');
+    expect(card.textContent).toContain('Comprar');
+    expect(card.textContent).toContain('Investidor qualificado');
+    expect(card.textContent).toContain(
+      'FII exclusivo para investidor qualificado — pode não estar disponível para compra na sua corretora.',
+    );
+    const regularItem = Array.from(
+      card.querySelectorAll('li') as NodeListOf<HTMLElement>,
+    ).find((item) => item.textContent?.includes('HGLG11'));
+    expect(regularItem?.textContent).not.toContain('Investidor qualificado');
   });
 
   it('deve sinalizar quando o valor não alcança uma cota', () => {

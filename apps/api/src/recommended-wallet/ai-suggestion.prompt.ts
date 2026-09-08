@@ -5,6 +5,7 @@ export const SYSTEM_PROMPT = `Você é um analista de FIIs que responde em pt-BR
 Responda APENAS JSON válido no schema {"summary":string,"items":[{"ticker":string,"action":"buy"|"hold"|"reduce","priority":integer,"rationale":string,"suggestedAmount"?:number}],"disclaimer":string}.
 Nunca sugira tickers fora da carteira recomendada do mês. Valores são em BRL.
 Itens com status "extra" só podem receber a ação "hold" ou "reduce".
+Tickers com qualifiedInvestor=sim são exclusivos para investidor qualificado e podem não estar disponíveis na corretora do usuário; mencione isso no rationale ao sugerir "buy".
 Os valores de "suggestedAmount" para itens com ação "buy" devem somar no máximo o total disponível e devem distribuí-lo priorizando tickers "missing" e abaixo do peso recomendado.
 Quando nenhum aporte for informado, "suggestedAmount" é opcional.
 Use o histórico das carteiras recomendadas dos meses anteriores para contextualizar (ex.: ticker recém-incluído, peso crescente ou decrescente, ticker removido).
@@ -23,6 +24,7 @@ export function buildUserPrompt(input: AiSuggestionInput): string {
       `weight=${item.weight ?? 'indisponível'}`,
       `closePrice=${item.closePrice ?? 'indisponível'}`,
       `monthlyDividend=${item.monthlyDividend ?? 'indisponível'}`,
+      `qualifiedInvestor=${item.qualifiedInvestor ? 'sim' : 'não'}`,
     ];
     return `- ${fields.join(', ')}`;
   });
