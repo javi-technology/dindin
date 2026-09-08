@@ -179,6 +179,23 @@ describe('ai-suggestion.service', () => {
     ).toThrow('Resposta inválida da IA');
   });
 
+  it('deve usar openrouter/auto quando OPENROUTER_MODEL não está definido', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo-real',
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    });
+
+    await callOpenRouter('sistema', 'usuario');
+
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).model,
+    ).toBe('openrouter/auto');
+  });
+
   it('deve consultar o OpenRouter com modelo, segredo e JSON estruturado', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     process.env.OPENROUTER_MODEL = 'modelo-teste';

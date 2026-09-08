@@ -180,7 +180,7 @@ export async function callOpenRouter(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini',
+          model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
           temperature: 0.2,
           response_format: { type: 'json_object' },
           messages: [
