@@ -177,7 +177,7 @@ export async function callOpenRouter(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
   const requestBody = {
-    model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
+    model: process.env.OPENROUTER_MODEL ?? 'openai/gpt-5.6-luna',
     temperature: 0.2,
     response_format: { type: 'json_object' },
     messages: [
