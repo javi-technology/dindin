@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions/v1';
+import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import express, { Request, Response, NextFunction } from 'express';
@@ -182,9 +182,7 @@ app.use(
 
 // O segredo OPENROUTER_API_KEY é configurado com:
 //   firebase functions:secrets:set OPENROUTER_API_KEY
-export const api = functions
-  .runWith({ secrets: ['OPENROUTER_API_KEY'] })
-  .https.onRequest(app);
+export const api = onRequest({ secrets: ['OPENROUTER_API_KEY'] }, app);
 
 // Cloud Function agendada para atualizar cotações 1x ao dia.
 // Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)
