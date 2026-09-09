@@ -1,4 +1,5 @@
 import type Stripe from 'stripe';
+import * as admin from 'firebase-admin';
 import { UserSubscription } from 'dindin-shared-types';
 import { getStripe } from './stripe.client';
 import { mapSubscription, resolveUid } from './subscription-mapper';
@@ -17,12 +18,37 @@ async function resolveUidWithCustomer(
   return resolveUid(sub, customer);
 }
 
-async function upsert(uid: string, mapped: UserSubscription): Promise<void> {
-  await subscriptionDoc(uid).set(mapped, { merge: true });
+async function upsert(
+  uid: string,
+  mapped: UserSubscription,
+  eventCreated?: number,
+): Promise<void> {
+  if (typeof eventCreated === 'number') {
+    mapped.providerEventCreated = eventCreated;
+  }
+  const ref = subscriptionDoc(uid);
+  await admin.firestore().runTransaction(async (tx) => {
+    const snapshot = await tx.get(ref);
+    const stored = snapshot.data()?.providerEventCreated;
+    if (
+      typeof eventCreated === 'number' &&
+      typeof stored === 'number' &&
+      stored > eventCreated
+    ) {
+      console.warn(
+        '[billing.webhook] evento antigo ignorado',
+        uid,
+        eventCreated,
+      );
+      return;
+    }
+    tx.set(ref, mapped, { merge: true });
+  });
 }
 
 async function handleSubscriptionEvent(
   sub: Stripe.Subscription,
+  eventCreated?: number,
   forceStatus?: UserSubscription['status'],
 ): Promise<void> {
   const uid = await resolveUidWithCustomer(sub);
@@ -32,7 +58,7 @@ async function handleSubscriptionEvent(
   }
   const mapped = mapSubscription(sub, customerIdOf(sub));
   if (forceStatus) mapped.status = forceStatus;
-  await upsert(uid, mapped);
+  await upsert(uid, mapped, eventCreated);
 }
 
 export async function processStripeEvent(event: Stripe.Event): Promise<void> {
@@ -53,18 +79,22 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         console.warn('[billing.webhook] uid não encontrado para', session.id);
         return;
       }
-      await upsert(uid, mapSubscription(sub, customerIdOf(sub)));
+      await upsert(uid, mapSubscription(sub, customerIdOf(sub)), event.created);
       return;
     }
 
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
-      await handleSubscriptionEvent(event.data.object as Stripe.Subscription);
+      await handleSubscriptionEvent(
+        event.data.object as Stripe.Subscription,
+        event.created,
+      );
       return;
 
     case 'customer.subscription.deleted':
       await handleSubscriptionEvent(
         event.data.object as Stripe.Subscription,
+        event.created,
         'canceled',
       );
       return;
@@ -78,6 +108,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
       const subscription = await stripe.subscriptions.retrieve(subId);
       await handleSubscriptionEvent(
         subscription,
+        event.created,
         event.type === 'invoice.payment_failed' ? 'past_due' : undefined,
       );
       return;

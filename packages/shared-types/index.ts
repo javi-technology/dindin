@@ -45,6 +45,8 @@ export interface UserSubscription {
   provider: SubscriptionProvider | null;
   providerCustomerId?: string;
   providerSubscriptionId?: string;
+  /** `event.created` (unix seconds) do último evento do provedor aplicado — protege contra webhooks fora de ordem. */
+  providerEventCreated?: number;
   currentPeriodEnd: string | null; // ISO
   cancelAtPeriodEnd: boolean;
   updatedAt: string;

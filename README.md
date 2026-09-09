@@ -124,6 +124,7 @@ concessão manual pelo admin).
 | `plan` / `interval`                             | `basic` e `month`/`year` (ou `null`)                        |
 | `provider`                                      | `stripe`, `manual` ou `null`                                |
 | `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API)                     |
+| `providerEventCreated`                          | `event.created` do último webhook aplicado (ordenação)      |
 | `currentPeriodEnd`                              | Fim do período pago (ISO) — define a carência de `past_due` |
 | `cancelAtPeriodEnd`                             | Cancelamento agendado para o fim do período                 |
 
@@ -184,7 +185,7 @@ Configuração não secreta — o Functions v2 carrega arquivos `.env` do diret�
 # apps/api/.env
 STRIPE_PRICE_BASIC_MONTHLY=price_...
 STRIPE_PRICE_BASIC_YEARLY=price_...
-APP_BASE_URL=https://dindin-4e720.web.app   # opcional; fallback usa Origin ou esse domínio
+APP_BASE_URL=https://dindin-4e720.web.app   # opcional; sem ela usa esse domínio padrão
 ```
 
 #### Desenvolvimento local

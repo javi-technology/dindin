@@ -1,6 +1,10 @@
 import type Stripe from 'stripe';
 
-const setMock = jest.fn();
+const txGetMock = jest.fn();
+const txSetMock = jest.fn();
+const runTransactionMock = jest.fn(async (cb: (tx: unknown) => unknown) =>
+  cb({ get: txGetMock, set: txSetMock }),
+);
 const docPathMock = jest.fn();
 const subscriptionsRetrieveMock = jest.fn();
 const customersRetrieveMock = jest.fn();
@@ -18,11 +22,12 @@ jest.mock('firebase-admin', () => ({
         collection: jest.fn((c2: string) => ({
           doc: jest.fn((d2: string) => {
             docPathMock(c1, d1, c2, d2);
-            return { set: setMock };
+            return {};
           }),
         })),
       })),
     })),
+    runTransaction: runTransactionMock,
   })),
   storage: jest.fn(),
 }));
@@ -61,10 +66,15 @@ function makeSubscription(
   } as unknown as Stripe.Subscription;
 }
 
-function makeEvent(type: string, object: unknown): Stripe.Event {
+function makeEvent(
+  type: string,
+  object: unknown,
+  created = 2000,
+): Stripe.Event {
   return {
     id: 'evt_1',
     type,
+    created,
     data: { object },
   } as unknown as Stripe.Event;
 }
@@ -74,6 +84,12 @@ describe('processStripeEvent', () => {
     jest.clearAllMocks();
     process.env.STRIPE_SECRET_KEY = 'sk_test_123';
     subscriptionsRetrieveMock.mockResolvedValue(makeSubscription());
+    runTransactionMock.mockImplementation(
+      async (cb: (tx: unknown) => unknown) =>
+        cb({ get: txGetMock, set: txSetMock }),
+    );
+    txGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+    txSetMock.mockResolvedValue(undefined);
   });
 
   it('checkout.session.completed faz upsert pelo client_reference_id', async () => {
@@ -92,7 +108,8 @@ describe('processStripeEvent', () => {
       'billing',
       'subscription',
     );
-    expect(setMock).toHaveBeenCalledWith(
+    expect(txSetMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         status: 'active',
         plan: 'basic',
@@ -101,6 +118,7 @@ describe('processStripeEvent', () => {
         providerCustomerId: 'cus_1',
         providerSubscriptionId: 'sub_1',
         currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+        providerEventCreated: 2000,
       }),
       { merge: true },
     );
@@ -112,7 +130,7 @@ describe('processStripeEvent', () => {
     await processStripeEvent(makeEvent('checkout.session.completed', session));
 
     expect(subscriptionsRetrieveMock).not.toHaveBeenCalled();
-    expect(setMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
   });
 
   it.each(['customer.subscription.created', 'customer.subscription.updated'])(
@@ -120,8 +138,12 @@ describe('processStripeEvent', () => {
     async (type) => {
       await processStripeEvent(makeEvent(type, makeSubscription()));
 
-      expect(setMock).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'active' }),
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          status: 'active',
+          providerEventCreated: 2000,
+        }),
         { merge: true },
       );
       expect(docPathMock).toHaveBeenCalledWith(
@@ -138,7 +160,8 @@ describe('processStripeEvent', () => {
       makeEvent('customer.subscription.deleted', makeSubscription()),
     );
 
-    expect(setMock).toHaveBeenCalledWith(
+    expect(txSetMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ status: 'canceled' }),
       { merge: true },
     );
@@ -160,7 +183,7 @@ describe('processStripeEvent', () => {
       'billing',
       'subscription',
     );
-    expect(setMock).toHaveBeenCalled();
+    expect(txSetMock).toHaveBeenCalled();
   });
 
   it('não escreve nada quando uid não é encontrado', async () => {
@@ -173,7 +196,7 @@ describe('processStripeEvent', () => {
       ),
     );
 
-    expect(setMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
   });
 
   it('invoice.paid atualiza a assinatura via parent.subscription_details', async () => {
@@ -187,7 +210,8 @@ describe('processStripeEvent', () => {
     await processStripeEvent(makeEvent('invoice.paid', invoice));
 
     expect(subscriptionsRetrieveMock).toHaveBeenCalledWith('sub_1');
-    expect(setMock).toHaveBeenCalledWith(
+    expect(txSetMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ status: 'active' }),
       { merge: true },
     );
@@ -203,7 +227,8 @@ describe('processStripeEvent', () => {
 
     await processStripeEvent(makeEvent('invoice.payment_failed', invoice));
 
-    expect(setMock).toHaveBeenCalledWith(
+    expect(txSetMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ status: 'past_due' }),
       { merge: true },
     );
@@ -215,12 +240,66 @@ describe('processStripeEvent', () => {
     await processStripeEvent(makeEvent('invoice.paid', invoice));
 
     expect(subscriptionsRetrieveMock).not.toHaveBeenCalled();
-    expect(setMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
   });
 
   it('ignora tipos de evento desconhecidos', async () => {
     await processStripeEvent(makeEvent('payment_intent.succeeded', {}));
 
-    expect(setMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
+  });
+
+  describe('eventos fora de ordem', () => {
+    const stored = (providerEventCreated: number) => ({
+      exists: true,
+      data: () => ({ providerEventCreated }),
+    });
+
+    it('ignora evento mais antigo que o já gravado', async () => {
+      txGetMock.mockResolvedValue(stored(3000));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 2000),
+      );
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('grava evento igual ao já gravado', async () => {
+      txGetMock.mockResolvedValue(stored(2000));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 2000),
+      );
+
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ providerEventCreated: 2000 }),
+        { merge: true },
+      );
+    });
+
+    it('grava evento mais novo que o já gravado', async () => {
+      txGetMock.mockResolvedValue(stored(1000));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 2000),
+      );
+
+      expect(txSetMock).toHaveBeenCalled();
+    });
+
+    it('grava quando o doc não tem providerEventCreated', async () => {
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({ status: 'active' }),
+      });
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 2000),
+      );
+
+      expect(txSetMock).toHaveBeenCalled();
+    });
   });
 });
