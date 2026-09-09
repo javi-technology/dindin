@@ -82,6 +82,11 @@ import {
   downloadBbPdf,
 } from './recommended-wallet/storage.service';
 import {
+  createCheckoutSession,
+  createPortalSession,
+  handleWebhook,
+} from './billing/billing.controller';
+import {
   importBbWallet,
   syncBbWallet,
 } from './recommended-wallet/recommended-wallet.service';
@@ -89,6 +94,15 @@ import {
 admin.initializeApp();
 
 const app = express();
+
+// Webhook da Stripe precisa do body cru (Buffer) para validar a assinatura
+// e não passa pelo authMiddleware — registrar antes do express.json.
+app.post(
+  '/api/billing/webhook',
+  express.raw({ type: 'application/json' }),
+  handleWebhook,
+);
+
 app.use(express.json({ limit: '10mb' }));
 
 // Middleware de log de requisições para diagnóstico em produção
@@ -130,6 +144,9 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.post('/api/billing/checkout-session', createCheckoutSession);
+app.post('/api/billing/portal-session', createPortalSession);
 
 app.get('/api/assets', listAssets);
 app.get('/api/admin/assets', adminAuthMiddleware, listAllAssets);
@@ -216,10 +233,19 @@ app.use(
   },
 );
 
-// O segredo OPENROUTER_API_KEY é configurado com:
+// Os segredos são configurados com:
 //   firebase functions:secrets:set OPENROUTER_API_KEY
+//   firebase functions:secrets:set STRIPE_SECRET_KEY
+//   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
 export const api = onRequest(
-  { secrets: ['OPENROUTER_API_KEY'], timeoutSeconds: 180 },
+  {
+    secrets: [
+      'OPENROUTER_API_KEY',
+      'STRIPE_SECRET_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+    ],
+    timeoutSeconds: 180,
+  },
   app,
 );
 

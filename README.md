@@ -124,6 +124,7 @@ concessão manual pelo admin).
 | `plan` / `interval`                             | `basic` e `month`/`year` (ou `null`)                        |
 | `provider`                                      | `stripe`, `manual` ou `null`                                |
 | `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API)                     |
+| `providerEventCreated`                          | `event.created` do último webhook aplicado (ordenação)      |
 | `currentPeriodEnd`                              | Fim do período pago (ISO) — define a carência de `past_due` |
 | `cancelAtPeriodEnd`                             | Cancelamento agendado para o fim do período                 |
 
@@ -140,6 +141,75 @@ sugestões.
 
 `GET /api/me` devolve
 `{ uid, admin, subscription: { status, plan, interval, currentPeriodEnd, cancelAtPeriodEnd }, entitlements: ['ai'] }`.
+
+### Stripe
+
+O provedor de pagamento é a Stripe (Checkout + Customer Portal + webhooks).
+
+#### Configuração no painel da Stripe
+
+1. Crie o produto **DinDin Básico** com dois preços recorrentes:
+   - `brl 1000` por **mês** (R$ 10,00/mês)
+   - `brl 10000` por **ano** (R$ 100,00/ano)
+2. Em **Configurações → Portal do cliente**, habilite:
+   - Cancelar assinatura (no fim do período)
+   - Atualizar método de pagamento
+   - Trocar entre plano mensal e anual
+   - Histórico de faturas
+3. Em **Desenvolvedores → Webhooks**, crie o endpoint
+   `https://<região>-<projeto>.cloudfunctions.net/api/api/billing/webhook`
+   (ou via Hosting: `https://dindin-4e720.web.app/api/billing/webhook`) com os
+   eventos:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.paid`
+   - `invoice.payment_failed`
+
+#### Secrets e variáveis
+
+Secrets (nunca versionadas):
+
+```bash
+firebase functions:secrets:set STRIPE_SECRET_KEY
+firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+```
+
+Configuração não secreta — o Functions v2 carrega arquivos `.env` do diretório
+`apps/api` no deploy (`apps/api/.env` para todos os projetos ou
+`apps/api/.env.<projectId>` por projeto; esses arquivos já estão no
+`.gitignore`):
+
+```bash
+# apps/api/.env
+STRIPE_PRICE_BASIC_MONTHLY=price_...
+STRIPE_PRICE_BASIC_YEARLY=price_...
+APP_BASE_URL=https://dindin-4e720.web.app   # opcional; sem ela usa esse domínio padrão
+```
+
+#### Desenvolvimento local
+
+Com os emuladores rodando (`npm run emulators`), encaminhe os eventos da Stripe
+para o Functions emulator (a function se chama `api` e a rota Express é
+`/api/billing/webhook`):
+
+```bash
+stripe listen --forward-to http://127.0.0.1:5001/dindin-4e720/us-central1/api/api/billing/webhook
+```
+
+O `stripe listen` imprime um `whsec_...` — configure-o como
+`STRIPE_WEBHOOK_SECRET` local. Também é possível usar o Hosting emulator
+(`http://localhost:5002/api/billing/webhook`), que reescreve `/api/**` para a
+function `api`.
+
+#### Endpoints
+
+| Método | Rota                            | Descrição                                                                                                                                |
+| ------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/billing/checkout-session` | Cria sessão de Checkout (`{ interval: 'month'\|'year' }`, trial de 7 dias). `409 ALREADY_SUBSCRIBED` se já ativa/trialing                |
+| `POST` | `/api/billing/portal-session`   | Cria sessão do Customer Portal. `404 NO_CUSTOMER` sem customer                                                                           |
+| `POST` | `/api/billing/webhook`          | Webhook da Stripe (fora do `authMiddleware`, assinatura validada). `400` assinatura inválida; idempotência via `billingEvents/{eventId}` |
 
 ## Próximos passos
 
