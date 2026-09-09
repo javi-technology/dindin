@@ -87,5 +87,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Idempotência de webhooks de billing — acesso exclusivo pelo Admin SDK.
+    match /billingEvents/{eventId} {
+      allow read, write: if false;
+    }
+
   }
 }
