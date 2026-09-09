@@ -112,6 +112,9 @@ export class RecommendedWalletComponent implements OnInit {
       this.billingService.hasAi() &&
       !this.billingService.subscriptionRequired(),
   );
+  showPaywall = computed(
+    () => this.billingService.loaded() && !this.hasAiAccess(),
+  );
 
   ngOnInit(): void {
     this.loadRecommendedWallets();

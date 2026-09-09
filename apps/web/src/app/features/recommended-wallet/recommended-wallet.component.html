@@ -289,7 +289,7 @@
               }
             </div>
 
-            @if (!hasAiAccess()) {
+            @if (showPaywall()) {
               <div
                 class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
                 data-testid="ai-paywall"

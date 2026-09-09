@@ -27,6 +27,7 @@ describe('RecommendedWalletComponent', () => {
   let authServiceMock: { isAdmin: jasmine.Spy };
   let billingServiceMock: {
     hasAi: ReturnType<typeof signal<boolean>>;
+    loaded: ReturnType<typeof signal<boolean>>;
     subscriptionRequired: ReturnType<typeof signal<boolean>>;
     loadMe: jasmine.Spy;
   };
@@ -103,6 +104,7 @@ describe('RecommendedWalletComponent', () => {
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
     billingServiceMock = {
       hasAi: signal(true),
+      loaded: signal(true),
       subscriptionRequired: signal(false),
       loadMe: jasmine.createSpy('loadMe').and.returnValue(of(me)),
     };
