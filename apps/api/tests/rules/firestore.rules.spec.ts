@@ -475,3 +475,32 @@ describe('Firestore rules – billing', () => {
     await assertFails(getDoc(doc(unauth.firestore(), path)));
   });
 });
+
+// ---------------------------------------------------------------------------
+// billingEvents (idempotência de webhooks — somente Admin SDK)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – billingEvents', () => {
+  const path = 'billingEvents/evt_1';
+
+  it('deve negar leitura para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), path), { type: 'invoice.paid' }),
+    );
+
+    await assertFails(getDoc(doc(alice.firestore(), path)));
+  });
+
+  it('deve negar escrita para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), path), { type: 'invoice.paid' }),
+    );
+  });
+
+  it('deve negar acesso não autenticado', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauth.firestore(), path)));
+  });
+});
