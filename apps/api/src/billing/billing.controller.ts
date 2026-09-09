@@ -34,9 +34,11 @@ export async function createCheckoutSession(
 
     const uid = (req as AuthRequest).user!.uid;
     const subscription = await getSubscription(uid);
+    // past_due não inicia novo checkout — resolve o pagamento no portal
     if (
       subscription.status === 'active' ||
-      subscription.status === 'trialing'
+      subscription.status === 'trialing' ||
+      subscription.status === 'past_due'
     ) {
       res.status(409).json({
         error: 'Assinatura já ativa',
@@ -53,13 +55,19 @@ export async function createCheckoutSession(
     }
 
     const customer = await getOrCreateCustomer(uid, email);
-    const base = getAppBaseUrl(req);
+    const base = getAppBaseUrl();
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer,
       client_reference_id: uid,
       line_items: [{ price: getPriceId(interval), quantity: 1 }],
-      subscription_data: { trial_period_days: 7, metadata: { uid } },
+      // Trial apenas na primeira assinatura — ex-assinantes não repetem
+      subscription_data: {
+        ...(subscription.providerSubscriptionId
+          ? {}
+          : { trial_period_days: 7 }),
+        metadata: { uid },
+      },
       success_url: `${base}/assinatura?status=success`,
       cancel_url: `${base}/assinatura?status=cancel`,
       locale: 'pt-BR',
@@ -86,7 +94,7 @@ export async function createPortalSession(
       return;
     }
 
-    const base = getAppBaseUrl(req);
+    const base = getAppBaseUrl();
     const session = await getStripe().billingPortal.sessions.create({
       customer: subscription.providerCustomerId,
       return_url: `${base}/assinatura`,
@@ -140,10 +148,20 @@ export async function handleWebhook(
   }
 
   const now = new Date().toISOString();
-  await eventDoc.set({
-    type: event.type,
-    createdAt: now,
-    processedAt: now,
-  });
+  try {
+    await eventDoc.set({
+      type: event.type,
+      createdAt: now,
+      processedAt: now,
+    });
+  } catch (error) {
+    // O processamento já ocorreu — falhar aqui faria a Stripe retentar o
+    // evento, o que é inócuo, mas respondemos 200 para não gerar ruído.
+    console.error(
+      '[billing.webhook] falha ao registrar evento',
+      event.id,
+      (error as Error).message,
+    );
+  }
   res.json({ received: true });
 }

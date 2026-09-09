@@ -5,6 +5,11 @@ const verifyIdTokenMock = jest.fn();
 const getUserMock = jest.fn();
 const subGetMock = jest.fn();
 const subSetMock = jest.fn();
+const txGetMock = jest.fn();
+const txSetMock = jest.fn();
+const runTransactionMock = jest.fn(async (cb: (tx: unknown) => unknown) =>
+  cb({ get: txGetMock, set: txSetMock }),
+);
 const eventGetMock = jest.fn();
 const eventSetMock = jest.fn();
 const eventDocIdMock = jest.fn();
@@ -33,6 +38,7 @@ jest.mock('firebase-admin', () => ({
     getUser: getUserMock,
   })),
   firestore: jest.fn(() => ({
+    runTransaction: runTransactionMock,
     collection: jest.fn((name: string) => ({
       doc: jest.fn((id: string) => {
         if (name === 'billingEvents') {
@@ -111,6 +117,12 @@ describe('billing controller', () => {
     subSetMock.mockResolvedValue(undefined);
     eventGetMock.mockResolvedValue({ exists: false });
     eventSetMock.mockResolvedValue(undefined);
+    runTransactionMock.mockImplementation(
+      async (cb: (tx: unknown) => unknown) =>
+        cb({ get: txGetMock, set: txSetMock }),
+    );
+    txGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+    txSetMock.mockResolvedValue(undefined);
     customerCreateMock.mockResolvedValue({ id: 'cus_1' });
     checkoutCreateMock.mockResolvedValue({ url: 'https://checkout.test' });
     portalCreateMock.mockResolvedValue({ url: 'https://portal.test' });
@@ -173,7 +185,7 @@ describe('billing controller', () => {
       expect(checkoutCreateMock).not.toHaveBeenCalled();
     });
 
-    it.each(['active', 'trialing'])(
+    it.each(['active', 'trialing', 'past_due'])(
       'responde 409 quando a assinatura já está %s',
       async (status) => {
         subGetMock.mockResolvedValue(subscriptionDoc({ status }));
@@ -191,6 +203,58 @@ describe('billing controller', () => {
         expect(checkoutCreateMock).not.toHaveBeenCalled();
       },
     );
+
+    it('não concede trial para ex-assinante cancelado', async () => {
+      subGetMock.mockResolvedValue(
+        subscriptionDoc({
+          status: 'canceled',
+          providerCustomerId: 'cus_1',
+          providerSubscriptionId: 'sub_old',
+        }),
+      );
+
+      const response = await request(app)
+        .post('/api/billing/checkout-session')
+        .set('Authorization', 'Bearer token')
+        .send({ interval: 'month' });
+
+      expect(response.status).toBe(200);
+      const params = checkoutCreateMock.mock.calls[0][0];
+      expect(params.subscription_data).toEqual({ metadata: { uid: 'user-1' } });
+      expect('trial_period_days' in params.subscription_data).toBe(false);
+      expect(customerCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('ignora o header Origin nas URLs de retorno', async () => {
+      const response = await request(app)
+        .post('/api/billing/checkout-session')
+        .set('Authorization', 'Bearer token')
+        .set('Origin', 'https://evil.example')
+        .send({ interval: 'month' });
+
+      expect(response.status).toBe(200);
+      expect(checkoutCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success_url: 'https://dindin-4e720.web.app/assinatura?status=success',
+          cancel_url: 'https://dindin-4e720.web.app/assinatura?status=cancel',
+        }),
+      );
+
+      subGetMock.mockResolvedValue(
+        subscriptionDoc({ providerCustomerId: 'cus_1' }),
+      );
+      const portal = await request(app)
+        .post('/api/billing/portal-session')
+        .set('Authorization', 'Bearer token')
+        .set('Origin', 'https://evil.example')
+        .send({});
+
+      expect(portal.status).toBe(200);
+      expect(portalCreateMock).toHaveBeenCalledWith({
+        customer: 'cus_1',
+        return_url: 'https://dindin-4e720.web.app/assinatura',
+      });
+    });
 
     it('segue sem email quando getUser falha', async () => {
       getUserMock.mockRejectedValue(new Error('not found'));
@@ -280,7 +344,8 @@ describe('billing controller', () => {
       expect(eventSetMock).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'customer.subscription.updated' }),
       );
-      expect(subSetMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({ status: 'active', provider: 'stripe' }),
         { merge: true },
       );
@@ -306,8 +371,21 @@ describe('billing controller', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ received: true, duplicate: true });
-      expect(subSetMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
       expect(eventSetMock).not.toHaveBeenCalled();
+    });
+
+    it('responde 200 mesmo se registrar o evento falhar', async () => {
+      constructEventMock.mockReturnValue({
+        ...event,
+        data: { object: makeSubscription() },
+      });
+      eventSetMock.mockRejectedValue(new Error('firestore down'));
+
+      const response = await postWebhook(JSON.stringify(event));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ received: true });
     });
   });
 });

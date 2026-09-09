@@ -1,5 +1,4 @@
 import Stripe from 'stripe';
-import { Request } from 'express';
 
 type StatusError = Error & { statusCode?: number };
 
@@ -27,10 +26,7 @@ export function getPriceId(interval: 'month' | 'year'): string {
   return priceId;
 }
 
-export function getAppBaseUrl(req: Request): string {
-  const base =
-    process.env.APP_BASE_URL ??
-    req.headers.origin ??
-    'https://dindin-4e720.web.app';
+export function getAppBaseUrl(): string {
+  const base = process.env.APP_BASE_URL ?? 'https://dindin-4e720.web.app';
   return base.replace(/\/+$/, '');
 }
