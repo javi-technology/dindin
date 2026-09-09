@@ -37,7 +37,7 @@ export function mapSubscription(
   return {
     status: mapStripeStatus(sub.status),
     plan: 'basic',
-    interval: interval === 'month' || interval === 'year' ? interval : null,
+    interval,
     provider: 'stripe',
     providerCustomerId: customerId,
     providerSubscriptionId: sub.id,

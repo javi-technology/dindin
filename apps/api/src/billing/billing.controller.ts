@@ -7,13 +7,18 @@ import { getOrCreateCustomer } from './stripe-customer.service';
 import { getSubscription } from './entitlement.service';
 import { processStripeEvent } from './billing.webhook.service';
 
-function statusCode(error: unknown): number {
-  return typeof error === 'object' &&
+function sendError(res: Response, context: string, error: unknown): void {
+  console.error(`[${context}] error:`, error);
+  const status =
+    typeof error === 'object' &&
     error !== null &&
     'statusCode' in error &&
     typeof (error as { statusCode?: unknown }).statusCode === 'number'
-    ? (error as { statusCode: number }).statusCode
-    : 500;
+      ? (error as { statusCode: number }).statusCode
+      : 500;
+  res.status(status).json({
+    error: status >= 500 ? 'Internal server error' : (error as Error).message,
+  });
 }
 
 export async function createCheckoutSession(
@@ -63,10 +68,7 @@ export async function createCheckoutSession(
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error('[createCheckoutSession] error:', error);
-    res
-      .status(statusCode(error))
-      .json({ error: (error as Error).message ?? 'Internal server error' });
+    sendError(res, 'createCheckoutSession', error);
   }
 }
 
@@ -92,10 +94,7 @@ export async function createPortalSession(
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error('[createPortalSession] error:', error);
-    res
-      .status(statusCode(error))
-      .json({ error: (error as Error).message ?? 'Internal server error' });
+    sendError(res, 'createPortalSession', error);
   }
 }
 
