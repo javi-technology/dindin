@@ -280,6 +280,18 @@ describe('ai-suggestion.service', () => {
     );
   });
 
+  it('deve orientar a IA a continuar comprando de forma proporcional após equalizar os pesos', () => {
+    expect(SYSTEM_PROMPT).toContain(
+      'Após preencher as lacunas, distribua o saldo restante entre os tickers da carteira recomendada proporcionalmente ao peso recomendado',
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      'Estar no peso recomendado NÃO é motivo para "hold" quando há saldo disponível',
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      'Só deixe saldo sem alocar quando ele for menor que o closePrice de todos os tickers elegíveis',
+    );
+  });
+
   it('deve calcular os meses anteriores considerando a virada do ano', () => {
     expect(previousMonths('2026-01')).toEqual([
       '2025-12',
