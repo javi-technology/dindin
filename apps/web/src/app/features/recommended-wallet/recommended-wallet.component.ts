@@ -7,6 +7,7 @@ import { catchError, switchMap } from 'rxjs/operators';
 import { RecommendedWalletService } from '../../core/services/recommended-wallet.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
+import { BillingService } from '../../core/services/billing.service';
 import {
   RecommendedWallet,
   RecommendedWalletAsset,
@@ -48,6 +49,7 @@ export class RecommendedWalletComponent implements OnInit {
   private readonly recommendedWalletService = inject(RecommendedWalletService);
   private readonly walletService = inject(WalletService);
   private readonly authService = inject(AuthService);
+  private readonly billingService = inject(BillingService);
   private readonly compareRequest$ = new Subject<{
     walletId: string;
     month: string;
@@ -105,10 +107,19 @@ export class RecommendedWalletComponent implements OnInit {
   canGenerateSuggestion = computed(
     () => !!this.selectedWalletId() && !!this.selectedMonth(),
   );
+  hasAiAccess = computed(
+    () =>
+      this.billingService.hasAi() &&
+      !this.billingService.subscriptionRequired(),
+  );
 
   ngOnInit(): void {
     this.loadRecommendedWallets();
     this.loadWallets();
+    this.billingService.loadMe().subscribe({
+      next: () => this.loadSavedSuggestion(),
+      error: () => {},
+    });
     this.authService
       .isAdmin()
       .then((isAdmin) => this.isAdmin.set(isAdmin))
@@ -242,7 +253,7 @@ export class RecommendedWalletComponent implements OnInit {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
     const tab = this.selectedTab();
-    if (!walletId || !month) return;
+    if (!walletId || !month || !this.hasAiAccess()) return;
 
     this.suggestionError.set(null);
     const rawContribution = this.contributionInput().trim();
@@ -290,11 +301,13 @@ export class RecommendedWalletComponent implements OnInit {
           tab === this.selectedTab()
         ) {
           this.suggestionLoading.set(false);
-          this.suggestionError.set(
-            error?.status === 429 && error.error?.error
-              ? error.error.error
-              : 'Não foi possível gerar a sugestão. Tente novamente.',
-          );
+          if (error?.status !== 403) {
+            this.suggestionError.set(
+              error?.status === 429 && error.error?.error
+                ? error.error.error
+                : 'Não foi possível gerar a sugestão. Tente novamente.',
+            );
+          }
         }
       },
     });
@@ -352,7 +365,7 @@ export class RecommendedWalletComponent implements OnInit {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
     const tab = this.selectedTab();
-    if (!walletId || !month) return;
+    if (!walletId || !month || !this.hasAiAccess()) return;
 
     this.recommendedWalletService
       .getSuggestion(walletId, month, tab)
