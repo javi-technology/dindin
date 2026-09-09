@@ -52,6 +52,12 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Assinatura do usuário — escrita exclusiva pelo Admin SDK
+      match /billing/{doc} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
     }
 
     // Cotações — leitura pública (qualquer usuário autenticado),

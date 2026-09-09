@@ -104,6 +104,43 @@ Na aplicação web, usuários autenticados podem acessar
 página exibe as abas Renda e Ganho de Capital, permite comparar uma carteira
 do usuário e, para administradores, confirmar ou importar um PDF.
 
+## Assinatura
+
+Os recursos de IA (sugestão mensal da carteira recomendada, chat com a IA e
+futuras features) são liberados mediante assinatura do plano `basic`
+(R$ 10,00/mês ou R$ 100,00/ano, com 7 dias de teste grátis).
+
+### Modelo
+
+A assinatura fica em `users/{uid}/billing/subscription` (tipo
+`UserSubscription` em `packages/shared-types`). A ausência do documento
+equivale a `status: 'none'`. O cliente pode ler o próprio documento, mas a
+escrita é exclusiva do Admin SDK (integração com o provedor de pagamento ou
+concessão manual pelo admin).
+
+| Campo                                           | Descrição                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `status`                                        | `none`, `trialing`, `active`, `past_due` ou `canceled`      |
+| `plan` / `interval`                             | `basic` e `month`/`year` (ou `null`)                        |
+| `provider`                                      | `stripe`, `manual` ou `null`                                |
+| `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API)                     |
+| `currentPeriodEnd`                              | Fim do período pago (ISO) — define a carência de `past_due` |
+| `cancelAtPeriodEnd`                             | Cancelamento agendado para o fim do período                 |
+
+### Gate de recursos
+
+O entitlement `ai` é concedido quando `status` é `trialing` ou `active`, quando
+é `past_due` e `currentPeriodEnd` ainda está no futuro (carência), ou quando o
+usuário é admin (bypass). O middleware `requireEntitlement('ai')`
+(`apps/api/src/middleware/entitlement.middleware.ts`) protege
+`GET/POST /api/recommended-wallets/bb-fii/suggestions` e responde
+`403 { error: 'Forbidden', code: 'SUBSCRIPTION_REQUIRED' }` sem entitlement.
+Com entitlement o fluxo segue inalterado, inclusive o limite diário de
+sugestões.
+
+`GET /api/me` devolve
+`{ uid, admin, subscription: { status, plan, interval, currentPeriodEnd, cancelAtPeriodEnd }, entitlements: ['ai'] }`.
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).
