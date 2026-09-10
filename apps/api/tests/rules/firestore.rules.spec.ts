@@ -436,3 +436,71 @@ describe('Firestore rules – coleções fora do escopo', () => {
     await assertFails(setDoc(ref, { value: 'x' }));
   });
 });
+
+// ---------------------------------------------------------------------------
+// billing (assinatura)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – billing', () => {
+  const path = 'users/alice/billing/subscription';
+
+  it('deve permitir que o proprietário leia sua assinatura', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), path), { status: 'active' }),
+    );
+
+    const snapshot = await assertSucceeds(getDoc(doc(alice.firestore(), path)));
+    expect(snapshot.data()?.status).toBe('active');
+  });
+
+  it('deve negar que outro usuário leia a assinatura', async () => {
+    const bob = testEnv.authenticatedContext('bob');
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), path), { status: 'active' }),
+    );
+
+    await assertFails(getDoc(doc(bob.firestore(), path)));
+  });
+
+  it('deve negar que o proprietário escreva sua assinatura', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), path), { status: 'active' }),
+    );
+  });
+
+  it('deve negar acesso não autenticado à assinatura', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauth.firestore(), path)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// billingEvents (idempotência de webhooks — somente Admin SDK)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – billingEvents', () => {
+  const path = 'billingEvents/evt_1';
+
+  it('deve negar leitura para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), path), { type: 'invoice.paid' }),
+    );
+
+    await assertFails(getDoc(doc(alice.firestore(), path)));
+  });
+
+  it('deve negar escrita para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), path), { type: 'invoice.paid' }),
+    );
+  });
+
+  it('deve negar acesso não autenticado', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauth.firestore(), path)));
+  });
+});

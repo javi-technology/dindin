@@ -5,7 +5,9 @@ import {
   tick,
 } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
 import { of, Subject, throwError } from 'rxjs';
+import { MeResponse } from 'dindin-shared-types';
 import {
   AiSuggestion,
   RecommendedWallet,
@@ -16,12 +18,32 @@ import { RecommendedWalletComponent } from './recommended-wallet.component';
 import { RecommendedWalletService } from '../../core/services/recommended-wallet.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
+import { BillingService } from '../../core/services/billing.service';
 
 describe('RecommendedWalletComponent', () => {
   let fixture: ComponentFixture<RecommendedWalletComponent>;
   let serviceMock: jasmine.SpyObj<RecommendedWalletService>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let authServiceMock: { isAdmin: jasmine.Spy };
+  let billingServiceMock: {
+    hasAi: ReturnType<typeof signal<boolean>>;
+    loaded: ReturnType<typeof signal<boolean>>;
+    subscriptionRequired: ReturnType<typeof signal<boolean>>;
+    loadMe: jasmine.Spy;
+  };
+
+  const me: MeResponse = {
+    uid: 'user-1',
+    admin: false,
+    subscription: {
+      status: 'active',
+      plan: 'basic',
+      interval: 'month',
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+    },
+    entitlements: ['ai'],
+  };
 
   const wallet: RecommendedWallet = {
     id: 'bb-fii_2026-09',
@@ -80,6 +102,12 @@ describe('RecommendedWalletComponent', () => {
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
+    billingServiceMock = {
+      hasAi: signal(true),
+      loaded: signal(true),
+      subscriptionRequired: signal(false),
+      loadMe: jasmine.createSpy('loadMe').and.returnValue(of(me)),
+    };
 
     serviceMock.list.and.returnValue(of([wallet]));
     serviceMock.compare.and.returnValue(of(comparison));
@@ -139,6 +167,7 @@ describe('RecommendedWalletComponent', () => {
         { provide: RecommendedWalletService, useValue: serviceMock },
         { provide: WalletService, useValue: walletServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: BillingService, useValue: billingServiceMock },
       ],
     }).compileComponents();
 
@@ -375,5 +404,53 @@ describe('RecommendedWalletComponent', () => {
     expect(fixture.componentInstance.suggestionError()).toBe(
       'Não foi possível gerar a sugestão. Tente novamente.',
     );
+  });
+
+  it('deve exibir o paywall e não buscar sugestão quando não há acesso à IA', () => {
+    billingServiceMock.hasAi.set(false);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="ai-paywall"]'),
+    ).not.toBeNull();
+    expect(
+      fixture.nativeElement.querySelector(
+        '[data-testid="generate-suggestion-button"]',
+      ),
+    ).toBeNull();
+    expect(serviceMock.getSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('deve exibir os controles e não o paywall quando há acesso à IA', () => {
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="ai-paywall"]'),
+    ).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector(
+        '[data-testid="generate-suggestion-button"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it('deve exibir o paywall quando a API exige assinatura', () => {
+    fixture.detectChanges();
+
+    billingServiceMock.subscriptionRequired.set(true);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="ai-paywall"]'),
+    ).not.toBeNull();
+  });
+
+  it('não deve gerar sugestão quando não há acesso à IA', () => {
+    billingServiceMock.hasAi.set(false);
+    fixture.detectChanges();
+
+    fixture.componentInstance.generateSuggestion();
+
+    expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
   });
 });
