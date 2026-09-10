@@ -174,6 +174,140 @@ export function applySuggestedQuantities(
   });
 }
 
+export function redistributeUnspentAmounts(
+  items: AiSuggestionItem[],
+  priceByTicker: Map<string, number>,
+  totalAvailable: number,
+  qualifiedTickers: Set<string>,
+  allowed: Map<string, RecommendedWalletComparisonItem['status']>,
+): AiSuggestionItem[] {
+  const normalizedQualifiedTickers = new Set(
+    [...qualifiedTickers].map((ticker) => ticker.toUpperCase()),
+  );
+  const roundAmount = (amount: number) => Math.round(amount * 100) / 100;
+  const states = items
+    .map((item, index) => {
+      if (item.action !== 'buy') return null;
+      const ticker = item.ticker.toUpperCase();
+      const price = priceByTicker.get(ticker);
+      const hasKnownPrice =
+        typeof price === 'number' && Number.isFinite(price) && price > 0;
+      const isQualified = normalizedQualifiedTickers.has(ticker);
+      const status = allowed.get(ticker);
+      const quantity =
+        typeof item.suggestedQuantity === 'number' &&
+        Number.isFinite(item.suggestedQuantity) &&
+        item.suggestedQuantity >= 0
+          ? item.suggestedQuantity
+          : 0;
+      if (!hasKnownPrice || isQualified || status === 'extra') {
+        return {
+          kind: 'fixed' as const,
+          amount:
+            status !== 'extra' &&
+            typeof item.suggestedAmount === 'number' &&
+            Number.isFinite(item.suggestedAmount)
+              ? item.suggestedAmount
+              : 0,
+        };
+      }
+      return {
+        kind: 'eligible' as const,
+        index,
+        item,
+        price,
+        quantity,
+        originalQuantity: quantity,
+      };
+    })
+    .filter(
+      (
+        state,
+      ): state is
+        | { kind: 'fixed'; amount: number }
+        | {
+            kind: 'eligible';
+            index: number;
+            item: AiSuggestionItem;
+            price: number;
+            quantity: number;
+            originalQuantity: number;
+          } => state !== null,
+    );
+  const fixedSpent = states
+    .filter(
+      (state): state is { kind: 'fixed'; amount: number } =>
+        state.kind === 'fixed',
+    )
+    .reduce((total, state) => total + state.amount, 0);
+  const eligibleStates = states.filter(
+    (
+      state,
+    ): state is {
+      kind: 'eligible';
+      index: number;
+      item: AiSuggestionItem;
+      price: number;
+      quantity: number;
+      originalQuantity: number;
+    } => state.kind === 'eligible',
+  );
+  const eligibleSpent = eligibleStates.reduce(
+    (total, state) => total + state.quantity * state.price,
+    0,
+  );
+  let pool = roundAmount(totalAvailable - fixedSpent - eligibleSpent);
+  if (pool <= 0) return items;
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const orderedStates = [...eligibleStates].sort(
+      (a, b) =>
+        Number(a.quantity > 0) - Number(b.quantity > 0) ||
+        a.item.priority - b.item.priority ||
+        a.index - b.index,
+    );
+    for (const state of orderedStates) {
+      if (pool + 1e-9 < state.price) continue;
+      state.quantity += 1;
+      pool = roundAmount(pool - state.price);
+      changed = true;
+    }
+  }
+
+  const updatedByIndex = new Map<number, AiSuggestionItem>();
+  for (const state of eligibleStates) {
+    if (state.quantity > 0) {
+      const quantityIncreased = state.quantity > state.originalQuantity;
+      updatedByIndex.set(state.index, {
+        ...state.item,
+        suggestedAmount: roundAmount(state.quantity * state.price),
+        suggestedQuantity: state.quantity,
+        referencePrice: state.price,
+        ...(quantityIncreased
+          ? {
+              rationale: `${state.item.rationale} Recebe cotas adicionais com o saldo realocado de ativos sem cota inteira.`,
+            }
+          : {}),
+      });
+    } else {
+      const {
+        suggestedAmount: _suggestedAmount,
+        suggestedQuantity: _suggestedQuantity,
+        referencePrice: _referencePrice,
+        ...withoutQuantities
+      } = state.item;
+      updatedByIndex.set(state.index, {
+        ...withoutQuantities,
+        action: 'hold',
+        rationale: `${state.item.rationale} Valor realocado para outros ativos por não completar 1 cota.`,
+      });
+    }
+  }
+  return items.map((item, index) => updatedByIndex.get(index) ?? item);
+}
+
 export function applyQualifiedInvestor(
   items: AiSuggestionItem[],
   qualifiedTickers: Set<string>,
@@ -761,6 +895,17 @@ export async function generateSuggestion(
   }
   const id = suggestionId(walletId, month, tab);
   const createdAt = new Date().toISOString();
+  const withQuantities = applySuggestedQuantities(output.items, priceByTicker);
+  const rebalanced =
+    totalAvailable === undefined
+      ? withQuantities
+      : redistributeUnspentAmounts(
+          withQuantities,
+          priceByTicker,
+          totalAvailable,
+          qualifiedTickers,
+          allowed,
+        );
   const suggestion: AiSuggestion = {
     id,
     walletId,
@@ -769,10 +914,7 @@ export async function generateSuggestion(
     model,
     ...output,
     items: applyFallbackAllocations(
-      applyQualifiedInvestor(
-        applySuggestedQuantities(output.items, priceByTicker),
-        qualifiedTickers,
-      ),
+      applyQualifiedInvestor(rebalanced, qualifiedTickers),
       qualifiedTickers,
       comparison.items,
       priceByTicker,
