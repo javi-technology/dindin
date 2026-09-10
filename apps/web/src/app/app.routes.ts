@@ -9,6 +9,7 @@ import { FridgeComponent } from './features/fridge/fridge.component';
 import { DividendComponent } from './features/dividend/dividend.component';
 import { AdminAssetsComponent } from './features/admin-assets/admin-assets.component';
 import { RecommendedWalletComponent } from './features/recommended-wallet/recommended-wallet.component';
+import { BillingComponent } from './features/billing/billing.component';
 
 export const routes: Routes = [
   {
@@ -40,6 +41,11 @@ export const routes: Routes = [
     path: 'carteira-recomendada',
     canActivate: [authGuard],
     component: RecommendedWalletComponent,
+  },
+  {
+    path: 'assinatura',
+    canActivate: [authGuard],
+    component: BillingComponent,
   },
   {
     path: 'admin/assets',

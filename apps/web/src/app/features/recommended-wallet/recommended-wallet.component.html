@@ -259,145 +259,177 @@
               <h2 class="text-lg font-semibold text-gray-900">
                 Sugestão do mês
               </h2>
-              <div class="flex flex-wrap items-end gap-3">
-                <label class="text-sm text-gray-700">
-                  Aporte mensal (R$)
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="500,00"
-                    class="block mt-1 border border-gray-300 rounded-lg px-3 py-2 w-36"
-                    [value]="contributionInput()"
-                    (input)="contributionInput.set($any($event.target).value)"
-                    data-testid="contribution-input"
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                  [disabled]="!canGenerateSuggestion() || suggestionLoading()"
-                  (click)="generateSuggestion()"
-                  data-testid="generate-suggestion-button"
-                >
-                  <svg lucideSparkles [size]="18" class="mr-2"></svg>
-                  {{
-                    suggestionLoading() ? 'Gerando…' : 'Gerar sugestão do mês'
-                  }}
-                </button>
-              </div>
-            </div>
-
-            @if (suggestionError()) {
-              <p
-                class="text-red-700 bg-red-50 rounded-lg p-3 mt-4"
-                data-testid="suggestion-error"
-              >
-                {{ suggestionError() }}
-              </p>
-            }
-
-            @if (suggestion(); as result) {
-              <article
-                class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
-                data-testid="suggestion-card"
-              >
-                <p class="text-gray-800">{{ result.summary }}</p>
-                @if (result.contribution !== undefined) {
-                  <p class="mt-3 text-sm text-gray-700">
-                    Aporte: {{ formatCurrency(result.contribution) }}
-                  </p>
-                  <p class="text-sm text-gray-700">
-                    Proventos projetados:
-                    {{ formatCurrency(result.projectedDividends ?? 0) }} ·
-                    Total:
-                    {{
-                      formatCurrency(
-                        result.contribution + (result.projectedDividends ?? 0)
-                      )
-                    }}
-                  </p>
-                }
-                <ol class="mt-4 space-y-3 list-decimal list-inside">
-                  @for (item of result.items; track item.ticker) {
-                    <li class="text-gray-800">
-                      <span
-                        class="inline-flex px-2 py-1 rounded-full text-xs font-medium mr-2"
-                        [class.bg-green-100]="
-                          item.action === 'buy' && !isUnaffordable(item)
-                        "
-                        [class.text-green-800]="
-                          item.action === 'buy' && !isUnaffordable(item)
-                        "
-                        [class.bg-slate-200]="isUnaffordable(item)"
-                        [class.text-slate-700]="isUnaffordable(item)"
-                        [class.bg-gray-100]="item.action === 'hold'"
-                        [class.text-gray-800]="item.action === 'hold'"
-                        [class.bg-amber-100]="item.action === 'reduce'"
-                        [class.text-amber-800]="item.action === 'reduce'"
-                      >
-                        {{
-                          isUnaffordable(item)
-                            ? 'Aguardar'
-                            : actionLabel(item.action)
-                        }}
-                      </span>
-                      <strong>{{ item.ticker }}</strong>
-                      @if (item.qualifiedInvestor) {
-                        <span
-                          class="inline-flex ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
-                        >
-                          Investidor qualificado
-                        </span>
-                      }
-                      <span class="block ml-6 mt-1 text-sm text-gray-700">
-                        {{ item.rationale }}
-                      </span>
-                      @if (item.qualifiedInvestor) {
-                        <span class="block ml-6 mt-1 text-sm text-amber-700">
-                          FII exclusivo para investidor qualificado — pode não
-                          estar disponível para compra na sua corretora.
-                        </span>
-                      }
-                      @if (item.suggestedAmount !== undefined) {
-                        <span class="block ml-6 mt-1 text-sm text-gray-700">
-                          Valor sugerido:
-                          {{ formatCurrency(item.suggestedAmount) }}
-                          @if (isUnaffordable(item)) {
-                            <span class="text-amber-700">
-                              · Valor insuficiente para 1 cota ({{
-                                formatCurrency(item.referencePrice ?? 0)
-                              }}); aguarde acumular ou redistribua.
-                            </span>
-                          } @else if (item.suggestedQuantity !== undefined) {
-                            · ≈ {{ item.suggestedQuantity }}
-                            {{ quantityLabel(item.suggestedQuantity) }} a
-                            {{ formatCurrency(item.referencePrice ?? 0) }}
-                          }
-                        </span>
-                      }
-                    </li>
-                  }
-                </ol>
-                <footer
-                  class="mt-5 pt-4 border-t border-blue-100 text-xs text-gray-600"
-                >
-                  <p>{{ result.disclaimer }}</p>
-                  <p class="mt-1">
-                    Gerada em
-                    {{ result.createdAt | date: 'dd/MM/yyyy HH:mm' }} · Modelo
-                    {{ result.model }}
-                  </p>
+              @if (hasAiAccess()) {
+                <div class="flex flex-wrap items-end gap-3">
+                  <label class="text-sm text-gray-700">
+                    Aporte mensal (R$)
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      placeholder="500,00"
+                      class="block mt-1 border border-gray-300 rounded-lg px-3 py-2 w-36"
+                      [value]="contributionInput()"
+                      (input)="contributionInput.set($any($event.target).value)"
+                      data-testid="contribution-input"
+                    />
+                  </label>
                   <button
                     type="button"
-                    class="mt-3 text-blue-700 font-medium hover:text-blue-900 disabled:opacity-50"
-                    [disabled]="suggestionLoading()"
-                    (click)="generateSuggestion(true)"
-                    data-testid="regenerate-suggestion-button"
+                    class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    [disabled]="!canGenerateSuggestion() || suggestionLoading()"
+                    (click)="generateSuggestion()"
+                    data-testid="generate-suggestion-button"
                   >
-                    Regerar
+                    <svg lucideSparkles [size]="18" class="mr-2"></svg>
+                    {{
+                      suggestionLoading() ? 'Gerando…' : 'Gerar sugestão do mês'
+                    }}
                   </button>
-                </footer>
-              </article>
+                </div>
+              }
+            </div>
+
+            @if (showPaywall()) {
+              <div
+                class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+                data-testid="ai-paywall"
+              >
+                <h3
+                  class="flex items-center text-base font-semibold text-gray-900"
+                >
+                  <svg
+                    lucideSparkles
+                    [size]="18"
+                    class="mr-2 text-blue-600"
+                  ></svg>
+                  Recurso disponível para assinantes
+                </h3>
+                <p class="mt-2 text-sm text-gray-700">
+                  Assine para receber a sugestão mensal de compras gerada por
+                  IA. 7 dias grátis, cancele quando quiser.
+                </p>
+                <a
+                  routerLink="/assinatura"
+                  class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+                  data-testid="paywall-cta"
+                  >Assinar</a
+                >
+              </div>
+            }
+
+            @if (hasAiAccess()) {
+              @if (suggestionError()) {
+                <p
+                  class="text-red-700 bg-red-50 rounded-lg p-3 mt-4"
+                  data-testid="suggestion-error"
+                >
+                  {{ suggestionError() }}
+                </p>
+              }
+
+              @if (suggestion(); as result) {
+                <article
+                  class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+                  data-testid="suggestion-card"
+                >
+                  <p class="text-gray-800">{{ result.summary }}</p>
+                  @if (result.contribution !== undefined) {
+                    <p class="mt-3 text-sm text-gray-700">
+                      Aporte: {{ formatCurrency(result.contribution) }}
+                    </p>
+                    <p class="text-sm text-gray-700">
+                      Proventos projetados:
+                      {{ formatCurrency(result.projectedDividends ?? 0) }} ·
+                      Total:
+                      {{
+                        formatCurrency(
+                          result.contribution + (result.projectedDividends ?? 0)
+                        )
+                      }}
+                    </p>
+                  }
+                  <ol class="mt-4 space-y-3 list-decimal list-inside">
+                    @for (item of result.items; track item.ticker) {
+                      <li class="text-gray-800">
+                        <span
+                          class="inline-flex px-2 py-1 rounded-full text-xs font-medium mr-2"
+                          [class.bg-green-100]="
+                            item.action === 'buy' && !isUnaffordable(item)
+                          "
+                          [class.text-green-800]="
+                            item.action === 'buy' && !isUnaffordable(item)
+                          "
+                          [class.bg-slate-200]="isUnaffordable(item)"
+                          [class.text-slate-700]="isUnaffordable(item)"
+                          [class.bg-gray-100]="item.action === 'hold'"
+                          [class.text-gray-800]="item.action === 'hold'"
+                          [class.bg-amber-100]="item.action === 'reduce'"
+                          [class.text-amber-800]="item.action === 'reduce'"
+                        >
+                          {{
+                            isUnaffordable(item)
+                              ? 'Aguardar'
+                              : actionLabel(item.action)
+                          }}
+                        </span>
+                        <strong>{{ item.ticker }}</strong>
+                        @if (item.qualifiedInvestor) {
+                          <span
+                            class="inline-flex ml-2 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                          >
+                            Investidor qualificado
+                          </span>
+                        }
+                        <span class="block ml-6 mt-1 text-sm text-gray-700">
+                          {{ item.rationale }}
+                        </span>
+                        @if (item.qualifiedInvestor) {
+                          <span class="block ml-6 mt-1 text-sm text-amber-700">
+                            FII exclusivo para investidor qualificado — pode não
+                            estar disponível para compra na sua corretora.
+                          </span>
+                        }
+                        @if (item.suggestedAmount !== undefined) {
+                          <span class="block ml-6 mt-1 text-sm text-gray-700">
+                            Valor sugerido:
+                            {{ formatCurrency(item.suggestedAmount) }}
+                            @if (isUnaffordable(item)) {
+                              <span class="text-amber-700">
+                                · Valor insuficiente para 1 cota ({{
+                                  formatCurrency(item.referencePrice ?? 0)
+                                }}); aguarde acumular ou redistribua.
+                              </span>
+                            } @else if (item.suggestedQuantity !== undefined) {
+                              · ≈ {{ item.suggestedQuantity }}
+                              {{ quantityLabel(item.suggestedQuantity) }} a
+                              {{ formatCurrency(item.referencePrice ?? 0) }}
+                            }
+                          </span>
+                        }
+                      </li>
+                    }
+                  </ol>
+                  <footer
+                    class="mt-5 pt-4 border-t border-blue-100 text-xs text-gray-600"
+                  >
+                    <p>{{ result.disclaimer }}</p>
+                    <p class="mt-1">
+                      Gerada em
+                      {{ result.createdAt | date: 'dd/MM/yyyy HH:mm' }} · Modelo
+                      {{ result.model }}
+                    </p>
+                    <button
+                      type="button"
+                      class="mt-3 text-blue-700 font-medium hover:text-blue-900 disabled:opacity-50"
+                      [disabled]="suggestionLoading()"
+                      (click)="generateSuggestion(true)"
+                      data-testid="regenerate-suggestion-button"
+                    >
+                      Regerar
+                    </button>
+                  </footer>
+                </article>
+              }
             }
           </section>
         </section>
