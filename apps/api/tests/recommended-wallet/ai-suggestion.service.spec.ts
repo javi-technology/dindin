@@ -518,7 +518,7 @@ describe('ai-suggestion.service', () => {
         ['A11', 60],
         ['B11', 60],
       ]),
-      100,
+      60,
       new Set(),
       new Map<string, RecommendedWalletComparisonItem['status']>([
         ['A11', 'missing'],
