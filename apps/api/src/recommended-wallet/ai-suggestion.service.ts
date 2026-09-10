@@ -438,6 +438,15 @@ export function applyFallbackAllocations(
     }
     return normalized;
   };
+  const getCandidates = (ticker: string) =>
+    comparisonItems.filter((comparisonItem) => {
+      const candidateTicker = comparisonItem.ticker.toUpperCase();
+      return (
+        comparisonItem.status !== 'extra' &&
+        !normalizedQualifiedTickers.has(candidateTicker) &&
+        candidateTicker !== ticker
+      );
+    });
 
   return items.map((item) => {
     const ticker = item.ticker.toUpperCase();
@@ -481,16 +490,9 @@ export function applyFallbackAllocations(
       (total, allocation) => total + allocation.amount,
       0,
     );
+    const candidates = getCandidates(ticker);
     let allocations = validAllocations;
     if (allocationTotal === 0) {
-      const candidates = comparisonItems.filter((comparisonItem) => {
-        const candidateTicker = comparisonItem.ticker.toUpperCase();
-        return (
-          comparisonItem.status !== 'extra' &&
-          !normalizedQualifiedTickers.has(candidateTicker) &&
-          candidateTicker !== ticker
-        );
-      });
       if (candidates.length === 0) {
         const {
           fallbackAllocations: _fallbackAllocations,
@@ -519,6 +521,47 @@ export function applyFallbackAllocations(
       suggestedAmount * 0.01
     ) {
       allocations = normalizeAmounts(validAllocations, suggestedAmount);
+    }
+    while (allocations.length > 0) {
+      const affordableAllocations = allocations.filter((allocation) => {
+        const price = priceByTicker.get(allocation.ticker);
+        return !(
+          typeof price === 'number' &&
+          Number.isFinite(price) &&
+          price > 0 &&
+          Math.floor(allocation.amount / price) === 0
+        );
+      });
+      if (affordableAllocations.length === allocations.length) break;
+      allocations = normalizeAmounts(affordableAllocations, suggestedAmount);
+    }
+    if (allocations.length === 0) {
+      const cheapestCandidate = candidates
+        .map((candidate) => {
+          const candidateTicker = candidate.ticker.toUpperCase();
+          const price = priceByTicker.get(candidateTicker);
+          return { ticker: candidateTicker, price };
+        })
+        .filter(
+          (candidate): candidate is { ticker: string; price: number } =>
+            typeof candidate.price === 'number' &&
+            Number.isFinite(candidate.price) &&
+            candidate.price > 0,
+        )
+        .sort((a, b) => a.price - b.price)[0];
+      if (
+        !cheapestCandidate ||
+        Math.floor(suggestedAmount / cheapestCandidate.price) === 0
+      ) {
+        const {
+          fallbackAllocations: _fallbackAllocations,
+          ...withoutFallback
+        } = item;
+        return withoutFallback;
+      }
+      allocations = [
+        { ticker: cheapestCandidate.ticker, amount: suggestedAmount },
+      ];
     }
     return {
       ...item,
