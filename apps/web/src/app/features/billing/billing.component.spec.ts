@@ -1,4 +1,9 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  tick,
+} from '@angular/core/testing';
 import { signal } from '@angular/core';
 import {
   ActivatedRoute,
@@ -41,6 +46,7 @@ describe('BillingComponent', () => {
   async function setup(
     subscription: PublicSubscription,
     queryParams: Record<string, string> = {},
+    autoDetect = true,
   ) {
     billingServiceMock = {
       subscription: signal(subscription),
@@ -70,7 +76,9 @@ describe('BillingComponent', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(BillingComponent);
-    fixture.detectChanges();
+    if (autoDetect) {
+      fixture.detectChanges();
+    }
   }
 
   afterEach(() => {
@@ -195,14 +203,64 @@ describe('BillingComponent', () => {
     expect(billingServiceMock.openPortal).toHaveBeenCalled();
   });
 
-  it('deve exibir mensagem de sucesso e recarregar ao voltar do checkout', async () => {
-    await setup(baseSubscription, { status: 'success' });
+  it('deve confirmar a assinatura via polling ao voltar do checkout', async () => {
+    const subscribed: MeResponse = {
+      ...me,
+      subscription: {
+        ...baseSubscription,
+        status: 'active',
+        plan: 'basic',
+        interval: 'month',
+      },
+    };
+    await setup(baseSubscription, { status: 'success' }, false);
+    billingServiceMock.loadMe.and.returnValues(
+      of({ ...me, subscription: baseSubscription }),
+      of(subscribed),
+    );
 
-    expect(
-      fixture.nativeElement.querySelector('[data-testid="success-message"]')
-        .textContent,
-    ).toContain('Assinatura confirmada!');
-    expect(billingServiceMock.loadMe).toHaveBeenCalled();
+    fakeAsync(() => {
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="info-message"]')
+          .textContent,
+      ).toContain('Confirmando sua assinatura');
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="success-message"]'),
+      ).toBeNull();
+
+      tick(2000);
+      fixture.detectChanges();
+
+      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="success-message"]')
+          .textContent,
+      ).toContain('Assinatura confirmada!');
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="info-message"]'),
+      ).toBeNull();
+    })();
+  });
+
+  it('deve avisar para atualizar a página se a confirmação não chegar', async () => {
+    await setup(baseSubscription, { status: 'success' }, false);
+
+    fakeAsync(() => {
+      fixture.detectChanges();
+      tick(12000);
+      fixture.detectChanges();
+
+      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(6);
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="info-message"]')
+          .textContent,
+      ).toContain('Pagamento recebido');
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="success-message"]'),
+      ).toBeNull();
+    })();
   });
 
   it('deve exibir mensagem informativa ao cancelar o checkout', async () => {

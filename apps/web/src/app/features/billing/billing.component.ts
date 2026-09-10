@@ -2,7 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideArrowLeft } from '@lucide/angular';
-import { SubscriptionInterval } from 'dindin-shared-types';
+import { EMPTY, catchError, concatMap, take, takeWhile, timer } from 'rxjs';
+import { MeResponse, SubscriptionInterval } from 'dindin-shared-types';
 import { BillingService } from '../../core/services/billing.service';
 
 @Component({
@@ -19,6 +20,7 @@ export class BillingComponent implements OnInit {
   readonly status = computed(() => this.subscription().status);
   readonly loading = computed(() => !this.billingService.loaded());
 
+  readonly verifying = signal(false);
   readonly checkoutLoading = signal(false);
   readonly portalLoading = signal(false);
   readonly error = signal<string | null>(null);
@@ -28,18 +30,56 @@ export class BillingComponent implements OnInit {
   ngOnInit(): void {
     const statusParam = this.route.snapshot.queryParamMap.get('status');
     if (statusParam === 'success') {
-      this.successMessage.set(
-        'Assinatura confirmada! Os recursos de IA já estão liberados.',
-      );
-    } else if (statusParam === 'cancel') {
-      this.infoMessage.set(
-        'Checkout cancelado. Você pode assinar quando quiser.',
-      );
+      this.verifySubscription();
+    } else {
+      if (statusParam === 'cancel') {
+        this.infoMessage.set(
+          'Checkout cancelado. Você pode assinar quando quiser.',
+        );
+      }
+      this.billingService.loadMe().subscribe({
+        error: () => this.error.set('Erro ao carregar sua assinatura.'),
+      });
     }
+  }
 
-    this.billingService.loadMe().subscribe({
-      error: () => this.error.set('Erro ao carregar sua assinatura.'),
-    });
+  private verifySubscription(): void {
+    this.verifying.set(true);
+    this.infoMessage.set('Confirmando sua assinatura…');
+    timer(0, 2000)
+      .pipe(
+        take(6),
+        concatMap(() =>
+          this.billingService.loadMe().pipe(catchError(() => EMPTY)),
+        ),
+        takeWhile((me) => !this.isSubscribed(me), true),
+      )
+      .subscribe({
+        next: (me) => {
+          if (this.isSubscribed(me)) {
+            this.verifying.set(false);
+            this.infoMessage.set(null);
+            this.successMessage.set(
+              'Assinatura confirmada! Os recursos de IA já estão liberados.',
+            );
+          }
+        },
+        complete: () => {
+          if (this.verifying()) {
+            this.verifying.set(false);
+            this.infoMessage.set(
+              'Pagamento recebido. A confirmação pode levar alguns instantes — atualize a página em breve.',
+            );
+          }
+        },
+      });
+  }
+
+  private isSubscribed(me: MeResponse): boolean {
+    return (
+      me.subscription.status === 'active' ||
+      me.subscription.status === 'trialing'
+    );
   }
 
   subscribe(interval: SubscriptionInterval): void {
