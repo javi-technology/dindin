@@ -114,8 +114,11 @@ export async function handleWebhook(
   try {
     const secret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!secret) throw new Error('STRIPE_WEBHOOK_SECRET não configurada');
+    // No Functions v2 o corpo já chega parseado; os bytes originais
+    // necessários para validar a assinatura ficam em req.rawBody.
+    const payload = (req as Request & { rawBody?: Buffer }).rawBody ?? req.body;
     event = getStripe().webhooks.constructEvent(
-      req.body,
+      payload,
       req.headers['stripe-signature'] as string,
       secret,
     );
