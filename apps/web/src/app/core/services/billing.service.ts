@@ -7,6 +7,7 @@ import {
   PublicSubscription,
   SubscriptionInterval,
 } from 'dindin-shared-types';
+import { AuthService } from './auth.service';
 
 const EMPTY_SUBSCRIPTION: PublicSubscription = {
   status: 'none',
@@ -34,6 +35,19 @@ export class BillingService {
   readonly hasAi = computed(() => this.entitlements().includes('ai'));
   /** Ligado pelo interceptor quando a API responde SUBSCRIPTION_REQUIRED. */
   readonly subscriptionRequired = signal(false);
+
+  private lastUid: string | null = null;
+
+  constructor() {
+    inject(AuthService).user$.subscribe((user) => {
+      const uid = user?.uid ?? null;
+      if (uid !== this.lastUid) {
+        this.meState.set(null);
+        this.subscriptionRequired.set(false);
+        this.lastUid = uid;
+      }
+    });
+  }
 
   loadMe(): Observable<MeResponse> {
     return this.http.get<MeResponse>('/api/me').pipe(

@@ -4,12 +4,15 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { Subject } from 'rxjs';
 import { MeResponse } from 'dindin-shared-types';
 import { BillingService } from './billing.service';
+import { AuthService } from './auth.service';
 
 describe('BillingService', () => {
   let service: BillingService;
   let httpMock: HttpTestingController;
+  let user$: Subject<{ uid: string } | null>;
 
   const me: MeResponse = {
     uid: 'user-1',
@@ -25,8 +28,13 @@ describe('BillingService', () => {
   };
 
   beforeEach(() => {
+    user$ = new Subject<{ uid: string } | null>();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: { user$ } },
+      ],
     });
     service = TestBed.inject(BillingService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -109,6 +117,43 @@ describe('BillingService', () => {
     service.loadMe().subscribe();
     httpMock.expectOne('/api/me').flush(me);
 
+    expect(service.subscriptionRequired()).toBeFalse();
+  });
+
+  it('deve limpar o estado quando o usuário mudar', () => {
+    user$.next({ uid: 'user-1' });
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush(me);
+    expect(service.loaded()).toBeTrue();
+
+    user$.next({ uid: 'user-2' });
+
+    expect(service.loaded()).toBeFalse();
+    expect(service.subscription().status).toBe('none');
+    expect(service.entitlements()).toEqual([]);
+  });
+
+  it('não deve limpar o estado quando o mesmo usuário reemitir', () => {
+    user$.next({ uid: 'user-1' });
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush(me);
+
+    user$.next({ uid: 'user-1' });
+
+    expect(service.loaded()).toBeTrue();
+    expect(service.hasAi()).toBeTrue();
+  });
+
+  it('deve limpar o estado ao deslogar', () => {
+    user$.next({ uid: 'user-1' });
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush(me);
+    service.markSubscriptionRequired();
+
+    user$.next(null);
+
+    expect(service.loaded()).toBeFalse();
+    expect(service.subscription().status).toBe('none');
     expect(service.subscriptionRequired()).toBeFalse();
   });
 });
