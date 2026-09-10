@@ -1,4 +1,5 @@
 import request from 'supertest';
+import express, { Request } from 'express';
 import type Stripe from 'stripe';
 
 const verifyIdTokenMock = jest.fn();
@@ -62,6 +63,7 @@ jest.mock('stripe', () => ({
 }));
 
 import { app } from '../../src/index';
+import { handleWebhook } from '../../src/billing/billing.controller';
 
 function makeSubscription(
   partial: Record<string, unknown> = {},
@@ -348,6 +350,41 @@ describe('billing controller', () => {
         expect.anything(),
         expect.objectContaining({ status: 'active', provider: 'stripe' }),
         { merge: true },
+      );
+    });
+
+    it('usa req.rawBody quando o corpo já foi parseado pelo Functions', async () => {
+      constructEventMock.mockReturnValue({
+        ...event,
+        data: { object: makeSubscription() },
+      });
+      const payload = JSON.stringify(event);
+
+      // Simula o Functions v2: o corpo chega já parseado e os bytes
+      // originais ficam disponíveis apenas em req.rawBody.
+      const functionsApp = express();
+      functionsApp.post(
+        '/api/billing/webhook',
+        (req: Request, _res, next) => {
+          (req as Request & { rawBody?: Buffer }).rawBody =
+            Buffer.from(payload);
+          req.body = JSON.parse(payload);
+          next();
+        },
+        handleWebhook,
+      );
+
+      const response = await request(functionsApp)
+        .post('/api/billing/webhook')
+        .set('Content-Type', 'application/json')
+        .set('stripe-signature', 'sig_1')
+        .send(payload);
+
+      expect(response.status).toBe(200);
+      expect(constructEventMock).toHaveBeenCalledWith(
+        Buffer.from(payload),
+        'sig_1',
+        'whsec_123',
       );
     });
 
