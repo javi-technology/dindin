@@ -36,6 +36,7 @@ import {
   previousMonths,
   applySuggestedQuantities,
   applyQualifiedInvestor,
+  applyFallbackAllocations,
   getSavedSuggestion,
   parseSuggestionOutput,
   suggestionId,
@@ -278,6 +279,8 @@ describe('ai-suggestion.service', () => {
     expect(SYSTEM_PROMPT).toContain(
       'Tickers com qualifiedInvestor=sim são exclusivos para investidor qualificado',
     );
+    expect(SYSTEM_PROMPT).toContain('fallbackAllocations');
+    expect(SYSTEM_PROMPT).toContain('OPCIONAIS');
   });
 
   it('deve orientar a IA a continuar comprando de forma proporcional após equalizar os pesos', () => {
@@ -456,6 +459,383 @@ describe('ai-suggestion.service', () => {
         ],
       },
     );
+  });
+
+  it('deve filtrar alocações alternativas inválidas e não permitidas', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'buy',
+            priority: 1,
+            rationale: 'Compre.',
+            suggestedAmount: 100,
+            fallbackAllocations: [
+              { ticker: 'HGCR11', amount: 50 },
+              { ticker: 'XPML11', amount: 25 },
+              { ticker: 'NAOEXISTE11', amount: 10 },
+              { ticker: 'HGLG11', amount: 15 },
+            ],
+          },
+          {
+            ticker: 'VISC11',
+            action: 'hold',
+            priority: 2,
+            rationale: 'Mantenha.',
+            fallbackAllocations: [{ ticker: 'HGCR11', amount: 10 }],
+          },
+          {
+            ticker: 'XPML11',
+            action: 'hold',
+            priority: 3,
+            rationale: 'Mantenha.',
+            fallbackAllocations: [{ ticker: 'HGCR11', amount: 10 }],
+          },
+        ],
+      }),
+      new Map([
+        ['HGLG11', 'match'],
+        ['VISC11', 'match'],
+        ['XPML11', 'extra'],
+        ['HGCR11', 'missing'],
+      ]),
+    );
+
+    expect(result.items[0].fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 50 },
+    ]);
+    expect(result.items[1].fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 10 },
+    ]);
+    expect(result.items[2].fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 10 },
+    ]);
+  });
+
+  it('deve remover alocações alternativas vazias ou não-array', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'hold',
+            priority: 1,
+            rationale: 'Mantenha.',
+            fallbackAllocations: [
+              { ticker: '', amount: 10 },
+              { ticker: 'HGCR11', amount: 0 },
+            ],
+          },
+          {
+            ticker: 'VISC11',
+            action: 'hold',
+            priority: 2,
+            rationale: 'Mantenha.',
+            fallbackAllocations: { ticker: 'HGCR11', amount: 10 },
+          },
+        ],
+      }),
+      new Map([
+        ['HGLG11', 'match'],
+        ['VISC11', 'match'],
+        ['HGCR11', 'missing'],
+      ]),
+    );
+
+    expect(result.items[0]).not.toHaveProperty('fallbackAllocations');
+    expect(result.items[1]).not.toHaveProperty('fallbackAllocations');
+  });
+
+  it('deve escalar alocações alternativas junto com as compras', () => {
+    const result = parseSuggestionOutput(
+      JSON.stringify({
+        summary: 'Resumo.',
+        items: [
+          {
+            ticker: 'HGLG11',
+            action: 'buy',
+            priority: 1,
+            rationale: 'Compre.',
+            suggestedAmount: 70,
+            fallbackAllocations: [{ ticker: 'HGCR11', amount: 70 }],
+          },
+          {
+            ticker: 'VISC11',
+            action: 'buy',
+            priority: 2,
+            rationale: 'Compre.',
+            suggestedAmount: 50,
+            fallbackAllocations: [{ ticker: 'HGCR11', amount: 50 }],
+          },
+        ],
+      }),
+      new Map([
+        ['HGLG11', 'match'],
+        ['VISC11', 'match'],
+        ['HGCR11', 'missing'],
+      ]),
+      100,
+    );
+
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticker: 'HGLG11',
+          suggestedAmount: 58.33,
+          fallbackAllocations: [{ ticker: 'HGCR11', amount: 58.33 }],
+        }),
+        expect.objectContaining({
+          ticker: 'VISC11',
+          suggestedAmount: 41.67,
+          fallbackAllocations: [{ ticker: 'HGCR11', amount: 41.67 }],
+        }),
+      ]),
+    );
+  });
+
+  it('deve aplicar alocações alternativas válidas e calcular quantidade', () => {
+    const items = applyFallbackAllocations(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+          fallbackAllocations: [{ ticker: 'hgcr11', amount: 100 }],
+        },
+        {
+          ticker: 'HGCR11',
+          action: 'hold',
+          priority: 2,
+          rationale: 'Mantenha.',
+          fallbackAllocations: [{ ticker: 'HGLG11', amount: 20 }],
+        },
+      ],
+      new Set(['HGLG11']),
+      [
+        {
+          ticker: 'HGLG11',
+          recommendedWeight: 0.125,
+          currentWeight: 0.1,
+          quantity: 2,
+          currentValue: 200,
+          status: 'match',
+        },
+        {
+          ticker: 'HGCR11',
+          recommendedWeight: 0.1,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+      new Map([
+        ['HGLG11', 100],
+        ['HGCR11', 96.44],
+      ]),
+    );
+
+    expect(items[0].fallbackAllocations).toEqual([
+      {
+        ticker: 'HGCR11',
+        amount: 100,
+        referencePrice: 96.44,
+        suggestedQuantity: 1,
+      },
+    ]);
+    expect(items[1]).not.toHaveProperty('fallbackAllocations');
+  });
+
+  it('deve redistribuir proporcionalmente quando a soma divergir', () => {
+    const [item] = applyFallbackAllocations(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+          fallbackAllocations: [
+            { ticker: 'HGCR11', amount: 10 },
+            { ticker: 'VISC11', amount: 30 },
+          ],
+        },
+      ],
+      new Set(['HGLG11']),
+      [
+        {
+          ticker: 'HGLG11',
+          recommendedWeight: 0.125,
+          currentWeight: 0.1,
+          quantity: 2,
+          currentValue: 200,
+          status: 'match',
+        },
+        {
+          ticker: 'HGCR11',
+          recommendedWeight: 0.1,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+        {
+          ticker: 'VISC11',
+          recommendedWeight: 0.1,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+      new Map(),
+    );
+
+    expect(item.fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 25 },
+      { ticker: 'VISC11', amount: 75 },
+    ]);
+  });
+
+  it('deve gerar fallback determinístico e excluir extras e qualificados', () => {
+    const [item] = applyFallbackAllocations(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+        },
+      ],
+      new Set(['HGLG11', 'VISC11']),
+      [
+        {
+          ticker: 'HGLG11',
+          recommendedWeight: 0.125,
+          currentWeight: 0.1,
+          quantity: 2,
+          currentValue: 200,
+          status: 'match',
+        },
+        {
+          ticker: 'HGCR11',
+          recommendedWeight: 0.125,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+        {
+          ticker: 'KNCR11',
+          recommendedWeight: 0.125,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+        {
+          ticker: 'VISC11',
+          recommendedWeight: 0.125,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+        {
+          ticker: 'MXRF11',
+          recommendedWeight: null,
+          currentWeight: 0.2,
+          quantity: 2,
+          currentValue: 200,
+          status: 'extra',
+        },
+      ],
+      new Map(),
+    );
+
+    expect(item.fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 50 },
+      { ticker: 'KNCR11', amount: 50 },
+    ]);
+  });
+
+  it('deve dividir igualmente quando os pesos forem zero e remover sem candidatos', () => {
+    const items = applyFallbackAllocations(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+        },
+      ],
+      new Set(['HGLG11']),
+      [
+        {
+          ticker: 'HGLG11',
+          recommendedWeight: 0.125,
+          currentWeight: 0.1,
+          quantity: 2,
+          currentValue: 200,
+          status: 'match',
+        },
+        {
+          ticker: 'HGCR11',
+          recommendedWeight: 0,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+        {
+          ticker: 'VISC11',
+          recommendedWeight: 0,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+      new Map(),
+    );
+
+    expect(items[0].fallbackAllocations).toEqual([
+      { ticker: 'HGCR11', amount: 50 },
+      { ticker: 'VISC11', amount: 50 },
+    ]);
+
+    const withoutCandidates = applyFallbackAllocations(
+      [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+        },
+      ],
+      new Set(['HGLG11']),
+      [
+        {
+          ticker: 'HGLG11',
+          recommendedWeight: 0.125,
+          currentWeight: 0.1,
+          quantity: 2,
+          currentValue: 200,
+          status: 'match',
+        },
+      ],
+      new Map(),
+    );
+
+    expect(withoutCandidates[0]).not.toHaveProperty('fallbackAllocations');
   });
 
   it('deve descartar individualmente itens inválidos', () => {
@@ -768,7 +1148,32 @@ describe('ai-suggestion.service', () => {
 
   it('deve gerar uma nova sugestão quando force estiver ativo', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
-    compareWithWalletMock.mockResolvedValue(comparison);
+    compareWithWalletMock.mockResolvedValue({
+      ...comparison,
+      recommended: {
+        ...comparison.recommended,
+        renda: [
+          ...comparison.recommended.renda,
+          {
+            ticker: 'VISC11',
+            segment: 'Shoppings',
+            weight: 0.1,
+            closePrice: 100,
+          },
+        ],
+      },
+      items: [
+        ...comparison.items,
+        {
+          ticker: 'VISC11',
+          recommendedWeight: 0.1,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+    });
     computeMonthlyIncomeMock.mockResolvedValue({
       byTicker: [],
       total: 15.5,
@@ -788,9 +1193,11 @@ describe('ai-suggestion.service', () => {
                 items: [
                   {
                     ticker: 'HGLG11',
-                    action: 'hold',
+                    action: 'buy',
                     priority: 1,
-                    rationale: 'Mantenha.',
+                    rationale: 'Compre ou redistribua.',
+                    suggestedAmount: 100,
+                    fallbackAllocations: [{ ticker: 'VISC11', amount: 100 }],
                   },
                 ],
               }),
@@ -849,7 +1256,12 @@ describe('ai-suggestion.service', () => {
       projectedDividends: 15.5,
     });
     expect(result.items[0]).toEqual(
-      expect.objectContaining({ qualifiedInvestor: true }),
+      expect.objectContaining({
+        qualifiedInvestor: true,
+        fallbackAllocations: [
+          expect.objectContaining({ ticker: 'VISC11', amount: 100 }),
+        ],
+      }),
     );
     expect(global.fetch).toHaveBeenCalled();
     expect(doc.set).toHaveBeenCalled();
