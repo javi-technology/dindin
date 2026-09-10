@@ -37,6 +37,7 @@ import {
   applySuggestedQuantities,
   applyQualifiedInvestor,
   applyFallbackAllocations,
+  redistributeUnspentAmounts,
   getSavedSuggestion,
   parseSuggestionOutput,
   suggestionId,
@@ -45,7 +46,11 @@ import {
   buildUserPrompt,
   SYSTEM_PROMPT,
 } from '../../src/recommended-wallet/ai-suggestion.prompt';
-import { RecommendedWallet, RecommendedWalletComparison } from 'dindin-models';
+import {
+  RecommendedWallet,
+  RecommendedWalletComparison,
+  RecommendedWalletComparisonItem,
+} from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
   let consoleErrorSpy: jest.SpyInstance;
@@ -200,6 +205,330 @@ describe('ai-suggestion.service', () => {
     expect(items[1]).not.toHaveProperty('referencePrice');
     expect(items[2]).not.toHaveProperty('suggestedQuantity');
     expect(items[2]).not.toHaveProperty('referencePrice');
+  });
+
+  it('deve redistribuir o saldo não gasto entre cotas inteiras', () => {
+    const prices = new Map([
+      ['KNIP11', 89.32],
+      ['HGCR11', 96.74],
+      ['XPML11', 102.6],
+      ['MXRF11', 9.16],
+      ['GARE11', 8.35],
+      ['KNHF11', 91.63],
+      ['RZTR11', 84.84],
+      ['XPCI11', 78.82],
+    ]);
+    const items = applySuggestedQuantities(
+      [
+        {
+          ticker: 'KNIP11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 90.64,
+        },
+        {
+          ticker: 'HGCR11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Compre.',
+          suggestedAmount: 94.3,
+        },
+        {
+          ticker: 'XPML11',
+          action: 'buy',
+          priority: 3,
+          rationale: 'Compre.',
+          suggestedAmount: 101.81,
+        },
+        {
+          ticker: 'MXRF11',
+          action: 'buy',
+          priority: 4,
+          rationale: 'Compre.',
+          suggestedAmount: 27.54,
+        },
+        {
+          ticker: 'GARE11',
+          action: 'buy',
+          priority: 5,
+          rationale: 'Compre.',
+          suggestedAmount: 108.68,
+        },
+        {
+          ticker: 'KNHF11',
+          action: 'buy',
+          priority: 6,
+          rationale: 'Compre.',
+          suggestedAmount: 91.42,
+        },
+        {
+          ticker: 'RZTR11',
+          action: 'buy',
+          priority: 7,
+          rationale: 'Compre.',
+          suggestedAmount: 85.25,
+        },
+        {
+          ticker: 'XPCI11',
+          action: 'buy',
+          priority: 8,
+          rationale: 'Compre.',
+          suggestedAmount: 78.2,
+        },
+      ],
+      prices,
+    );
+    const allowed = new Map<string, RecommendedWalletComparisonItem['status']>([
+      ['KNIP11', 'match'],
+      ['HGCR11', 'missing'],
+      ['XPML11', 'missing'],
+      ['MXRF11', 'missing'],
+      ['GARE11', 'missing'],
+      ['KNHF11', 'missing'],
+      ['RZTR11', 'missing'],
+      ['XPCI11', 'missing'],
+    ]);
+
+    const result = redistributeUnspentAmounts(
+      items,
+      prices,
+      685.9,
+      new Set(['KNIP11']),
+      allowed,
+    );
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticker: 'KNIP11',
+          suggestedAmount: 90.64,
+          suggestedQuantity: 1,
+        }),
+        expect.objectContaining({
+          ticker: 'HGCR11',
+          action: 'buy',
+          suggestedAmount: 96.74,
+          suggestedQuantity: 1,
+        }),
+        expect.objectContaining({
+          ticker: 'XPML11',
+          action: 'buy',
+          suggestedAmount: 102.6,
+          suggestedQuantity: 1,
+        }),
+        expect.objectContaining({
+          ticker: 'KNHF11',
+          action: 'buy',
+          suggestedAmount: 91.63,
+          suggestedQuantity: 1,
+        }),
+        expect.objectContaining({
+          ticker: 'XPCI11',
+          action: 'buy',
+          suggestedAmount: 78.82,
+          suggestedQuantity: 1,
+        }),
+        expect.objectContaining({
+          ticker: 'MXRF11',
+          suggestedAmount: 27.48,
+          suggestedQuantity: 3,
+        }),
+        expect.objectContaining({
+          ticker: 'GARE11',
+          suggestedAmount: 108.55,
+          suggestedQuantity: 13,
+        }),
+        expect.objectContaining({
+          ticker: 'RZTR11',
+          suggestedAmount: 84.84,
+          suggestedQuantity: 1,
+        }),
+      ]),
+    );
+    for (const ticker of ['HGCR11', 'XPML11', 'KNHF11', 'XPCI11']) {
+      expect(
+        result.find((item) => item.ticker === ticker)?.rationale,
+      ).toContain('saldo realocado');
+    }
+  });
+
+  it('deve converter em hold o item que ainda não completa uma cota', () => {
+    const prices = new Map([
+      ['A11', 96],
+      ['B11', 60],
+    ]);
+    const items = applySuggestedQuantities(
+      [
+        {
+          ticker: 'A11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 50,
+        },
+        {
+          ticker: 'B11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Compre.',
+          suggestedAmount: 50,
+        },
+      ],
+      prices,
+    );
+
+    const [a, b] = redistributeUnspentAmounts(
+      items,
+      prices,
+      100,
+      new Set(),
+      new Map<string, RecommendedWalletComparisonItem['status']>([
+        ['A11', 'missing'],
+        ['B11', 'missing'],
+      ]),
+    );
+
+    expect(a).toEqual(
+      expect.objectContaining({
+        action: 'buy',
+        suggestedAmount: 96,
+        suggestedQuantity: 1,
+        referencePrice: 96,
+      }),
+    );
+    expect(b).toMatchObject({
+      action: 'hold',
+      rationale: expect.stringContaining('não completar 1 cota'),
+    });
+    expect(b).not.toHaveProperty('suggestedAmount');
+    expect(b).not.toHaveProperty('suggestedQuantity');
+    expect(b).not.toHaveProperty('referencePrice');
+  });
+
+  it('não deve redistribuir para extras e não deve contabilizar seu valor', () => {
+    const prices = new Map([
+      ['EXTRA11', 10],
+      ['A11', 60],
+      ['B11', 60],
+    ]);
+    const items = applySuggestedQuantities(
+      [
+        {
+          ticker: 'EXTRA11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+        },
+        {
+          ticker: 'A11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Compre.',
+          suggestedAmount: 0,
+        },
+        {
+          ticker: 'B11',
+          action: 'buy',
+          priority: 3,
+          rationale: 'Compre.',
+          suggestedAmount: 0,
+        },
+      ],
+      prices,
+    );
+    const result = redistributeUnspentAmounts(
+      items,
+      prices,
+      100,
+      new Set(),
+      new Map<string, RecommendedWalletComparisonItem['status']>([
+        ['EXTRA11', 'extra'],
+        ['A11', 'missing'],
+        ['B11', 'missing'],
+      ]),
+    );
+
+    expect(result[0]).toEqual(items[0]);
+    expect(result[1]).toEqual(
+      expect.objectContaining({ action: 'buy', suggestedAmount: 60 }),
+    );
+    expect(result[1].suggestedQuantity).toBe(1);
+  });
+
+  it('deve manter item sem preço conhecido e contabilizar seu valor', () => {
+    const items = [
+      {
+        ticker: 'UNKNOWN11',
+        action: 'buy' as const,
+        priority: 1,
+        rationale: 'Compre.',
+        suggestedAmount: 50,
+      },
+      {
+        ticker: 'A11',
+        action: 'buy' as const,
+        priority: 2,
+        rationale: 'Compre.',
+        suggestedAmount: 0,
+      },
+    ];
+    const result = redistributeUnspentAmounts(
+      items,
+      new Map([['A11', 60]]),
+      100,
+      new Set(),
+      new Map<string, RecommendedWalletComparisonItem['status']>([
+        ['UNKNOWN11', 'missing'],
+        ['A11', 'missing'],
+      ]),
+    );
+
+    expect(result[0]).toBe(items[0]);
+    expect(result[1].action).toBe('hold');
+  });
+
+  it('deve manter os itens inalterados quando não houver saldo para redistribuir', () => {
+    const items = applySuggestedQuantities(
+      [
+        {
+          ticker: 'A11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Compre.',
+          suggestedAmount: 100,
+        },
+        {
+          ticker: 'B11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Compre.',
+          suggestedAmount: 0,
+        },
+      ],
+      new Map([
+        ['A11', 60],
+        ['B11', 60],
+      ]),
+    );
+    const result = redistributeUnspentAmounts(
+      items,
+      new Map([
+        ['A11', 60],
+        ['B11', 60],
+      ]),
+      60,
+      new Set(),
+      new Map<string, RecommendedWalletComparisonItem['status']>([
+        ['A11', 'missing'],
+        ['B11', 'missing'],
+      ]),
+    );
+
+    expect(result).toBe(items);
+    expect(result[0]).toBe(items[0]);
+    expect(result[1]).toBe(items[1]);
   });
 
   it('deve marcar ativos de investidores qualificados no contexto', () => {
@@ -1467,6 +1796,13 @@ describe('ai-suggestion.service', () => {
                     suggestedAmount: 100,
                     fallbackAllocations: [{ ticker: 'VISC11', amount: 100 }],
                   },
+                  {
+                    ticker: 'VISC11',
+                    action: 'buy',
+                    priority: 2,
+                    rationale: 'Compre.',
+                    suggestedAmount: 15.5,
+                  },
                 ],
               }),
             },
@@ -1514,6 +1850,7 @@ describe('ai-suggestion.service', () => {
       '2026-09',
       'renda',
       true,
+      100,
     );
 
     expect(result).toMatchObject({
@@ -1531,6 +1868,14 @@ describe('ai-suggestion.service', () => {
         ],
       }),
     );
+    expect(result.items[1]).toEqual(
+      expect.objectContaining({
+        ticker: 'VISC11',
+        action: 'hold',
+        rationale: expect.stringContaining('não completar 1 cota'),
+      }),
+    );
+    expect(result.items[1]).not.toHaveProperty('suggestedAmount');
     expect(global.fetch).toHaveBeenCalled();
     expect(doc.set).toHaveBeenCalled();
   });
