@@ -133,6 +133,14 @@ describe('RecommendedWalletComponent', () => {
             suggestedAmount: 100,
             suggestedQuantity: 1,
             referencePrice: 95,
+            fallbackAllocations: [
+              {
+                ticker: 'HGCR11',
+                amount: 100,
+                suggestedQuantity: 1,
+                referencePrice: 96.44,
+              },
+            ],
           },
           {
             ticker: 'MXRF11',
@@ -328,8 +336,14 @@ describe('RecommendedWalletComponent', () => {
     expect(card.textContent).toContain('Comprar');
     expect(card.textContent).toContain('Investidor qualificado');
     expect(card.textContent).toContain(
-      'FII exclusivo para investidor qualificado — pode não estar disponível para compra na sua corretora.',
+      'FII exclusivo para investidor qualificado (opcional) — pode não estar disponível para compra na sua corretora.',
     );
+    expect(
+      card.querySelector('[data-testid="fallback-allocations"]')?.textContent,
+    ).toContain('HGCR11');
+    expect(
+      card.querySelector('[data-testid="fallback-allocations"]')?.textContent,
+    ).toContain('redistribua');
     const regularItem = Array.from(
       card.querySelectorAll('li') as NodeListOf<HTMLElement>,
     ).find((item) => item.textContent?.includes('HGLG11'));

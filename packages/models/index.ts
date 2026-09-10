@@ -185,6 +185,13 @@ export interface RecommendedWalletComparison {
 
 export type AiSuggestionTab = 'renda' | 'ganho';
 
+export interface AiSuggestionFallbackAllocation {
+  ticker: string;
+  amount: number;
+  suggestedQuantity?: number;
+  referencePrice?: number;
+}
+
 export interface AiSuggestionItem {
   ticker: string;
   action: 'buy' | 'hold' | 'reduce';
@@ -194,6 +201,7 @@ export interface AiSuggestionItem {
   suggestedQuantity?: number;
   referencePrice?: number;
   qualifiedInvestor?: boolean;
+  fallbackAllocations?: AiSuggestionFallbackAllocation[];
 }
 
 /** Sugestão gerada por IA — subcoleção users/{uid}/aiSuggestions. */

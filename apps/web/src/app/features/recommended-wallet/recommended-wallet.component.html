@@ -385,8 +385,9 @@
                         </span>
                         @if (item.qualifiedInvestor) {
                           <span class="block ml-6 mt-1 text-sm text-amber-700">
-                            FII exclusivo para investidor qualificado — pode não
-                            estar disponível para compra na sua corretora.
+                            FII exclusivo para investidor qualificado (opcional)
+                            — pode não estar disponível para compra na sua
+                            corretora.
                           </span>
                         }
                         @if (item.suggestedAmount !== undefined) {
@@ -403,6 +404,30 @@
                               · ≈ {{ item.suggestedQuantity }}
                               {{ quantityLabel(item.suggestedQuantity) }} a
                               {{ formatCurrency(item.referencePrice ?? 0) }}
+                            }
+                          </span>
+                        }
+                        @if (item.fallbackAllocations?.length) {
+                          <span
+                            class="block ml-6 mt-1 text-sm text-gray-700"
+                            data-testid="fallback-allocations"
+                          >
+                            Se não puder comprar este FII, redistribua o valor:
+                            @for (
+                              alt of item.fallbackAllocations;
+                              track alt.ticker;
+                              let last = $last
+                            ) {
+                              <strong>{{ alt.ticker }}</strong>
+                              {{ formatCurrency(alt.amount) }}
+                              @if (alt.suggestedQuantity !== undefined) {
+                                (≈ {{ alt.suggestedQuantity }}
+                                {{ quantityLabel(alt.suggestedQuantity) }} a
+                                {{ formatCurrency(alt.referencePrice ?? 0) }})
+                              }
+                              @if (!last) {
+                                ·
+                              }
                             }
                           </span>
                         }

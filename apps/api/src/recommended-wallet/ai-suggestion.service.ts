@@ -193,6 +193,28 @@ function isValidItem(value: unknown): value is AiSuggestionItem {
     typeof item.priority === 'string' ? Number(item.priority) : item.priority;
   if (typeof item.priority === 'string') item.priority = priority;
   if (item.suggestedAmount === null) delete item.suggestedAmount;
+  if (Array.isArray(item.fallbackAllocations)) {
+    const fallbackAllocations = item.fallbackAllocations.filter(
+      (allocation) => {
+        if (!allocation || typeof allocation !== 'object') return false;
+        const candidate = allocation as Record<string, unknown>;
+        return (
+          typeof candidate.ticker === 'string' &&
+          candidate.ticker.length > 0 &&
+          typeof candidate.amount === 'number' &&
+          Number.isFinite(candidate.amount) &&
+          candidate.amount > 0
+        );
+      },
+    );
+    if (fallbackAllocations.length > 0) {
+      item.fallbackAllocations = fallbackAllocations;
+    } else {
+      delete item.fallbackAllocations;
+    }
+  } else if (item.fallbackAllocations !== undefined) {
+    delete item.fallbackAllocations;
+  }
   return (
     typeof item.ticker === 'string' &&
     item.ticker.length > 0 &&
@@ -251,12 +273,35 @@ export function parseSuggestionOutput(
       throw new Error('Nenhum item permitido');
     }
     let normalizedItems = items.map((item) => {
+      const fallbackAllocations = item.fallbackAllocations
+        ?.filter((allocation) => {
+          const ticker = allocation.ticker.toUpperCase();
+          return (
+            normalizedAllowed.has(ticker) &&
+            normalizedAllowed.get(ticker) !== 'extra' &&
+            ticker !== item.ticker.toUpperCase()
+          );
+        })
+        .map((allocation) => ({
+          ...allocation,
+          ticker: allocation.ticker,
+        }));
+      let normalizedItem: AiSuggestionItem;
+      if (fallbackAllocations?.length) {
+        normalizedItem = { ...item, fallbackAllocations };
+      } else {
+        const {
+          fallbackAllocations: _fallbackAllocations,
+          ...withoutFallback
+        } = item;
+        normalizedItem = withoutFallback;
+      }
       if (
         normalizedAllowed.get(item.ticker.toUpperCase()) === 'extra' &&
         item.action === 'buy'
       ) {
         const { suggestedAmount: _suggestedAmount, ...itemWithoutAmount } =
-          item;
+          normalizedItem;
         console.warn(
           '[parseSuggestionOutput] compra em item extra convertida',
           {
@@ -265,7 +310,7 @@ export function parseSuggestionOutput(
         );
         return { ...itemWithoutAmount, action: 'hold' as const };
       }
-      return item;
+      return normalizedItem;
     });
     if (totalAvailable !== undefined) {
       const buyTotal = normalizedItems
@@ -303,6 +348,16 @@ export function parseSuggestionOutput(
             ...item,
             suggestedAmount:
               Math.round(item.suggestedAmount * ratio * 100) / 100,
+            ...(item.fallbackAllocations?.length
+              ? {
+                  fallbackAllocations: item.fallbackAllocations.map(
+                    (allocation) => ({
+                      ...allocation,
+                      amount: Math.round(allocation.amount * ratio * 100) / 100,
+                    }),
+                  ),
+                }
+              : {}),
           };
         });
       }
@@ -323,6 +378,153 @@ export function parseSuggestionOutput(
     });
     throw new Error('Resposta inválida da IA');
   }
+}
+
+export function applyFallbackAllocations(
+  items: AiSuggestionItem[],
+  qualifiedTickers: Set<string>,
+  comparisonItems: RecommendedWalletComparisonItem[],
+  priceByTicker: Map<string, number>,
+): AiSuggestionItem[] {
+  const normalizedQualifiedTickers = new Set(
+    [...qualifiedTickers].map((ticker) => ticker.toUpperCase()),
+  );
+  const comparisonByTicker = new Map(
+    comparisonItems.map((comparisonItem) => [
+      comparisonItem.ticker.toUpperCase(),
+      comparisonItem,
+    ]),
+  );
+  const roundAmount = (amount: number): number =>
+    Math.round(amount * 100) / 100;
+  const withQuantities = (
+    allocations: Array<{ ticker: string; amount: number }>,
+  ) =>
+    allocations.map((allocation) => {
+      const ticker = allocation.ticker.toUpperCase();
+      const price = priceByTicker.get(ticker);
+      if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
+        return { ticker, amount: allocation.amount };
+      }
+      return {
+        ticker,
+        amount: allocation.amount,
+        referencePrice: price,
+        suggestedQuantity: Math.floor(allocation.amount / price),
+      };
+    });
+  const normalizeAmounts = (
+    allocations: Array<{ ticker: string; amount: number }>,
+    total: number,
+  ) => {
+    if (allocations.length === 0) return allocations;
+    const sum = allocations.reduce(
+      (allocationTotal, allocation) => allocationTotal + allocation.amount,
+      0,
+    );
+    if (sum === 0) return allocations;
+    const normalized = allocations.map((allocation) => ({
+      ticker: allocation.ticker,
+      amount: roundAmount((allocation.amount / sum) * total),
+    }));
+    const difference = roundAmount(
+      total -
+        normalized.reduce((value, allocation) => value + allocation.amount, 0),
+    );
+    if (difference !== 0) {
+      normalized[normalized.length - 1].amount = roundAmount(
+        normalized[normalized.length - 1].amount + difference,
+      );
+    }
+    return normalized;
+  };
+
+  return items.map((item) => {
+    const ticker = item.ticker.toUpperCase();
+    const isQualified = normalizedQualifiedTickers.has(ticker);
+    const suggestedAmount = item.suggestedAmount;
+    if (
+      !isQualified ||
+      item.action !== 'buy' ||
+      typeof suggestedAmount !== 'number' ||
+      !Number.isFinite(suggestedAmount) ||
+      suggestedAmount <= 0
+    ) {
+      const { fallbackAllocations: _fallbackAllocations, ...withoutFallback } =
+        item;
+      return withoutFallback;
+    }
+
+    const validAllocations = (item.fallbackAllocations ?? [])
+      .filter(
+        (allocation) =>
+          typeof allocation.ticker === 'string' &&
+          allocation.ticker.length > 0 &&
+          typeof allocation.amount === 'number' &&
+          Number.isFinite(allocation.amount) &&
+          allocation.amount > 0,
+      )
+      .map((allocation) => ({
+        ticker: allocation.ticker.toUpperCase(),
+        amount: allocation.amount,
+      }))
+      .filter((allocation) => {
+        const comparisonItem = comparisonByTicker.get(allocation.ticker);
+        return (
+          comparisonItem !== undefined &&
+          comparisonItem.status !== 'extra' &&
+          !normalizedQualifiedTickers.has(allocation.ticker) &&
+          allocation.ticker !== ticker
+        );
+      });
+    const allocationTotal = validAllocations.reduce(
+      (total, allocation) => total + allocation.amount,
+      0,
+    );
+    let allocations = validAllocations;
+    if (allocationTotal === 0) {
+      const candidates = comparisonItems.filter((comparisonItem) => {
+        const candidateTicker = comparisonItem.ticker.toUpperCase();
+        return (
+          comparisonItem.status !== 'extra' &&
+          !normalizedQualifiedTickers.has(candidateTicker) &&
+          candidateTicker !== ticker
+        );
+      });
+      if (candidates.length === 0) {
+        const {
+          fallbackAllocations: _fallbackAllocations,
+          ...withoutFallback
+        } = item;
+        return withoutFallback;
+      }
+      const weights = candidates.map((candidate) =>
+        typeof candidate.recommendedWeight === 'number' &&
+        Number.isFinite(candidate.recommendedWeight) &&
+        candidate.recommendedWeight > 0
+          ? candidate.recommendedWeight
+          : 0,
+      );
+      const weightTotal = weights.reduce((total, weight) => total + weight, 0);
+      allocations = candidates.map((candidate, index) => ({
+        ticker: candidate.ticker.toUpperCase(),
+        amount:
+          weightTotal > 0
+            ? roundAmount((suggestedAmount * weights[index]) / weightTotal)
+            : roundAmount(suggestedAmount / candidates.length),
+      }));
+      allocations = normalizeAmounts(allocations, suggestedAmount);
+    } else if (
+      Math.abs(allocationTotal - suggestedAmount) >
+      suggestedAmount * 0.01
+    ) {
+      allocations = normalizeAmounts(validAllocations, suggestedAmount);
+    }
+    return {
+      ...item,
+      fallbackAllocations: withQuantities(allocations),
+    };
+  });
 }
 
 export async function callOpenRouter(
@@ -523,9 +725,14 @@ export async function generateSuggestion(
     tab,
     model,
     ...output,
-    items: applyQualifiedInvestor(
-      applySuggestedQuantities(output.items, priceByTicker),
+    items: applyFallbackAllocations(
+      applyQualifiedInvestor(
+        applySuggestedQuantities(output.items, priceByTicker),
+        qualifiedTickers,
+      ),
       qualifiedTickers,
+      comparison.items,
+      priceByTicker,
     ),
     createdAt,
     ...(contribution === undefined ? {} : { contribution }),
