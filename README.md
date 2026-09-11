@@ -12,47 +12,51 @@ Sistema de controle de carteira de Fundos Imobiliários (FIIs) com estratégia d
 - **Hospedagem**: Firebase Hosting
 - **Autenticação**: Firebase Authentication
 
-## Estrutura
+## Estrutura do Projeto
 
-```
-dindin/
-├── apps/
-│   ├── web/          # Aplicação Angular
-│   └── api/          # Cloud Functions (Express)
-├── packages/
-│   └── shared-types/ # Tipos compartilhados
-├── firebase.json
-├── firestore.rules
-└── firestore.indexes.json
-```
+O projeto utiliza uma estrutura de monorepo para compartilhar código entre o frontend e o backend:
 
-## Pré-requisitos
+- `apps/api`: Cloud Functions (Express) que processam as regras de negócio.
+- `apps/web`: Aplicação Frontend em Angular com Tailwind CSS.
+- `packages/models`: Definições de modelos do Firestore.
+- `packages/shared-types`: Tipos TypeScript compartilhados por ambas as aplicações.
 
-- Node.js 22
-- Firebase CLI
-- Secret `OPENROUTER_API_KEY` configurado nas Cloud Functions (e,
-  opcionalmente, `OPENROUTER_MODEL`, padrão `openai/gpt-5.6-luna`) com:
-  `firebase functions:secrets:set OPENROUTER_API_KEY`
-- Conta Google e projeto Firebase (`dindin-4e720`)
+## Como Começar (Setup Local)
 
-## Comandos
+Siga os passos abaixo para configurar o ambiente de desenvolvimento local:
 
-```bash
-# Instalar dependências
-npm install
+1. **Clonar o repositório**
+   ```bash
+   git clone <url-do-repositório>
+   cd dindin
+   ```
 
-# Rodar emuladores locais
-npm run emulators
+2. **Instalar dependências**
+   ```bash
+   npm install
+   ```
 
-# Build da API
-npm run api:build
+3. **Configurar Variáveis de Ambiente (Secrets)**
+   As segredos devem ser configurados no ambiente do Firebase:
+   ```bash
+   firebase functions:secrets:set OPENROUTER_API_KEY
+   firebase functions:secrets:set STRIPE_SECRET_KEY
+   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+   ```
 
-# Servir API localmente
-npm run api:serve
+4. **Configurar o Ambiente Local**
+   Crie um arquivo `.env` em `apps/api/` (ou use o arquivo de ambiente de projeto) para configurar chaves de teste da Stripe e URLs base:
+   ```env
+   STRIPE_PRICE_BASIC_MONTHLY=price_...
+   STRIPE_PRICE_BASIC_YEARLY=price_...
+   APP_BASE_URL=http://localhost:5173
+   ```
 
-# Deploy
-npm run deploy
-```
+5. **Executar o Projeto**
+   - Para rodar os emuladores (Firebase, Firestore, etc.): `npm run emulators`
+   - Para rodar a API em modo de desenvolvimento: `npm run api:serve`
+   - Para iniciar o frontend: `npm run dev` (ou o comando padrão do Angular)
+   
 
 ## Integração Contínua
 
@@ -104,25 +108,26 @@ Na aplicação web, usuários autenticados podem acessar
 página exibe as abas Renda e Ganho de Capital, permite comparar uma carteira
 do usuário e, para administradores, confirmar ou importar um PDF.
 
-## Assinatura
+## Assinatura e Acesso a Recursos
 
-Os recursos de IA (sugestão mensal da carteira recomendada, chat com a IA e
-futuras features) são liberados mediante assinatura do plano `basic`
-(R$ 10,00/mês ou R$ 100,00/ano, com 7 dias de teste grátis).
+Os recursos avançados de IA (sugestão mensal da carteira recomendada, chat com a IA e futuras funcionalidades) são liberados mediante assinatura do plano **basic**.
 
-### Modelo
+### Modelo de Negócio
+A assinatura é gerenciada via **Stripe** e os dados são armazenados em `users/{uid}/billing/subscription` (tipo `UserSubscription`).
 
-A assinatura fica em `users/{uid}/billing/subscription` (tipo
-`UserSubscription` em `packages/shared-types`). A ausência do documento
-equivale a `status: 'none'`. O cliente pode ler o próprio documento, mas a
-escrita é exclusiva do Admin SDK (integração com o provedor de pagamento ou
-concessão manual pelo admin).
+| Campo | Descrição |
+| --- | --- |
+| `status` | `none`, `trialing`, `active`, `past_due` ou `canceled` |
+| `plan` / `interval` | `basic` e `month`/`year` |
+| `provider` | `stripe`, `manual` ou `null` |
 
-| Campo                                           | Descrição                                                   |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `status`                                        | `none`, `trialing`, `active`, `past_due` ou `canceled`      |
-| `plan` / `interval`                             | `basic` e `month`/`year` (ou `null`)                        |
-| `provider`                                      | `stripe`, `manual` ou `null`                                |
+### Regras de Acesso (Gate de Recursos)
+O direito ao recurso **`ai`** é concedido automaticamente se:
+1. O usuário possuir assinatura ativa ou em período de teste (`status` é `trialing` ou `active`).
+2. O usuário estiver em período de carência (`past_due` e `currentPeriodEnd` no futuro).
+3. O usuário for um administrador do sistema (bypass).
+
+O middleware `requireEntitlement('ai')` protege as rotas sensíveis, retornando `403 Forbidden` caso o usuário não cumpra os requisitos.
 | `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API)                     |
 | `providerEventCreated`                          | `event.created` do último webhook aplicado (ordenação)      |
 | `currentPeriodEnd`                              | Fim do período pago (ISO) — define a carência de `past_due` |

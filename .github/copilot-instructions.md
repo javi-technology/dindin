@@ -33,6 +33,13 @@ Regras:
 | API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
 | Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
 
+### Regras de Teste Frontend
+- Os testes unitários do frontend devem ser **browserless**.
+- O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
+- Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
+- Prefira mockar serviços e inputs/outputs em vez de disparar eventos de DOM real.
+- Não adicione dependências de browsers reais na configuração de testes.
+
 ## Git e Branches
 
 ### Preparação de Branch (sempre executar antes de implementar)
@@ -73,8 +80,7 @@ Regras:
 - Descrição em português, no imperativo ("adiciona", "corrige", "remove").
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
-- Nunca commitar com testes falhando.
-
+- Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects
@@ -99,14 +105,12 @@ firebase deploy                               # deploy completo
 
 ## Estrutura do Repositório
 
-```
-apps/
-  api/    # Cloud Functions (Express + TypeScript) — src/ e tests/
-  web/    # Angular + Tailwind — src/app/{core,features,shared}/
-packages/
-  models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
-  shared-types/  # Tipos compartilhados (ex: HealthResponse)
-```
+Monorepo estruturado da seguinte forma:
+
+- `apps/api`: Cloud Functions (Express + TypeScript) - Regras de negócio e APIs.
+- `apps/web`: Aplicação Frontend (Angular + Tailwind CSS).
+- `packages/models`: Modelos de dados Firestore.
+- `packages/shared-types`: Tipos TypeScript compartilhados entre frontend e backend.
 
 ## Padrões de UX e Código
 
@@ -166,4 +170,7 @@ rtk proxy <cmd>       # Run raw (no filtering) but track usage
 
 ## Idioma do Agente
 
-- **Sempre responder em português do Brasil (pt-BR)**. Todas as interações, explicações e comentários devem ser feitos neste idioma.
+- **Sempre responder em português do Brasil (pt-BR)**.
+- **Mensagens de Commit**: Devem ser sempre em português, no imperativo (ex: "adiciona", "corrige", "ajusta").
+- Todas as interações, explicações e comentários devem ser feitos neste idioma.
+
