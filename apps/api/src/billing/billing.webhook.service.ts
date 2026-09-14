@@ -30,15 +30,6 @@ async function upsert(
   await admin.firestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const current = snapshot.data() as UserSubscription | undefined;
-    // Concessão manual vigente tem precedência sobre a Stripe (#150).
-    if (current?.provider === 'manual' && isEntitled(current, 'ai')) {
-      console.warn(
-        '[billing.webhook] concessão manual vigente preservada',
-        uid,
-        eventCreated,
-      );
-      return;
-    }
     const stored = current?.providerEventCreated;
     if (
       typeof eventCreated === 'number' &&
@@ -50,6 +41,24 @@ async function upsert(
         uid,
         eventCreated,
       );
+      return;
+    }
+    // Concessão manual vigente tem precedência sobre a Stripe (#150): grava só
+    // os ids para que o estado da Stripe não se perca quando ela terminar.
+    if (current?.provider === 'manual' && isEntitled(current, 'ai')) {
+      console.warn(
+        '[billing.webhook] concessão manual vigente preservada',
+        uid,
+        eventCreated,
+      );
+      const providerFields: Partial<UserSubscription> = {
+        providerCustomerId: mapped.providerCustomerId,
+        providerSubscriptionId: mapped.providerSubscriptionId,
+      };
+      if (typeof eventCreated === 'number') {
+        providerFields.providerEventCreated = eventCreated;
+      }
+      tx.set(ref, providerFields, { merge: true });
       return;
     }
     tx.set(ref, mapped, { merge: true });
