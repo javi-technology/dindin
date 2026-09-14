@@ -6,6 +6,9 @@ const listUsersMock = jest.fn();
 const getUserMock = jest.fn();
 const setMock = jest.fn();
 const updateMock = jest.fn();
+const txGetMock = jest.fn();
+const txSetMock = jest.fn();
+const runTransactionMock = jest.fn();
 
 /** Documentos `users/{uid}/billing/subscription` em memória. */
 let subscriptions: Map<string, Partial<UserSubscription>>;
@@ -42,6 +45,7 @@ jest.mock('firebase-admin', () => ({
     getAll: jest.fn(async (...refs: Array<{ uid: string }>) =>
       refs.map((ref) => snapshotOf(ref.uid)),
     ),
+    runTransaction: runTransactionMock,
   })),
   storage: jest.fn(),
 }));
@@ -78,6 +82,15 @@ describe('admin – assinaturas de usuários', () => {
     subscriptions = new Map();
     setMock.mockResolvedValue(undefined);
     updateMock.mockResolvedValue(undefined);
+    txGetMock.mockImplementation(async (uid: string) => snapshotOf(uid));
+    runTransactionMock.mockImplementation(
+      async (cb: (tx: unknown) => unknown) =>
+        cb({
+          get: (ref: { uid: string }) => txGetMock(ref.uid),
+          set: (ref: { uid: string }, data: unknown, options: unknown) =>
+            txSetMock(ref.uid, data, options),
+        }),
+    );
     getUserMock.mockImplementation(async (uid: string) =>
       authUser(uid, `${uid}@dindin.app`),
     );
@@ -326,7 +339,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({
           status: 'active',
@@ -360,7 +373,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({ provider: 'manual', currentPeriodEnd: null }),
         { merge: true },
@@ -374,7 +387,7 @@ describe('admin – assinaturas de usuários', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({
           currentPeriodEnd: '2100-01-01T02:59:59.000Z',
@@ -394,7 +407,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toEqual(expect.any(String));
-      expect(setMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
     });
 
     it.each(['active', 'trialing'])(
@@ -415,7 +428,7 @@ describe('admin – assinaturas de usuários', () => {
           error: expect.any(String),
           code: 'STRIPE_SUBSCRIPTION',
         });
-        expect(setMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
       },
     );
 
@@ -431,7 +444,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalled();
+      expect(txSetMock).toHaveBeenCalled();
     });
 
     it('deve responder 409 quando a Stripe guardada sob concessão expirada está ativa', async () => {
@@ -447,7 +460,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(409);
       expect(response.body.code).toBe('STRIPE_SUBSCRIPTION');
-      expect(setMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
     });
 
     it('deve guardar o estado da Stripe de docs antigos ao conceder acesso', async () => {
@@ -465,7 +478,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({
           provider: 'manual',
@@ -499,7 +512,49 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
 
       expect(response.status).toBe(200);
-      expect(setMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+      expect(txSetMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+    });
+
+    it('deve ler e gravar a concessão na mesma transação', async () => {
+      const response = await grant({ plan: 'basic', currentPeriodEnd: null });
+
+      expect(response.status).toBe(200);
+      expect(runTransactionMock).toHaveBeenCalledTimes(1);
+      expect(txGetMock).toHaveBeenCalledWith('user-2');
+      expect(txSetMock).toHaveBeenCalledTimes(1);
+      expect(setMock).not.toHaveBeenCalled();
+    });
+
+    it('não restaura estado da Stripe antigo gravado pelo webhook durante a concessão', async () => {
+      // Leitura fora da transação ainda veria o doc antigo, sem `stripe`.
+      subscriptions.set('user-2', {
+        status: 'past_due',
+        plan: 'basic',
+        interval: 'month',
+        provider: 'stripe',
+        providerSubscriptionId: 'sub_1',
+        currentPeriodEnd: PAST,
+        cancelAtPeriodEnd: false,
+      });
+      // Dentro da transação, o webhook já gravou o cancelamento.
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          ...subscriptions.get('user-2'),
+          status: 'canceled',
+          stripe: {
+            ...STRIPE_ACTIVE,
+            status: 'canceled',
+            currentPeriodEnd: PAST,
+          },
+        }),
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
+
+      expect(response.status).toBe(200);
+      expect(txSetMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+      expect(response.body.subscription.stripeStatus).toBe('canceled');
     });
 
     it('deve responder 404 quando o usuário não existe', async () => {
@@ -511,7 +566,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'User not found' });
-      expect(setMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
     });
   });
 
