@@ -120,7 +120,7 @@ describe('BillingComponent', () => {
       status: 'active',
       plan: 'basic',
       interval: 'month',
-      currentPeriodEnd: '2026-10-01T00:00:00Z',
+      currentPeriodEnd: '2026-10-01T12:00:00Z',
       cancelAtPeriodEnd: false,
     });
 
@@ -167,7 +167,7 @@ describe('BillingComponent', () => {
       status: 'trialing',
       plan: 'basic',
       interval: 'year',
-      currentPeriodEnd: '2026-10-01T00:00:00Z',
+      currentPeriodEnd: '2026-10-01T12:00:00Z',
       cancelAtPeriodEnd: false,
     });
 
@@ -183,7 +183,7 @@ describe('BillingComponent', () => {
       status: 'active',
       plan: 'basic',
       interval: 'month',
-      currentPeriodEnd: '2026-10-01T00:00:00Z',
+      currentPeriodEnd: '2026-10-01T12:00:00Z',
       cancelAtPeriodEnd: true,
     });
 
