@@ -212,6 +212,23 @@ describe('admin – assinaturas de usuários', () => {
       expect(response.body).toHaveLength(2);
     });
 
+    it('deve limitar a resposta aos primeiros 100 usuários por e-mail', async () => {
+      listUsersMock.mockResolvedValue({
+        users: Array.from({ length: 150 }, (_, i) =>
+          authUser(`u-${i}`, `user${String(i).padStart(3, '0')}@dindin.app`),
+        ),
+      });
+
+      const response = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', 'Bearer token');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(100);
+      expect(response.body[0].email).toBe('user000@dindin.app');
+      expect(response.body[99].email).toBe('user099@dindin.app');
+    });
+
     it('deve devolver lista vazia sem consultar assinaturas', async () => {
       const response = await request(app)
         .get('/api/admin/users')
@@ -413,6 +430,16 @@ describe('admin – assinaturas de usuários', () => {
         error: expect.any(String),
         code: 'STRIPE_SUBSCRIPTION',
       });
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('deve responder 404 quando não há concessão manual', async () => {
+      subscriptions.set('user-2', { status: 'none', provider: null });
+
+      const response = await revoke();
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Manual subscription not found' });
       expect(updateMock).not.toHaveBeenCalled();
     });
 
