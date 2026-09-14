@@ -64,3 +64,22 @@ export interface MeResponse {
   subscription: PublicSubscription;
   entitlements: Entitlement[];
 }
+
+/** Visão da assinatura na área admin: pública + provedor (issue #150). */
+export type AdminSubscriptionView = PublicSubscription &
+  Pick<UserSubscription, 'provider'>;
+
+/** Usuário listado em `GET /api/admin/users`. */
+export interface AdminUser {
+  uid: string;
+  email: string | null;
+  admin: boolean;
+  subscription: AdminSubscriptionView;
+  entitlements: Entitlement[];
+}
+
+/** Body de `PUT /api/admin/users/:uid/subscription`. `null` = sem validade. */
+export interface GrantSubscriptionRequest {
+  plan: SubscriptionPlan;
+  currentPeriodEnd: string | null;
+}

@@ -82,6 +82,11 @@ import {
   downloadBbPdf,
 } from './recommended-wallet/storage.service';
 import {
+  grantSubscription,
+  listUsers,
+  revokeSubscription,
+} from './admin/subscription/admin-subscription.controller';
+import {
   createCheckoutSession,
   createPortalSession,
   handleWebhook,
@@ -152,6 +157,18 @@ app.get('/api/assets', listAssets);
 app.get('/api/admin/assets', adminAuthMiddleware, listAllAssets);
 app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
 app.put('/api/admin/assets/:ticker', adminAuthMiddleware, updateAsset);
+
+app.get('/api/admin/users', adminAuthMiddleware, listUsers);
+app.put(
+  '/api/admin/users/:uid/subscription',
+  adminAuthMiddleware,
+  grantSubscription,
+);
+app.delete(
+  '/api/admin/users/:uid/subscription',
+  adminAuthMiddleware,
+  revokeSubscription,
+);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);
