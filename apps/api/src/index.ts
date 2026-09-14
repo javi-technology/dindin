@@ -297,15 +297,16 @@ export const api = onRequest(
   app,
 );
 
-// Cloud Function agendada para atualizar cotações 1x ao dia.
-// Ver issues #10 e #22 — busca cotações via Brapi (fallback Yahoo Finance)
+// Cloud Function agendada para atualizar cotações 1x ao dia, às 18:30, após o
+// fechamento da B3 (o pregão pode ir até ~18h fora do horário de verão dos EUA).
+// Ver issues #10, #22 e #192 — busca cotações via Brapi (fallback Yahoo Finance)
 // e salva em `quotes/{ticker}` + histórico.
 // O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
 // em process.env dentro da execução. Configurar com:
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
   {
-    schedule: '0 0 * * *',
+    schedule: '30 18 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['BRAPI_API_KEY'],
@@ -315,10 +316,11 @@ export const updateQuotesScheduled = onSchedule(
   },
 );
 
-// Snapshot diário do patrimônio, 1h após a atualização de cotações
+// Snapshot diário do patrimônio, 30 min após a atualização de cotações,
+// para registrar o patrimônio com a data e os preços do pregão do dia
 export const savePatrimonySnapshotsScheduled = onSchedule(
   {
-    schedule: '0 1 * * *',
+    schedule: '0 19 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
   },
