@@ -77,9 +77,17 @@ function latestEventDate(a: string, b: string): number {
   return new Date(b).getTime() - new Date(a).getTime();
 }
 
-function toDateOnly(value: string | Date | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  const date = value instanceof Date ? value : new Date(value);
+// As datas vêm de APIs externas: `null`, strings vazias ou valores inválidos
+// não podem virar uma data (ex.: `new Date(null)` é 1970-01-01).
+function toDateOnly(value: unknown): string | undefined {
+  let date: Date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    date = new Date(value);
+  } else {
+    return undefined;
+  }
   return Number.isNaN(date.getTime())
     ? undefined
     : date.toISOString().slice(0, 10);
@@ -87,7 +95,7 @@ function toDateOnly(value: string | Date | undefined): string | undefined {
 
 function dividendInfo(
   monthlyDividend: number,
-  paymentDate: string | Date | undefined,
+  paymentDate: unknown,
 ): DividendInfo {
   const date = toDateOnly(paymentDate);
   return date ? { monthlyDividend, paymentDate: date } : { monthlyDividend };
@@ -255,8 +263,9 @@ function buildYahooTicker(ticker: string): string {
 
 /**
  * O `chart` do Yahoo só informa a data ex (data com) de cada provento. A data
- * de pagamento vem de `calendarEvents.dividendDate`, que só é aceita quando não
- * é anterior à data ex do último provento (senão se refere a outro evento).
+ * de pagamento vem de `calendarEvents.dividendDate`, que só é aceita quando a
+ * data ex do `calendarEvents` é a mesma do provento usado para o valor —
+ * senão ela se refere a outro evento (ex.: o próximo provento anunciado).
  */
 async function fetchYahooPaymentDate(
   yahooFinance: InstanceType<typeof YahooFinance>,
@@ -267,12 +276,13 @@ async function fetchYahooPaymentDate(
     const summary = await yahooFinance.quoteSummary(buildYahooTicker(ticker), {
       modules: ['calendarEvents'],
     });
-    const dividendDate = summary.calendarEvents?.dividendDate;
-    if (
-      dividendDate instanceof Date &&
-      toDateOnly(dividendDate)! >= toDateOnly(exDividendDate)!
-    ) {
-      return dividendDate;
+    const calendar = summary.calendarEvents;
+    const calendarExDate = toDateOnly(calendar?.exDividendDate);
+    const sameEvent =
+      calendarExDate !== undefined &&
+      calendarExDate === toDateOnly(exDividendDate);
+    if (sameEvent && toDateOnly(calendar?.dividendDate)) {
+      return calendar?.dividendDate;
     }
   } catch (error) {
     console.error(
@@ -392,6 +402,16 @@ export async function fetchMonthlyDividends(
     for (const { ticker, ...info } of yahooResults) {
       merged.set(ticker, info);
     }
+  }
+
+  const withoutPaymentDate = [...merged.entries()]
+    .filter(([, info]) => !info.paymentDate)
+    .map(([ticker]) => ticker);
+  if (withoutPaymentDate.length > 0) {
+    console.warn(
+      '[fetchMonthlyDividends] Tickers com provento sem data de pagamento em nenhuma fonte:',
+      { tickers: withoutPaymentDate },
+    );
   }
 
   return merged;
