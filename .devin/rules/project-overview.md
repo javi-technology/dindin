@@ -5,7 +5,7 @@ trigger: always_on
 
 # DinDin — Visão Geral
 
-Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 3 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
 
 ## Estrutura do Repositório
 
