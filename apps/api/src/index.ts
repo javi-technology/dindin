@@ -9,6 +9,7 @@ import {
 } from './middleware/auth.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
 import {
+  effectiveStatus,
   getSubscription,
   listEntitlements,
   toPublicSubscription,
@@ -82,6 +83,11 @@ import {
   downloadBbPdf,
 } from './recommended-wallet/storage.service';
 import {
+  grantSubscription,
+  listUsers,
+  revokeSubscription,
+} from './admin/subscription/admin-subscription.controller';
+import {
   createCheckoutSession,
   createPortalSession,
   handleWebhook,
@@ -135,7 +141,10 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     const body: MeResponse = {
       uid: user.uid,
       admin: isAdmin,
-      subscription: toPublicSubscription(subscription),
+      subscription: toPublicSubscription({
+        ...subscription,
+        status: effectiveStatus(subscription),
+      }),
       entitlements: listEntitlements(subscription, isAdmin),
     };
     res.json(body);
@@ -152,6 +161,18 @@ app.get('/api/assets', listAssets);
 app.get('/api/admin/assets', adminAuthMiddleware, listAllAssets);
 app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
 app.put('/api/admin/assets/:ticker', adminAuthMiddleware, updateAsset);
+
+app.get('/api/admin/users', adminAuthMiddleware, listUsers);
+app.put(
+  '/api/admin/users/:uid/subscription',
+  adminAuthMiddleware,
+  grantSubscription,
+);
+app.delete(
+  '/api/admin/users/:uid/subscription',
+  adminAuthMiddleware,
+  revokeSubscription,
+);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);

@@ -249,6 +249,82 @@ describe('processStripeEvent', () => {
     expect(txSetMock).not.toHaveBeenCalled();
   });
 
+  describe('concessão manual existente', () => {
+    const FUTURE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const manual = (status: string, currentPeriodEnd: string | null) => ({
+      exists: true,
+      data: () => ({ status, provider: 'manual', currentPeriodEnd }),
+    });
+
+    it.each([
+      ['com validade futura', FUTURE],
+      ['sem validade', null],
+    ])(
+      'preserva concessão manual ativa %s gravando só os ids da Stripe',
+      async (_label, end) => {
+        txGetMock.mockResolvedValue(manual('active', end));
+
+        await processStripeEvent(
+          makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+        );
+
+        expect(txSetMock).toHaveBeenCalledTimes(1);
+        expect(txSetMock).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            providerCustomerId: 'cus_1',
+            providerSubscriptionId: 'sub_1',
+            providerEventCreated: 3000,
+          },
+          { merge: true },
+        );
+      },
+    );
+
+    it('ignora evento antigo mesmo com concessão manual ativa', async () => {
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: null,
+          providerEventCreated: 5000,
+        }),
+      });
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+      );
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('sobrescreve concessão manual expirada', async () => {
+      txGetMock.mockResolvedValue(manual('active', PAST));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription()),
+      );
+
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ provider: 'stripe' }),
+        { merge: true },
+      );
+    });
+
+    it('sobrescreve concessão manual revogada', async () => {
+      txGetMock.mockResolvedValue(manual('canceled', FUTURE));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription()),
+      );
+
+      expect(txSetMock).toHaveBeenCalled();
+    });
+  });
+
   describe('eventos fora de ordem', () => {
     const stored = (providerEventCreated: number) => ({
       exists: true,

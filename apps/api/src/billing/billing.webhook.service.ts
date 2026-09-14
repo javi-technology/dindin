@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import { UserSubscription } from 'dindin-shared-types';
 import { getStripe } from './stripe.client';
 import { mapSubscription, resolveUid } from './subscription-mapper';
-import { subscriptionDoc } from './entitlement.service';
+import { isEntitled, subscriptionDoc } from './entitlement.service';
 
 function customerIdOf(sub: Stripe.Subscription): string {
   return typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -29,7 +29,8 @@ async function upsert(
   const ref = subscriptionDoc(uid);
   await admin.firestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
-    const stored = snapshot.data()?.providerEventCreated;
+    const current = snapshot.data() as UserSubscription | undefined;
+    const stored = current?.providerEventCreated;
     if (
       typeof eventCreated === 'number' &&
       typeof stored === 'number' &&
@@ -40,6 +41,24 @@ async function upsert(
         uid,
         eventCreated,
       );
+      return;
+    }
+    // Concessão manual vigente tem precedência sobre a Stripe (#150): grava só
+    // os ids para que o estado da Stripe não se perca quando ela terminar.
+    if (current?.provider === 'manual' && isEntitled(current, 'ai')) {
+      console.warn(
+        '[billing.webhook] concessão manual vigente preservada',
+        uid,
+        eventCreated,
+      );
+      const providerFields: Partial<UserSubscription> = {
+        providerCustomerId: mapped.providerCustomerId,
+        providerSubscriptionId: mapped.providerSubscriptionId,
+      };
+      if (typeof eventCreated === 'number') {
+        providerFields.providerEventCreated = eventCreated;
+      }
+      tx.set(ref, providerFields, { merge: true });
       return;
     }
     tx.set(ref, mapped, { merge: true });
