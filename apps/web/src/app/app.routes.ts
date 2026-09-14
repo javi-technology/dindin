@@ -7,8 +7,6 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { WalletComponent } from './features/wallet/wallet.component';
 import { FridgeComponent } from './features/fridge/fridge.component';
 import { DividendComponent } from './features/dividend/dividend.component';
-import { AdminAssetsComponent } from './features/admin-assets/admin-assets.component';
-import { AdminUsersComponent } from './features/admin-users/admin-users.component';
 import { RecommendedWalletComponent } from './features/recommended-wallet/recommended-wallet.component';
 import { BillingComponent } from './features/billing/billing.component';
 
@@ -51,12 +49,18 @@ export const routes: Routes = [
   {
     path: 'admin/assets',
     canActivate: [authGuard, adminGuard],
-    component: AdminAssetsComponent,
+    loadComponent: () =>
+      import('./features/admin-assets/admin-assets.component').then(
+        (m) => m.AdminAssetsComponent,
+      ),
   },
   {
     path: 'admin/users',
     canActivate: [authGuard, adminGuard],
-    component: AdminUsersComponent,
+    loadComponent: () =>
+      import('./features/admin-users/admin-users.component').then(
+        (m) => m.AdminUsersComponent,
+      ),
   },
   { path: '**', redirectTo: '' },
 ];
