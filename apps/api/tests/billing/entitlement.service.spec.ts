@@ -87,6 +87,28 @@ describe('entitlement.service – isEntitled', () => {
   it('deve liberar ai para admin sem assinatura', () => {
     expect(isEntitled(NO_SUBSCRIPTION, 'ai', true, NOW)).toBe(true);
   });
+
+  describe('concessão manual', () => {
+    const manual = (currentPeriodEnd: string | null) =>
+      sub({
+        status: 'active',
+        provider: 'manual',
+        interval: null,
+        currentPeriodEnd,
+      });
+
+    it('deve liberar ai sem validade', () => {
+      expect(isEntitled(manual(null), 'ai', false, NOW)).toBe(true);
+    });
+
+    it('deve liberar ai dentro da validade', () => {
+      expect(isEntitled(manual(FUTURE), 'ai', false, NOW)).toBe(true);
+    });
+
+    it('deve negar ai após a validade', () => {
+      expect(isEntitled(manual(PAST), 'ai', false, NOW)).toBe(false);
+    });
+  });
 });
 
 describe('entitlement.service – getSubscription / hasEntitlement', () => {
