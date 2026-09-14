@@ -165,6 +165,46 @@ describe('AdminUsersComponent', () => {
       ).toBeTruthy();
       expect(rows[2].querySelector('[data-testid="revoke-button"]')).toBeNull();
     });
+
+    it('deve ocultar Conceder acesso para assinatura Stripe vigente', () => {
+      const rows = queryAll('user-row');
+
+      expect(
+        rows[0].querySelector('[data-testid="grant-button"]'),
+      ).toBeTruthy();
+      expect(
+        rows[1].querySelector('[data-testid="grant-button"]'),
+      ).toBeTruthy();
+      expect(rows[2].querySelector('[data-testid="grant-button"]')).toBeNull();
+    });
+
+    it('deve permitir Conceder acesso para assinatura Stripe cancelada', () => {
+      serviceMock.list.and.returnValue(
+        of([makeUser('dani', { status: 'canceled', provider: 'stripe' })]),
+      );
+      component.search();
+      fixture.detectChanges();
+
+      expect(
+        queryAll('user-row')[0].querySelector('[data-testid="grant-button"]'),
+      ).toBeTruthy();
+    });
+
+    it('deve avisar quando a busca atinge o limite de resultados', () => {
+      serviceMock.list.and.returnValue(
+        of(Array.from({ length: 100 }, (_, i) => makeUser(`u-${i}`))),
+      );
+      component.search();
+      fixture.detectChanges();
+
+      expect(query('limit-notice')?.textContent).toContain(
+        'Mostrando os primeiros 100 usuários',
+      );
+    });
+
+    it('não deve exibir aviso de limite abaixo de 100 resultados', () => {
+      expect(query('limit-notice')).toBeNull();
+    });
   });
 
   describe('busca', () => {
@@ -221,20 +261,30 @@ describe('AdminUsersComponent', () => {
     });
 
     it('deve manter o modal aberto e exibir erro da API', () => {
-      serviceMock.grant.and.returnValue(
-        throwError(() => ({
-          status: 400,
-          error: { error: 'currentPeriodEnd must be in the future' },
-        })),
-      );
+      serviceMock.grant.and.returnValue(throwError(() => ({ status: 500 })));
       component.openGrant(noSubscription);
       component.confirmGrant();
       fixture.detectChanges();
 
       expect(component.grantTarget()).toEqual(noSubscription);
       expect(query('grant-error')?.textContent).toContain(
-        'Não foi possível conceder o acesso.',
+        'Não foi possível conceder o acesso. Tente novamente.',
       );
+    });
+
+    [
+      [400, 'Verifique a validade informada.'],
+      [404, 'Usuário não encontrado.'],
+      [409, 'Este usuário já tem uma assinatura ativa na Stripe.'],
+    ].forEach(([status, message]) => {
+      it(`deve exibir mensagem específica para erro ${status}`, () => {
+        serviceMock.grant.and.returnValue(throwError(() => ({ status })));
+        component.openGrant(noSubscription);
+        component.confirmGrant();
+        fixture.detectChanges();
+
+        expect(query('grant-error')?.textContent).toContain(message as string);
+      });
     });
   });
 
