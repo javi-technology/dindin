@@ -1,6 +1,9 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { AuthRequest } from './auth.middleware';
 
+/** Chave do contador quando o IP do cliente não pôde ser resolvido. */
+const UNKNOWN_IP_KEY = 'unknown-ip';
+
 /** Janela e limite de requisições por IP em todas as rotas autenticadas. */
 export const API_RATE_LIMIT = {
   windowMs: 60 * 1000,
@@ -18,11 +21,16 @@ export const API_RATE_LIMIT = {
  * ser forjado por quem chama a URL da Function diretamente. Fixar o número de
  * hops exige confirmar a cadeia Hosting → Cloud Run em produção; errar faria
  * todo o tráfego do Hosting compartilhar um único contador.
+ *
+ * Sem IP resolvido (ex.: emulador do Functions, sem X-Forwarded-For nem
+ * socket), as requisições caem num contador compartilhado em vez de o gerador
+ * padrão lançar erro e derrubar a rota com 500.
  */
 export const apiRateLimiter = rateLimit({
   ...API_RATE_LIMIT,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  keyGenerator: (req) => (req.ip ? ipKeyGenerator(req.ip) : UNKNOWN_IP_KEY),
   message: { error: 'Too many requests' },
   validate: { trustProxy: false },
 });
