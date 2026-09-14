@@ -13,10 +13,20 @@ const mockStripe = {
   customers: { retrieve: customersRetrieveMock },
 };
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(),
-  firestore: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  getFirestore: jest.fn(() => ({
     collection: jest.fn((c1: string) => ({
       doc: jest.fn((d1: string) => ({
         collection: jest.fn((c2: string) => ({
@@ -29,10 +39,6 @@ jest.mock('firebase-admin', () => ({
     })),
     runTransaction: runTransactionMock,
   })),
-  storage: jest.fn(),
-}));
-
-jest.mock('firebase-admin/firestore', () => ({
   FieldValue: { delete: jest.fn(() => 'DELETE_FIELD') },
 }));
 

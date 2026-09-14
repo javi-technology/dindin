@@ -3,17 +3,27 @@ import request from 'supertest';
 const verifyIdTokenMock = jest.fn();
 const listUsersMock = jest.fn();
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
     listUsers: listUsersMock,
   })),
-  firestore: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({
     collection: jest.fn(),
     getAll: jest.fn(async () => []),
   })),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 import { app } from '../../src/index';

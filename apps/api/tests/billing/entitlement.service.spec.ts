@@ -1,8 +1,9 @@
 import { StripeSubscriptionState, UserSubscription } from 'dindin-shared-types';
 
 const getMock = jest.fn();
-jest.mock('firebase-admin', () => ({
-  firestore: jest.fn(() => ({
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
         collection: jest.fn(() => ({

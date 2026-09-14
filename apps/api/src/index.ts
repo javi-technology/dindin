@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
 import express, { Request, Response, NextFunction } from 'express';
 import {
   authMiddleware,
@@ -98,7 +98,7 @@ import {
   syncBbWallet,
 } from './recommended-wallet/recommended-wallet.service';
 
-admin.initializeApp();
+initializeApp();
 
 const app = express();
 

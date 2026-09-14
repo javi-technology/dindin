@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { FridgeItem, Position, Quote } from 'dindin-models';
 
 export interface MonthlyIncomeItem {
@@ -16,8 +16,7 @@ export interface MonthlyIncome {
 }
 
 function positionsCollection(userId: string, walletId: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')
@@ -26,11 +25,7 @@ function positionsCollection(userId: string, walletId: string) {
 }
 
 function fridgesCollection(userId: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('fridges');
+  return getFirestore().collection('users').doc(userId).collection('fridges');
 }
 
 function roundCurrency(value: number): number {
@@ -57,7 +52,7 @@ export async function computeMonthlyIncome(
 ): Promise<MonthlyIncome> {
   const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    admin.firestore().collection('quotes').get(),
+    getFirestore().collection('quotes').get(),
     fetchFridgeItems(userId),
   ]);
 

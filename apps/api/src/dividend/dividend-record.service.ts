@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Dividend, FridgeItem, Position, Quote } from 'dindin-models';
 import {
   fetchFridgeItems,
@@ -9,11 +9,7 @@ import {
 const BATCH_SIZE = 10;
 
 function userCollection(userId: string, collection: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection(collection);
+  return getFirestore().collection('users').doc(userId).collection(collection);
 }
 
 function normalizeTicker(ticker: unknown): string {
@@ -45,7 +41,7 @@ export async function recordMonthlyDividends(
   date = todayDateInBrazil(),
 ): Promise<Dividend[]> {
   const [quotesSnapshot, positions, fridgeItems] = await Promise.all([
-    admin.firestore().collection('quotes').get(),
+    getFirestore().collection('quotes').get(),
     getAllUserPositions(userId),
     fetchFridgeItems(userId),
   ]);
@@ -100,7 +96,7 @@ export async function recordMonthlyDividends(
       )
       .filter(Boolean),
   );
-  const batch = admin.firestore().batch();
+  const batch = getFirestore().batch();
   const dividends: Dividend[] = [];
   const desiredIds = new Set<string>();
 
@@ -146,8 +142,7 @@ export async function recordMonthlyDividends(
 }
 
 export async function recordAllMonthlyDividends(): Promise<void> {
-  const userDocuments = await admin
-    .firestore()
+  const userDocuments = await getFirestore()
     .collection('users')
     .listDocuments();
   let succeeded = 0;

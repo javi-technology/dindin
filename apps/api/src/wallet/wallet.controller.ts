@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Wallet } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -19,11 +19,7 @@ const SUPPORTED_CURRENCIES = new Set([
 ]);
 
 function walletsCollection(userId: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets');
+  return getFirestore().collection('users').doc(userId).collection('wallets');
 }
 
 /** Retorna o uid do usuário autenticado. O authMiddleware garante que sempre está presente. */

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { getStripe, getAppBaseUrl } from './stripe.client';
@@ -52,7 +53,7 @@ export async function createCheckoutSession(
 
     let email: string | undefined;
     try {
-      email = (await admin.auth().getUser(uid)).email;
+      email = (await getAuth().getUser(uid)).email;
     } catch {
       email = undefined;
     }
@@ -135,7 +136,7 @@ export async function handleWebhook(
     return;
   }
 
-  const eventDoc = admin.firestore().collection('billingEvents').doc(event.id);
+  const eventDoc = getFirestore().collection('billingEvents').doc(event.id);
 
   try {
     const snapshot = await eventDoc.get();

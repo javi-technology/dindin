@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import * as admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 
 /** Requisição com campo `user` opcional — antes do authMiddleware. */
 export interface AuthRequest extends Request {
@@ -32,7 +32,7 @@ export async function authMiddleware(
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await getAuth().verifyIdToken(token);
     req.user = { uid: decoded.uid, admin: decoded.admin === true };
     next();
   } catch (error) {

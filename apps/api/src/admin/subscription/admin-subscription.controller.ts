@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
-import type { UserRecord } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth, type UserRecord } from 'firebase-admin/auth';
 import {
   AdminUser,
   SubscriptionPlan,
@@ -44,7 +44,7 @@ async function listAllAuthUsers(): Promise<UserRecord[]> {
   const users: UserRecord[] = [];
   let pageToken: string | undefined;
   do {
-    const page = await admin.auth().listUsers(LIST_USERS_PAGE_SIZE, pageToken);
+    const page = await getAuth().listUsers(LIST_USERS_PAGE_SIZE, pageToken);
     users.push(...page.users);
     pageToken = page.pageToken;
   } while (pageToken);
@@ -53,9 +53,9 @@ async function listAllAuthUsers(): Promise<UserRecord[]> {
 
 async function getSubscriptions(uids: string[]): Promise<UserSubscription[]> {
   if (uids.length === 0) return [];
-  const snapshots = await admin
-    .firestore()
-    .getAll(...uids.map((uid) => subscriptionDoc(uid)));
+  const snapshots = await getFirestore().getAll(
+    ...uids.map((uid) => subscriptionDoc(uid)),
+  );
   return snapshots.map((snapshot) => ({
     ...NO_SUBSCRIPTION,
     ...((snapshot.exists ? snapshot.data() : {}) as Partial<UserSubscription>),
@@ -112,7 +112,7 @@ function parseGrantBody(
 
 async function findAuthUser(uid: string): Promise<UserRecord | null> {
   try {
-    return await admin.auth().getUser(uid);
+    return await getAuth().getUser(uid);
   } catch (error) {
     if ((error as { code?: string }).code === 'auth/user-not-found') {
       return null;
@@ -142,7 +142,7 @@ export async function grantSubscription(
     // Leitura e gravação na mesma transação: o webhook pode gravar o estado
     // da Stripe entre as duas e não pode ser sobrescrito por um estado antigo.
     const ref = subscriptionDoc(user.uid);
-    const result = await admin.firestore().runTransaction(async (tx) => {
+    const result = await getFirestore().runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
       const current = resolveSubscription({
         ...NO_SUBSCRIPTION,
@@ -201,7 +201,7 @@ export async function revokeSubscription(
     const ref = subscriptionDoc(uid);
     // Leitura e gravação na mesma transação: o webhook pode ativar a Stripe
     // entre as duas e a revogação não pode cancelar essa assinatura.
-    const result = await admin.firestore().runTransaction(async (tx) => {
+    const result = await getFirestore().runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
       if (!snapshot.exists) {
         return { status: 404, error: 'Subscription not found' } as const;

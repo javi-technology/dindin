@@ -2,9 +2,13 @@ import { FridgeItem, Position, Quote } from 'dindin-models';
 
 let firestoreMock: any;
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  firestore: jest.fn(() => firestoreMock),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => firestoreMock),
 }));
 
 import {

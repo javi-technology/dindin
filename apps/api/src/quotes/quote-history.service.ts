@@ -1,8 +1,8 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Quote, QuoteHistory } from 'dindin-models';
 
 function quotesCollection() {
-  return admin.firestore().collection('quotes');
+  return getFirestore().collection('quotes');
 }
 
 function historyCollection(ticker: string) {

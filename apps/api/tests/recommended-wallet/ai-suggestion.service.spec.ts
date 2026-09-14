@@ -5,9 +5,13 @@ const getQuotePricesMock = jest.fn();
 const computeMonthlyIncomeMock = jest.fn();
 const listQualifiedInvestorTickersMock = jest.fn();
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  firestore: jest.fn(() => firestoreMock),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => firestoreMock),
 }));
 
 jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({

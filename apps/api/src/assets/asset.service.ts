@@ -1,8 +1,8 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Asset, AssetType } from 'dindin-models';
 
 function assetsCollection() {
-  return admin.firestore().collection('assets');
+  return getFirestore().collection('assets');
 }
 
 const VALID_ASSET_TYPES: Set<AssetType> = new Set([

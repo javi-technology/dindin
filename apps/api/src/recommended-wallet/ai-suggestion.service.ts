@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   AiSuggestion,
   AiSuggestionItem,
@@ -56,16 +56,14 @@ function createError(message: string, statusCode: number): StatusError {
 }
 
 function suggestionsCollection(uid: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(uid)
     .collection('aiSuggestions');
 }
 
 function usageCollection(uid: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(uid)
     .collection('aiSuggestionUsage');

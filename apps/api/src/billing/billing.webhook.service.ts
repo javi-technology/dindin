@@ -1,5 +1,5 @@
 import type Stripe from 'stripe';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { UserSubscription } from 'dindin-shared-types';
 import { getStripe } from './stripe.client';
 import { mapSubscription, resolveUid } from './subscription-mapper';
@@ -34,7 +34,7 @@ async function upsert(
   // O estado da Stripe é sempre guardado, inclusive sob concessão manual (#171).
   mapped.stripe = toStripeState(mapped);
   const ref = subscriptionDoc(uid);
-  await admin.firestore().runTransaction(async (tx) => {
+  await getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const current = snapshot.data() as UserSubscription | undefined;
     const stored = current?.providerEventCreated;

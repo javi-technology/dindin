@@ -1,7 +1,7 @@
 let bucketMock: any;
 
-jest.mock('firebase-admin', () => ({
-  storage: jest.fn(() => ({ bucket: () => bucketMock })),
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(() => ({ bucket: () => bucketMock })),
 }));
 
 import {

@@ -23,13 +23,20 @@ const subscriptionRef = {
   ),
 };
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
     getUser: getUserMock,
   })),
-  firestore: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({
     runTransaction: jest.fn(async (cb: (tx: unknown) => unknown) =>
       cb({
         get: () => subscriptionRef.get(),
@@ -48,7 +55,10 @@ jest.mock('firebase-admin', () => ({
       })),
     })),
   })),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 jest.mock('stripe', () => ({
