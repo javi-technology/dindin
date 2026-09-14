@@ -42,6 +42,9 @@
     "vite@6": "^6.4.3",
     "esbuild@0.28": "^0.28.2",
     "@babel/core@<7.29.6": "^7.29.7",
-    "serialize-javascript@<7.0.5": "^7.1.1"
+    "serialize-javascript@<7.0.5": "^7.1.1",
+    "@angular/fire": {
+      "firebase-tools": "$firebase-tools"
+    }
   }
 }
