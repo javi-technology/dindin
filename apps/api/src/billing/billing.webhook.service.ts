@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import { UserSubscription } from 'dindin-shared-types';
 import { getStripe } from './stripe.client';
 import { mapSubscription, resolveUid } from './subscription-mapper';
-import { subscriptionDoc } from './entitlement.service';
+import { isEntitled, subscriptionDoc } from './entitlement.service';
 
 function customerIdOf(sub: Stripe.Subscription): string {
   return typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -29,7 +29,17 @@ async function upsert(
   const ref = subscriptionDoc(uid);
   await admin.firestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
-    const stored = snapshot.data()?.providerEventCreated;
+    const current = snapshot.data() as UserSubscription | undefined;
+    // Concessão manual vigente tem precedência sobre a Stripe (#150).
+    if (current?.provider === 'manual' && isEntitled(current, 'ai')) {
+      console.warn(
+        '[billing.webhook] concessão manual vigente preservada',
+        uid,
+        eventCreated,
+      );
+      return;
+    }
+    const stored = current?.providerEventCreated;
     if (
       typeof eventCreated === 'number' &&
       typeof stored === 'number' &&
