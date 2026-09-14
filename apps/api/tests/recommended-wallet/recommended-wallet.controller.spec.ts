@@ -14,11 +14,21 @@ const generateSuggestionMock = jest.fn();
 const parseBbFileNameMock = jest.fn();
 const saveBbPdfMock = jest.fn();
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({ verifyIdToken: verifyIdTokenMock })),
-  firestore: jest.fn(() => ({ collection: jest.fn() })),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({ verifyIdToken: verifyIdTokenMock })),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({ collection: jest.fn() })),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({

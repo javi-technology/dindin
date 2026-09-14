@@ -4,15 +4,18 @@ const verifyIdTokenMock = jest.fn();
 
 let firestoreMock: any;
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
   })),
-  firestore: jest.fn(() => firestoreMock),
 }));
 
 jest.mock('firebase-admin/firestore', () => ({
+  getFirestore: jest.fn(() => firestoreMock),
   FieldValue: {
     delete: jest.fn(() => '__DELETE_SENTINEL__'),
   },

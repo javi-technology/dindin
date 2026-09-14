@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Dividend, Position, AssetType } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import {
@@ -24,16 +24,11 @@ function uid(req: Request): string {
 }
 
 function dividendsCollection(userId: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('dividends');
+  return getFirestore().collection('users').doc(userId).collection('dividends');
 }
 
 function positionsCollection(userId: string, walletId: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')
@@ -52,8 +47,7 @@ async function getAllUserPositions(
     );
   }
 
-  const walletsSnapshot = await admin
-    .firestore()
+  const walletsSnapshot = await getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')

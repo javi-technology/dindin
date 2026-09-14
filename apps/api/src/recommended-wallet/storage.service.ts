@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getStorage } from 'firebase-admin/storage';
 
 export const BB_WALLET_PREFIX = 'wallets/fii-bb/';
 
@@ -7,8 +7,7 @@ export async function saveBbPdf(
   buffer: Buffer,
 ): Promise<string> {
   const path = `${BB_WALLET_PREFIX}${fileName}`;
-  await admin
-    .storage()
+  await getStorage()
     .bucket()
     .file(path)
     .save(buffer, { contentType: 'application/pdf' });
@@ -16,11 +15,11 @@ export async function saveBbPdf(
 }
 
 export async function downloadBbPdf(path: string): Promise<Buffer> {
-  const [buffer] = await admin.storage().bucket().file(path).download();
+  const [buffer] = await getStorage().bucket().file(path).download();
   return buffer;
 }
 
 export async function bbPdfExists(path: string): Promise<boolean> {
-  const [exists] = await admin.storage().bucket().file(path).exists();
+  const [exists] = await getStorage().bucket().file(path).exists();
   return exists;
 }

@@ -10,7 +10,8 @@
  * Em produção, remova a variável FIREBASE_AUTH_EMULATOR_HOST e use
  * GOOGLE_APPLICATION_CREDENTIALS com uma service account.
  */
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 
 const uid = process.argv[2];
 
@@ -24,9 +25,9 @@ if (!uid) {
 }
 
 async function setAdminClaim(): Promise<void> {
-  admin.initializeApp({ projectId: 'dindin-4e720' });
+  initializeApp({ projectId: 'dindin-4e720' });
 
-  await admin.auth().setCustomUserClaims(uid, { admin: true });
+  await getAuth().setCustomUserClaims(uid, { admin: true });
   console.log(`[setAdminClaim] admin: true aplicado ao uid ${uid}`);
 }
 

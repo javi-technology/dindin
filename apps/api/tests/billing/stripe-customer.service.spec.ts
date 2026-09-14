@@ -5,10 +5,17 @@ const mockStripe = {
   customers: { create: customerCreateMock },
 };
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(),
-  firestore: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
         collection: jest.fn(() => ({
@@ -17,7 +24,10 @@ jest.mock('firebase-admin', () => ({
       })),
     })),
   })),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 jest.mock('stripe', () => ({

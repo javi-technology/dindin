@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
@@ -10,11 +10,7 @@ function uid(req: Request): string {
 }
 
 function fridgesCollection(userId: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('fridges');
+  return getFirestore().collection('users').doc(userId).collection('fridges');
 }
 
 function itemsCollection(userId: string, fridgeId: string) {
@@ -22,8 +18,7 @@ function itemsCollection(userId: string, fridgeId: string) {
 }
 
 function positionsCollection(userId: string, walletId: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')
@@ -179,7 +174,7 @@ export async function deleteFridge(req: Request, res: Response): Promise<void> {
     // Remove os itens da geladeira em cascata antes de deletar a geladeira.
     // O Firestore não cascadeia deletes automaticamente.
     const itemsSnapshot = await fridgeRef.collection('fridgeItems').get();
-    const batch = admin.firestore().batch();
+    const batch = getFirestore().batch();
     itemsSnapshot.docs.forEach((itemDoc) => batch.delete(itemDoc.ref));
     batch.delete(fridgeRef);
     await batch.commit();
@@ -487,8 +482,7 @@ export async function unfreezeItem(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const walletRef = admin
-      .firestore()
+    const walletRef = getFirestore()
       .collection('users')
       .doc(userId)
       .collection('wallets')
@@ -512,7 +506,7 @@ export async function unfreezeItem(req: Request, res: Response): Promise<void> {
       updatedAt: now,
     };
     const positionRef = positionsCollection(userId, walletId).doc();
-    const batch = admin.firestore().batch();
+    const batch = getFirestore().batch();
     batch.delete(itemRef);
     batch.set(positionRef, positionData);
     await batch.commit();

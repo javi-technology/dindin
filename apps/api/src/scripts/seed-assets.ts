@@ -23,7 +23,8 @@
  * (ex: `firebase login` + Application Default Credentials, ou uma
  * service account key via GOOGLE_APPLICATION_CREDENTIALS).
  */
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Asset, AssetType } from 'dindin-models';
 
 interface SeedAsset {
@@ -51,11 +52,11 @@ const SEED_ASSETS: SeedAsset[] = [
 ];
 
 async function seedAssets(): Promise<void> {
-  admin.initializeApp();
-  const assetsCollection = admin.firestore().collection('assets');
+  initializeApp();
+  const assetsCollection = getFirestore().collection('assets');
   const now = new Date().toISOString();
 
-  const batch = admin.firestore().batch();
+  const batch = getFirestore().batch();
   for (const seed of SEED_ASSETS) {
     const asset: Asset = {
       ...seed,

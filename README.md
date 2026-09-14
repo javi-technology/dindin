@@ -6,8 +6,9 @@ Sistema de controle de carteira de Fundos Imobiliários (FIIs) com estratégia d
 
 ## Stack
 
-- **Frontend**: Angular + Tailwind CSS
-- **Backend**: Firebase Cloud Functions + Express.js + Node.js
+- **Frontend**: Angular 20 + Tailwind CSS 3 (builder `@angular/build`)
+- **Backend**: Firebase Cloud Functions + Express.js + Node.js 22
+- **Requisitos locais**: Node.js 22 (Angular 20 exige Node >= 20.19)
 - **Banco de dados**: Firestore
 - **Hospedagem**: Firebase Hosting
 - **Autenticação**: Firebase Authentication

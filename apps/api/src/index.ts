@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
 import express, { Request, Response, NextFunction } from 'express';
 import {
   authMiddleware,
@@ -8,7 +8,10 @@ import {
   AuthRequest,
 } from './middleware/auth.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
-import { adminRateLimiter } from './middleware/rate-limit.middleware';
+import {
+  adminRateLimiter,
+  apiRateLimiter,
+} from './middleware/rate-limit.middleware';
 import {
   effectiveStatus,
   getSubscription,
@@ -98,9 +101,13 @@ import {
   syncBbWallet,
 } from './recommended-wallet/recommended-wallet.service';
 
-admin.initializeApp();
+initializeApp();
 
 const app = express();
+
+// A Function recebe as requisições via Firebase Hosting/Cloud Run; sem isso o
+// req.ip seria o do proxy e o rate limit trataria todos como um único cliente.
+app.set('trust proxy', true);
 
 // Webhook da Stripe precisa do body cru (Buffer) para validar a assinatura
 // e não passa pelo authMiddleware — registrar antes do express.json.
@@ -132,7 +139,7 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', project: 'dindin' });
 });
 
-app.use('/api/*', authMiddleware);
+app.use('/api/*', apiRateLimiter, authMiddleware);
 
 app.get('/api/me', async (req: AuthRequest, res: Response) => {
   const user = req.user!;

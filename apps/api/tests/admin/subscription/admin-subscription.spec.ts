@@ -28,14 +28,21 @@ function snapshotOf(uid: string) {
   return { exists: data !== undefined, data: () => data };
 }
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
     listUsers: listUsersMock,
     getUser: getUserMock,
   })),
-  firestore: jest.fn(() => ({
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({
     collection: jest.fn(() => ({
       doc: jest.fn((uid: string) => ({
         collection: jest.fn(() => ({
@@ -48,7 +55,10 @@ jest.mock('firebase-admin', () => ({
     ),
     runTransaction: runTransactionMock,
   })),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 import { app } from '../../../src/index';

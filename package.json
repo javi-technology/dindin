@@ -23,9 +23,21 @@
     ]
   },
   "devDependencies": {
-    "firebase-tools": "^15.0.0",
+    "firebase-tools": "^15.30.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.5"
+  },
+  "overrides": {
+    "gaxios@6": {
+      "uuid": "^11.1.1"
+    },
+    "postcss@<8.5.23": "^8.5.28",
+    "vite@6": "^6.4.3",
+    "esbuild@0.28": "^0.28.2",
+    "@babel/core@<7.29.6": "^7.29.7",
+    "@angular/fire": {
+      "firebase-tools": "$firebase-tools"
+    }
   }
 }

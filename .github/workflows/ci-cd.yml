@@ -81,6 +81,25 @@ jobs:
           echo "Última tag: ${LAST_TAG:-nenhuma} | incremento: $BUMP | versão: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+  # Falha o pipeline se houver vulnerabilidade high/critical em dependências
+  # de runtime. Usa só o package-lock.json, sem instalar dependências.
+  audit:
+    name: Auditar dependências
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm audit (runtime, high+)
+        run: npm audit --audit-level=high --omit=dev
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -168,6 +187,7 @@ jobs:
     name: Deploy to Firebase
     needs:
       - version
+      - audit
       - build-and-test-api
       - build-and-test-web
     # Executa apenas em push direto na main, após CI passar.

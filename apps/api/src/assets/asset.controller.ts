@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Asset, AssetType } from 'dindin-models';
 
 const VALID_ASSET_TYPES: AssetType[] = ['FII', 'STOCK', 'ETF', 'REIT', 'OTHER'];
 
 function assetsCollection() {
-  return admin.firestore().collection('assets');
+  return getFirestore().collection('assets');
 }
 
 /**

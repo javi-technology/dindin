@@ -5,10 +5,17 @@ const serviceMock = {
   recordMonthlyDividends: jest.fn(),
 };
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  auth: jest.fn(() => ({ verifyIdToken: verifyIdTokenMock })),
-  firestore: jest.fn(() => ({})),
+}));
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({ verifyIdToken: verifyIdTokenMock })),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => ({})),
 }));
 
 jest.mock('../../src/dividend/dividend-record.service', () => serviceMock);

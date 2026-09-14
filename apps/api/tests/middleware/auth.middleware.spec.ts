@@ -7,8 +7,8 @@ import {
 } from '../../src/middleware/auth.middleware';
 
 const verifyIdTokenMock = jest.fn();
-jest.mock('firebase-admin', () => ({
-  auth: jest.fn(() => ({
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({
     verifyIdToken: verifyIdTokenMock,
   })),
 }));

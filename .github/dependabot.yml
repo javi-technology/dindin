@@ -1,0 +1,81 @@
+# Version updates semanais e agrupados. Os PRs são abertos contra a develop,
+# onde o CI (evento pull_request) valida cada bump antes do merge.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    # O lock do root resolve os workspaces apps/* e packages/*.
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      include: scope
+    # Cada dependência entra no primeiro grupo que casar.
+    groups:
+      angular:
+        patterns:
+          - '@angular/*'
+          - '@angular-devkit/*'
+          - '@schematics/angular'
+          - 'zone.js'
+      firebase:
+        patterns:
+          - 'firebase'
+          - 'firebase-admin'
+          - 'firebase-functions'
+          - 'firebase-tools'
+          - '@firebase/*'
+      dev-tooling:
+        patterns:
+          - 'jest'
+          - 'ts-jest'
+          - '@types/jest'
+          - 'karma*'
+          - 'jasmine-core'
+          - '@types/jasmine'
+          - 'prettier'
+          - 'husky'
+          - 'lint-staged'
+          - 'typescript'
+      minor-and-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+    # Majors do Angular exigem `ng update` com migrações e dependem do
+    # @angular/fire acompanhar; são tratados em issue própria.
+    ignore:
+      - dependency-name: '@angular/*'
+        update-types:
+          - version-update:semver-major
+      - dependency-name: '@angular-devkit/*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    # Cobre os workflows em .github/workflows.
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - 'actions/*'
+          - 'google-github-actions/*'
