@@ -26,18 +26,21 @@ O projeto utiliza uma estrutura de monorepo para compartilhar código entre o fr
 Siga os passos abaixo para configurar o ambiente de desenvolvimento local:
 
 1. **Clonar o repositório**
+
    ```bash
    git clone <url-do-repositório>
    cd dindin
    ```
 
 2. **Instalar dependências**
+
    ```bash
    npm install
    ```
 
 3. **Configurar Variáveis de Ambiente (Secrets)**
    As segredos devem ser configurados no ambiente do Firebase:
+
    ```bash
    firebase functions:secrets:set OPENROUTER_API_KEY
    firebase functions:secrets:set STRIPE_SECRET_KEY
@@ -46,6 +49,7 @@ Siga os passos abaixo para configurar o ambiente de desenvolvimento local:
 
 4. **Configurar o Ambiente Local**
    Crie um arquivo `.env` em `apps/api/` (ou use o arquivo de ambiente de projeto) para configurar chaves de teste da Stripe e URLs base:
+
    ```env
    STRIPE_PRICE_BASIC_MONTHLY=price_...
    STRIPE_PRICE_BASIC_YEARLY=price_...
@@ -56,7 +60,6 @@ Siga os passos abaixo para configurar o ambiente de desenvolvimento local:
    - Para rodar os emuladores (Firebase, Firestore, etc.): `npm run emulators`
    - Para rodar a API em modo de desenvolvimento: `npm run api:serve`
    - Para iniciar o frontend: `npm run dev` (ou o comando padrão do Angular)
-   
 
 ## Integração Contínua
 
@@ -113,25 +116,28 @@ do usuário e, para administradores, confirmar ou importar um PDF.
 Os recursos avançados de IA (sugestão mensal da carteira recomendada, chat com a IA e futuras funcionalidades) são liberados mediante assinatura do plano **basic**.
 
 ### Modelo de Negócio
+
 A assinatura é gerenciada via **Stripe** e os dados são armazenados em `users/{uid}/billing/subscription` (tipo `UserSubscription`).
 
-| Campo | Descrição |
-| --- | --- |
-| `status` | `none`, `trialing`, `active`, `past_due` ou `canceled` |
-| `plan` / `interval` | `basic` e `month`/`year` |
-| `provider` | `stripe`, `manual` ou `null` |
+| Campo               | Descrição                                              |
+| ------------------- | ------------------------------------------------------ |
+| `status`            | `none`, `trialing`, `active`, `past_due` ou `canceled` |
+| `plan` / `interval` | `basic` e `month`/`year`                               |
+| `provider`          | `stripe`, `manual` ou `null`                           |
 
 ### Regras de Acesso (Gate de Recursos)
+
 O direito ao recurso **`ai`** é concedido automaticamente se:
+
 1. O usuário possuir assinatura ativa ou em período de teste (`status` é `trialing` ou `active`).
 2. O usuário estiver em período de carência (`past_due` e `currentPeriodEnd` no futuro).
 3. O usuário for um administrador do sistema (bypass).
 
 O middleware `requireEntitlement('ai')` protege as rotas sensíveis, retornando `403 Forbidden` caso o usuário não cumpra os requisitos.
-| `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API)                     |
-| `providerEventCreated`                          | `event.created` do último webhook aplicado (ordenação)      |
-| `currentPeriodEnd`                              | Fim do período pago (ISO) — define a carência de `past_due` |
-| `cancelAtPeriodEnd`                             | Cancelamento agendado para o fim do período                 |
+| `providerCustomerId` / `providerSubscriptionId` | Ids no provedor (nunca expostos na API) |
+| `providerEventCreated` | `event.created` do último webhook aplicado (ordenação) |
+| `currentPeriodEnd` | Fim do período pago (ISO) — define a carência de `past_due` |
+| `cancelAtPeriodEnd` | Cancelamento agendado para o fim do período |
 
 ### Gate de recursos
 
@@ -166,6 +172,7 @@ O provedor de pagamento é a Stripe (Checkout + Customer Portal + webhooks).
    (ou via Hosting: `https://dindin-4e720.web.app/api/billing/webhook`) com os
    eventos:
    - `checkout.session.completed`
+   - `checkout.session.expired`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
@@ -210,11 +217,27 @@ function `api`.
 
 #### Endpoints
 
-| Método | Rota                            | Descrição                                                                                                                                |
-| ------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/api/billing/checkout-session` | Cria sessão de Checkout (`{ interval: 'month'\|'year' }`, trial de 7 dias). `409 ALREADY_SUBSCRIBED` se já ativa/trialing                |
-| `POST` | `/api/billing/portal-session`   | Cria sessão do Customer Portal. `404 NO_CUSTOMER` sem customer                                                                           |
-| `POST` | `/api/billing/webhook`          | Webhook da Stripe (fora do `authMiddleware`, assinatura validada). `400` assinatura inválida; idempotência via `billingEvents/{eventId}` |
+| Método | Rota                            | Descrição                                                                                                                                                                                                                                                                                  |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST` | `/api/billing/checkout-session` | Cria sessão de Checkout (`{ interval: 'month'\|'year' }`, trial de 7 dias). Reutiliza a sessão pendente do mesmo intervalo (mesma `url`). `409 ALREADY_SUBSCRIBED` se já ativa/trialing/past_due; `409 CHECKOUT_IN_PROGRESS` se a sessão pendente de outro intervalo não pôde ser expirada |
+| `POST` | `/api/billing/portal-session`   | Cria sessão do Customer Portal. `404 NO_CUSTOMER` sem customer; `429 RATE_LIMITED` (com `Retry-After`) acima de 5 sessões por minuto por usuário                                                                                                                                           |
+| `POST` | `/api/billing/webhook`          | Webhook da Stripe (fora do `authMiddleware`, assinatura validada). `400` assinatura inválida; idempotência via `billingEvents/{eventId}`                                                                                                                                                   |
+
+#### Reserva de checkout por usuário
+
+Para evitar assinaturas duplicadas e criação ilimitada de objetos na Stripe, o
+backend mantém no doc `users/{uid}/billing/subscription` campos internos (nunca
+expostos em `GET /api/me`):
+
+- `pendingCheckout: { sessionId, url, expiresAt, interval }` — gravado numa
+  transação ao criar a Checkout Session. Enquanto não expirar (`expires_at` da
+  sessão, 24h), novas chamadas do mesmo intervalo devolvem a mesma `url`; ao
+  trocar de intervalo a sessão anterior é expirada na Stripe antes de criar a
+  nova. A criação usa `idempotencyKey` estável para retries do mesmo intento.
+  É removido pelos eventos `checkout.session.completed` e
+  `checkout.session.expired` (somente se ainda for a mesma sessão).
+- `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
+  `portal-session`.
 
 ## Próximos passos
 
