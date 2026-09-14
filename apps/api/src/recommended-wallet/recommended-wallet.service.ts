@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   RecommendedWallet,
   RecommendedWalletAsset,
@@ -12,7 +12,7 @@ import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
 
 function recommendedWalletsCollection() {
-  return admin.firestore().collection('recommendedWallets');
+  return getFirestore().collection('recommendedWallets');
 }
 
 export function recommendedWalletId(month: string): string {
@@ -83,7 +83,7 @@ export async function persistRecommendedWallet(
   wallet: RecommendedWallet,
 ): Promise<RecommendedWallet> {
   const docRef = recommendedWalletsCollection().doc(wallet.id);
-  return admin.firestore().runTransaction(async (transaction) => {
+  return getFirestore().runTransaction(async (transaction) => {
     const existingDoc = await transaction.get(docRef);
     const existing = existingDoc.exists
       ? (existingDoc.data() as RecommendedWallet)
@@ -161,8 +161,7 @@ export async function confirmRecommendedWallet(
 }
 
 function positionsCollection(userId: string, walletId: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')
@@ -184,7 +183,7 @@ export function quotePriceByTicker(snapshot: {
 }
 
 export async function getQuotePrices(): Promise<Map<string, number>> {
-  const snapshot = await admin.firestore().collection('quotes').get();
+  const snapshot = await getFirestore().collection('quotes').get();
   return quotePriceByTicker(snapshot);
 }
 
@@ -205,7 +204,7 @@ export async function compareWithWallet(
 
   const [positionsSnapshot, quotesSnapshot] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    admin.firestore().collection('quotes').get(),
+    getFirestore().collection('quotes').get(),
   ]);
   const quotesByTicker = quotePriceByTicker(quotesSnapshot);
   const positionsByTicker = new Map<

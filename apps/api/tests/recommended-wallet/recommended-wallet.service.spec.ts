@@ -3,10 +3,17 @@ const assetExistsMock = jest.fn();
 const parseBbFiiPdfMock = jest.fn();
 const parseBbFileNameMock = jest.fn();
 
-jest.mock('firebase-admin', () => ({
+jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  firestore: jest.fn(() => firestoreMock),
-  storage: jest.fn(),
+}));
+
+jest.mock('firebase-admin/firestore', () => ({
+  ...jest.requireActual('firebase-admin/firestore'),
+  getFirestore: jest.fn(() => firestoreMock),
+}));
+
+jest.mock('firebase-admin/storage', () => ({
+  getStorage: jest.fn(),
 }));
 
 jest.mock('../../src/assets/asset.service', () => ({

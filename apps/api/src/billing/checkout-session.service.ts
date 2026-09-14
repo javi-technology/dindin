@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { SubscriptionInterval, UserSubscription } from 'dindin-shared-types';
 import { getStripe, getPriceId, getAppBaseUrl } from './stripe.client';
 import {
@@ -56,7 +56,7 @@ export async function reserveCheckoutSession(
   // Gerada fora da transação: estável nas reexecuções do Firestore e única por
   // requisição, para a Stripe nunca devolver uma sessão antiga já encerrada.
   const idempotencyKey = `checkout:${uid}:${interval}:${randomUUID()}`;
-  return admin.firestore().runTransaction(async (tx) => {
+  return getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const doc = {
       ...NO_SUBSCRIPTION,
@@ -153,7 +153,7 @@ export async function clearPendingCheckout(
   sessionId: string,
 ): Promise<void> {
   const ref = subscriptionDoc(uid);
-  await admin.firestore().runTransaction(async (tx) => {
+  await getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const current = snapshot.data() as BillingDoc | undefined;
     if (current?.pendingCheckout?.sessionId !== sessionId) return;
@@ -167,7 +167,7 @@ export async function clearPendingCheckout(
  */
 export async function consumePortalQuota(uid: string): Promise<number | null> {
   const ref = subscriptionDoc(uid);
-  return admin.firestore().runTransaction(async (tx) => {
+  return getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const current = (snapshot.data() as BillingDoc | undefined)
       ?.portalRateLimit;

@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   Entitlement,
   PublicSubscription,
@@ -18,8 +18,7 @@ export const NO_SUBSCRIPTION: UserSubscription = {
 };
 
 export function subscriptionDoc(uid: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(uid)
     .collection('billing')

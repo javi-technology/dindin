@@ -1,14 +1,10 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { FridgeItem, PatrimonySnapshot, Position, Quote } from 'dindin-models';
 
 const BATCH_SIZE = 10;
 
 function userCollection(userId: string, collection: string) {
-  return admin
-    .firestore()
-    .collection('users')
-    .doc(userId)
-    .collection(collection);
+  return getFirestore().collection('users').doc(userId).collection(collection);
 }
 
 export function todayDateInBrazil(now = new Date()): string {
@@ -71,7 +67,7 @@ export async function computeUserPatrimony(
   userId: string,
 ): Promise<{ totalWallet: number; totalFridge: number; total: number }> {
   const [quotesSnapshot, positions, fridgeItems] = await Promise.all([
-    admin.firestore().collection('quotes').get(),
+    getFirestore().collection('quotes').get(),
     getAllUserPositions(userId),
     fetchFridgeItems(userId),
   ]);
@@ -151,8 +147,7 @@ export async function listPatrimonySnapshots(
 }
 
 export async function saveAllPatrimonySnapshots(): Promise<void> {
-  const userDocuments = await admin
-    .firestore()
+  const userDocuments = await getFirestore()
     .collection('users')
     .listDocuments();
   let succeeded = 0;

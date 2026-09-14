@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { Position, AssetType, FridgeItem } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
@@ -19,8 +19,7 @@ function uid(req: Request): string {
 }
 
 function positionsCollection(userId: string, walletId: string) {
-  return admin
-    .firestore()
+  return getFirestore()
     .collection('users')
     .doc(userId)
     .collection('wallets')
@@ -376,8 +375,7 @@ export async function moveToFridge(req: Request, res: Response): Promise<void> {
     const positionData = positionDoc.data() as Position;
 
     // Verifica se a geladeira existe
-    const fridgeRef = admin
-      .firestore()
+    const fridgeRef = getFirestore()
       .collection('users')
       .doc(userId)
       .collection('fridges')
@@ -407,7 +405,7 @@ export async function moveToFridge(req: Request, res: Response): Promise<void> {
     // a partir da collection `quotes` no momento da leitura (issue #86).
 
     // Operação atômica: remove posição e cria item na geladeira
-    const batch = admin.firestore().batch();
+    const batch = getFirestore().batch();
     batch.delete(positionRef);
     batch.set(fridgeItemRef, fridgeItemData);
     await batch.commit();
