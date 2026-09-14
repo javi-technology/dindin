@@ -1,4 +1,4 @@
-import { UserSubscription } from 'dindin-shared-types';
+import { StripeSubscriptionState, UserSubscription } from 'dindin-shared-types';
 
 const getMock = jest.fn();
 jest.mock('firebase-admin', () => ({
@@ -20,6 +20,7 @@ import {
   isEntitled,
   listEntitlements,
   NO_SUBSCRIPTION,
+  resolveSubscription,
   toPublicSubscription,
 } from '../../src/billing/entitlement.service';
 
@@ -142,6 +143,87 @@ describe('entitlement.service – effectiveStatus', () => {
   });
 });
 
+describe('entitlement.service – resolveSubscription', () => {
+  const stripe = (partial: Partial<StripeSubscriptionState> = {}) => ({
+    status: 'active' as const,
+    interval: 'year' as const,
+    providerSubscriptionId: 'sub_1',
+    currentPeriodEnd: FUTURE,
+    cancelAtPeriodEnd: false,
+    updatedAt: '2026-09-05T00:00:00.000Z',
+    ...partial,
+  });
+  const manual = (partial: Partial<UserSubscription>) =>
+    sub({
+      status: 'active',
+      interval: null,
+      provider: 'manual',
+      providerCustomerId: 'cus_1',
+      currentPeriodEnd: PAST,
+      ...partial,
+    });
+
+  it.each([
+    ['expirada', { currentPeriodEnd: PAST }],
+    ['revogada', { status: 'canceled' as const, currentPeriodEnd: FUTURE }],
+  ])(
+    'deve usar o estado da Stripe guardado quando a concessão manual está %s',
+    (_label, partial) => {
+      const resolved = resolveSubscription(
+        manual({ ...partial, stripe: stripe() }),
+        NOW,
+      );
+
+      expect(resolved).toEqual(
+        expect.objectContaining({
+          status: 'active',
+          plan: 'basic',
+          interval: 'year',
+          provider: 'stripe',
+          providerCustomerId: 'cus_1',
+          providerSubscriptionId: 'sub_1',
+          currentPeriodEnd: FUTURE,
+          cancelAtPeriodEnd: false,
+        }),
+      );
+      expect(isEntitled(resolved, 'ai', false, NOW)).toBe(true);
+      expect(effectiveStatus(resolved, NOW)).toBe('active');
+    },
+  );
+
+  it('deve manter a concessão manual vigente mesmo com Stripe ativa', () => {
+    const doc = manual({ currentPeriodEnd: FUTURE, stripe: stripe() });
+
+    expect(resolveSubscription(doc, NOW)).toEqual(doc);
+  });
+
+  it('deve usar past_due guardado para bloquear novo checkout', () => {
+    const resolved = resolveSubscription(
+      manual({
+        stripe: stripe({ status: 'past_due', currentPeriodEnd: PAST }),
+      }),
+      NOW,
+    );
+
+    expect(effectiveStatus(resolved, NOW)).toBe('past_due');
+    expect(isEntitled(resolved, 'ai', false, NOW)).toBe(false);
+  });
+
+  it('deve manter a concessão expirada quando a Stripe guardada foi cancelada', () => {
+    const doc = manual({ stripe: stripe({ status: 'canceled' }) });
+
+    expect(resolveSubscription(doc, NOW)).toEqual(doc);
+    expect(effectiveStatus(doc, NOW)).toBe('canceled');
+    expect(isEntitled(doc, 'ai', false, NOW)).toBe(false);
+  });
+
+  it('deve manter docs sem estado da Stripe guardado', () => {
+    const doc = manual({});
+
+    expect(resolveSubscription(doc, NOW)).toEqual(doc);
+  });
+});
+
 describe('entitlement.service – getSubscription / hasEntitlement', () => {
   beforeEach(() => getMock.mockReset());
 
@@ -161,6 +243,31 @@ describe('entitlement.service – getSubscription / hasEntitlement', () => {
     const subscription = await getSubscription('user-1');
     expect(subscription.status).toBe('active');
     expect(subscription.providerCustomerId).toBe('cus_1');
+    await expect(hasEntitlement('user-1', 'ai')).resolves.toBe(true);
+  });
+
+  it('deve resolver a Stripe guardada sob concessão manual expirada', async () => {
+    getMock.mockResolvedValue({
+      exists: true,
+      data: () =>
+        sub({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: '2000-01-01T00:00:00.000Z',
+          stripe: {
+            status: 'active',
+            interval: 'month',
+            providerSubscriptionId: 'sub_1',
+            currentPeriodEnd: '2999-01-01T00:00:00.000Z',
+            cancelAtPeriodEnd: false,
+            updatedAt: '2026-09-05T00:00:00.000Z',
+          },
+        }),
+    });
+
+    await expect(getSubscription('user-1')).resolves.toEqual(
+      expect.objectContaining({ provider: 'stripe', status: 'active' }),
+    );
     await expect(hasEntitlement('user-1', 'ai')).resolves.toBe(true);
   });
 

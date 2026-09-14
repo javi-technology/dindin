@@ -79,6 +79,15 @@ function makeEvent(
   } as unknown as Stripe.Event;
 }
 
+const STRIPE_STATE = {
+  status: 'active',
+  interval: 'month',
+  providerSubscriptionId: 'sub_1',
+  currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+  cancelAtPeriodEnd: false,
+  updatedAt: expect.any(String),
+};
+
 describe('processStripeEvent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -119,6 +128,7 @@ describe('processStripeEvent', () => {
         providerSubscriptionId: 'sub_1',
         currentPeriodEnd: '2030-01-01T00:00:00.000Z',
         providerEventCreated: 2000,
+        stripe: STRIPE_STATE,
       }),
       { merge: true },
     );
@@ -276,11 +286,25 @@ describe('processStripeEvent', () => {
             providerCustomerId: 'cus_1',
             providerSubscriptionId: 'sub_1',
             providerEventCreated: 3000,
+            stripe: STRIPE_STATE,
           },
           { merge: true },
         );
       },
     );
+
+    it('guarda cancelamento da Stripe sem encerrar a concessão manual', async () => {
+      txGetMock.mockResolvedValue(manual('active', FUTURE));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.deleted', makeSubscription(), 3000),
+      );
+
+      const [, data] = txSetMock.mock.calls[0];
+      expect(data).not.toHaveProperty('status');
+      expect(data).not.toHaveProperty('provider');
+      expect(data.stripe).toEqual({ ...STRIPE_STATE, status: 'canceled' });
+    });
 
     it('ignora evento antigo mesmo com concessão manual ativa', async () => {
       txGetMock.mockResolvedValue({
@@ -309,7 +333,7 @@ describe('processStripeEvent', () => {
 
       expect(txSetMock).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ provider: 'stripe' }),
+        expect.objectContaining({ provider: 'stripe', stripe: STRIPE_STATE }),
         { merge: true },
       );
     });

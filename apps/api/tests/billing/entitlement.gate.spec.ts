@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { UserSubscription } from 'dindin-shared-types';
+import { StripeSubscriptionState, UserSubscription } from 'dindin-shared-types';
 
 const verifyIdTokenMock = jest.fn();
 const subscriptionGetMock = jest.fn();
@@ -47,6 +47,28 @@ function subscriptionDoc(partial: Partial<UserSubscription>) {
       ...partial,
     }),
   };
+}
+
+function manualWithStripe(
+  manual: Partial<UserSubscription>,
+  stripe: Partial<StripeSubscriptionState>,
+) {
+  return subscriptionDoc({
+    status: 'active',
+    provider: 'manual',
+    interval: null,
+    currentPeriodEnd: PAST,
+    ...manual,
+    stripe: {
+      status: 'active',
+      interval: 'year',
+      providerSubscriptionId: 'sub_1',
+      currentPeriodEnd: FUTURE,
+      cancelAtPeriodEnd: false,
+      updatedAt: '2026-09-05T00:00:00.000Z',
+      ...stripe,
+    },
+  });
 }
 
 const FORBIDDEN = { error: 'Forbidden', code: 'SUBSCRIPTION_REQUIRED' };
@@ -102,6 +124,30 @@ describe('gate de assinatura nos endpoints de sugestão IA', () => {
       expect(generateSuggestionMock).toHaveBeenCalled();
     },
   );
+
+  it.each([
+    ['expira', {}],
+    ['é revogada', { status: 'canceled' as const, currentPeriodEnd: FUTURE }],
+  ])(
+    'deve manter o acesso pela Stripe paga quando a concessão manual %s',
+    async (_label, manual) => {
+      subscriptionGetMock.mockResolvedValue(manualWithStripe(manual, {}));
+
+      const get = await getSuggestionRequest();
+      expect(get.status).toBe(200);
+      expect(getSavedSuggestionMock).toHaveBeenCalled();
+    },
+  );
+
+  it('deve negar quando a Stripe foi cancelada durante a concessão expirada', async () => {
+    subscriptionGetMock.mockResolvedValue(
+      manualWithStripe({}, { status: 'canceled' }),
+    );
+
+    const get = await getSuggestionRequest();
+    expect(get.status).toBe(403);
+    expect(get.body).toEqual(FORBIDDEN);
+  });
 
   it('deve liberar past_due dentro da carência', async () => {
     subscriptionGetMock.mockResolvedValue(
@@ -226,6 +272,25 @@ describe('GET /api/me', () => {
     expect(response.status).toBe(200);
     expect(response.body.subscription.status).toBe('canceled');
     expect(response.body.entitlements).toEqual([]);
+  });
+
+  it('deve devolver a Stripe guardada quando a concessão manual expirou', async () => {
+    subscriptionGetMock.mockResolvedValue(manualWithStripe({}, {}));
+
+    const response = await request(app)
+      .get('/api/me')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.subscription).toEqual({
+      status: 'active',
+      plan: 'basic',
+      interval: 'year',
+      currentPeriodEnd: FUTURE,
+      cancelAtPeriodEnd: false,
+    });
+    expect(response.body.entitlements).toEqual(['ai']);
+    expect(JSON.stringify(response.body)).not.toContain('sub_1');
   });
 
   it('deve devolver entitlement ai para admin sem assinatura', async () => {
