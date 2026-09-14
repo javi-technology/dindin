@@ -10,13 +10,17 @@ jest.mock('yahoo-finance2', () => ({
 describe('DividendFetchService — fetchMonthlyDividends', () => {
   const originalFetch = globalThis.fetch;
   const chartMock = jest.fn();
+  const quoteSummaryMock = jest.fn();
   const YahooFinanceMock = YahooFinance as unknown as jest.Mock;
 
   beforeEach(() => {
     process.env.BRAPI_API_KEY = 'test-api-key';
     chartMock.mockReset();
+    quoteSummaryMock.mockReset();
+    quoteSummaryMock.mockResolvedValue({});
     YahooFinanceMock.mockImplementation(() => ({
       chart: chartMock,
+      quoteSummary: quoteSummaryMock,
     }));
   });
 
@@ -71,7 +75,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       const assets: ActiveAsset[] = [{ ticker: 'HGLG11', assetType: 'FII' }];
       const result = await fetchMonthlyDividends(assets);
 
-      expect(result.get('HGLG11')).toBe(0.92);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.92);
       expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining(
           'brapi.dev/api/v2/fii/dividends?symbols=HGLG11',
@@ -102,7 +106,54 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'HGLG11', assetType: 'FII' },
       ]);
 
-      expect(result.get('HGLG11')).toBe(0.88);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.88);
+    });
+
+    it('deve retornar a data de pagamento do rendimento escolhido (YYYY-MM-DD)', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.9,
+            paymentDate: '2026-06-12T00:00:00.000Z',
+          },
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.92,
+            paymentDate: '2026-07-14T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+      ]);
+
+      expect(result.get('HGLG11')).toEqual({
+        monthlyDividend: 0.92,
+        paymentDate: '2026-07-14',
+      });
+    });
+
+    it('não deve gerar data de pagamento quando a Brapi retornar paymentDate nulo', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.92,
+            paymentDate: null,
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+      ]);
+
+      expect(result.get('HGLG11')).toEqual({ monthlyDividend: 0.92 });
     });
 
     it('deve retornar undefined quando FII não tem histórico de dividendos', async () => {
@@ -146,7 +197,65 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
-      expect(result.get('PETR4')).toBe(1.25);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+    });
+
+    it('deve retornar a data de pagamento do dividendo mais recente da ação', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'PETR4',
+            data: {
+              cashDividends: [
+                {
+                  rate: 1.1,
+                  paymentDate: '2026-06-15T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+                {
+                  rate: 1.25,
+                  paymentDate: '2026-10-15T03:00:00.000Z',
+                  label: 'JCP',
+                },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({
+        monthlyDividend: 1.25,
+        paymentDate: '2026-10-15',
+      });
+    });
+
+    it('não deve gerar data de pagamento quando a Brapi retornar paymentDate vazio', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'PETR4',
+            data: {
+              cashDividends: [
+                { rate: 1.25, paymentDate: '', label: 'DIVIDENDO' },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
     });
 
     it('deve retornar undefined quando ação não tem dividendos em dinheiro', async () => {
@@ -220,8 +329,8 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
-      expect(result.get('HGLG11')).toBe(0.9);
-      expect(result.get('PETR4')).toBe(1.25);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.9);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
       const urls = fetchMock.mock.calls.map((call) => call[0] as string);
       expect(urls.some((u) => u.includes('/api/v2/fii/dividends'))).toBe(true);
       expect(urls.some((u) => u.includes('/api/v2/stocks/dividends'))).toBe(
@@ -276,7 +385,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
-      expect(result.get('PETR4')).toBe(1.25);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
       expect(chartMock).toHaveBeenCalledWith(
         'PETR4.SA',
         expect.objectContaining({
@@ -305,7 +414,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'HGLG11', assetType: 'FII' },
       ]);
 
-      expect(result.get('HGLG11')).toBe(0.92);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.92);
     });
 
     it('deve complementar resultados parciais da Brapi com dados do Yahoo Finance', async () => {
@@ -349,8 +458,108 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
-      expect(result.get('HGLG11')).toBe(0.9);
-      expect(result.get('PETR4')).toBe(1.25);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.9);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+    });
+
+    it('deve usar a data de pagamento do calendarEvents do Yahoo Finance', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      chartMock.mockResolvedValue(
+        buildChartResponse([
+          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
+        ]),
+      );
+      quoteSummaryMock.mockResolvedValue({
+        calendarEvents: {
+          exDividendDate: new Date('2026-07-01T00:00:00.000Z'),
+          dividendDate: new Date('2026-07-15T00:00:00.000Z'),
+        },
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({
+        monthlyDividend: 1.25,
+        paymentDate: '2026-07-15',
+      });
+      expect(quoteSummaryMock).toHaveBeenCalledWith('PETR4.SA', {
+        modules: ['calendarEvents'],
+      });
+    });
+
+    it('não deve usar a data ex (data com) do Yahoo Finance como data de pagamento', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      chartMock.mockResolvedValue(
+        buildChartResponse([
+          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
+        ]),
+      );
+      quoteSummaryMock.mockResolvedValue({ calendarEvents: {} });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
+    });
+
+    it('deve ignorar dividendDate do Yahoo anterior à data ex do último provento', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      chartMock.mockResolvedValue(
+        buildChartResponse([
+          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
+        ]),
+      );
+      quoteSummaryMock.mockResolvedValue({
+        calendarEvents: {
+          dividendDate: new Date('2026-03-15T00:00:00.000Z'),
+        },
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
+    });
+
+    it('deve ignorar dividendDate do Yahoo quando a data ex do calendarEvents for de outro provento', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      chartMock.mockResolvedValue(
+        buildChartResponse([
+          { date: new Date('2026-07-01T13:00:00.000Z'), amount: 1.25 },
+        ]),
+      );
+      quoteSummaryMock.mockResolvedValue({
+        calendarEvents: {
+          exDividendDate: new Date('2026-09-20T00:00:00.000Z'),
+          dividendDate: new Date('2026-10-15T00:00:00.000Z'),
+        },
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
+    });
+
+    it('deve manter o valor quando a consulta de calendarEvents do Yahoo falhar', async () => {
+      mockFetch({ error: 'Unauthorized' }, 401);
+      chartMock.mockResolvedValue(
+        buildChartResponse([
+          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
+        ]),
+      );
+      quoteSummaryMock.mockRejectedValue(new Error('Timeout'));
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
     });
 
     it('deve ignorar ticker quando Yahoo Finance retornar eventos vazios', async () => {
@@ -393,6 +602,62 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       ]);
 
       expect(result.has('PETR4')).toBe(false);
+    });
+  });
+
+  describe('tickers sem data de pagamento', () => {
+    it('deve logar os tickers com provento mas sem data de pagamento em nenhuma fonte', async () => {
+      const consoleWarnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.92,
+            paymentDate: '2026-07-14T00:00:00.000Z',
+          },
+          {
+            symbol: 'XPLG11',
+            label: 'RENDIMENTO',
+            rate: 0.7,
+            paymentDate: null,
+          },
+        ],
+      });
+
+      await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'XPLG11', assetType: 'FII' },
+      ]);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[fetchMonthlyDividends] Tickers com provento sem data de pagamento em nenhuma fonte:',
+        { tickers: ['XPLG11'] },
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('não deve logar quando todos os proventos têm data de pagamento', async () => {
+      const consoleWarnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.92,
+            paymentDate: '2026-07-14T00:00:00.000Z',
+          },
+        ],
+      });
+
+      await fetchMonthlyDividends([{ ticker: 'HGLG11', assetType: 'FII' }]);
+
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      consoleWarnSpy.mockRestore();
     });
   });
 

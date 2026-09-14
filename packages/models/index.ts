@@ -116,6 +116,7 @@ export interface Quote {
   ticker: string;
   price: number;
   monthlyDividend: number; // último provento/rendimento por cota/ação
+  dividendPaymentDate?: string; // YYYY-MM-DD — data de pagamento do provento
   updatedAt: string; // ISO-8601
   source: string; // ex: "brapi"
 }

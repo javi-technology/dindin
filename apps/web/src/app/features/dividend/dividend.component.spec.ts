@@ -47,6 +47,7 @@ describe('DividendComponent', () => {
             quantity: 150,
             monthlyDividend: 0.9,
             monthlyIncome: 135,
+            paymentDate: '2026-09-15',
           },
           {
             ticker: 'XPLG11',
@@ -119,6 +120,21 @@ describe('DividendComponent', () => {
     expect(rows.length).toBe(2);
     expect(rows[0].textContent).toContain('HGLG11');
     expect(rows[1].textContent).toContain('XPLG11');
+  });
+
+  it('deve exibir a data de pagamento de cada provento', async () => {
+    await setup();
+
+    const table = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="monthly-income-table"]',
+    );
+    expect(table?.querySelector('thead')?.textContent).toContain(
+      'Data de pagamento',
+    );
+    const dates = table?.querySelectorAll('[data-testid="payment-date"]');
+    expect(dates?.length).toBe(2);
+    expect(dates?.[0].textContent?.trim()).toBe('15/09/2026');
+    expect(dates?.[1].textContent?.trim()).toBe('—');
   });
 
   it('deve consolidar várias carteiras contando a geladeira uma única vez', async () => {

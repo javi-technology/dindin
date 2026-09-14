@@ -23,6 +23,7 @@ export async function saveQuoteHistory(
   price: number,
   monthlyDividend: number | undefined,
   source = 'brapi',
+  dividendPaymentDate?: string,
 ): Promise<void> {
   const now = new Date().toISOString();
   const date = todayDate();
@@ -31,16 +32,18 @@ export async function saveQuoteHistory(
   const quoteRef = quotesCollection().doc(ticker);
 
   let resolvedMonthlyDividend = monthlyDividend;
+  let resolvedPaymentDate = dividendPaymentDate;
   if (resolvedMonthlyDividend === undefined) {
-    const existing = await quoteRef.get();
-    resolvedMonthlyDividend =
-      (existing.data() as Quote | undefined)?.monthlyDividend ?? 0;
+    const existing = (await quoteRef.get()).data() as Quote | undefined;
+    resolvedMonthlyDividend = existing?.monthlyDividend ?? 0;
+    resolvedPaymentDate = existing?.dividendPaymentDate;
   }
 
   const quoteData: Quote = {
     ticker,
     price,
     monthlyDividend: resolvedMonthlyDividend,
+    ...(resolvedPaymentDate && { dividendPaymentDate: resolvedPaymentDate }),
     updatedAt: now,
     source,
   };

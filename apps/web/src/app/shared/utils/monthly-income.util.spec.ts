@@ -60,6 +60,38 @@ describe('aggregateMonthlyIncome', () => {
     expect(aggregated.total).toBe(30.5);
   });
 
+  it('deve preservar a data de pagamento ao consolidar o mesmo ticker', () => {
+    const aggregated = aggregateMonthlyIncome([
+      {
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            quantity: 10,
+            monthlyDividend: 1.1,
+            monthlyIncome: 11,
+          },
+        ],
+        total: 11,
+        totalFromFridge: 0,
+      },
+      {
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            quantity: 5,
+            monthlyDividend: 1.1,
+            monthlyIncome: 5.5,
+            paymentDate: '2026-09-15',
+          },
+        ],
+        total: 5.5,
+        totalFromFridge: 0,
+      },
+    ]);
+
+    expect(aggregated.byTicker[0].paymentDate).toBe('2026-09-15');
+  });
+
   it('deve contar a geladeira uma única vez', () => {
     const aggregated = aggregateMonthlyIncome([
       { byTicker: [], total: 130, totalFromFridge: 30 },

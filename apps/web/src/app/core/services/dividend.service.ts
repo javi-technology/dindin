@@ -24,6 +24,7 @@ export interface MonthlyIncomeItem {
   quantity: number;
   monthlyDividend: number;
   monthlyIncome: number;
+  paymentDate?: string; // YYYY-MM-DD
 }
 
 export interface MonthlyIncomeResponse {

@@ -246,6 +246,72 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
     expect(response.body.totalFromFridge).toBe(0);
   });
 
+  it('deve incluir a data de pagamento do provento em cada ticker', async () => {
+    const positions: Position[] = [
+      {
+        id: 'position-1',
+        walletId: 'wallet-1',
+        ticker: 'HGLG11',
+        assetType: 'FII',
+        quantity: 10,
+        averagePrice: 110,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'position-2',
+        walletId: 'wallet-1',
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: 100,
+        averagePrice: 10,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+    const quotes: Quote[] = [
+      {
+        ticker: 'HGLG11',
+        price: 112,
+        monthlyDividend: 0.9,
+        dividendPaymentDate: '2026-09-15',
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+      {
+        ticker: 'MXRF11',
+        price: 10.5,
+        monthlyDividend: 0.07,
+        updatedAt: '2026-08-25T00:00:00Z',
+        source: 'brapi',
+      },
+    ];
+    firestoreMock = createFirestoreMock(positions, quotes, []);
+
+    const response = await request(app)
+      .get('/api/wallets/wallet-1/monthly-income')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.byTicker).toEqual([
+      {
+        ticker: 'HGLG11',
+        quantity: 10,
+        monthlyDividend: 0.9,
+        monthlyIncome: 9,
+        paymentDate: '2026-09-15',
+      },
+      {
+        ticker: 'MXRF11',
+        quantity: 100,
+        monthlyDividend: 0.07,
+        monthlyIncome: 7,
+      },
+    ]);
+  });
+
   it('deve somar proventos da geladeira no total', async () => {
     const positions: Position[] = [
       {

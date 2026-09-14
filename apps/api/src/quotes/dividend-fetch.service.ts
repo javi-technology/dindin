@@ -2,9 +2,13 @@ import { AssetType } from 'dindin-models';
 import YahooFinance from 'yahoo-finance2';
 import { ActiveAsset } from '../assets/asset.service';
 
-export interface MonthlyDividendResult {
-  ticker: string;
+export interface DividendInfo {
   monthlyDividend: number;
+  paymentDate?: string; // YYYY-MM-DD
+}
+
+export interface MonthlyDividendResult extends DividendInfo {
+  ticker: string;
 }
 
 interface FiiDividendEvent {
@@ -73,6 +77,30 @@ function latestEventDate(a: string, b: string): number {
   return new Date(b).getTime() - new Date(a).getTime();
 }
 
+// As datas vêm de APIs externas: `null`, strings vazias ou valores inválidos
+// não podem virar uma data (ex.: `new Date(null)` é 1970-01-01).
+function toDateOnly(value: unknown): string | undefined {
+  let date: Date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    date = new Date(value);
+  } else {
+    return undefined;
+  }
+  return Number.isNaN(date.getTime())
+    ? undefined
+    : date.toISOString().slice(0, 10);
+}
+
+function dividendInfo(
+  monthlyDividend: number,
+  paymentDate: unknown,
+): DividendInfo {
+  const date = toDateOnly(paymentDate);
+  return date ? { monthlyDividend, paymentDate: date } : { monthlyDividend };
+}
+
 async function fetchFiiDividendBatch(
   tickers: string[],
 ): Promise<MonthlyDividendResult[]> {
@@ -117,7 +145,7 @@ async function fetchFiiDividendBatch(
 
   return [...byTicker.entries()].map(([ticker, event]) => ({
     ticker,
-    monthlyDividend: event.rate,
+    ...dividendInfo(event.rate, event.paymentDate),
   }));
 }
 
@@ -161,7 +189,7 @@ async function fetchStocksDividendBatch(
     }
     output.push({
       ticker: item.symbol.toUpperCase(),
-      monthlyDividend: latest.rate,
+      ...dividendInfo(latest.rate, latest.paymentDate),
     });
   }
 
@@ -180,16 +208,16 @@ async function fetchBatches(
   tickers: string[],
   batchSize: number,
   fetchBatch: (batch: string[]) => Promise<MonthlyDividendResult[]>,
-): Promise<Map<string, number>> {
-  const resultMap = new Map<string, number>();
+): Promise<Map<string, DividendInfo>> {
+  const resultMap = new Map<string, DividendInfo>();
   let lastError: Error | undefined;
 
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
     try {
       const batchResults = await fetchBatch(batch);
-      for (const { ticker, monthlyDividend } of batchResults) {
-        resultMap.set(ticker, monthlyDividend);
+      for (const { ticker, ...info } of batchResults) {
+        resultMap.set(ticker, info);
       }
     } catch (error) {
       lastError = toError(error);
@@ -233,6 +261,41 @@ function buildYahooTicker(ticker: string): string {
   return `${ticker}.SA`;
 }
 
+/**
+ * O `chart` do Yahoo só informa a data ex (data com) de cada provento. A data
+ * de pagamento vem de `calendarEvents.dividendDate`, que só é aceita quando a
+ * data ex do `calendarEvents` é a mesma do provento usado para o valor —
+ * senão ela se refere a outro evento (ex.: o próximo provento anunciado).
+ */
+async function fetchYahooPaymentDate(
+  yahooFinance: InstanceType<typeof YahooFinance>,
+  ticker: string,
+  exDividendDate: Date,
+): Promise<Date | undefined> {
+  try {
+    const summary = await yahooFinance.quoteSummary(buildYahooTicker(ticker), {
+      modules: ['calendarEvents'],
+    });
+    const calendar = summary.calendarEvents;
+    const calendarExDate = toDateOnly(calendar?.exDividendDate);
+    const sameEvent =
+      calendarExDate !== undefined &&
+      calendarExDate === toDateOnly(exDividendDate);
+    if (sameEvent && toDateOnly(calendar?.dividendDate)) {
+      return calendar?.dividendDate;
+    }
+  } catch (error) {
+    console.error(
+      '[fetchYahooFinanceDividends] Erro ao buscar data de pagamento no Yahoo Finance:',
+      {
+        ticker,
+        message: toError(error).message,
+      },
+    );
+  }
+  return undefined;
+}
+
 function yahooLookbackStartDate(): Date {
   const date = new Date();
   date.setDate(date.getDate() - YAHOO_LOOKBACK_DAYS);
@@ -270,10 +333,15 @@ async function fetchYahooFinanceDividends(
         (a, b) => b.date.getTime() - a.date.getTime(),
       );
       const latest = sorted[0];
+      const paymentDate = await fetchYahooPaymentDate(
+        yahooFinance,
+        ticker,
+        latest.date,
+      );
 
       output.push({
         ticker: ticker.toUpperCase(),
-        monthlyDividend: latest.amount,
+        ...dividendInfo(latest.amount, paymentDate),
       });
     } catch (error) {
       console.error(
@@ -291,7 +359,7 @@ async function fetchYahooFinanceDividends(
 
 export async function fetchMonthlyDividends(
   assets: ActiveAsset[],
-): Promise<Map<string, number>> {
+): Promise<Map<string, DividendInfo>> {
   const fiiTickers = assets
     .filter((a) => isFii(a.assetType))
     .map((a) => a.ticker);
@@ -305,7 +373,7 @@ export async function fetchMonthlyDividends(
         console.error('[fetchMonthlyDividends] Erro ao buscar FIIs:', {
           message: toError(error).message,
         });
-        return new Map<string, number>();
+        return new Map<string, DividendInfo>();
       },
     ),
     fetchBatches(
@@ -316,11 +384,11 @@ export async function fetchMonthlyDividends(
       console.error('[fetchMonthlyDividends] Erro ao buscar stocks:', {
         message: toError(error).message,
       });
-      return new Map<string, number>();
+      return new Map<string, DividendInfo>();
     }),
   ]);
 
-  const merged = new Map<string, number>();
+  const merged = new Map<string, DividendInfo>();
   for (const [ticker, value] of fiiMap) merged.set(ticker, value);
   for (const [ticker, value] of stocksMap) merged.set(ticker, value);
 
@@ -331,9 +399,19 @@ export async function fetchMonthlyDividends(
 
   if (missingTickers.length > 0) {
     const yahooResults = await fetchYahooFinanceDividends(missingTickers);
-    for (const { ticker, monthlyDividend } of yahooResults) {
-      merged.set(ticker, monthlyDividend);
+    for (const { ticker, ...info } of yahooResults) {
+      merged.set(ticker, info);
     }
+  }
+
+  const withoutPaymentDate = [...merged.entries()]
+    .filter(([, info]) => !info.paymentDate)
+    .map(([ticker]) => ticker);
+  if (withoutPaymentDate.length > 0) {
+    console.warn(
+      '[fetchMonthlyDividends] Tickers com provento sem data de pagamento em nenhuma fonte:',
+      { tickers: withoutPaymentDate },
+    );
   }
 
   return merged;
