@@ -40,7 +40,7 @@ describe('AdminUsersComponent', () => {
       status: 'active',
       plan: 'basic',
       provider: 'manual',
-      currentPeriodEnd: '2099-12-31T02:59:59.000Z',
+      currentPeriodEnd: '2099-12-31T12:00:00.000Z',
     },
     { entitlements: ['ai'] },
   );
