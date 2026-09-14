@@ -25,8 +25,8 @@
   "devDependencies": {
     "firebase-tools": "^15.30.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.8",
-    "prettier": "^3.9.5"
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.6"
   },
   "overrides": {
     "gaxios@6": {
