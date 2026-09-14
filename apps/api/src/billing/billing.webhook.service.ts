@@ -95,9 +95,6 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.mode !== 'subscription' || !session.subscription) return;
-      if (session.client_reference_id) {
-        await clearPendingCheckout(session.client_reference_id, session.id);
-      }
       const subId =
         typeof session.subscription === 'string'
           ? session.subscription
@@ -110,6 +107,8 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         return;
       }
       await upsert(uid, mapSubscription(sub, customerIdOf(sub)), event.created);
+      // Só depois de gravar: sem reserva nem assinatura, um novo checkout passaria
+      await clearPendingCheckout(uid, session.id);
       return;
     }
 

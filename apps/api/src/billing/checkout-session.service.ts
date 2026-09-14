@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { SubscriptionInterval, UserSubscription } from 'dindin-shared-types';
@@ -30,7 +31,6 @@ export type CheckoutReservation =
 
 /** Sessões prestes a expirar não são reutilizadas. */
 const REUSE_MARGIN_MS = 60 * 1000;
-const IDEMPOTENCY_BUCKET_SECONDS = 60 * 60;
 
 export const PORTAL_LIMIT_PER_WINDOW = 5;
 export const PORTAL_WINDOW_MS = 60 * 1000;
@@ -44,8 +44,8 @@ export function isInForce(subscription: UserSubscription): boolean {
 /**
  * Reserva uma única Checkout Session por `uid`: dentro da transação no doc de
  * billing, devolve a sessão pendente ainda válida ou cria uma nova e a grava em
- * `pendingCheckout`. A `idempotencyKey` deriva do estado lido, então retries da
- * transação não duplicam a sessão na Stripe.
+ * `pendingCheckout`. A `idempotencyKey` é fixa por requisição, então
+ * reexecuções da transação não duplicam a sessão na Stripe.
  */
 export async function reserveCheckoutSession(
   uid: string,
@@ -53,6 +53,9 @@ export async function reserveCheckoutSession(
   customer: string,
 ): Promise<CheckoutReservation> {
   const ref = subscriptionDoc(uid);
+  // Gerada fora da transação: estável nas reexecuções do Firestore e única por
+  // requisição, para a Stripe nunca devolver uma sessão antiga já encerrada.
+  const idempotencyKey = `checkout:${uid}:${interval}:${randomUUID()}`;
   return admin.firestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const doc = {
@@ -76,28 +79,10 @@ export async function reserveCheckoutSession(
     if (pending && pendingValid) {
       // Troca de intervalo: a sessão anterior é encerrada para não haver duas
       // abertas. Se já foi concluída, o webhook ainda vai gravar a assinatura.
-      try {
-        await stripe.checkout.sessions.expire(pending.sessionId);
-      } catch (error) {
-        console.warn(
-          '[billing.checkout] não foi possível expirar sessão pendente',
-          uid,
-          pending.sessionId,
-          (error as Error).message,
-        );
+      if (!(await expirePendingSession(uid, pending.sessionId))) {
         return { kind: 'in_progress' };
       }
     }
-
-    const bucket = Math.floor(now / 1000 / IDEMPOTENCY_BUCKET_SECONDS);
-    const idempotencyKey = [
-      'checkout',
-      uid,
-      interval,
-      subscription.providerSubscriptionId ?? 'first',
-      pending?.sessionId ?? 'none',
-      bucket,
-    ].join(':');
 
     const base = getAppBaseUrl();
     const session = await stripe.checkout.sessions.create(
@@ -130,6 +115,36 @@ export async function reserveCheckoutSession(
     tx.set(ref, { pendingCheckout }, { merge: true });
     return { kind: 'url', url: pendingCheckout.url };
   });
+}
+
+/**
+ * Encerra a sessão pendente. Uma reexecução da transação (ou nova requisição
+ * após falha) encontra a sessão já expirada — isso conta como sucesso; só uma
+ * sessão concluída ou impossível de consultar mantém o checkout em andamento.
+ */
+async function expirePendingSession(
+  uid: string,
+  sessionId: string,
+): Promise<boolean> {
+  const stripe = getStripe();
+  try {
+    await stripe.checkout.sessions.expire(sessionId);
+    return true;
+  } catch (error) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.status === 'expired') return true;
+    } catch {
+      // mantém a reserva: não dá para afirmar que a sessão foi encerrada
+    }
+    console.warn(
+      '[billing.checkout] não foi possível expirar sessão pendente',
+      uid,
+      sessionId,
+      (error as Error).message,
+    );
+    return false;
+  }
 }
 
 /** Remove `pendingCheckout` só se ainda for a sessão informada. */
