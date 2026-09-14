@@ -76,8 +76,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
       mockFetchMonthlyDividends.mockResolvedValue(
         new Map([
-          ['HGLG11', 0.92],
-          ['MXRF11', 0.07],
+          ['HGLG11', { monthlyDividend: 0.92 }],
+          ['MXRF11', { monthlyDividend: 0.07 }],
         ]),
       );
 
@@ -97,8 +97,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
       mockFetchMonthlyDividends.mockResolvedValue(
         new Map([
-          ['HGLG11', 0.92],
-          ['MXRF11', 0.07],
+          ['HGLG11', { monthlyDividend: 0.92 }],
+          ['MXRF11', { monthlyDividend: 0.07 }],
         ]),
       );
 
@@ -116,6 +116,39 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         10.32,
         0.07,
         'brapi',
+      );
+    });
+
+    it('deve salvar a data de pagamento do provento junto com o histórico', async () => {
+      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+        ]),
+      );
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([
+          ['HGLG11', { monthlyDividend: 0.92, paymentDate: '2026-07-14' }],
+          ['MXRF11', { monthlyDividend: 0.07 }],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+        'HGLG11',
+        165.5,
+        0.92,
+        'brapi',
+        '2026-07-14',
+      );
+      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+        'MXRF11',
+        10.32,
+        0.07,
+        'brapi',
+        undefined,
       );
     });
 
@@ -167,8 +200,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
       mockFetchMonthlyDividends.mockResolvedValue(
         new Map([
-          ['HGLG11', 0.92],
-          ['MXRF11', 0.07],
+          ['HGLG11', { monthlyDividend: 0.92 }],
+          ['MXRF11', { monthlyDividend: 0.07 }],
         ]),
       );
 
@@ -223,7 +256,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
-      mockFetchMonthlyDividends.mockResolvedValue(new Map([['HGLG11', 0.92]]));
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([['HGLG11', { monthlyDividend: 0.92 }]]),
+      );
 
       await updateAllQuotes();
 
@@ -246,8 +281,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
       mockFetchMonthlyDividends.mockResolvedValue(
         new Map([
-          ['HGLG11', 0.92],
-          ['MXRF11', 0.07],
+          ['HGLG11', { monthlyDividend: 0.92 }],
+          ['MXRF11', { monthlyDividend: 0.07 }],
         ]),
       );
 
@@ -312,7 +347,12 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         ),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
-        new Map(tickers.map((ticker, i) => [ticker, (10 + i) / 100])),
+        new Map(
+          tickers.map((ticker, i) => [
+            ticker,
+            { monthlyDividend: (10 + i) / 100 },
+          ]),
+        ),
       );
 
       await updateAllQuotes();

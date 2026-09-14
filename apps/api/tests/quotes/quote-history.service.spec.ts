@@ -128,6 +128,66 @@ describe('QuoteHistoryService', () => {
         expect.objectContaining({ monthlyDividend: 0.07 }),
       );
     });
+    it('deve salvar a data de pagamento do provento no documento principal', async () => {
+      const historySet = jest.fn().mockResolvedValue(undefined);
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: historySet })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('HGLG11', 165.5, 0.92, 'brapi', '2026-07-14');
+
+      expect(quoteSet).toHaveBeenCalledWith({
+        ticker: 'HGLG11',
+        price: 165.5,
+        monthlyDividend: 0.92,
+        dividendPaymentDate: '2026-07-14',
+        updatedAt: expect.any(String),
+        source: 'brapi',
+      });
+    });
+
+    it('deve preservar a data de pagamento existente quando o provento não é informado', async () => {
+      const historySet = jest.fn().mockResolvedValue(undefined);
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            ticker: 'MXRF11',
+            price: 10.32,
+            monthlyDividend: 0.07,
+            dividendPaymentDate: '2026-07-14',
+            updatedAt: '2026-07-15T18:00:00Z',
+            source: 'brapi',
+          }),
+        }),
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: historySet })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('MXRF11', 10.5, undefined);
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monthlyDividend: 0.07,
+          dividendPaymentDate: '2026-07-14',
+        }),
+      );
+    });
   });
 
   describe('getQuoteHistory', () => {
