@@ -16,7 +16,7 @@
             >
             <select
               id="wallet-select"
-              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               [value]="selectedWallet()?.id"
               (change)="onWalletChange($event)"
             >
@@ -271,7 +271,7 @@
             <select
               id="ticker"
               formControlName="ticker"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               [class.border-red-500]="
                 form.get('ticker')?.invalid && form.get('ticker')?.touched
               "
@@ -302,7 +302,7 @@
             <select
               id="assetType"
               formControlName="assetType"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               <option value="FII">FII</option>
               <option value="STOCK">Ação</option>
@@ -323,7 +323,7 @@
               type="number"
               step="0.0001"
               formControlName="quantity"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               [class.border-red-500]="
                 form.get('quantity')?.invalid && form.get('quantity')?.touched
               "
@@ -348,7 +348,7 @@
               type="text"
               inputmode="decimal"
               formControlName="averagePrice"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               [class.border-red-500]="
                 form.get('averagePrice')?.invalid &&
                 form.get('averagePrice')?.touched
@@ -463,7 +463,7 @@
               id="mover-fridge-select"
               formControlName="fridgeId"
               data-testid="mover-fridge-select"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
             >
               @for (fridge of fridges(); track fridge.id) {
                 <option [value]="fridge.id">{{ fridge.name }}</option>
@@ -483,7 +483,7 @@
               inputmode="decimal"
               formControlName="targetPrice"
               data-testid="mover-target-price"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
               [class.border-red-500]="
                 moveToFridgeForm.get('targetPrice')?.invalid &&
                 moveToFridgeForm.get('targetPrice')?.touched
