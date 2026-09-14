@@ -19,6 +19,7 @@ function makeUser(
       plan: null,
       interval: null,
       provider: null,
+      stripeStatus: null,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       ...subscription,
@@ -136,6 +137,42 @@ describe('AdminUsersComponent', () => {
       fixture.detectChanges();
 
       expect(queryAll('user-row')[0].textContent).toContain('Expirada');
+    });
+
+    it('deve indicar assinatura Stripe guardada sob concessão manual', () => {
+      serviceMock.list.and.returnValue(
+        of([
+          makeUser('ativa', {
+            status: 'active',
+            provider: 'manual',
+            stripeStatus: 'active',
+          }),
+          makeUser('teste', {
+            status: 'active',
+            provider: 'manual',
+            stripeStatus: 'trialing',
+          }),
+          makeUser('pendente', {
+            status: 'active',
+            provider: 'manual',
+            stripeStatus: 'past_due',
+          }),
+          makeUser('cancelada', {
+            status: 'active',
+            provider: 'manual',
+            stripeStatus: 'canceled',
+          }),
+        ]),
+      );
+      component.search();
+      fixture.detectChanges();
+
+      const rows = queryAll('user-row');
+      expect(rows[0].textContent).toContain('Manual (Stripe ativa)');
+      expect(rows[1].textContent).toContain('Manual (Stripe em teste)');
+      expect(rows[2].textContent).toContain('Manual (Stripe pendente)');
+      expect(rows[3].textContent).toContain('Manual');
+      expect(rows[3].textContent).not.toContain('(Stripe');
     });
 
     it('deve exibir estado vazio', () => {
