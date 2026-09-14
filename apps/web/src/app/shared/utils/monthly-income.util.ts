@@ -25,6 +25,8 @@ export function aggregateMonthlyIncome(
         current
           ? {
               ...current,
+              ...(!current.paymentDate &&
+                item.paymentDate && { paymentDate: item.paymentDate }),
               quantity: current.quantity + item.quantity,
               monthlyIncome: round(current.monthlyIncome + item.monthlyIncome),
             }

@@ -8,7 +8,7 @@ import {
   MonthlyIncomeItem,
 } from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
-import { formatCurrency } from '../../shared/utils/format.util';
+import { formatCurrency, formatDate } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 
 @Component({
@@ -146,4 +146,5 @@ export class DividendComponent implements OnInit {
   }
 
   formatCurrency = formatCurrency;
+  formatDate = formatDate;
 }

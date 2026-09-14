@@ -5,6 +5,7 @@ import {
   formatCurrency,
   parseBrlNumber,
   parseDecimal,
+  formatDate,
 } from './format.util';
 
 describe('format.util', () => {
@@ -117,5 +118,16 @@ describe('format.util', () => {
     it('formata valores pequenos como moeda', () => {
       expect(formatCompactCurrency(120)).toMatch(/R\$\s?120/);
     });
+  });
+});
+
+describe('formatDate', () => {
+  it('deve formatar data YYYY-MM-DD no padrão pt-BR sem deslocar o fuso', () => {
+    expect(formatDate('2026-09-01')).toBe('01/09/2026');
+  });
+
+  it('deve retornar travessão quando não houver data', () => {
+    expect(formatDate(undefined)).toBe('—');
+    expect(formatDate('')).toBe('—');
   });
 });

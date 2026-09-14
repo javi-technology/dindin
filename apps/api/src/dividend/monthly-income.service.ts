@@ -6,6 +6,7 @@ export interface MonthlyIncomeItem {
   quantity: number;
   monthlyDividend: number;
   monthlyIncome: number;
+  paymentDate?: string; // YYYY-MM-DD
 }
 
 export interface MonthlyIncome {
@@ -57,8 +58,12 @@ export async function computeMonthlyIncome(
   ]);
 
   const monthlyDividendByTicker = new Map<string, number>();
+  const paymentDateByTicker = new Map<string, string>();
   for (const doc of quotesSnapshot.docs) {
     const data = doc.data() as Quote;
+    if (typeof data.dividendPaymentDate === 'string') {
+      paymentDateByTicker.set(doc.id.toUpperCase(), data.dividendPaymentDate);
+    }
     if (
       typeof data.monthlyDividend === 'number' &&
       Number.isFinite(data.monthlyDividend)
@@ -80,12 +85,14 @@ export async function computeMonthlyIncome(
         ? position.quantity
         : 0;
     const monthlyIncome = roundCurrency(quantity * monthlyDividend);
+    const paymentDate = paymentDateByTicker.get(position.ticker.toUpperCase());
 
     byTicker.push({
       ticker: position.ticker,
       quantity,
       monthlyDividend,
       monthlyIncome,
+      ...(paymentDate && { paymentDate }),
     });
     total += monthlyIncome;
   }
