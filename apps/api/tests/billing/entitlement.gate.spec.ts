@@ -274,6 +274,30 @@ describe('GET /api/me', () => {
     expect(JSON.stringify(response.body)).not.toContain('sub_1');
   });
 
+  it('não expõe pendingCheckout nem portalRateLimit', async () => {
+    subscriptionGetMock.mockResolvedValue(
+      subscriptionDoc({
+        status: 'none',
+        pendingCheckout: {
+          sessionId: 'cs_secret',
+          url: 'https://checkout.test/cs_secret',
+          expiresAt: FUTURE,
+          interval: 'month',
+        },
+        portalRateLimit: { windowStart: FUTURE, count: 1 },
+      }),
+    );
+
+    const response = await request(app)
+      .get('/api/me')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.subscription).not.toHaveProperty('pendingCheckout');
+    expect(response.body.subscription).not.toHaveProperty('portalRateLimit');
+    expect(JSON.stringify(response.body)).not.toContain('cs_secret');
+  });
+
   it('deve devolver concessão manual expirada como canceled', async () => {
     subscriptionGetMock.mockResolvedValue(
       subscriptionDoc({
