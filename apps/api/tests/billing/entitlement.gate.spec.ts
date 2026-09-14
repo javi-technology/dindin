@@ -71,6 +71,16 @@ function manualWithStripe(
   });
 }
 
+/** Doc gravado antes da #173: checkout aberto sobre concessão manual expirada. */
+function abandonedCheckoutDoc() {
+  return subscriptionDoc({
+    status: 'active',
+    interval: null,
+    providerSubscriptionId: undefined,
+    currentPeriodEnd: PAST,
+  });
+}
+
 const FORBIDDEN = { error: 'Forbidden', code: 'SUBSCRIPTION_REQUIRED' };
 
 function getSuggestionRequest() {
@@ -147,6 +157,15 @@ describe('gate de assinatura nos endpoints de sugestão IA', () => {
     const get = await getSuggestionRequest();
     expect(get.status).toBe(403);
     expect(get.body).toEqual(FORBIDDEN);
+  });
+
+  it('deve negar doc marcado como Stripe por checkout abandonado após concessão expirada', async () => {
+    subscriptionGetMock.mockResolvedValue(abandonedCheckoutDoc());
+
+    const get = await getSuggestionRequest();
+    expect(get.status).toBe(403);
+    expect(get.body).toEqual(FORBIDDEN);
+    expect(getSavedSuggestionMock).not.toHaveBeenCalled();
   });
 
   it('deve liberar past_due dentro da carência', async () => {
@@ -264,6 +283,18 @@ describe('GET /api/me', () => {
         currentPeriodEnd: PAST,
       }),
     );
+
+    const response = await request(app)
+      .get('/api/me')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.subscription.status).toBe('canceled');
+    expect(response.body.entitlements).toEqual([]);
+  });
+
+  it('deve devolver canceled para doc marcado como Stripe por checkout abandonado', async () => {
+    subscriptionGetMock.mockResolvedValue(abandonedCheckoutDoc());
 
     const response = await request(app)
       .get('/api/me')

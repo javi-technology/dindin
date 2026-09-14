@@ -222,6 +222,51 @@ describe('entitlement.service – resolveSubscription', () => {
 
     expect(resolveSubscription(doc, NOW)).toEqual(doc);
   });
+
+  describe('doc marcado como Stripe por checkout abandonado (#173)', () => {
+    const abandoned = (partial: Partial<UserSubscription> = {}) =>
+      sub({
+        status: 'active',
+        interval: null,
+        provider: 'stripe',
+        providerCustomerId: 'cus_1',
+        currentPeriodEnd: PAST,
+        ...partial,
+      });
+
+    it.each(['active', 'trialing'] as const)(
+      'deve tratar como concessão manual com status %s',
+      (status) => {
+        const resolved = resolveSubscription(abandoned({ status }), NOW);
+
+        expect(resolved.provider).toBe('manual');
+        expect(isEntitled(resolved, 'ai', false, NOW)).toBe(false);
+        expect(effectiveStatus(resolved, NOW)).toBe('canceled');
+      },
+    );
+
+    it('deve manter a concessão manual vigente', () => {
+      const resolved = resolveSubscription(
+        abandoned({ currentPeriodEnd: FUTURE }),
+        NOW,
+      );
+
+      expect(resolved.provider).toBe('manual');
+      expect(isEntitled(resolved, 'ai', false, NOW)).toBe(true);
+    });
+
+    it('deve manter assinatura Stripe com providerSubscriptionId', () => {
+      const doc = abandoned({ providerSubscriptionId: 'sub_1' });
+
+      expect(resolveSubscription(doc, NOW)).toEqual(doc);
+    });
+
+    it('deve manter doc sem assinatura de quem só abriu o checkout', () => {
+      const doc = abandoned({ status: 'none', currentPeriodEnd: null });
+
+      expect(resolveSubscription(doc, NOW)).toEqual(doc);
+    });
+  });
 });
 
 describe('entitlement.service – getSubscription / hasEntitlement', () => {

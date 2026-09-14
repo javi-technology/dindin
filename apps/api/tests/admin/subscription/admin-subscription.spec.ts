@@ -64,6 +64,17 @@ const STRIPE_ACTIVE: StripeSubscriptionState = {
   updatedAt: '2026-09-05T00:00:00.000Z',
 };
 
+/** Doc gravado antes da #173: checkout aberto sobre concessão manual expirada. */
+const ABANDONED_CHECKOUT: Partial<UserSubscription> = {
+  status: 'active',
+  plan: 'basic',
+  interval: null,
+  provider: 'stripe',
+  providerCustomerId: 'cus_1',
+  currentPeriodEnd: PAST,
+  cancelAtPeriodEnd: false,
+};
+
 function authUser(uid: string, email?: string, admin = false) {
   return { uid, email, customClaims: admin ? { admin: true } : undefined };
 }
@@ -250,6 +261,24 @@ describe('admin – assinaturas de usuários', () => {
         }),
       );
       expect(response.body[0].entitlements).toEqual(['ai']);
+    });
+
+    it('deve exibir checkout abandonado sobre concessão expirada como manual sem entitlement', async () => {
+      listUsersMock.mockResolvedValue({
+        users: [authUser('user-2', 'b@dindin.app')],
+        pageToken: undefined,
+      });
+      subscriptions.set('user-2', ABANDONED_CHECKOUT);
+
+      const response = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', 'Bearer token');
+
+      expect(response.status).toBe(200);
+      expect(response.body[0].subscription).toEqual(
+        expect.objectContaining({ status: 'canceled', provider: 'manual' }),
+      );
+      expect(response.body[0].entitlements).toEqual([]);
     });
 
     it('deve filtrar por e-mail sem diferenciar maiúsculas', async () => {
@@ -447,6 +476,20 @@ describe('admin – assinaturas de usuários', () => {
       expect(txSetMock).toHaveBeenCalled();
     });
 
+    it('deve conceder acesso sobre checkout abandonado após concessão expirada', async () => {
+      subscriptions.set('user-2', ABANDONED_CHECKOUT);
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
+
+      expect(response.status).toBe(200);
+      expect(txSetMock).toHaveBeenCalledWith(
+        'user-2',
+        expect.objectContaining({ provider: 'manual', status: 'active' }),
+        { merge: true },
+      );
+      expect(txSetMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+    });
+
     it('deve responder 409 quando a Stripe guardada sob concessão expirada está ativa', async () => {
       subscriptions.set('user-2', {
         status: 'active',
@@ -618,6 +661,26 @@ describe('admin – assinaturas de usuários', () => {
         expect.objectContaining({ status: 'active', provider: 'stripe' }),
       );
       expect(response.body.entitlements).toEqual(['ai']);
+    });
+
+    it('deve revogar e restaurar provider manual em checkout abandonado', async () => {
+      subscriptions.set('user-2', {
+        ...ABANDONED_CHECKOUT,
+        currentPeriodEnd: FUTURE,
+      });
+
+      const response = await revoke();
+
+      expect(response.status).toBe(200);
+      expect(updateMock).toHaveBeenCalledWith('user-2', {
+        status: 'canceled',
+        provider: 'manual',
+        updatedAt: expect.any(String),
+      });
+      expect(response.body.subscription).toEqual(
+        expect.objectContaining({ status: 'canceled', provider: 'manual' }),
+      );
+      expect(response.body.entitlements).toEqual([]);
     });
 
     it('deve responder 409 para assinatura Stripe', async () => {
