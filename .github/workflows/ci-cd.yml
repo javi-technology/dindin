@@ -10,6 +10,10 @@ on:
       - main
       - develop
 
+# Permissão mínima do GITHUB_TOKEN; jobs que precisam de mais declaram a sua.
+permissions:
+  contents: read
+
 jobs:
   # Calcula a versão semântica em tempo de execução a partir da última tag
   # vX.Y.Z e dos Conventional Commits desde ela:
