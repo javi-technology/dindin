@@ -59,6 +59,27 @@ updates:
       - dependency-name: '@angular-devkit/*'
         update-types:
           - version-update:semver-major
+      # O @angular/core@20 declara peer zone.js ~0.15.0 e o @angular/fire@20
+      # depende de firebase@^11; ambos sobem junto com a migração ao Angular 21.
+      - dependency-name: 'zone.js'
+        versions:
+          - '>=0.16.0'
+      - dependency-name: 'firebase'
+        update-types:
+          - version-update:semver-major
+      # TypeScript 7 (nativo) não expõe a API JS do compilador: quebra o
+      # ts-jest e o @angular/compiler-cli@20 exige typescript <6.0.
+      - dependency-name: 'typescript'
+        update-types:
+          - version-update:semver-major
+      # O jasmine-core@7 quebra o karma-jasmine@5 (describe read-only); os tipos
+      # acompanham a versão do jasmine-core.
+      - dependency-name: 'jasmine-core'
+        update-types:
+          - version-update:semver-major
+      - dependency-name: '@types/jasmine'
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     # Cobre os workflows em .github/workflows.
