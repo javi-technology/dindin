@@ -6,6 +6,7 @@ import {
   Router,
 } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
+import { APP_VERSION } from '../environments/version';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,7 @@ export class AppComponent {
   private readonly router = inject(Router);
 
   user = this.authService.user;
+  readonly version = APP_VERSION;
 
   async logout(): Promise<void> {
     await this.authService.logout();

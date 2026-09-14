@@ -8,6 +8,7 @@ import { Router, provideRouter } from '@angular/router';
 import { Component, signal } from '@angular/core';
 import { AppComponent } from './app.component';
 import { AuthService } from './core/services/auth.service';
+import { APP_VERSION } from '../environments/version';
 
 @Component({ selector: 'app-stub', standalone: true, template: '' })
 class StubComponent {}
@@ -76,5 +77,23 @@ describe('AppComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid="main-nav"]'),
     ).toBeFalsy();
+  });
+
+  it('deve exibir no rodapé a versão em execução', () => {
+    fixture.detectChanges();
+
+    const footer = fixture.nativeElement.querySelector(
+      '[data-testid="app-version"]',
+    ) as HTMLElement;
+
+    expect(footer.textContent?.trim()).toBe(`v${APP_VERSION}`);
+  });
+
+  it('deve exibir a versão também quando não autenticado', () => {
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('footer [data-testid="app-version"]'),
+    ).toBeTruthy();
   });
 });
