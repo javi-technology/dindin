@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import {
   Entitlement,
   PublicSubscription,
+  SubscriptionStatus,
   UserSubscription,
 } from 'dindin-shared-types';
 
@@ -43,6 +44,24 @@ export function toPublicSubscription(
     currentPeriodEnd: subscription.currentPeriodEnd,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
   };
+}
+
+/**
+ * Status considerado pelo checkout e pelo `GET /api/me`: concessão `manual`
+ * expirada equivale a `canceled` (o documento continua `active`).
+ */
+export function effectiveStatus(
+  subscription: UserSubscription,
+  now: Date = new Date(),
+): SubscriptionStatus {
+  const expiredManual =
+    subscription.provider === 'manual' &&
+    subscription.currentPeriodEnd !== null &&
+    new Date(subscription.currentPeriodEnd).getTime() <= now.getTime();
+  return expiredManual &&
+    (subscription.status === 'active' || subscription.status === 'trialing')
+    ? 'canceled'
+    : subscription.status;
 }
 
 /**

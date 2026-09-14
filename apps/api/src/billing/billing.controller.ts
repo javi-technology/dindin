@@ -4,7 +4,7 @@ import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { getStripe, getPriceId, getAppBaseUrl } from './stripe.client';
 import { getOrCreateCustomer } from './stripe-customer.service';
-import { getSubscription } from './entitlement.service';
+import { effectiveStatus, getSubscription } from './entitlement.service';
 import { processStripeEvent } from './billing.webhook.service';
 
 function sendError(res: Response, context: string, error: unknown): void {
@@ -35,11 +35,8 @@ export async function createCheckoutSession(
     const uid = (req as AuthRequest).user!.uid;
     const subscription = await getSubscription(uid);
     // past_due não inicia novo checkout — resolve o pagamento no portal
-    if (
-      subscription.status === 'active' ||
-      subscription.status === 'trialing' ||
-      subscription.status === 'past_due'
-    ) {
+    const status = effectiveStatus(subscription);
+    if (status === 'active' || status === 'trialing' || status === 'past_due') {
       res.status(409).json({
         error: 'Assinatura já ativa',
         code: 'ALREADY_SUBSCRIBED',

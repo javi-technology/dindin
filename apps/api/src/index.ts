@@ -9,6 +9,7 @@ import {
 } from './middleware/auth.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
 import {
+  effectiveStatus,
   getSubscription,
   listEntitlements,
   toPublicSubscription,
@@ -140,7 +141,10 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     const body: MeResponse = {
       uid: user.uid,
       admin: isAdmin,
-      subscription: toPublicSubscription(subscription),
+      subscription: toPublicSubscription({
+        ...subscription,
+        status: effectiveStatus(subscription),
+      }),
       entitlements: listEntitlements(subscription, isAdmin),
     };
     res.json(body);
