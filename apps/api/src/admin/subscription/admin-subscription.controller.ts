@@ -7,6 +7,8 @@ import {
   UserSubscription,
 } from 'dindin-shared-types';
 import {
+  getSubscription,
+  isEntitled,
   listEntitlements,
   NO_SUBSCRIPTION,
   subscriptionDoc,
@@ -15,6 +17,7 @@ import {
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
+const STRIPE_SUBSCRIPTION_CODE = 'STRIPE_SUBSCRIPTION';
 
 function toAdminUser(user: UserRecord, sub: UserSubscription): AdminUser {
   const isAdmin = user.customClaims?.admin === true;
@@ -125,6 +128,15 @@ export async function grantSubscription(
       return;
     }
 
+    const current = await getSubscription(user.uid);
+    if (current.provider === 'stripe' && isEntitled(current, 'ai')) {
+      res.status(409).json({
+        error: 'User already has an active Stripe subscription',
+        code: STRIPE_SUBSCRIPTION_CODE,
+      });
+      return;
+    }
+
     const patch: Partial<UserSubscription> = {
       status: 'active',
       plan: parsed.plan,
@@ -168,7 +180,7 @@ export async function revokeSubscription(
     if (current.provider !== 'manual') {
       res.status(409).json({
         error: 'Only manual subscriptions can be revoked by an admin',
-        code: 'STRIPE_SUBSCRIPTION',
+        code: STRIPE_SUBSCRIPTION_CODE,
       });
       return;
     }
