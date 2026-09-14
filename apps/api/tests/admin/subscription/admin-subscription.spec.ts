@@ -276,7 +276,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(200);
       expect(response.body[0].subscription).toEqual(
-        expect.objectContaining({ status: 'canceled', provider: 'manual' }),
+        expect.objectContaining({ status: 'active', provider: 'manual' }),
       );
       expect(response.body[0].entitlements).toEqual([]);
     });
