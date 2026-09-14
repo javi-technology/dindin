@@ -19,6 +19,7 @@ const customerCreateMock = jest.fn();
 const customerRetrieveMock = jest.fn();
 const checkoutCreateMock = jest.fn();
 const checkoutExpireMock = jest.fn();
+const checkoutRetrieveMock = jest.fn();
 const portalCreateMock = jest.fn();
 const subscriptionsRetrieveMock = jest.fn();
 const constructEventMock = jest.fn();
@@ -28,7 +29,11 @@ const mockStripe = {
     retrieve: customerRetrieveMock,
   },
   checkout: {
-    sessions: { create: checkoutCreateMock, expire: checkoutExpireMock },
+    sessions: {
+      create: checkoutCreateMock,
+      expire: checkoutExpireMock,
+      retrieve: checkoutRetrieveMock,
+    },
   },
   billingPortal: { sessions: { create: portalCreateMock } },
   subscriptions: { retrieve: subscriptionsRetrieveMock },
@@ -135,6 +140,7 @@ describe('billing controller', () => {
       expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
     });
     checkoutExpireMock.mockResolvedValue({ id: 'cs_old', status: 'expired' });
+    checkoutRetrieveMock.mockResolvedValue({ id: 'cs_old', status: 'open' });
     portalCreateMock.mockResolvedValue({ url: 'https://portal.test' });
     subscriptionsRetrieveMock.mockResolvedValue(makeSubscription());
   });
@@ -503,7 +509,7 @@ describe('billing controller', () => {
           expect.objectContaining({
             line_items: [{ price: 'price_year', quantity: 1 }],
           }),
-          { idempotencyKey: expect.stringContaining('cs_old') },
+          { idempotencyKey: expect.stringMatching(/^checkout:user-1:year:/) },
         );
       });
 
@@ -519,6 +525,10 @@ describe('billing controller', () => {
         checkoutExpireMock.mockRejectedValue(
           new Error('session is already complete'),
         );
+        checkoutRetrieveMock.mockResolvedValue({
+          id: 'cs_old',
+          status: 'complete',
+        });
 
         const response = await request(app)
           .post('/api/billing/checkout-session')
@@ -530,6 +540,56 @@ describe('billing controller', () => {
           error: 'Checkout em andamento',
           code: 'CHECKOUT_IN_PROGRESS',
         });
+        expect(checkoutCreateMock).not.toHaveBeenCalled();
+      });
+
+      it('segue com a nova sessão quando a anterior já estava expirada na Stripe', async () => {
+        txGetMock.mockResolvedValue(
+          pendingDoc({
+            sessionId: 'cs_old',
+            url: 'https://checkout.test/cs_old',
+            expiresAt: FUTURE(),
+            interval: 'month',
+          }),
+        );
+        checkoutExpireMock.mockRejectedValue(
+          new Error('This Checkout Session is already expired'),
+        );
+        checkoutRetrieveMock.mockResolvedValue({
+          id: 'cs_old',
+          status: 'expired',
+        });
+
+        const response = await request(app)
+          .post('/api/billing/checkout-session')
+          .set('Authorization', 'Bearer token')
+          .send({ interval: 'year' });
+
+        expect(checkoutRetrieveMock).toHaveBeenCalledWith('cs_old');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ url: 'https://checkout.test' });
+        expect(checkoutCreateMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('responde 409 CHECKOUT_IN_PROGRESS quando não consegue consultar a sessão anterior', async () => {
+        txGetMock.mockResolvedValue(
+          pendingDoc({
+            sessionId: 'cs_old',
+            url: 'https://checkout.test/cs_old',
+            expiresAt: FUTURE(),
+            interval: 'month',
+          }),
+        );
+        checkoutExpireMock.mockRejectedValue(new Error('network'));
+        checkoutRetrieveMock.mockRejectedValue(new Error('network'));
+
+        const response = await request(app)
+          .post('/api/billing/checkout-session')
+          .set('Authorization', 'Bearer token')
+          .send({ interval: 'year' });
+
+        expect(response.status).toBe(409);
+        expect(response.body.code).toBe('CHECKOUT_IN_PROGRESS');
         expect(checkoutCreateMock).not.toHaveBeenCalled();
       });
 
@@ -553,7 +613,27 @@ describe('billing controller', () => {
         expect(checkoutCreateMock).not.toHaveBeenCalled();
       });
 
-      it('usa idempotencyKey estável para o mesmo intento', async () => {
+      it('mantém a idempotencyKey quando a transação é reexecutada', async () => {
+        runTransactionMock.mockImplementation(
+          async (cb: (tx: unknown) => unknown) => {
+            // Primeira tentativa abortada por contenção; o Firestore reexecuta.
+            await cb({ get: txGetMock, set: txSetMock });
+            return cb({ get: txGetMock, set: txSetMock });
+          },
+        );
+
+        const response = await request(app)
+          .post('/api/billing/checkout-session')
+          .set('Authorization', 'Bearer token')
+          .send({ interval: 'month' });
+
+        expect(response.status).toBe(200);
+        const [[, first], [, second]] = checkoutCreateMock.mock.calls;
+        expect(first.idempotencyKey).toBe(second.idempotencyKey);
+      });
+
+      it('usa idempotencyKey nova em cada requisição sem reserva', async () => {
+        // pendingCheckout removido entre as chamadas (ex.: webhook), na mesma hora
         for (let i = 0; i < 2; i++) {
           await request(app)
             .post('/api/billing/checkout-session')
@@ -562,7 +642,7 @@ describe('billing controller', () => {
         }
 
         const [[, first], [, second]] = checkoutCreateMock.mock.calls;
-        expect(first.idempotencyKey).toBe(second.idempotencyKey);
+        expect(first.idempotencyKey).not.toBe(second.idempotencyKey);
       });
     });
   });

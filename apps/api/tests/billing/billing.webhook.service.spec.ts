@@ -296,6 +296,44 @@ describe('processStripeEvent', () => {
       );
     });
 
+    it('checkout.session.completed só remove pendingCheckout depois de gravar a assinatura', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+
+      await processStripeEvent(
+        makeEvent('checkout.session.completed', {
+          id: 'cs_1',
+          mode: 'subscription',
+          subscription: 'sub_1',
+          client_reference_id: 'user-1',
+        }),
+      );
+
+      const writes = txSetMock.mock.calls.map(([, data]) => data);
+      expect(writes).toHaveLength(2);
+      expect(writes[0]).toEqual(
+        expect.objectContaining({ status: 'active', provider: 'stripe' }),
+      );
+      expect(writes[1]).toEqual({ pendingCheckout: 'DELETE_FIELD' });
+    });
+
+    it('checkout.session.completed mantém pendingCheckout quando a gravação falha', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+      subscriptionsRetrieveMock.mockRejectedValue(new Error('stripe down'));
+
+      await expect(
+        processStripeEvent(
+          makeEvent('checkout.session.completed', {
+            id: 'cs_1',
+            mode: 'subscription',
+            subscription: 'sub_1',
+            client_reference_id: 'user-1',
+          }),
+        ),
+      ).rejects.toThrow('stripe down');
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
     it('checkout.session.expired remove pendingCheckout da sessão', async () => {
       txGetMock.mockResolvedValue(pending('cs_1'));
 
