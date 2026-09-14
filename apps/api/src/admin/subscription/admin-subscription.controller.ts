@@ -17,6 +17,8 @@ import {
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
+/** Máximo de usuários por busca — evita ler a assinatura de toda a base. */
+export const ADMIN_USERS_LIMIT = 100;
 const STRIPE_SUBSCRIPTION_CODE = 'STRIPE_SUBSCRIPTION';
 
 function toAdminUser(user: UserRecord, sub: UserSubscription): AdminUser {
@@ -61,7 +63,8 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
         : '';
     const users = (await listAllAuthUsers())
       .filter((user) => (user.email ?? '').toLowerCase().includes(search))
-      .sort((a, b) => (a.email ?? '').localeCompare(b.email ?? ''));
+      .sort((a, b) => (a.email ?? '').localeCompare(b.email ?? ''))
+      .slice(0, ADMIN_USERS_LIMIT);
     const subscriptions = await getSubscriptions(users.map((u) => u.uid));
     res.json(users.map((user, i) => toAdminUser(user, subscriptions[i])));
   } catch (error) {
@@ -177,11 +180,15 @@ export async function revokeSubscription(
       ...NO_SUBSCRIPTION,
       ...(snapshot.data() as Partial<UserSubscription>),
     };
-    if (current.provider !== 'manual') {
+    if (current.provider === 'stripe') {
       res.status(409).json({
         error: 'Only manual subscriptions can be revoked by an admin',
         code: STRIPE_SUBSCRIPTION_CODE,
       });
+      return;
+    }
+    if (current.provider !== 'manual') {
+      res.status(404).json({ error: 'Manual subscription not found' });
       return;
     }
 
