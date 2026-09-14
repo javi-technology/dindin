@@ -199,39 +199,50 @@ export async function revokeSubscription(
   try {
     const { uid } = req.params;
     const ref = subscriptionDoc(uid);
-    const snapshot = await ref.get();
-    if (!snapshot.exists) {
-      res.status(404).json({ error: 'Subscription not found' });
-      return;
-    }
+    // Leitura e gravação na mesma transação: o webhook pode ativar a Stripe
+    // entre as duas e a revogação não pode cancelar essa assinatura.
+    const result = await admin.firestore().runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists) {
+        return { status: 404, error: 'Subscription not found' } as const;
+      }
 
-    const doc: UserSubscription = {
-      ...NO_SUBSCRIPTION,
-      ...(snapshot.data() as Partial<UserSubscription>),
-    };
-    const current = repairAbandonedCheckout(doc);
-    if (current.provider === 'stripe') {
+      const doc: UserSubscription = {
+        ...NO_SUBSCRIPTION,
+        ...(snapshot.data() as Partial<UserSubscription>),
+      };
+      const current = repairAbandonedCheckout(doc);
+      if (current.provider === 'stripe') {
+        return { status: 409 } as const;
+      }
+      if (current.provider !== 'manual') {
+        return { status: 404, error: 'Manual subscription not found' } as const;
+      }
+
+      const patch: Partial<UserSubscription> = {
+        status: 'canceled',
+        // Corrige no doc o provider trocado por checkout abandonado (#173)
+        ...(doc.provider !== current.provider ? { provider: 'manual' } : {}),
+        updatedAt: new Date().toISOString(),
+      };
+      tx.update(ref, patch);
+      return { status: 200, subscription: { ...current, ...patch } } as const;
+    });
+
+    if (result.status === 409) {
       res.status(409).json({
         error: 'Only manual subscriptions can be revoked by an admin',
         code: STRIPE_SUBSCRIPTION_CODE,
       });
       return;
     }
-    if (current.provider !== 'manual') {
-      res.status(404).json({ error: 'Manual subscription not found' });
+    if (result.status === 404) {
+      res.status(404).json({ error: result.error });
       return;
     }
 
-    const patch: Partial<UserSubscription> = {
-      status: 'canceled',
-      // Corrige no doc o provider trocado por checkout abandonado (#173)
-      ...(doc.provider !== current.provider ? { provider: 'manual' } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-    await ref.update(patch);
-
     const user = (await findAuthUser(uid)) ?? ({ uid } as UserRecord);
-    res.json(toAdminUser(user, { ...current, ...patch }));
+    res.json(toAdminUser(user, result.subscription));
   } catch (error) {
     console.error('[admin.revokeSubscription] error:', {
       uid: req.params.uid,

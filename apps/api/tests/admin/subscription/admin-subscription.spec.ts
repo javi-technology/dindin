@@ -8,6 +8,7 @@ const setMock = jest.fn();
 const updateMock = jest.fn();
 const txGetMock = jest.fn();
 const txSetMock = jest.fn();
+const txUpdateMock = jest.fn();
 const runTransactionMock = jest.fn();
 
 /** Documentos `users/{uid}/billing/subscription` em memória. */
@@ -100,6 +101,8 @@ describe('admin – assinaturas de usuários', () => {
           get: (ref: { uid: string }) => txGetMock(ref.uid),
           set: (ref: { uid: string }, data: unknown, options: unknown) =>
             txSetMock(ref.uid, data, options),
+          update: (ref: { uid: string }, data: unknown) =>
+            txUpdateMock(ref.uid, data),
         }),
     );
     getUserMock.mockImplementation(async (uid: string) =>
@@ -128,6 +131,8 @@ describe('admin – assinaturas de usuários', () => {
         expect(listUsersMock).not.toHaveBeenCalled();
         expect(setMock).not.toHaveBeenCalled();
         expect(updateMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
+        expect(txUpdateMock).not.toHaveBeenCalled();
       },
     );
   });
@@ -636,7 +641,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(200);
-      expect(updateMock).toHaveBeenCalledWith('user-2', {
+      expect(txUpdateMock).toHaveBeenCalledWith('user-2', {
         status: 'canceled',
         updatedAt: expect.any(String),
       });
@@ -672,7 +677,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(200);
-      expect(updateMock).toHaveBeenCalledWith('user-2', {
+      expect(txUpdateMock).toHaveBeenCalledWith('user-2', {
         status: 'canceled',
         provider: 'manual',
         updatedAt: expect.any(String),
@@ -698,7 +703,7 @@ describe('admin – assinaturas de usuários', () => {
         error: expect.any(String),
         code: 'STRIPE_SUBSCRIPTION',
       });
-      expect(updateMock).not.toHaveBeenCalled();
+      expect(txUpdateMock).not.toHaveBeenCalled();
     });
 
     it('deve responder 404 quando não há concessão manual', async () => {
@@ -708,7 +713,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'Manual subscription not found' });
-      expect(updateMock).not.toHaveBeenCalled();
+      expect(txUpdateMock).not.toHaveBeenCalled();
     });
 
     it('deve responder 404 sem documento de assinatura', async () => {
@@ -716,6 +721,54 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'Subscription not found' });
+      expect(txUpdateMock).not.toHaveBeenCalled();
+    });
+
+    it('deve ler e gravar a revogação na mesma transação', async () => {
+      subscriptions.set('user-2', {
+        status: 'active',
+        plan: 'basic',
+        provider: 'manual',
+        currentPeriodEnd: null,
+      });
+
+      const response = await revoke();
+
+      expect(response.status).toBe(200);
+      expect(runTransactionMock).toHaveBeenCalledTimes(1);
+      expect(txGetMock).toHaveBeenCalledWith('user-2');
+      expect(txUpdateMock).toHaveBeenCalledTimes(1);
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('não cancela a Stripe ativada pelo webhook durante a revogação', async () => {
+      // Leitura fora da transação ainda veria a concessão manual expirada.
+      subscriptions.set('user-2', {
+        status: 'active',
+        plan: 'basic',
+        interval: null,
+        provider: 'manual',
+        currentPeriodEnd: PAST,
+      });
+      // Dentro da transação, o webhook já gravou a assinatura Stripe ativa.
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          status: 'active',
+          plan: 'basic',
+          interval: 'month',
+          provider: 'stripe',
+          providerSubscriptionId: 'sub_1',
+          currentPeriodEnd: FUTURE,
+          cancelAtPeriodEnd: false,
+        }),
+      });
+
+      const response = await revoke();
+
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('STRIPE_SUBSCRIPTION');
+      expect(txUpdateMock).not.toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
     });
   });
