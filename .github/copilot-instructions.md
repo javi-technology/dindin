@@ -12,6 +12,27 @@ Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 3 (frontend
 - Antes de iniciar qualquer trabalho, verificar se existe issue aberta. Se não existir, criar.
 - Nenhum commit sem o número da issue correspondente.
 
+#### Campos obrigatórios no GitHub Projects
+
+Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
+
+| Campo      | Valores                      | Critério                                                         |
+| ---------- | ---------------------------- | ---------------------------------------------------------------- |
+| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5) |
+| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                   |
+| `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
+
+```bash
+gh issue create --title "..." --label "..." --body-file issue.md
+gh project item-add 4 --owner javi-technology --url <url_da_issue>
+gh project field-list 4 --owner javi-technology           # ids dos campos e opções
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <estimate_id> --number <pontos>
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <size_id> --single-select-option-id <opcao_id>
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <priority_id> --single-select-option-id <opcao_id>
+```
+
+- Uma issue sem `Estimate`, `Size` e `Priority` não está pronta para ser trabalhada.
+
 ### TDD Estrito (Red → Green → Refactor)
 
 Todo desenvolvimento segue TDD. Não há exceção.
@@ -83,7 +104,7 @@ Regras:
 - Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
 ### Fluxo Completo de Tarefa
 
-1. Verificar/criar issue no GitHub Projects
+1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
 2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>`
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
 4. Abrir PR de `issue-<N>` para `develop`, referenciando a issue (`Closes #N`)
