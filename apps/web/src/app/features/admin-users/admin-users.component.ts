@@ -29,6 +29,15 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
 const STRIPE_REVOKE_MESSAGE =
   'Assinaturas da Stripe só podem ser canceladas pelo próprio usuário no portal de pagamento.';
 
+/** Espelha `ADMIN_USERS_LIMIT` da API: acima disso a busca vem truncada. */
+export const ADMIN_USERS_LIMIT = 100;
+
+const GRANT_ERROR_MESSAGES: Record<number, string> = {
+  400: 'Não foi possível conceder o acesso. Verifique a validade informada.',
+  404: 'Não foi possível conceder o acesso. Usuário não encontrado.',
+  409: 'Não foi possível conceder o acesso. Este usuário já tem uma assinatura ativa na Stripe.',
+};
+
 @Component({
   selector: 'app-admin-users',
   standalone: true,
@@ -58,6 +67,7 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
   revokeTarget = signal<AdminUser | null>(null);
   revokeError = signal<string | null>(null);
   saving = signal(false);
+  readonly limit = ADMIN_USERS_LIMIT;
 
   searchControl = new FormControl('', { nonNullable: true });
   grantForm = this.fb.nonNullable.group({ currentPeriodEnd: '' });
@@ -121,6 +131,22 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
     );
   }
 
+  /** A API recusa concessão manual sobre assinatura Stripe vigente (409). */
+  canGrant(user: AdminUser): boolean {
+    const { provider, status, currentPeriodEnd } = user.subscription;
+    if (provider !== 'stripe') return true;
+    if (status === 'active' || status === 'trialing') return false;
+    return !(
+      status === 'past_due' &&
+      currentPeriodEnd !== null &&
+      new Date(currentPeriodEnd).getTime() > Date.now()
+    );
+  }
+
+  reachedLimit(): boolean {
+    return this.users().length >= ADMIN_USERS_LIMIT;
+  }
+
   openGrant(user: AdminUser): void {
     this.grantForm.reset({ currentPeriodEnd: '' });
     this.grantError.set(null);
@@ -153,10 +179,11 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
           this.successMessage.set(`Acesso concedido a ${user.email}.`);
           this.search();
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           this.grantError.set(
-            'Não foi possível conceder o acesso. Verifique a validade informada e tente novamente.',
+            GRANT_ERROR_MESSAGES[err.status] ??
+              'Não foi possível conceder o acesso. Tente novamente.',
           );
         },
       });
