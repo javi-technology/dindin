@@ -233,7 +233,8 @@ expostos em `GET /api/me`):
   transação ao criar a Checkout Session. Enquanto não expirar (`expires_at` da
   sessão, 24h), novas chamadas do mesmo intervalo devolvem a mesma `url`; ao
   trocar de intervalo a sessão anterior é expirada na Stripe antes de criar a
-  nova. A criação usa `idempotencyKey` estável para retries do mesmo intento.
+  nova (se ela já estava expirada na Stripe, segue normalmente). A criação usa
+  `idempotencyKey` única por requisição, estável nas reexecuções da transação.
   É removido pelos eventos `checkout.session.completed` e
   `checkout.session.expired` (somente se ainda for a mesma sessão).
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
