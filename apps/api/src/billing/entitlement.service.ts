@@ -51,6 +51,23 @@ export function toStripeState(
   };
 }
 
+/**
+ * Antes da #173, abrir o checkout gravava `provider: 'stripe'` sobre uma
+ * concessão manual. Uma assinatura Stripe real sempre tem
+ * `providerSubscriptionId` (gravado pelo webhook); sem ele, um doc
+ * `active`/`trialing` é a concessão manual original.
+ */
+export function repairAbandonedCheckout(
+  subscription: UserSubscription,
+): UserSubscription {
+  const abandoned =
+    subscription.provider === 'stripe' &&
+    !!subscription.providerCustomerId &&
+    !subscription.providerSubscriptionId &&
+    (subscription.status === 'active' || subscription.status === 'trialing');
+  return abandoned ? { ...subscription, provider: 'manual' } : subscription;
+}
+
 const STRIPE_IN_FORCE: SubscriptionStatus[] = [
   'active',
   'trialing',
@@ -63,9 +80,10 @@ const STRIPE_IN_FORCE: SubscriptionStatus[] = [
  * past_due, vale a Stripe — sem depender de um novo evento do webhook.
  */
 export function resolveSubscription(
-  subscription: UserSubscription,
+  doc: UserSubscription,
   now: Date = new Date(),
 ): UserSubscription {
+  const subscription = repairAbandonedCheckout(doc);
   const { stripe } = subscription;
   if (
     subscription.provider !== 'manual' ||

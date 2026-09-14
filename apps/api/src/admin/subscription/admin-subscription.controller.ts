@@ -10,6 +10,7 @@ import {
   isEntitled,
   listEntitlements,
   NO_SUBSCRIPTION,
+  repairAbandonedCheckout,
   resolveSubscription,
   subscriptionDoc,
   toPublicSubscription,
@@ -204,10 +205,11 @@ export async function revokeSubscription(
       return;
     }
 
-    const current: UserSubscription = {
+    const doc: UserSubscription = {
       ...NO_SUBSCRIPTION,
       ...(snapshot.data() as Partial<UserSubscription>),
     };
+    const current = repairAbandonedCheckout(doc);
     if (current.provider === 'stripe') {
       res.status(409).json({
         error: 'Only manual subscriptions can be revoked by an admin',
@@ -220,8 +222,10 @@ export async function revokeSubscription(
       return;
     }
 
-    const patch = {
-      status: 'canceled' as const,
+    const patch: Partial<UserSubscription> = {
+      status: 'canceled',
+      // Corrige no doc o provider trocado por checkout abandonado (#173)
+      ...(doc.provider !== current.provider ? { provider: 'manual' } : {}),
       updatedAt: new Date().toISOString(),
     };
     await ref.update(patch);
