@@ -4,10 +4,11 @@ import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { getStripe, getAppBaseUrl } from './stripe.client';
 import { getOrCreateCustomer } from './stripe-customer.service';
-import { effectiveStatus, getSubscription } from './entitlement.service';
+import { getSubscription } from './entitlement.service';
 import { processStripeEvent } from './billing.webhook.service';
 import {
   consumePortalQuota,
+  isInForce,
   reserveCheckoutSession,
 } from './checkout-session.service';
 
@@ -25,6 +26,13 @@ function sendError(res: Response, context: string, error: unknown): void {
   });
 }
 
+function sendAlreadySubscribed(res: Response): void {
+  res.status(409).json({
+    error: 'Assinatura já ativa',
+    code: 'ALREADY_SUBSCRIBED',
+  });
+}
+
 export async function createCheckoutSession(
   req: Request,
   res: Response,
@@ -37,14 +45,8 @@ export async function createCheckoutSession(
     }
 
     const uid = (req as AuthRequest).user!.uid;
-    const subscription = await getSubscription(uid);
-    // past_due não inicia novo checkout — resolve o pagamento no portal
-    const status = effectiveStatus(subscription);
-    if (status === 'active' || status === 'trialing' || status === 'past_due') {
-      res.status(409).json({
-        error: 'Assinatura já ativa',
-        code: 'ALREADY_SUBSCRIBED',
-      });
+    if (isInForce(await getSubscription(uid))) {
+      sendAlreadySubscribed(res);
       return;
     }
 
@@ -59,10 +61,7 @@ export async function createCheckoutSession(
     // Revalida o status na transação: o webhook pode ter ativado a assinatura
     const reservation = await reserveCheckoutSession(uid, interval, customer);
     if (reservation.kind === 'already_subscribed') {
-      res.status(409).json({
-        error: 'Assinatura já ativa',
-        code: 'ALREADY_SUBSCRIBED',
-      });
+      sendAlreadySubscribed(res);
       return;
     }
     if (reservation.kind === 'in_progress') {

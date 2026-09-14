@@ -35,7 +35,8 @@ const IDEMPOTENCY_BUCKET_SECONDS = 60 * 60;
 export const PORTAL_LIMIT_PER_WINDOW = 5;
 export const PORTAL_WINDOW_MS = 60 * 1000;
 
-function isInForce(subscription: UserSubscription): boolean {
+/** past_due não inicia novo checkout — resolve o pagamento no portal. */
+export function isInForce(subscription: UserSubscription): boolean {
   const status = effectiveStatus(subscription);
   return status === 'active' || status === 'trialing' || status === 'past_due';
 }
