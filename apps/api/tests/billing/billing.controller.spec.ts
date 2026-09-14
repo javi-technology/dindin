@@ -284,13 +284,13 @@ describe('billing controller', () => {
     );
 
     it('não concede trial para ex-assinante cancelado', async () => {
-      subGetMock.mockResolvedValue(
-        subscriptionDoc({
-          status: 'canceled',
-          providerCustomerId: 'cus_1',
-          providerSubscriptionId: 'sub_old',
-        }),
-      );
+      const doc = subscriptionDoc({
+        status: 'canceled',
+        providerCustomerId: 'cus_1',
+        providerSubscriptionId: 'sub_old',
+      });
+      subGetMock.mockResolvedValue(doc);
+      txGetMock.mockResolvedValue(doc);
 
       const response = await request(app)
         .post('/api/billing/checkout-session')

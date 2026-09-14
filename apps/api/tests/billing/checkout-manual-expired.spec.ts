@@ -30,6 +30,16 @@ jest.mock('firebase-admin', () => ({
     getUser: getUserMock,
   })),
   firestore: jest.fn(() => ({
+    runTransaction: jest.fn(async (cb: (tx: unknown) => unknown) =>
+      cb({
+        get: () => subscriptionRef.get(),
+        set: (
+          _ref: unknown,
+          data: Record<string, unknown>,
+          options?: { merge?: boolean },
+        ) => subscriptionRef.set(data, options),
+      }),
+    ),
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
         collection: jest.fn(() => ({
@@ -78,7 +88,11 @@ describe('checkout abandonado após concessão manual expirada (#173)', () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     getUserMock.mockResolvedValue({ email: 'user@example.com' });
     customerCreateMock.mockResolvedValue({ id: 'cus_new' });
-    checkoutCreateMock.mockResolvedValue({ url: 'https://checkout.test' });
+    checkoutCreateMock.mockResolvedValue({
+      id: 'cs_1',
+      url: 'https://checkout.test',
+      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+    });
     getSavedSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
   });
 
@@ -134,8 +148,11 @@ describe('checkout abandonado após concessão manual expirada (#173)', () => {
     await openCheckout();
 
     expect(customerCreateMock).toHaveBeenCalledTimes(1);
+    // A segunda abertura reutiliza a sessão pendente (#155)
+    expect(checkoutCreateMock).toHaveBeenCalledTimes(1);
     expect(checkoutCreateMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ customer: 'cus_new' }),
+      expect.anything(),
     );
   });
 });
