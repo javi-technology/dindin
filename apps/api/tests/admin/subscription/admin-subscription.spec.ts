@@ -317,6 +317,43 @@ describe('admin – assinaturas de usuários', () => {
       expect(setMock).not.toHaveBeenCalled();
     });
 
+    it.each(['active', 'trialing'])(
+      'deve responder 409 para assinatura Stripe %s',
+      async (status) => {
+        subscriptions.set('user-2', {
+          status: status as UserSubscription['status'],
+          plan: 'basic',
+          interval: 'month',
+          provider: 'stripe',
+          currentPeriodEnd: FUTURE,
+        });
+
+        const response = await grant({ plan: 'basic', currentPeriodEnd: null });
+
+        expect(response.status).toBe(409);
+        expect(response.body).toEqual({
+          error: expect.any(String),
+          code: 'STRIPE_SUBSCRIPTION',
+        });
+        expect(setMock).not.toHaveBeenCalled();
+      },
+    );
+
+    it('deve conceder acesso quando a assinatura Stripe foi cancelada', async () => {
+      subscriptions.set('user-2', {
+        status: 'canceled',
+        plan: 'basic',
+        interval: 'month',
+        provider: 'stripe',
+        currentPeriodEnd: PAST,
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: null });
+
+      expect(response.status).toBe(200);
+      expect(setMock).toHaveBeenCalled();
+    });
+
     it('deve responder 404 quando o usuário não existe', async () => {
       getUserMock.mockRejectedValue(
         Object.assign(new Error('not found'), { code: 'auth/user-not-found' }),
