@@ -11,8 +11,10 @@ import {
   isEntitled,
   listEntitlements,
   NO_SUBSCRIPTION,
+  resolveSubscription,
   subscriptionDoc,
   toPublicSubscription,
+  toStripeState,
 } from '../../billing/entitlement.service';
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
@@ -21,13 +23,19 @@ const LIST_USERS_PAGE_SIZE = 1000;
 export const ADMIN_USERS_LIMIT = 100;
 const STRIPE_SUBSCRIPTION_CODE = 'STRIPE_SUBSCRIPTION';
 
-function toAdminUser(user: UserRecord, sub: UserSubscription): AdminUser {
+/** `doc` é o documento gravado; a visão exibe o estado efetivo (#171). */
+function toAdminUser(user: UserRecord, doc: UserSubscription): AdminUser {
   const isAdmin = user.customClaims?.admin === true;
+  const sub = resolveSubscription(doc);
   return {
     uid: user.uid,
     email: user.email ?? null,
     admin: isAdmin,
-    subscription: { ...toPublicSubscription(sub), provider: sub.provider },
+    subscription: {
+      ...toPublicSubscription(sub),
+      provider: sub.provider,
+      stripeStatus: doc.stripe?.status ?? null,
+    },
     entitlements: listEntitlements(sub, isAdmin),
   };
 }
@@ -149,9 +157,14 @@ export async function grantSubscription(
       cancelAtPeriodEnd: false,
       updatedAt: new Date().toISOString(),
     };
+    // Docs anteriores à #171 guardam a Stripe só no estado principal: preserva
+    // esse estado antes que a concessão manual o sobrescreva.
+    if (current.provider === 'stripe' && !current.stripe) {
+      patch.stripe = toStripeState(current);
+    }
     await subscriptionDoc(user.uid).set(patch, { merge: true });
 
-    res.json(toAdminUser(user, { ...NO_SUBSCRIPTION, ...patch }));
+    res.json(toAdminUser(user, { ...current, ...patch }));
   } catch (error) {
     console.error('[admin.grantSubscription] error:', {
       uid: req.params.uid,
