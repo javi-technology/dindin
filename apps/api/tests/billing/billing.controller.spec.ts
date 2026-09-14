@@ -206,6 +206,42 @@ describe('billing controller', () => {
       },
     );
 
+    it('permite checkout quando a concessão manual expirou', async () => {
+      subGetMock.mockResolvedValue(
+        subscriptionDoc({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: new Date(Date.now() - 60_000).toISOString(),
+        }),
+      );
+
+      const response = await request(app)
+        .post('/api/billing/checkout-session')
+        .set('Authorization', 'Bearer token')
+        .send({ interval: 'month' });
+
+      expect(response.status).toBe(200);
+      expect(checkoutCreateMock).toHaveBeenCalled();
+    });
+
+    it('responde 409 quando a concessão manual está vigente', async () => {
+      subGetMock.mockResolvedValue(
+        subscriptionDoc({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: null,
+        }),
+      );
+
+      const response = await request(app)
+        .post('/api/billing/checkout-session')
+        .set('Authorization', 'Bearer token')
+        .send({ interval: 'month' });
+
+      expect(response.status).toBe(409);
+      expect(checkoutCreateMock).not.toHaveBeenCalled();
+    });
+
     it('não concede trial para ex-assinante cancelado', async () => {
       subGetMock.mockResolvedValue(
         subscriptionDoc({

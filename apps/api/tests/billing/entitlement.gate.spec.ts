@@ -209,6 +209,25 @@ describe('GET /api/me', () => {
     expect(JSON.stringify(response.body)).not.toContain('sub_1');
   });
 
+  it('deve devolver concessão manual expirada como canceled', async () => {
+    subscriptionGetMock.mockResolvedValue(
+      subscriptionDoc({
+        status: 'active',
+        provider: 'manual',
+        interval: null,
+        currentPeriodEnd: PAST,
+      }),
+    );
+
+    const response = await request(app)
+      .get('/api/me')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.subscription.status).toBe('canceled');
+    expect(response.body.entitlements).toEqual([]);
+  });
+
   it('deve devolver entitlement ai para admin sem assinatura', async () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'admin-1', admin: true });
     subscriptionGetMock.mockResolvedValue({ exists: false });

@@ -14,6 +14,7 @@ jest.mock('firebase-admin', () => ({
 }));
 
 import {
+  effectiveStatus,
   getSubscription,
   hasEntitlement,
   isEntitled,
@@ -108,6 +109,36 @@ describe('entitlement.service – isEntitled', () => {
     it('deve negar ai após a validade', () => {
       expect(isEntitled(manual(PAST), 'ai', false, NOW)).toBe(false);
     });
+  });
+});
+
+describe('entitlement.service – effectiveStatus', () => {
+  it('deve tratar concessão manual expirada como canceled', () => {
+    expect(
+      effectiveStatus(
+        sub({ status: 'active', provider: 'manual', currentPeriodEnd: PAST }),
+        NOW,
+      ),
+    ).toBe('canceled');
+  });
+
+  it.each([
+    [
+      'manual sem validade',
+      { provider: 'manual' as const, currentPeriodEnd: null },
+    ],
+    [
+      'manual vigente',
+      { provider: 'manual' as const, currentPeriodEnd: FUTURE },
+    ],
+    [
+      'stripe com período vencido',
+      { provider: 'stripe' as const, currentPeriodEnd: PAST },
+    ],
+  ])('deve manter o status para %s', (_label, partial) => {
+    expect(effectiveStatus(sub({ status: 'active', ...partial }), NOW)).toBe(
+      'active',
+    );
   });
 });
 
