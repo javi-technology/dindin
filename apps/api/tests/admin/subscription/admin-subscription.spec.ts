@@ -1,11 +1,14 @@
 import request from 'supertest';
-import { UserSubscription } from 'dindin-shared-types';
+import { StripeSubscriptionState, UserSubscription } from 'dindin-shared-types';
 
 const verifyIdTokenMock = jest.fn();
 const listUsersMock = jest.fn();
 const getUserMock = jest.fn();
 const setMock = jest.fn();
 const updateMock = jest.fn();
+const txGetMock = jest.fn();
+const txSetMock = jest.fn();
+const runTransactionMock = jest.fn();
 
 /** Documentos `users/{uid}/billing/subscription` em memória. */
 let subscriptions: Map<string, Partial<UserSubscription>>;
@@ -42,6 +45,7 @@ jest.mock('firebase-admin', () => ({
     getAll: jest.fn(async (...refs: Array<{ uid: string }>) =>
       refs.map((ref) => snapshotOf(ref.uid)),
     ),
+    runTransaction: runTransactionMock,
   })),
   storage: jest.fn(),
 }));
@@ -50,6 +54,15 @@ import { app } from '../../../src/index';
 
 const FUTURE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+const STRIPE_ACTIVE: StripeSubscriptionState = {
+  status: 'active',
+  interval: 'month',
+  providerSubscriptionId: 'sub_1',
+  currentPeriodEnd: FUTURE,
+  cancelAtPeriodEnd: false,
+  updatedAt: '2026-09-05T00:00:00.000Z',
+};
 
 function authUser(uid: string, email?: string, admin = false) {
   return { uid, email, customClaims: admin ? { admin: true } : undefined };
@@ -69,6 +82,15 @@ describe('admin – assinaturas de usuários', () => {
     subscriptions = new Map();
     setMock.mockResolvedValue(undefined);
     updateMock.mockResolvedValue(undefined);
+    txGetMock.mockImplementation(async (uid: string) => snapshotOf(uid));
+    runTransactionMock.mockImplementation(
+      async (cb: (tx: unknown) => unknown) =>
+        cb({
+          get: (ref: { uid: string }) => txGetMock(ref.uid),
+          set: (ref: { uid: string }, data: unknown, options: unknown) =>
+            txSetMock(ref.uid, data, options),
+        }),
+    );
     getUserMock.mockImplementation(async (uid: string) =>
       authUser(uid, `${uid}@dindin.app`),
     );
@@ -135,6 +157,7 @@ describe('admin – assinaturas de usuários', () => {
             plan: null,
             interval: null,
             provider: null,
+            stripeStatus: null,
             currentPeriodEnd: null,
             cancelAtPeriodEnd: false,
           },
@@ -149,6 +172,7 @@ describe('admin – assinaturas de usuários', () => {
             plan: 'basic',
             interval: null,
             provider: 'manual',
+            stripeStatus: null,
             currentPeriodEnd: FUTURE,
             cancelAtPeriodEnd: false,
           },
@@ -175,6 +199,57 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.body[0].subscription.status).toBe('active');
       expect(response.body[0].entitlements).toEqual([]);
+    });
+
+    it('deve indicar Stripe guardada sob concessão manual vigente', async () => {
+      listUsersMock.mockResolvedValue({
+        users: [authUser('u-1', 'u1@dindin.app')],
+      });
+      subscriptions.set('u-1', {
+        status: 'active',
+        plan: 'basic',
+        interval: null,
+        provider: 'manual',
+        currentPeriodEnd: FUTURE,
+        stripe: STRIPE_ACTIVE,
+      });
+
+      const response = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', 'Bearer token');
+
+      expect(response.body[0].subscription).toEqual(
+        expect.objectContaining({ provider: 'manual', stripeStatus: 'active' }),
+      );
+      expect(JSON.stringify(response.body)).not.toContain('sub_1');
+    });
+
+    it('deve exibir a Stripe guardada quando a concessão manual expirou', async () => {
+      listUsersMock.mockResolvedValue({
+        users: [authUser('u-1', 'u1@dindin.app')],
+      });
+      subscriptions.set('u-1', {
+        status: 'active',
+        plan: 'basic',
+        interval: null,
+        provider: 'manual',
+        currentPeriodEnd: PAST,
+        stripe: STRIPE_ACTIVE,
+      });
+
+      const response = await request(app)
+        .get('/api/admin/users')
+        .set('Authorization', 'Bearer token');
+
+      expect(response.body[0].subscription).toEqual(
+        expect.objectContaining({
+          status: 'active',
+          provider: 'stripe',
+          interval: 'month',
+          currentPeriodEnd: FUTURE,
+        }),
+      );
+      expect(response.body[0].entitlements).toEqual(['ai']);
     });
 
     it('deve filtrar por e-mail sem diferenciar maiúsculas', async () => {
@@ -264,7 +339,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({
           status: 'active',
@@ -286,6 +361,7 @@ describe('admin – assinaturas de usuários', () => {
           plan: 'basic',
           interval: null,
           provider: 'manual',
+          stripeStatus: null,
           currentPeriodEnd: FUTURE,
           cancelAtPeriodEnd: false,
         },
@@ -297,7 +373,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({ provider: 'manual', currentPeriodEnd: null }),
         { merge: true },
@@ -311,7 +387,7 @@ describe('admin – assinaturas de usuários', () => {
       });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalledWith(
+      expect(txSetMock).toHaveBeenCalledWith(
         'user-2',
         expect.objectContaining({
           currentPeriodEnd: '2100-01-01T02:59:59.000Z',
@@ -331,7 +407,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toEqual(expect.any(String));
-      expect(setMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
     });
 
     it.each(['active', 'trialing'])(
@@ -352,7 +428,7 @@ describe('admin – assinaturas de usuários', () => {
           error: expect.any(String),
           code: 'STRIPE_SUBSCRIPTION',
         });
-        expect(setMock).not.toHaveBeenCalled();
+        expect(txSetMock).not.toHaveBeenCalled();
       },
     );
 
@@ -368,7 +444,117 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(200);
-      expect(setMock).toHaveBeenCalled();
+      expect(txSetMock).toHaveBeenCalled();
+    });
+
+    it('deve responder 409 quando a Stripe guardada sob concessão expirada está ativa', async () => {
+      subscriptions.set('user-2', {
+        status: 'active',
+        plan: 'basic',
+        provider: 'manual',
+        currentPeriodEnd: PAST,
+        stripe: STRIPE_ACTIVE,
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: null });
+
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('STRIPE_SUBSCRIPTION');
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('deve guardar o estado da Stripe de docs antigos ao conceder acesso', async () => {
+      subscriptions.set('user-2', {
+        status: 'past_due',
+        plan: 'basic',
+        interval: 'month',
+        provider: 'stripe',
+        providerCustomerId: 'cus_1',
+        providerSubscriptionId: 'sub_1',
+        currentPeriodEnd: PAST,
+        cancelAtPeriodEnd: false,
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
+
+      expect(response.status).toBe(200);
+      expect(txSetMock).toHaveBeenCalledWith(
+        'user-2',
+        expect.objectContaining({
+          provider: 'manual',
+          stripe: {
+            status: 'past_due',
+            interval: 'month',
+            providerSubscriptionId: 'sub_1',
+            currentPeriodEnd: PAST,
+            cancelAtPeriodEnd: false,
+            updatedAt: expect.any(String),
+          },
+        }),
+        { merge: true },
+      );
+      expect(response.body.subscription.stripeStatus).toBe('past_due');
+    });
+
+    it('não sobrescreve o estado da Stripe já guardado ao conceder acesso', async () => {
+      subscriptions.set('user-2', {
+        status: 'canceled',
+        plan: 'basic',
+        provider: 'manual',
+        currentPeriodEnd: FUTURE,
+        stripe: {
+          ...STRIPE_ACTIVE,
+          status: 'past_due',
+          currentPeriodEnd: PAST,
+        },
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
+
+      expect(response.status).toBe(200);
+      expect(txSetMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+    });
+
+    it('deve ler e gravar a concessão na mesma transação', async () => {
+      const response = await grant({ plan: 'basic', currentPeriodEnd: null });
+
+      expect(response.status).toBe(200);
+      expect(runTransactionMock).toHaveBeenCalledTimes(1);
+      expect(txGetMock).toHaveBeenCalledWith('user-2');
+      expect(txSetMock).toHaveBeenCalledTimes(1);
+      expect(setMock).not.toHaveBeenCalled();
+    });
+
+    it('não restaura estado da Stripe antigo gravado pelo webhook durante a concessão', async () => {
+      // Leitura fora da transação ainda veria o doc antigo, sem `stripe`.
+      subscriptions.set('user-2', {
+        status: 'past_due',
+        plan: 'basic',
+        interval: 'month',
+        provider: 'stripe',
+        providerSubscriptionId: 'sub_1',
+        currentPeriodEnd: PAST,
+        cancelAtPeriodEnd: false,
+      });
+      // Dentro da transação, o webhook já gravou o cancelamento.
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          ...subscriptions.get('user-2'),
+          status: 'canceled',
+          stripe: {
+            ...STRIPE_ACTIVE,
+            status: 'canceled',
+            currentPeriodEnd: PAST,
+          },
+        }),
+      });
+
+      const response = await grant({ plan: 'basic', currentPeriodEnd: FUTURE });
+
+      expect(response.status).toBe(200);
+      expect(txSetMock.mock.calls[0][1]).not.toHaveProperty('stripe');
+      expect(response.body.subscription.stripeStatus).toBe('canceled');
     });
 
     it('deve responder 404 quando o usuário não existe', async () => {
@@ -380,7 +566,7 @@ describe('admin – assinaturas de usuários', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'User not found' });
-      expect(setMock).not.toHaveBeenCalled();
+      expect(txSetMock).not.toHaveBeenCalled();
     });
   });
 
@@ -413,6 +599,25 @@ describe('admin – assinaturas de usuários', () => {
       });
       expect(response.body.subscription.status).toBe('canceled');
       expect(response.body.entitlements).toEqual([]);
+    });
+
+    it('deve devolver a Stripe guardada após revogar a concessão manual', async () => {
+      subscriptions.set('user-2', {
+        status: 'active',
+        plan: 'basic',
+        interval: null,
+        provider: 'manual',
+        currentPeriodEnd: null,
+        stripe: STRIPE_ACTIVE,
+      });
+
+      const response = await revoke();
+
+      expect(response.status).toBe(200);
+      expect(response.body.subscription).toEqual(
+        expect.objectContaining({ status: 'active', provider: 'stripe' }),
+      );
+      expect(response.body.entitlements).toEqual(['ai']);
     });
 
     it('deve responder 409 para assinatura Stripe', async () => {

@@ -26,6 +26,14 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   canceled: 'Cancelada',
 };
 
+/** Assinatura Stripe guardada por baixo de uma concessão manual (#171). */
+const STRIPE_UNDER_MANUAL_LABELS: Partial<Record<SubscriptionStatus, string>> =
+  {
+    active: 'Stripe ativa',
+    trialing: 'Stripe em teste',
+    past_due: 'Stripe pendente',
+  };
+
 const STRIPE_REVOKE_MESSAGE =
   'Assinaturas da Stripe só podem ser canceladas pelo próprio usuário no portal de pagamento.';
 
@@ -110,7 +118,12 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
   }
 
   providerLabel(subscription: AdminSubscriptionView): string {
-    if (subscription.provider === 'manual') return 'Manual';
+    if (subscription.provider === 'manual') {
+      const stripe =
+        subscription.stripeStatus &&
+        STRIPE_UNDER_MANUAL_LABELS[subscription.stripeStatus];
+      return stripe ? `Manual (${stripe})` : 'Manual';
+    }
     if (subscription.provider === 'stripe') return 'Stripe';
     return '—';
   }

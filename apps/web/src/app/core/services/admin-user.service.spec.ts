@@ -20,6 +20,7 @@ describe('AdminUserService', () => {
       plan: 'basic',
       interval: null,
       provider: 'manual',
+      stripeStatus: null,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
     },

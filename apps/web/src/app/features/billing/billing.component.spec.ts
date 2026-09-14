@@ -134,6 +134,34 @@ describe('BillingComponent', () => {
     ).toBeNull();
   });
 
+  it('deve exibir portal e próxima cobrança quando a Stripe volta a valer após a concessão manual', async () => {
+    await setup({
+      status: 'active',
+      plan: 'basic',
+      interval: null,
+      currentPeriodEnd: '2026-09-30T23:59:59Z',
+      cancelAtPeriodEnd: false,
+    });
+    const effective: PublicSubscription = {
+      status: 'active',
+      plan: 'basic',
+      interval: 'year',
+      currentPeriodEnd: '2027-09-15T12:00:00Z',
+      cancelAtPeriodEnd: false,
+    };
+    billingServiceMock.subscription.set(effective);
+    fixture.detectChanges();
+
+    const section = fixture.nativeElement.querySelector(
+      '[data-testid="active-section"]',
+    );
+    expect(section.textContent).toContain('Plano Básico · Anual');
+    expect(section.textContent).toContain('Próxima cobrança em 15/09/2027');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="manage-button"]'),
+    ).toBeTruthy();
+  });
+
   it('deve exibir período de teste quando em trialing', async () => {
     await setup({
       status: 'trialing',

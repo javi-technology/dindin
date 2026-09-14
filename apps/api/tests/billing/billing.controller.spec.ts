@@ -242,6 +242,37 @@ describe('billing controller', () => {
       expect(checkoutCreateMock).not.toHaveBeenCalled();
     });
 
+    it.each(['active', 'trialing', 'past_due'])(
+      'responde 409 quando a Stripe guardada sob concessão expirada está %s',
+      async (status) => {
+        subGetMock.mockResolvedValue(
+          subscriptionDoc({
+            status: 'active',
+            provider: 'manual',
+            providerCustomerId: 'cus_1',
+            currentPeriodEnd: new Date(Date.now() - 60_000).toISOString(),
+            stripe: {
+              status,
+              interval: 'month',
+              providerSubscriptionId: 'sub_1',
+              currentPeriodEnd: new Date(Date.now() - 1000).toISOString(),
+              cancelAtPeriodEnd: false,
+              updatedAt: '2026-09-05T00:00:00.000Z',
+            },
+          }),
+        );
+
+        const response = await request(app)
+          .post('/api/billing/checkout-session')
+          .set('Authorization', 'Bearer token')
+          .send({ interval: 'month' });
+
+        expect(response.status).toBe(409);
+        expect(response.body.code).toBe('ALREADY_SUBSCRIBED');
+        expect(checkoutCreateMock).not.toHaveBeenCalled();
+      },
+    );
+
     it('não concede trial para ex-assinante cancelado', async () => {
       subGetMock.mockResolvedValue(
         subscriptionDoc({
@@ -327,6 +358,35 @@ describe('billing controller', () => {
         customer: 'cus_1',
         return_url: 'https://dindin-4e720.web.app/assinatura',
       });
+    });
+
+    it('cria sessão do portal durante concessão manual com customer gravado', async () => {
+      subGetMock.mockResolvedValue(
+        subscriptionDoc({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: null,
+          providerCustomerId: 'cus_1',
+          stripe: {
+            status: 'active',
+            interval: 'month',
+            providerSubscriptionId: 'sub_1',
+            currentPeriodEnd: '2999-01-01T00:00:00.000Z',
+            cancelAtPeriodEnd: false,
+            updatedAt: '2026-09-05T00:00:00.000Z',
+          },
+        }),
+      );
+
+      const response = await request(app)
+        .post('/api/billing/portal-session')
+        .set('Authorization', 'Bearer token')
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(portalCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: 'cus_1' }),
+      );
     });
 
     it('responde 404 sem customer', async () => {

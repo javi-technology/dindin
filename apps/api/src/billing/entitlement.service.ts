@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import {
   Entitlement,
   PublicSubscription,
+  StripeSubscriptionState,
   SubscriptionStatus,
   UserSubscription,
 } from 'dindin-shared-types';
@@ -28,9 +29,62 @@ export function subscriptionDoc(uid: string) {
 export async function getSubscription(uid: string): Promise<UserSubscription> {
   const snapshot = await subscriptionDoc(uid).get();
   if (!snapshot.exists) return NO_SUBSCRIPTION;
-  return {
+  return resolveSubscription({
     ...NO_SUBSCRIPTION,
     ...(snapshot.data() as Partial<UserSubscription>),
+  });
+}
+
+/** Extrai do estado principal a parte que pertence à assinatura Stripe. */
+export function toStripeState(
+  subscription: UserSubscription,
+): StripeSubscriptionState {
+  return {
+    status: subscription.status,
+    interval: subscription.interval,
+    ...(subscription.providerSubscriptionId
+      ? { providerSubscriptionId: subscription.providerSubscriptionId }
+      : {}),
+    currentPeriodEnd: subscription.currentPeriodEnd,
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    updatedAt: subscription.updatedAt,
+  };
+}
+
+const STRIPE_IN_FORCE: SubscriptionStatus[] = [
+  'active',
+  'trialing',
+  'past_due',
+];
+
+/**
+ * Estado efetivo do documento (#171): quando a concessão manual não está mais
+ * vigente (expirada ou revogada) e a Stripe guardada segue ativa, trialing ou
+ * past_due, vale a Stripe — sem depender de um novo evento do webhook.
+ */
+export function resolveSubscription(
+  subscription: UserSubscription,
+  now: Date = new Date(),
+): UserSubscription {
+  const { stripe } = subscription;
+  if (
+    subscription.provider !== 'manual' ||
+    !stripe ||
+    !STRIPE_IN_FORCE.includes(stripe.status) ||
+    isEntitled(subscription, 'ai', false, now)
+  ) {
+    return subscription;
+  }
+  return {
+    ...subscription,
+    status: stripe.status,
+    plan: 'basic',
+    interval: stripe.interval,
+    provider: 'stripe',
+    providerSubscriptionId:
+      stripe.providerSubscriptionId ?? subscription.providerSubscriptionId,
+    currentPeriodEnd: stripe.currentPeriodEnd,
+    cancelAtPeriodEnd: stripe.cancelAtPeriodEnd,
   };
 }
 
