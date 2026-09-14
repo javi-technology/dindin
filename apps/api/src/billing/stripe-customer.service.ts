@@ -15,9 +15,9 @@ export async function getOrCreateCustomer(
     metadata: { uid },
   });
 
+  // `provider` e o status só mudam pelo webhook: o checkout pode ser abandonado
   await subscriptionDoc(uid).set(
     {
-      provider: 'stripe',
       providerCustomerId: customer.id,
       updatedAt: new Date().toISOString(),
     },
