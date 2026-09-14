@@ -1,3 +1,4 @@
+import express, { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 
 const verifyIdTokenMock = jest.fn();
@@ -25,7 +26,10 @@ jest.mock('firebase-admin/storage', () => ({
 }));
 
 import { app } from '../../src/index';
-import { API_RATE_LIMIT } from '../../src/middleware/rate-limit.middleware';
+import {
+  API_RATE_LIMIT,
+  apiRateLimiter,
+} from '../../src/middleware/rate-limit.middleware';
 
 // O contador é por IP e fica em memória durante todo o arquivo; cada teste
 // usa um X-Forwarded-For próprio para não herdar requisições dos anteriores.
@@ -76,5 +80,23 @@ describe('rate limiting global da API', () => {
 
     const afterHealth = await getMe(ip);
     expect(afterHealth.status).toBe(401);
+  });
+
+  // No emulador do Functions a requisição chega sem X-Forwarded-For nem
+  // endereço de socket, então o req.ip fica undefined.
+  it('não deve quebrar a requisição quando req.ip é undefined', async () => {
+    const semIp = express();
+    semIp.use((req: Request, _res: Response, next: NextFunction) => {
+      Object.defineProperty(req, 'ip', { value: undefined });
+      next();
+    });
+    semIp.use(apiRateLimiter);
+    semIp.get('/api/me', (_req: Request, res: Response) => {
+      res.json({ ok: true });
+    });
+
+    const response = await request(semIp).get('/api/me');
+
+    expect(response.status).toBe(200);
   });
 });
