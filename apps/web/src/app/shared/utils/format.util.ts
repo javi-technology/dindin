@@ -48,6 +48,13 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Formata uma data `YYYY-MM-DD` como `dd/MM/yyyy`, sem conversão de fuso. */
+export function formatDate(value: string | undefined): string {
+  if (!value) return '—';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return `${day}/${month}/${year}`;
+}
+
 /** Formata um número como moeda compacta em reais (pt-BR). */
 export function formatCompactCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
