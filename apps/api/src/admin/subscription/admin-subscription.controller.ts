@@ -7,7 +7,6 @@ import {
   UserSubscription,
 } from 'dindin-shared-types';
 import {
-  getSubscription,
   isEntitled,
   listEntitlements,
   NO_SUBSCRIPTION,
@@ -139,8 +138,40 @@ export async function grantSubscription(
       return;
     }
 
-    const current = await getSubscription(user.uid);
-    if (current.provider === 'stripe' && isEntitled(current, 'ai')) {
+    // Leitura e gravação na mesma transação: o webhook pode gravar o estado
+    // da Stripe entre as duas e não pode ser sobrescrito por um estado antigo.
+    const ref = subscriptionDoc(user.uid);
+    const result = await admin.firestore().runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref);
+      const current = resolveSubscription({
+        ...NO_SUBSCRIPTION,
+        ...((snapshot.exists
+          ? snapshot.data()
+          : {}) as Partial<UserSubscription>),
+      });
+      if (current.provider === 'stripe' && isEntitled(current, 'ai')) {
+        return null;
+      }
+
+      const patch: Partial<UserSubscription> = {
+        status: 'active',
+        plan: parsed.plan,
+        interval: null,
+        provider: 'manual',
+        currentPeriodEnd: parsed.currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        updatedAt: new Date().toISOString(),
+      };
+      // Docs anteriores à #171 guardam a Stripe só no estado principal: preserva
+      // esse estado antes que a concessão manual o sobrescreva.
+      if (current.provider === 'stripe' && !current.stripe) {
+        patch.stripe = toStripeState(current);
+      }
+      tx.set(ref, patch, { merge: true });
+      return { ...current, ...patch };
+    });
+
+    if (!result) {
       res.status(409).json({
         error: 'User already has an active Stripe subscription',
         code: STRIPE_SUBSCRIPTION_CODE,
@@ -148,23 +179,7 @@ export async function grantSubscription(
       return;
     }
 
-    const patch: Partial<UserSubscription> = {
-      status: 'active',
-      plan: parsed.plan,
-      interval: null,
-      provider: 'manual',
-      currentPeriodEnd: parsed.currentPeriodEnd,
-      cancelAtPeriodEnd: false,
-      updatedAt: new Date().toISOString(),
-    };
-    // Docs anteriores à #171 guardam a Stripe só no estado principal: preserva
-    // esse estado antes que a concessão manual o sobrescreva.
-    if (current.provider === 'stripe' && !current.stripe) {
-      patch.stripe = toStripeState(current);
-    }
-    await subscriptionDoc(user.uid).set(patch, { merge: true });
-
-    res.json(toAdminUser(user, { ...current, ...patch }));
+    res.json(toAdminUser(user, result));
   } catch (error) {
     console.error('[admin.grantSubscription] error:', {
       uid: req.params.uid,
