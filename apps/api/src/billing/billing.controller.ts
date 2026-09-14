@@ -2,10 +2,14 @@ import { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { getStripe, getPriceId, getAppBaseUrl } from './stripe.client';
+import { getStripe, getAppBaseUrl } from './stripe.client';
 import { getOrCreateCustomer } from './stripe-customer.service';
 import { effectiveStatus, getSubscription } from './entitlement.service';
 import { processStripeEvent } from './billing.webhook.service';
+import {
+  consumePortalQuota,
+  reserveCheckoutSession,
+} from './checkout-session.service';
 
 function sendError(res: Response, context: string, error: unknown): void {
   console.error(`[${context}] error:`, error);
@@ -52,26 +56,24 @@ export async function createCheckoutSession(
     }
 
     const customer = await getOrCreateCustomer(uid, email);
-    const base = getAppBaseUrl();
-    const session = await getStripe().checkout.sessions.create({
-      mode: 'subscription',
-      customer,
-      client_reference_id: uid,
-      line_items: [{ price: getPriceId(interval), quantity: 1 }],
-      // Trial apenas na primeira assinatura — ex-assinantes não repetem
-      subscription_data: {
-        ...(subscription.providerSubscriptionId
-          ? {}
-          : { trial_period_days: 7 }),
-        metadata: { uid },
-      },
-      success_url: `${base}/assinatura?status=success`,
-      cancel_url: `${base}/assinatura?status=cancel`,
-      locale: 'pt-BR',
-      allow_promotion_codes: false,
-    });
+    // Revalida o status na transação: o webhook pode ter ativado a assinatura
+    const reservation = await reserveCheckoutSession(uid, interval, customer);
+    if (reservation.kind === 'already_subscribed') {
+      res.status(409).json({
+        error: 'Assinatura já ativa',
+        code: 'ALREADY_SUBSCRIBED',
+      });
+      return;
+    }
+    if (reservation.kind === 'in_progress') {
+      res.status(409).json({
+        error: 'Checkout em andamento',
+        code: 'CHECKOUT_IN_PROGRESS',
+      });
+      return;
+    }
 
-    res.json({ url: session.url });
+    res.json({ url: reservation.url });
   } catch (error) {
     sendError(res, 'createCheckoutSession', error);
   }
@@ -88,6 +90,15 @@ export async function createPortalSession(
       res
         .status(404)
         .json({ error: 'Cliente não encontrado', code: 'NO_CUSTOMER' });
+      return;
+    }
+
+    const retryAfter = await consumePortalQuota(uid);
+    if (retryAfter !== null) {
+      res.status(429).set('Retry-After', String(retryAfter)).json({
+        error: 'Muitas requisições, tente novamente em instantes',
+        code: 'RATE_LIMITED',
+      });
       return;
     }
 

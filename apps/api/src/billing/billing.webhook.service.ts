@@ -8,6 +8,7 @@ import {
   subscriptionDoc,
   toStripeState,
 } from './entitlement.service';
+import { clearPendingCheckout } from './checkout-session.service';
 
 function customerIdOf(sub: Stripe.Subscription): string {
   return typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -94,6 +95,9 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.mode !== 'subscription' || !session.subscription) return;
+      if (session.client_reference_id) {
+        await clearPendingCheckout(session.client_reference_id, session.id);
+      }
       const subId =
         typeof session.subscription === 'string'
           ? session.subscription
@@ -106,6 +110,13 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         return;
       }
       await upsert(uid, mapSubscription(sub, customerIdOf(sub)), event.created);
+      return;
+    }
+
+    case 'checkout.session.expired': {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (!session.client_reference_id) return;
+      await clearPendingCheckout(session.client_reference_id, session.id);
       return;
     }
 
