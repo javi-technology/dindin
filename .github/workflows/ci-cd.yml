@@ -83,6 +83,7 @@ jobs:
 
   build-and-test-api:
     name: Build and Test API
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
