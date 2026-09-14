@@ -48,7 +48,8 @@ export function toPublicSubscription(
 /**
  * `ai` é liberado quando a assinatura está `trialing`/`active`, ou `past_due`
  * ainda dentro do período pago (carência até `currentPeriodEnd`), ou o
- * usuário é admin.
+ * usuário é admin. Concessões `manual` expiram em `currentPeriodEnd`
+ * (`null` = sem validade).
  */
 export function isEntitled(
   subscription: UserSubscription,
@@ -59,15 +60,20 @@ export function isEntitled(
   if (isAdmin) return true;
   if (entitlement !== 'ai') return false;
 
+  const withinPeriod =
+    subscription.currentPeriodEnd !== null &&
+    new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+
   switch (subscription.status) {
     case 'trialing':
     case 'active':
-      return true;
-    case 'past_due':
       return (
-        subscription.currentPeriodEnd !== null &&
-        new Date(subscription.currentPeriodEnd).getTime() > now.getTime()
+        subscription.provider !== 'manual' ||
+        subscription.currentPeriodEnd === null ||
+        withinPeriod
       );
+    case 'past_due':
+      return withinPeriod;
     default:
       return false;
   }
