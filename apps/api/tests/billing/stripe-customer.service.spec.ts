@@ -46,7 +46,7 @@ describe('getOrCreateCustomer', () => {
     expect(docSetMock).not.toHaveBeenCalled();
   });
 
-  it('cria customer com email e metadata.uid e grava o id no doc', async () => {
+  it('cria customer com email e metadata.uid e grava só o id no doc', async () => {
     docGetMock.mockResolvedValue({ exists: false });
     customerCreateMock.mockResolvedValue({ id: 'cus_new' });
 
@@ -58,13 +58,32 @@ describe('getOrCreateCustomer', () => {
     });
     expect(docSetMock).toHaveBeenCalledWith(
       {
-        provider: 'stripe',
         providerCustomerId: 'cus_new',
         updatedAt: expect.any(String),
       },
       { merge: true },
     );
     expect(customerId).toBe('cus_new');
+  });
+
+  it('não altera provider nem status de uma concessão manual expirada', async () => {
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        status: 'active',
+        provider: 'manual',
+        currentPeriodEnd: '2026-01-01T00:00:00.000Z',
+      }),
+    });
+    customerCreateMock.mockResolvedValue({ id: 'cus_new' });
+
+    await getOrCreateCustomer('user-1', 'a@b.com');
+
+    const [written] = docSetMock.mock.calls[0];
+    expect(Object.keys(written).sort()).toEqual([
+      'providerCustomerId',
+      'updatedAt',
+    ]);
   });
 
   it('cria customer sem email quando indefinido', async () => {

@@ -318,6 +318,19 @@ describe('DashboardComponent', () => {
     ).toBeTruthy();
   }));
 
+  it('deve exibir link admin de usuários quando usuário é admin', fakeAsync(() => {
+    authServiceMock.isAdmin.and.returnValue(Promise.resolve(true));
+
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector(
+      '[data-testid="admin-users-link"]',
+    );
+    expect(link?.getAttribute('href')).toBe('/admin/users');
+  }));
+
   it('não deve exibir link admin quando usuário não é admin', fakeAsync(() => {
     fixture.detectChanges();
     tick();

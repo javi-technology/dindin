@@ -10,7 +10,77 @@ on:
       - main
       - develop
 
+# Permissão mínima do GITHUB_TOKEN; jobs que precisam de mais declaram a sua.
+permissions:
+  contents: read
+
 jobs:
+  # Calcula a versão semântica em tempo de execução a partir da última tag
+  # vX.Y.Z e dos Conventional Commits desde ela:
+  #   - "tipo!:" ou "BREAKING CHANGE" no corpo → major
+  #   - "feat"                                  → minor
+  #   - demais commits                          → patch
+  # Na main a versão é final (ex.: 1.2.0) e vira tag após o deploy. Nas demais
+  # branches e PRs é uma pré-release (ex.: 1.2.0-develop.42+a1b2c3d).
+  version:
+    name: Calcular versão
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calcular versão semântica
+        id: semver
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          IS_RELEASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="$LAST_TAG..HEAD"
+            BASE="${LAST_TAG#v}"
+          else
+            RANGE="HEAD"
+            BASE="0.0.0"
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+
+          SUBJECTS=$(git log "$RANGE" --no-merges --format='%s')
+          BODIES=$(git log "$RANGE" --no-merges --format='%b')
+
+          if [ -z "$SUBJECTS" ]; then
+            BUMP=none
+          elif grep -qE '^[a-z]+(\([^)]*\))?!:' <<< "$SUBJECTS" || grep -q 'BREAKING CHANGE' <<< "$BODIES"; then
+            BUMP=major
+          elif grep -qE '^feat(\([^)]*\))?:' <<< "$SUBJECTS"; then
+            BUMP=minor
+          else
+            BUMP=patch
+          fi
+
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+
+          VERSION="$MAJOR.$MINOR.$PATCH"
+          if [ "$IS_RELEASE" != "true" ]; then
+            SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
+            VERSION="$VERSION-$SLUG.${{ github.run_number }}+$(git rev-parse --short HEAD)"
+          fi
+
+          echo "Última tag: ${LAST_TAG:-nenhuma} | incremento: $BUMP | versão: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   build-and-test-api:
     name: Build and Test API
     runs-on: ubuntu-latest
@@ -53,6 +123,7 @@ jobs:
 
   build-and-test-web:
     name: Build and Test Web
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -68,6 +139,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Injeta a versão calculada no build para exibição no rodapé.
+      - name: Definir versão do app
+        env:
+          APP_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          printf "export const APP_VERSION = '%s';\n" "$APP_VERSION" > apps/web/src/environments/version.ts
 
       - name: Build Web
         run: npm run web:build
@@ -88,6 +166,7 @@ jobs:
   deploy:
     name: Deploy to Firebase
     needs:
+      - version
       - build-and-test-api
       - build-and-test-web
     # Executa apenas em push direto na main, após CI passar.
@@ -95,6 +174,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
+    # Necessário para publicar a tag da versão.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -144,3 +226,17 @@ jobs:
       # gerenciados separadamente para evitar alterações acidentais de segurança.
       - name: Deploy to Firebase
         run: npx firebase deploy --only hosting,functions --project dindin-4e720 --force
+
+      # Registra a versão publicada como tag, servindo de base para o
+      # cálculo da próxima versão.
+      - name: Criar tag da versão
+        env:
+          APP_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          TAG="v$APP_VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "Tag $TAG já existe, nada a fazer."
+            exit 0
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"

@@ -1,25 +1,56 @@
 # DinDin — Diretrizes do Projeto
 
+> Fonte das regras: `.github/copilot-instructions.md` e `.devin/rules/`. Ao alterar uma regra aqui, mantenha esses arquivos sincronizados.
+
+## Idioma
+
+- **Sempre responder em português do Brasil (pt-BR)**: interações, explicações, comentários, descrições de PR e mensagens de commit.
+
 ## Visão Geral
 
 Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 3 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+
+### Estrutura do Repositório
+
+```
+apps/
+  api/    # Cloud Functions (Express + TypeScript) — regras de negócio e APIs; src/ e tests/
+  web/    # Angular + Tailwind — src/app/{core,features,shared}/
+packages/
+  models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
+  shared-types/  # Tipos TypeScript compartilhados entre frontend e backend
+```
+
+## Comandos
+
+```bash
+npm install                                    # instalar dependências
+firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
+npm run api:build                              # build da API
+npm run build --workspace=apps/web             # build do frontend
+npm run test --workspace=apps/api              # testes da API (Jest)
+npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run format                                 # formatar com Prettier
+npm run format:check                           # verificar formatação
+firebase deploy                                # deploy completo
+```
 
 ## Fluxo de Trabalho Obrigatório
 
 ### Vínculo com Issues
 
 - **Toda implementação deve estar vinculada a uma issue do GitHub Projects** (https://github.com/orgs/javi-technology/projects/4).
-- Antes de iniciar qualquer trabalho, verificar se existe issue aberta. Se não existir, criar.
+- Antes de iniciar qualquer trabalho, verificar se existe issue aberta (`gh issue list`). Se não existir, criar.
 - Nenhum commit sem o número da issue correspondente.
 
 #### Campos obrigatórios no GitHub Projects
 
 Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
 
-| Campo      | Valores                      | Critério                                                         |
-| ---------- | ---------------------------- | ---------------------------------------------------------------- |
-| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5) |
-| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                   |
+| Campo      | Valores                      | Critério                                                                                              |
+| ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5)                               |
+| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                                                        |
 | `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
 ```bash
@@ -45,21 +76,29 @@ Regras:
 
 - Nunca escrever código de produção antes de ter um teste falhando.
 - Nunca escrever mais código do que o necessário para o teste passar.
-- Testes mantidos junto ao código que testam (co-location).
+- Testes mantidos junto ao código que testam, conforme a localização de cada camada (tabela abaixo).
 
-### Estrutura de Testes
+### Fluxo Completo de Tarefa
+
+1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>`
+3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
+4. Abrir PR de `issue-<N>` para `develop`, referenciando a issue (`Closes #N`)
+5. Merge após revisão
+
+## Testes
 
 | Camada   | Ferramenta                | Localização                   |
 | -------- | ------------------------- | ----------------------------- |
 | API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
 | Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
 
-### Regras de Teste Frontend
-- Os testes unitários do frontend devem ser **browserless**.
-- O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
-- Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
-- Prefira mockar serviços e inputs/outputs em vez de disparar eventos de DOM real.
-- Não adicione dependências de browsers reais na configuração de testes.
+### Frontend: testes unitários browserless
+
+- Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`, `singleRun: true`) — rápidos, determinísticos e compatíveis com CI sem interface gráfica.
+- Evitar dependências de APIs de navegador (`window`, `document`, `setTimeout` reais) quando não forem essenciais.
+- Preferir mockar serviços e inputs/outputs de componentes em vez de disparar eventos reais do DOM.
+- Não adicionar browsers reais (Chrome, Firefox, Safari) na configuração de testes.
 
 ## Git e Branches
 
@@ -98,40 +137,10 @@ fix(#15): corrige cálculo de total da carteira
 
 Regras:
 
-- Descrição em português, no imperativo ("adiciona", "corrige", "remove").
+- Descrição **sempre em português (pt-BR)**, no imperativo ("adiciona", "corrige", "remove").
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
-- Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
-### Fluxo Completo de Tarefa
-
-1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>`
-3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop`, referenciando a issue (`Closes #N`)
-5. Merge após revisão
-
-## Comandos
-
-```bash
-npm install                                    # instalar dependências
-firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
-npm run api:build --workspace=apps/api         # build da API
-npm run build --workspace=apps/web             # build do frontend
-npm run test --workspace=apps/api              # testes da API (Jest)
-npm run test --workspace=apps/web              # testes do frontend (Karma)
-npm run format                                # formatar com Prettier
-npm run format:check                          # verificar formatação
-firebase deploy                               # deploy completo
-```
-
-## Estrutura do Repositório
-
-Monorepo estruturado da seguinte forma:
-
-- `apps/api`: Cloud Functions (Express + TypeScript) - Regras de negócio e APIs.
-- `apps/web`: Aplicação Frontend (Angular + Tailwind CSS).
-- `packages/models`: Modelos de dados Firestore.
-- `packages/shared-types`: Tipos TypeScript compartilhados entre frontend e backend.
+- Nunca commitar com testes falhando.
 
 ## Padrões de UX e Código
 
@@ -159,39 +168,28 @@ Monorepo estruturado da seguinte forma:
 - Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).
 - Em produção, considerar logger estruturado.
 
-<!-- rtk-instructions v2 -->
+## Segurança
 
-# RTK — Token-Optimized CLI
+- Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
 
-**rtk** is a CLI proxy that filters and compresses command outputs, saving 60-90% tokens.
+## RTK — Token-Optimized CLI
 
-## Rule
+**rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
 
-Always prefix shell commands with `rtk`:
+Sempre prefixar comandos de shell com `rtk`:
 
 ```bash
-# Instead of:              Use:
+# Em vez de:              Use:
 git status                 rtk git status
 git log -10                rtk git log -10
-cargo test                 rtk cargo test
-docker ps                  rtk docker ps
-kubectl get pods           rtk kubectl pods
+npm run test               rtk npm run test
 ```
 
-## Meta commands (use directly)
+Comandos meta (usar diretamente):
 
 ```bash
-rtk gain              # Token savings dashboard
-rtk gain --history    # Per-command savings history
-rtk discover          # Find missed rtk opportunities
-rtk proxy <cmd>       # Run raw (no filtering) but track usage
+rtk gain              # dashboard de economia de tokens
+rtk gain --history    # histórico de economia por comando
+rtk discover          # encontrar oportunidades perdidas de uso do rtk
+rtk proxy <cmd>       # rodar sem filtragem, mas registrar uso
 ```
-
-<!-- /rtk-instructions -->
-
-## Idioma do Agente
-
-- **Sempre responder em português do Brasil (pt-BR)**.
-- **Mensagens de Commit**: Devem ser sempre em português, no imperativo (ex: "adiciona", "corrige", "ajusta").
-- Todas as interações, explicações e comentários devem ser feitos neste idioma.
-

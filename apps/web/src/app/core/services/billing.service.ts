@@ -6,6 +6,7 @@ import {
   MeResponse,
   PublicSubscription,
   SubscriptionInterval,
+  SubscriptionStatus,
 } from 'dindin-shared-types';
 import { AuthService } from './auth.service';
 
@@ -16,6 +17,12 @@ const EMPTY_SUBSCRIPTION: PublicSubscription = {
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
 };
+
+const SUBSCRIBER_STATUSES: SubscriptionStatus[] = [
+  'active',
+  'trialing',
+  'past_due',
+];
 
 @Injectable({
   providedIn: 'root',
@@ -33,6 +40,13 @@ export class BillingService {
     () => this.meState()?.entitlements ?? [],
   );
   readonly hasAi = computed(() => this.entitlements().includes('ai'));
+  /**
+   * Indica assinatura vigente, independente do acesso de admin. O `/api/me`
+   * já devolve concessão manual expirada como `canceled`.
+   */
+  readonly isSubscriber = computed(() =>
+    SUBSCRIBER_STATUSES.includes(this.subscription().status),
+  );
   /** Ligado pelo interceptor quando a API responde SUBSCRIPTION_REQUIRED. */
   readonly subscriptionRequired = signal(false);
 

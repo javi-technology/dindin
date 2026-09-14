@@ -70,6 +70,41 @@ describe('BillingService', () => {
     expect(service.hasAi()).toBeFalse();
   });
 
+  it('não deve considerar assinante antes de carregar', () => {
+    expect(service.isSubscriber()).toBeFalse();
+  });
+
+  (
+    [
+      ['active', true],
+      ['trialing', true],
+      ['past_due', true],
+      ['canceled', false],
+      ['none', false],
+    ] as const
+  ).forEach(([status, expected]) => {
+    it(`deve indicar assinante=${expected} para status ${status}`, () => {
+      service.loadMe().subscribe();
+      httpMock
+        .expectOne('/api/me')
+        .flush({ ...me, subscription: { ...me.subscription, status } });
+
+      expect(service.isSubscriber()).toBe(expected);
+    });
+  });
+
+  it('não deve considerar assinante o admin sem assinatura', () => {
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush({
+      ...me,
+      admin: true,
+      subscription: { ...me.subscription, status: 'none' },
+      entitlements: ['ai'],
+    });
+
+    expect(service.isSubscriber()).toBeFalse();
+  });
+
   it('deve iniciar checkout e redirecionar para a url retornada', () => {
     spyOn(service, 'redirectTo');
 

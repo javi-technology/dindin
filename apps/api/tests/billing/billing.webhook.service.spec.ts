@@ -32,6 +32,10 @@ jest.mock('firebase-admin', () => ({
   storage: jest.fn(),
 }));
 
+jest.mock('firebase-admin/firestore', () => ({
+  FieldValue: { delete: jest.fn(() => 'DELETE_FIELD') },
+}));
+
 jest.mock('stripe', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => mockStripe),
@@ -79,6 +83,15 @@ function makeEvent(
   } as unknown as Stripe.Event;
 }
 
+const STRIPE_STATE = {
+  status: 'active',
+  interval: 'month',
+  providerSubscriptionId: 'sub_1',
+  currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+  cancelAtPeriodEnd: false,
+  updatedAt: expect.any(String),
+};
+
 describe('processStripeEvent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -119,6 +132,7 @@ describe('processStripeEvent', () => {
         providerSubscriptionId: 'sub_1',
         currentPeriodEnd: '2030-01-01T00:00:00.000Z',
         providerEventCreated: 2000,
+        stripe: STRIPE_STATE,
       }),
       { merge: true },
     );
@@ -247,6 +261,220 @@ describe('processStripeEvent', () => {
     await processStripeEvent(makeEvent('payment_intent.succeeded', {}));
 
     expect(txSetMock).not.toHaveBeenCalled();
+  });
+
+  describe('limpeza de pendingCheckout', () => {
+    const pending = (sessionId: string) => ({
+      exists: true,
+      data: () => ({
+        status: 'none',
+        pendingCheckout: {
+          sessionId,
+          url: `https://checkout.test/${sessionId}`,
+          expiresAt: '2030-01-01T00:00:00.000Z',
+          interval: 'month',
+        },
+      }),
+    });
+
+    it('checkout.session.completed remove pendingCheckout da sessão', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+
+      await processStripeEvent(
+        makeEvent('checkout.session.completed', {
+          id: 'cs_1',
+          mode: 'subscription',
+          subscription: 'sub_1',
+          client_reference_id: 'user-1',
+        }),
+      );
+
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        { pendingCheckout: 'DELETE_FIELD' },
+        { merge: true },
+      );
+    });
+
+    it('checkout.session.completed só remove pendingCheckout depois de gravar a assinatura', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+
+      await processStripeEvent(
+        makeEvent('checkout.session.completed', {
+          id: 'cs_1',
+          mode: 'subscription',
+          subscription: 'sub_1',
+          client_reference_id: 'user-1',
+        }),
+      );
+
+      const writes = txSetMock.mock.calls.map(([, data]) => data);
+      expect(writes).toHaveLength(2);
+      expect(writes[0]).toEqual(
+        expect.objectContaining({ status: 'active', provider: 'stripe' }),
+      );
+      expect(writes[1]).toEqual({ pendingCheckout: 'DELETE_FIELD' });
+    });
+
+    it('checkout.session.completed mantém pendingCheckout quando a gravação falha', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+      subscriptionsRetrieveMock.mockRejectedValue(new Error('stripe down'));
+
+      await expect(
+        processStripeEvent(
+          makeEvent('checkout.session.completed', {
+            id: 'cs_1',
+            mode: 'subscription',
+            subscription: 'sub_1',
+            client_reference_id: 'user-1',
+          }),
+        ),
+      ).rejects.toThrow('stripe down');
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.expired remove pendingCheckout da sessão', async () => {
+      txGetMock.mockResolvedValue(pending('cs_1'));
+
+      await processStripeEvent(
+        makeEvent('checkout.session.expired', {
+          id: 'cs_1',
+          mode: 'subscription',
+          client_reference_id: 'user-1',
+        }),
+      );
+
+      expect(docPathMock).toHaveBeenCalledWith(
+        'users',
+        'user-1',
+        'billing',
+        'subscription',
+      );
+      expect(txSetMock).toHaveBeenCalledTimes(1);
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        { pendingCheckout: 'DELETE_FIELD' },
+        { merge: true },
+      );
+      expect(subscriptionsRetrieveMock).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.expired preserva pendingCheckout de outra sessão', async () => {
+      txGetMock.mockResolvedValue(pending('cs_new'));
+
+      await processStripeEvent(
+        makeEvent('checkout.session.expired', {
+          id: 'cs_1',
+          mode: 'subscription',
+          client_reference_id: 'user-1',
+        }),
+      );
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.expired sem client_reference_id não escreve nada', async () => {
+      await processStripeEvent(
+        makeEvent('checkout.session.expired', {
+          id: 'cs_1',
+          mode: 'subscription',
+          client_reference_id: null,
+        }),
+      );
+
+      expect(runTransactionMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('concessão manual existente', () => {
+    const FUTURE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const manual = (status: string, currentPeriodEnd: string | null) => ({
+      exists: true,
+      data: () => ({ status, provider: 'manual', currentPeriodEnd }),
+    });
+
+    it.each([
+      ['com validade futura', FUTURE],
+      ['sem validade', null],
+    ])(
+      'preserva concessão manual ativa %s gravando só os ids da Stripe',
+      async (_label, end) => {
+        txGetMock.mockResolvedValue(manual('active', end));
+
+        await processStripeEvent(
+          makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+        );
+
+        expect(txSetMock).toHaveBeenCalledTimes(1);
+        expect(txSetMock).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            providerCustomerId: 'cus_1',
+            providerSubscriptionId: 'sub_1',
+            providerEventCreated: 3000,
+            stripe: STRIPE_STATE,
+          },
+          { merge: true },
+        );
+      },
+    );
+
+    it('guarda cancelamento da Stripe sem encerrar a concessão manual', async () => {
+      txGetMock.mockResolvedValue(manual('active', FUTURE));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.deleted', makeSubscription(), 3000),
+      );
+
+      const [, data] = txSetMock.mock.calls[0];
+      expect(data).not.toHaveProperty('status');
+      expect(data).not.toHaveProperty('provider');
+      expect(data.stripe).toEqual({ ...STRIPE_STATE, status: 'canceled' });
+    });
+
+    it('ignora evento antigo mesmo com concessão manual ativa', async () => {
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: null,
+          providerEventCreated: 5000,
+        }),
+      });
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+      );
+
+      expect(txSetMock).not.toHaveBeenCalled();
+    });
+
+    it('sobrescreve concessão manual expirada', async () => {
+      txGetMock.mockResolvedValue(manual('active', PAST));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription()),
+      );
+
+      expect(txSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ provider: 'stripe', stripe: STRIPE_STATE }),
+        { merge: true },
+      );
+    });
+
+    it('sobrescreve concessão manual revogada', async () => {
+      txGetMock.mockResolvedValue(manual('canceled', FUTURE));
+
+      await processStripeEvent(
+        makeEvent('customer.subscription.updated', makeSubscription()),
+      );
+
+      expect(txSetMock).toHaveBeenCalled();
+    });
   });
 
   describe('eventos fora de ordem', () => {
