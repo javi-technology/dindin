@@ -260,11 +260,41 @@ describe('processStripeEvent', () => {
     it.each([
       ['com validade futura', FUTURE],
       ['sem validade', null],
-    ])('não sobrescreve concessão manual ativa %s', async (_label, end) => {
-      txGetMock.mockResolvedValue(manual('active', end));
+    ])(
+      'preserva concessão manual ativa %s gravando só os ids da Stripe',
+      async (_label, end) => {
+        txGetMock.mockResolvedValue(manual('active', end));
+
+        await processStripeEvent(
+          makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+        );
+
+        expect(txSetMock).toHaveBeenCalledTimes(1);
+        expect(txSetMock).toHaveBeenCalledWith(
+          expect.anything(),
+          {
+            providerCustomerId: 'cus_1',
+            providerSubscriptionId: 'sub_1',
+            providerEventCreated: 3000,
+          },
+          { merge: true },
+        );
+      },
+    );
+
+    it('ignora evento antigo mesmo com concessão manual ativa', async () => {
+      txGetMock.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          status: 'active',
+          provider: 'manual',
+          currentPeriodEnd: null,
+          providerEventCreated: 5000,
+        }),
+      });
 
       await processStripeEvent(
-        makeEvent('customer.subscription.updated', makeSubscription()),
+        makeEvent('customer.subscription.updated', makeSubscription(), 3000),
       );
 
       expect(txSetMock).not.toHaveBeenCalled();
