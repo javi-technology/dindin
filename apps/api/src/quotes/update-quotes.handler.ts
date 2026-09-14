@@ -1,6 +1,6 @@
 import { fetchQuotes, QuoteResult } from './brapi.service';
 import { fetchYahooQuotes } from './yahoo-quote.service';
-import { fetchMonthlyDividends } from './dividend-fetch.service';
+import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 
@@ -18,10 +18,16 @@ interface SourcedQuote extends QuoteResult {
 async function processTickerQuote(
   ticker: string,
   quote: SourcedQuote,
-  monthlyDividend: number | undefined,
+  dividend: DividendInfo | undefined,
 ): Promise<void> {
   try {
-    await saveQuoteHistory(ticker, quote.price, monthlyDividend, quote.source);
+    await saveQuoteHistory(
+      ticker,
+      quote.price,
+      dividend?.monthlyDividend,
+      quote.source,
+      dividend?.paymentDate,
+    );
     console.log(
       `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${quote.source}).`,
     );
@@ -114,7 +120,7 @@ export async function updateAllQuotes(): Promise<void> {
     const tickerList = assetList.map((asset) => asset.ticker);
     const quotes = await fetchQuotesWithFallback(tickerList);
 
-    let dividends: Map<string, number>;
+    let dividends: Map<string, DividendInfo>;
     try {
       dividends = await fetchMonthlyDividends(assetList);
     } catch (error) {
@@ -129,11 +135,7 @@ export async function updateAllQuotes(): Promise<void> {
       const batch = tickerEntries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map(([ticker, quote]) =>
-          processTickerQuote(
-            ticker,
-            quote,
-            dividends.has(ticker) ? dividends.get(ticker) : undefined,
-          ),
+          processTickerQuote(ticker, quote, dividends.get(ticker)),
         ),
       );
     }

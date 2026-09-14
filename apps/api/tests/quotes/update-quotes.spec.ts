@@ -110,12 +110,14 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         0.92,
         'brapi',
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
         10.32,
         0.07,
         'brapi',
+        undefined,
       );
     });
 
@@ -169,6 +171,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         undefined,
         'brapi',
+        undefined,
       );
     });
 
@@ -215,12 +218,14 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         0.92,
         'brapi',
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
         10.3,
         0.07,
         'yahoo',
+        undefined,
       );
     });
 
@@ -268,6 +273,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         0.92,
         'brapi',
+        undefined,
       );
     });
 
@@ -296,6 +302,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         10.32,
         0.07,
         'brapi',
+        undefined,
       );
     });
 
@@ -324,6 +331,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         undefined,
         'brapi',
+        undefined,
       );
 
       consoleErrorSpy.mockRestore();
@@ -364,6 +372,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           10 + i,
           (10 + i) / 100,
           'brapi',
+          undefined,
         );
       }
     });
@@ -396,6 +405,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         164.9,
         undefined,
         'yahoo',
+        undefined,
       );
 
       consoleErrorSpy.mockRestore();
