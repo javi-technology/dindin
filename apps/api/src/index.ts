@@ -8,6 +8,7 @@ import {
   AuthRequest,
 } from './middleware/auth.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
+import { adminRateLimiter } from './middleware/rate-limit.middleware';
 import {
   effectiveStatus,
   getSubscription,
@@ -158,19 +159,36 @@ app.post('/api/billing/checkout-session', createCheckoutSession);
 app.post('/api/billing/portal-session', createPortalSession);
 
 app.get('/api/assets', listAssets);
-app.get('/api/admin/assets', adminAuthMiddleware, listAllAssets);
-app.post('/api/admin/assets', adminAuthMiddleware, createAsset);
-app.put('/api/admin/assets/:ticker', adminAuthMiddleware, updateAsset);
+app.get(
+  '/api/admin/assets',
+  adminAuthMiddleware,
+  adminRateLimiter,
+  listAllAssets,
+);
+app.post(
+  '/api/admin/assets',
+  adminAuthMiddleware,
+  adminRateLimiter,
+  createAsset,
+);
+app.put(
+  '/api/admin/assets/:ticker',
+  adminAuthMiddleware,
+  adminRateLimiter,
+  updateAsset,
+);
 
-app.get('/api/admin/users', adminAuthMiddleware, listUsers);
+app.get('/api/admin/users', adminAuthMiddleware, adminRateLimiter, listUsers);
 app.put(
   '/api/admin/users/:uid/subscription',
   adminAuthMiddleware,
+  adminRateLimiter,
   grantSubscription,
 );
 app.delete(
   '/api/admin/users/:uid/subscription',
   adminAuthMiddleware,
+  adminRateLimiter,
   revokeSubscription,
 );
 
@@ -233,11 +251,13 @@ app.post(
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',
   adminAuthMiddleware,
+  adminRateLimiter,
   importRecommended,
 );
 app.put(
   '/api/admin/recommended-wallets/bb-fii/:id/confirm',
   adminAuthMiddleware,
+  adminRateLimiter,
   confirmRecommended,
 );
 
