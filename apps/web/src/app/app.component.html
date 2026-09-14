@@ -1,11 +1,26 @@
 <header
   class="bg-white shadow-sm px-6 py-4 flex flex-wrap justify-between items-center gap-3"
 >
-  <a
-    routerLink="/"
-    class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
-    >DinDin</a
-  >
+  <div class="flex items-center gap-2">
+    <a
+      routerLink="/"
+      class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+      >DinDin</a
+    >
+    @if (user() && subscriptionLoaded()) {
+      <span
+        data-testid="subscription-badge"
+        class="rounded-full px-2 py-0.5 text-xs font-medium"
+        [class]="
+          isSubscriber()
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-gray-100 text-gray-600'
+        "
+      >
+        {{ isSubscriber() ? 'Assinante' : 'Não assinante' }}
+      </span>
+    }
+  </div>
   <div class="flex flex-wrap items-center gap-4">
     @if (user(); as currentUser) {
       <nav class="flex flex-wrap items-center gap-4" data-testid="main-nav">

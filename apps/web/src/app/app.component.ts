@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import {
   RouterOutlet,
   RouterLink,
@@ -6,6 +6,7 @@ import {
   Router,
 } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
+import { BillingService } from './core/services/billing.service';
 import { APP_VERSION } from '../environments/version';
 
 @Component({
@@ -17,9 +18,22 @@ import { APP_VERSION } from '../environments/version';
 export class AppComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly billingService = inject(BillingService);
 
   user = this.authService.user;
+  readonly subscriptionLoaded = this.billingService.loaded;
+  readonly isSubscriber = this.billingService.isSubscriber;
   readonly version = APP_VERSION;
+
+  constructor() {
+    // Carrega a assinatura para a badge do cabeçalho; o BillingService limpa o
+    // estado ao trocar de usuário, o que dispara um novo carregamento.
+    effect(() => {
+      if (this.user() && !this.subscriptionLoaded()) {
+        this.billingService.loadMe().subscribe({ error: () => undefined });
+      }
+    });
+  }
 
   async logout(): Promise<void> {
     await this.authService.logout();
