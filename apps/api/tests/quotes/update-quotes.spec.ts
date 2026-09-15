@@ -2,14 +2,9 @@ const mockFetchQuotes = jest.fn();
 const mockSaveQuoteHistory = jest.fn();
 const mockListActiveAssetTickers = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
-const mockFetchYahooQuotes = jest.fn();
 
 jest.mock('../../src/quotes/brapi.service', () => ({
   fetchQuotes: mockFetchQuotes,
-}));
-
-jest.mock('../../src/quotes/yahoo-quote.service', () => ({
-  fetchYahooQuotes: mockFetchYahooQuotes,
 }));
 
 jest.mock('../../src/quotes/dividend-fetch.service', () => ({
@@ -30,7 +25,6 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchMonthlyDividends.mockResolvedValue(new Map());
-    mockFetchYahooQuotes.mockResolvedValue(new Map());
   });
 
   describe('sem ativos no catálogo', () => {
@@ -201,7 +195,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(3);
     });
 
-    it('não deve buscar em outra fonte os tickers que a Brapi não retornou', async () => {
+    it('não deve salvar os tickers que a Brapi não retornou', async () => {
       const consoleWarnSpy = jest
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
@@ -211,15 +205,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
-      mockFetchYahooQuotes.mockResolvedValue(
-        new Map([
-          ['MXRF11', { price: 10.3, updatedAt: '2026-07-15T18:00:00Z' }],
-        ]),
-      );
 
       await updateAllQuotes();
 
-      expect(mockFetchYahooQuotes).not.toHaveBeenCalled();
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(1);
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'HGLG11',
@@ -381,7 +369,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
   });
 
   describe('erro na Brapi', () => {
-    it('deve lançar erro sem consultar outra fonte quando a Brapi falha totalmente, para acionar o retry do scheduler', async () => {
+    it('deve lançar erro quando a Brapi falha totalmente, para acionar o retry do scheduler', async () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
@@ -389,11 +377,6 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         { ticker: 'HGLG11', assetType: 'FII' },
       ]);
       mockFetchQuotes.mockRejectedValue(new Error('Brapi API error'));
-      mockFetchYahooQuotes.mockResolvedValue(
-        new Map([
-          ['HGLG11', { price: 164.9, updatedAt: '2026-07-15T18:00:00Z' }],
-        ]),
-      );
 
       await expect(updateAllQuotes()).rejects.toThrow(
         'Nenhuma cotação obtida na Brapi: Brapi API error',
@@ -402,7 +385,6 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         '[updateAllQuotes] Erro ao buscar cotações na Brapi:',
         expect.objectContaining({ message: 'Brapi API error' }),
       );
-      expect(mockFetchYahooQuotes).not.toHaveBeenCalled();
       expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();

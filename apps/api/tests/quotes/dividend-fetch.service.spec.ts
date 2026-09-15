@@ -1,33 +1,16 @@
 import { fetchMonthlyDividends } from '../../src/quotes/dividend-fetch.service';
 import { ActiveAsset } from '../../src/assets/asset.service';
-import YahooFinance from 'yahoo-finance2';
-
-jest.mock('yahoo-finance2', () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
 
 describe('DividendFetchService — fetchMonthlyDividends', () => {
   const originalFetch = globalThis.fetch;
-  const chartMock = jest.fn();
-  const quoteSummaryMock = jest.fn();
-  const YahooFinanceMock = YahooFinance as unknown as jest.Mock;
 
   beforeEach(() => {
     process.env.BRAPI_API_KEY = 'test-api-key';
-    chartMock.mockReset();
-    quoteSummaryMock.mockReset();
-    quoteSummaryMock.mockResolvedValue({});
-    YahooFinanceMock.mockImplementation(() => ({
-      chart: chartMock,
-      quoteSummary: quoteSummaryMock,
-    }));
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     delete process.env.BRAPI_API_KEY;
-    YahooFinanceMock.mockReset();
   });
 
   function mockFetch(response: unknown, status = 200) {
@@ -357,32 +340,21 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
   });
 
   describe('Brapi como fonte única', () => {
-    it('não deve consultar outra fonte quando a Brapi falhar', async () => {
+    it('deve retornar sem provento os tickers quando a Brapi falhar', async () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue({
-        events: {
-          dividends: {
-            '1784084400000': {
-              date: new Date('2026-07-15T03:00:00.000Z'),
-              amount: 1.25,
-            },
-          },
-        },
-      });
 
       const result = await fetchMonthlyDividends([
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
       expect(result.has('PETR4')).toBe(false);
-      expect(YahooFinanceMock).not.toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });
 
-    it('não deve complementar em outra fonte os tickers que a Brapi não retornou', async () => {
+    it('deve retornar sem provento os tickers que a Brapi não retornou', async () => {
       const fetchMock = jest.fn().mockImplementation((url: string) => {
         if (url.includes('/api/v2/fii/dividends')) {
           return Promise.resolve({
@@ -418,7 +390,6 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         paymentDate: '2026-07-14',
       });
       expect(result.has('PETR4')).toBe(false);
-      expect(YahooFinanceMock).not.toHaveBeenCalled();
     });
   });
 
