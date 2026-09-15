@@ -7,12 +7,13 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { Subject, takeUntil, finalize } from 'rxjs';
+import { Subject, takeUntil, finalize, merge } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
+  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
@@ -31,6 +32,10 @@ import {
   formatPercent,
   parseDecimal,
 } from '../../shared/utils/format.util';
+import {
+  resolveQuantity,
+  weightedAveragePrice,
+} from '../../shared/utils/position-quantity.util';
 import {
   LucideWallet,
   LucidePlus,
@@ -89,11 +94,17 @@ export class WalletComponent implements OnInit, OnDestroy {
     targetPrice: ['0', [Validators.required, decimalValidator()]],
   });
 
+  /** Quantidade e preço médio da posição ao abrir o formulário. */
+  private originalQuantity = 0;
+  private originalAveragePrice = '0';
+  private averagePriceRecalculated = false;
+
   form: FormGroup = this.fb.group({
     ticker: ['', [Validators.required]],
     assetType: ['FII', [Validators.required]],
-    quantity: [0, [Validators.required, Validators.min(0.0001)]],
+    quantity: ['0', [Validators.required, this.quantityValidator()]],
     averagePrice: ['0', [Validators.required, decimalValidator()]],
+    purchasePrice: ['', [decimalValidator()]],
   });
 
   /** Retorna o preço unitário atual (mercado) ou o preço médio como fallback. */
@@ -133,6 +144,12 @@ export class WalletComponent implements OnInit, OnDestroy {
   };
 
   ngOnInit(): void {
+    merge(
+      this.form.controls['quantity'].valueChanges,
+      this.form.controls['purchasePrice'].valueChanges,
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.syncAveragePrice());
     this.loadWallets();
     this.loadFridges();
     this.loadAssets();
@@ -309,21 +326,78 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.editingPosition.set(position);
     this.formVisible.set(true);
     this.formError.set(null);
+    this.originalQuantity = position?.quantity ?? 0;
+    this.originalAveragePrice = String(position?.averagePrice ?? 0);
+    this.averagePriceRecalculated = false;
 
-    if (position) {
-      this.form.patchValue({
-        ticker: position.ticker,
-        assetType: position.assetType,
-        quantity: position.quantity,
-        averagePrice: String(position.averagePrice),
-      });
-    } else {
-      this.form.reset({
-        ticker: '',
-        assetType: 'FII',
-        quantity: 0,
-        averagePrice: '0',
-      });
+    this.form.reset({
+      ticker: position?.ticker ?? '',
+      assetType: position?.assetType ?? 'FII',
+      purchasePrice: '',
+      quantity: String(this.originalQuantity),
+      averagePrice: this.originalAveragePrice,
+    });
+  }
+
+  /** Indica se a quantidade digitada é uma compra (`+N`). */
+  isAddingQuantity(): boolean {
+    return this.quantityText().startsWith('+');
+  }
+
+  /** Total resultante quando a quantidade é informada como variação. */
+  quantityPreview(): string | null {
+    if (!/^[+-]/.test(this.quantityText())) return null;
+    const resolved = resolveQuantity(
+      this.quantityText(),
+      this.originalQuantity,
+    );
+    return resolved
+      ? `Total: ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(resolved.quantity)}`
+      : null;
+  }
+
+  private quantityText(): string {
+    return String(this.form.controls['quantity'].value ?? '').trim();
+  }
+
+  private quantityValidator(): ValidatorFn {
+    return (control) =>
+      resolveQuantity(control.value, this.originalQuantity)
+        ? null
+        : { invalidQuantity: true };
+  }
+
+  /** Recalcula o preço médio em compras (`+N`) com preço da compra informado. */
+  private syncAveragePrice(): void {
+    const purchasePriceControl = this.form.controls['purchasePrice'];
+    const averagePriceControl = this.form.controls['averagePrice'];
+
+    if (!this.isAddingQuantity() && purchasePriceControl.value) {
+      purchasePriceControl.setValue('', { emitEvent: false });
+    }
+
+    const resolved = resolveQuantity(
+      this.quantityText(),
+      this.originalQuantity,
+    );
+    const purchasePrice = parseDecimal(purchasePriceControl.value);
+
+    if (
+      resolved?.mode === 'add' &&
+      purchasePrice !== null &&
+      purchasePrice >= 0
+    ) {
+      const averagePrice = weightedAveragePrice(
+        this.originalQuantity,
+        parseDecimal(this.originalAveragePrice) ?? 0,
+        resolved.quantity - this.originalQuantity,
+        purchasePrice,
+      );
+      averagePriceControl.setValue(averagePrice.toFixed(2));
+      this.averagePriceRecalculated = true;
+    } else if (this.averagePriceRecalculated) {
+      averagePriceControl.setValue(this.originalAveragePrice);
+      this.averagePriceRecalculated = false;
     }
   }
 
@@ -347,13 +421,15 @@ export class WalletComponent implements OnInit, OnDestroy {
     }
 
     const ticker = this.form.value.ticker as string;
-    const quantity = Number(this.form.value.quantity);
+    const quantity = resolveQuantity(
+      this.form.value.quantity,
+      this.originalQuantity,
+    )?.quantity;
     const averagePrice = this.parseDecimal(this.form.value.averagePrice);
 
     if (
       !ticker ||
-      Number.isNaN(quantity) ||
-      quantity <= 0 ||
+      quantity === undefined ||
       averagePrice === null ||
       averagePrice < 0
     ) {
