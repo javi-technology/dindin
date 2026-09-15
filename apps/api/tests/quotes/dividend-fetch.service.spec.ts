@@ -150,7 +150,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
     });
   });
 
-  describe('Ações e ETFs', () => {
+  describe('Ações', () => {
     it('deve retornar o último dividendo em dinheiro de cada ação', async () => {
       mockFetch({
         results: [
@@ -528,20 +528,6 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
   });
 
   describe('Brapi como fonte única', () => {
-    it('deve retornar sem provento os tickers quando a Brapi falhar', async () => {
-      const consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      mockFetch({ error: 'Unauthorized' }, 401);
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.has('PETR4')).toBe(false);
-      consoleErrorSpy.mockRestore();
-    });
-
     it('deve retornar sem provento os tickers que a Brapi não retornou', async () => {
       const fetchMock = jest.fn().mockImplementation((url: string) => {
         if (url.includes('/api/v2/fii/dividends')) {

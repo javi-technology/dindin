@@ -7,10 +7,6 @@ export interface DividendInfo {
   paymentDate?: string; // YYYY-MM-DD
 }
 
-export interface MonthlyDividendResult extends DividendInfo {
-  ticker: string;
-}
-
 interface FiiDividendEvent {
   symbol: string;
   label: string;
@@ -52,6 +48,8 @@ const BRAPI_STOCKS_DIVIDENDS_URL = 'https://brapi.dev/api/v2/stocks/dividends';
 // requisição (limite do plano Pro); acima disso a Brapi responde 400.
 const FII_BATCH_SIZE = 20;
 const STOCKS_BATCH_SIZE = 20;
+const BATCH_ERROR_LOG_MESSAGE =
+  '[fetchMonthlyDividends] Erro ao buscar lote de dividendos:';
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -75,14 +73,10 @@ function latestEventDate(a: string, b: string): number {
 // As datas vêm de APIs externas: `null`, strings vazias ou valores inválidos
 // não podem virar uma data (ex.: `new Date(null)` é 1970-01-01).
 function toDateOnly(value: unknown): string | undefined {
-  let date: Date;
-  if (value instanceof Date) {
-    date = value;
-  } else if (typeof value === 'string' && value.trim() !== '') {
-    date = new Date(value);
-  } else {
+  if (typeof value !== 'string' || value.trim() === '') {
     return undefined;
   }
+  const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? undefined
     : date.toISOString().slice(0, 10);
@@ -98,7 +92,7 @@ function dividendInfo(
 
 async function fetchFiiDividendBatch(
   tickers: string[],
-): Promise<MonthlyDividendResult[]> {
+): Promise<Map<string, DividendInfo>> {
   const symbols = tickers.join(',');
   const url = `${BRAPI_FII_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
   const response = await fetch(url, { headers: buildAuthHeaders() });
@@ -139,15 +133,17 @@ async function fetchFiiDividendBatch(
     }
   }
 
-  return [...byTicker.entries()].map(([ticker, event]) => ({
-    ticker,
-    ...dividendInfo(event.rate, event.paymentDate),
-  }));
+  return new Map(
+    [...byTicker.entries()].map(([ticker, event]) => [
+      ticker,
+      dividendInfo(event.rate, event.paymentDate),
+    ]),
+  );
 }
 
 async function fetchStocksDividendBatch(
   tickers: string[],
-): Promise<MonthlyDividendResult[]> {
+): Promise<Map<string, DividendInfo>> {
   const symbols = tickers.join(',');
   const url = `${BRAPI_STOCKS_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
   const response = await fetch(url, { headers: buildAuthHeaders() });
@@ -171,7 +167,7 @@ async function fetchStocksDividendBatch(
   }
 
   const results = (data as StockDividendsResponse).results;
-  const output: MonthlyDividendResult[] = [];
+  const output = new Map<string, DividendInfo>();
 
   for (const item of results) {
     const dividends = item.data?.cashDividends ?? [];
@@ -184,10 +180,10 @@ async function fetchStocksDividendBatch(
     if (typeof latest.rate !== 'number' || !Number.isFinite(latest.rate)) {
       continue;
     }
-    output.push({
-      ticker: (item.requestedSymbol ?? item.symbol).toUpperCase(),
-      ...dividendInfo(latest.rate, latest.paymentDate),
-    });
+    output.set(
+      (item.requestedSymbol ?? item.symbol).toUpperCase(),
+      dividendInfo(latest.rate, latest.paymentDate),
+    );
   }
 
   return output;
@@ -204,22 +200,6 @@ function isStockLike(assetType: AssetType): boolean {
   return assetType === 'STOCK' || assetType === 'OTHER';
 }
 
-async function fetchBatches(
-  tickers: string[],
-  batchSize: number,
-  fetchBatch: (batch: string[]) => Promise<MonthlyDividendResult[]>,
-): Promise<Map<string, DividendInfo>> {
-  return fetchInBatches(
-    tickers,
-    batchSize,
-    async (batch) =>
-      new Map(
-        (await fetchBatch(batch)).map(({ ticker, ...info }) => [ticker, info]),
-      ),
-    '[fetchMonthlyDividends] Erro ao buscar lote de dividendos:',
-  );
-}
-
 export async function fetchMonthlyDividends(
   assets: ActiveAsset[],
 ): Promise<Map<string, DividendInfo>> {
@@ -231,18 +211,22 @@ export async function fetchMonthlyDividends(
     .map((a) => a.ticker);
 
   const [fiiMap, stocksMap] = await Promise.all([
-    fetchBatches(fiiTickers, FII_BATCH_SIZE, fetchFiiDividendBatch).catch(
-      (error) => {
-        console.error('[fetchMonthlyDividends] Erro ao buscar FIIs:', {
-          message: toError(error).message,
-        });
-        return new Map<string, DividendInfo>();
-      },
-    ),
-    fetchBatches(
+    fetchInBatches(
+      fiiTickers,
+      FII_BATCH_SIZE,
+      fetchFiiDividendBatch,
+      BATCH_ERROR_LOG_MESSAGE,
+    ).catch((error) => {
+      console.error('[fetchMonthlyDividends] Erro ao buscar FIIs:', {
+        message: toError(error).message,
+      });
+      return new Map<string, DividendInfo>();
+    }),
+    fetchInBatches(
       stockTickers,
       STOCKS_BATCH_SIZE,
       fetchStocksDividendBatch,
+      BATCH_ERROR_LOG_MESSAGE,
     ).catch((error) => {
       console.error('[fetchMonthlyDividends] Erro ao buscar stocks:', {
         message: toError(error).message,

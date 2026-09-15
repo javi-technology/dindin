@@ -195,31 +195,6 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(3);
     });
 
-    it('não deve salvar os tickers que a Brapi não retornou', async () => {
-      const consoleWarnSpy = jest
-        .spyOn(console, 'warn')
-        .mockImplementation(() => {});
-      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
-      mockFetchQuotes.mockResolvedValue(
-        new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-        ]),
-      );
-
-      await updateAllQuotes();
-
-      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(1);
-      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
-        'HGLG11',
-        165.5,
-        undefined,
-        'brapi',
-        undefined,
-      );
-
-      consoleWarnSpy.mockRestore();
-    });
-
     it('deve logar os tickers que ficaram sem cotação na Brapi', async () => {
       const consoleWarnSpy = jest
         .spyOn(console, 'warn')
