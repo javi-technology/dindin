@@ -1,5 +1,6 @@
 import { AssetType } from 'dindin-models';
 import { ActiveAsset } from '../assets/asset.service';
+import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 
 export interface DividendInfo {
   monthlyDividend: number;
@@ -35,6 +36,8 @@ interface StockDividendsData {
 
 interface StockDividendsResult {
   symbol: string;
+  // Ticker pedido; difere de `symbol` quando o ativo foi renomeado.
+  requestedSymbol?: string;
   data?: StockDividendsData;
 }
 
@@ -101,8 +104,9 @@ async function fetchFiiDividendBatch(
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
-    throw new Error(
+    throw new BrapiHttpError(
       `Brapi FII dividends API returned status ${response.status}`,
+      response.status,
     );
   }
 
@@ -149,8 +153,9 @@ async function fetchStocksDividendBatch(
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
-    throw new Error(
+    throw new BrapiHttpError(
       `Brapi stocks dividends API returned status ${response.status}`,
+      response.status,
     );
   }
 
@@ -180,7 +185,7 @@ async function fetchStocksDividendBatch(
       continue;
     }
     output.push({
-      ticker: item.symbol.toUpperCase(),
+      ticker: (item.requestedSymbol ?? item.symbol).toUpperCase(),
       ...dividendInfo(latest.rate, latest.paymentDate),
     });
   }
@@ -192,8 +197,11 @@ function isFii(assetType: AssetType): boolean {
   return assetType === 'FII' || assetType === 'REIT';
 }
 
+// ETFs ficam de fora: a Brapi não tem proventos de ETFs (o endpoint de FIIs
+// retorna vazio) e o endpoint de ações recusa o lote inteiro com 400
+// (FII_DIVIDENDS_MISUSE) quando recebe um ticker como BOVA11.
 function isStockLike(assetType: AssetType): boolean {
-  return assetType === 'STOCK' || assetType === 'ETF' || assetType === 'OTHER';
+  return assetType === 'STOCK' || assetType === 'OTHER';
 }
 
 async function fetchBatches(
@@ -201,33 +209,15 @@ async function fetchBatches(
   batchSize: number,
   fetchBatch: (batch: string[]) => Promise<MonthlyDividendResult[]>,
 ): Promise<Map<string, DividendInfo>> {
-  const resultMap = new Map<string, DividendInfo>();
-  let lastError: Error | undefined;
-
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    try {
-      const batchResults = await fetchBatch(batch);
-      for (const { ticker, ...info } of batchResults) {
-        resultMap.set(ticker, info);
-      }
-    } catch (error) {
-      lastError = toError(error);
-      console.error(
-        '[fetchMonthlyDividends] Erro ao buscar lote de dividendos:',
-        {
-          tickers: batch,
-          message: lastError.message,
-        },
-      );
-    }
-  }
-
-  if (lastError && resultMap.size === 0) {
-    throw lastError;
-  }
-
-  return resultMap;
+  return fetchInBatches(
+    tickers,
+    batchSize,
+    async (batch) =>
+      new Map(
+        (await fetchBatch(batch)).map(({ ticker, ...info }) => [ticker, info]),
+      ),
+    '[fetchMonthlyDividends] Erro ao buscar lote de dividendos:',
+  );
 }
 
 export async function fetchMonthlyDividends(

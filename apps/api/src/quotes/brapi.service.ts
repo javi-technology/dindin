@@ -1,3 +1,5 @@
+import { BrapiHttpError, fetchInBatches } from './brapi-batch';
+
 export interface QuoteResult {
   price: number;
   updatedAt: string;
@@ -5,6 +7,9 @@ export interface QuoteResult {
 
 interface BrapiResult {
   symbol: string;
+  // Ticker pedido; difere de `symbol` quando o ativo foi renomeado
+  // (ex.: VIIA3 → BHIA3).
+  requestedSymbol?: string;
   data?: {
     regularMarketPrice: number | null;
     regularMarketTime: string | null;
@@ -30,10 +35,6 @@ function getMaxSymbolsPerRequest(): number {
     : MAX_SYMBOLS_PER_REQUEST;
 }
 
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
 async function fetchQuoteBatch(
   tickers: string[],
 ): Promise<Map<string, QuoteResult>> {
@@ -51,7 +52,10 @@ async function fetchQuoteBatch(
   const response = await fetch(url, { headers });
 
   if (!response.ok) {
-    throw new Error(`Brapi API returned status ${response.status}`);
+    throw new BrapiHttpError(
+      `Brapi API returned status ${response.status}`,
+      response.status,
+    );
   }
 
   const data: unknown = await response.json();
@@ -71,7 +75,7 @@ async function fetchQuoteBatch(
   for (const item of results) {
     const price = item.data?.regularMarketPrice ?? null;
     if (price !== null && price !== undefined) {
-      quoteMap.set(item.symbol.toUpperCase(), {
+      quoteMap.set((item.requestedSymbol ?? item.symbol).toUpperCase(), {
         price,
         updatedAt: item.data?.regularMarketTime ?? new Date().toISOString(),
       });
@@ -88,29 +92,10 @@ export async function fetchQuotes(
     return new Map();
   }
 
-  const batchSize = getMaxSymbolsPerRequest();
-  const quoteMap = new Map<string, QuoteResult>();
-  let lastError: Error | undefined;
-
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    try {
-      const batchQuotes = await fetchQuoteBatch(batch);
-      for (const [symbol, quote] of batchQuotes) {
-        quoteMap.set(symbol, quote);
-      }
-    } catch (error) {
-      lastError = toError(error);
-      console.error('[fetchQuotes] Erro ao buscar lote de tickers:', {
-        tickers: batch,
-        message: lastError.message,
-      });
-    }
-  }
-
-  if (lastError && quoteMap.size === 0) {
-    throw lastError;
-  }
-
-  return quoteMap;
+  return fetchInBatches(
+    tickers,
+    getMaxSymbolsPerRequest(),
+    fetchQuoteBatch,
+    '[fetchQuotes] Erro ao buscar lote de tickers:',
+  );
 }
