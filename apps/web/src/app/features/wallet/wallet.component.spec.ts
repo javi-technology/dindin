@@ -971,4 +971,184 @@ describe('WalletComponent', () => {
       );
     }));
   });
+
+  describe('variação de quantidade (+N/-N)', () => {
+    const mxrf: Position = {
+      id: 'position-mxrf',
+      walletId: 'wallet-1',
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 32,
+      averagePrice: 9.18,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    const editWith = (values: Record<string, string>): void => {
+      fixture.componentInstance.openForm(mxrf);
+      fixture.componentInstance.form.patchValue(values);
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      positionServiceMock.update.and.returnValue(of(mxrf));
+    });
+
+    it('deve aceitar texto no campo de quantidade', () => {
+      editWith({ quantity: '+27' });
+      const input = (fixture.nativeElement as HTMLElement).querySelector(
+        'input#quantity',
+      ) as HTMLInputElement;
+      expect(input.type).toBe('text');
+      expect(input.value).toBe('+27');
+    });
+
+    it('deve somar +N à quantidade atual e manter o preço médio', fakeAsync(() => {
+      editWith({ quantity: '+27' });
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-mxrf',
+        {
+          ticker: 'MXRF11',
+          assetType: 'FII',
+          quantity: 59,
+          averagePrice: 9.18,
+        },
+      );
+    }));
+
+    it('deve subtrair -N da quantidade atual sem alterar o preço médio', fakeAsync(() => {
+      editWith({ quantity: '-10' });
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-mxrf',
+        jasmine.objectContaining({ quantity: 22, averagePrice: 9.18 }),
+      );
+    }));
+
+    it('deve continuar aceitando o valor total', fakeAsync(() => {
+      editWith({ quantity: '59' });
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-mxrf',
+        jasmine.objectContaining({ quantity: 59 }),
+      );
+    }));
+
+    it('deve exibir o total resultante ao informar variação', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      editWith({ quantity: '+27' });
+      expect(
+        compiled.querySelector('[data-testid="quantity-preview"]')?.textContent,
+      ).toContain('Total: 59');
+
+      editWith({ quantity: '-10' });
+      expect(
+        compiled.querySelector('[data-testid="quantity-preview"]')?.textContent,
+      ).toContain('Total: 22');
+
+      editWith({ quantity: '59' });
+      expect(
+        compiled.querySelector('[data-testid="quantity-preview"]'),
+      ).toBeNull();
+    });
+
+    it('deve exibir o campo de preço da compra apenas ao somar', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      editWith({ quantity: '+27' });
+      expect(compiled.querySelector('input#purchasePrice')).toBeTruthy();
+
+      editWith({ quantity: '-10' });
+      expect(compiled.querySelector('input#purchasePrice')).toBeNull();
+
+      editWith({ quantity: '59' });
+      expect(compiled.querySelector('input#purchasePrice')).toBeNull();
+    });
+
+    it('deve recalcular o preço médio com o preço da compra', fakeAsync(() => {
+      editWith({ quantity: '+27', purchasePrice: '9,45' });
+      expect(
+        parseFloat(fixture.componentInstance.form.value.averagePrice),
+      ).toBe(9.3);
+
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).toHaveBeenCalledWith(
+        'wallet-1',
+        'position-mxrf',
+        jasmine.objectContaining({ quantity: 59, averagePrice: 9.3 }),
+      );
+    }));
+
+    it('deve restaurar o preço médio ao limpar o preço da compra', () => {
+      editWith({ quantity: '+27', purchasePrice: '9,45' });
+      fixture.componentInstance.form.patchValue({ purchasePrice: '' });
+      expect(fixture.componentInstance.form.value.averagePrice).toBe('9.18');
+    });
+
+    it('deve restaurar o preço médio ao deixar de somar', () => {
+      editWith({ quantity: '+27', purchasePrice: '9,45' });
+      fixture.componentInstance.form.patchValue({ quantity: '-10' });
+      expect(fixture.componentInstance.form.value.averagePrice).toBe('9.18');
+    });
+
+    it('não deve salvar quando o resultado não for maior que zero', fakeAsync(() => {
+      editWith({ quantity: '-32' });
+      expect(
+        fixture.componentInstance.form.get('quantity')?.invalid,
+      ).toBeTrue();
+
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).not.toHaveBeenCalled();
+    }));
+
+    it('não deve salvar entrada inválida', fakeAsync(() => {
+      editWith({ quantity: '+abc' });
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.update).not.toHaveBeenCalled();
+    }));
+
+    it('deve tratar +N como total na criação de posição', fakeAsync(() => {
+      positionServiceMock.create.and.returnValue(of(mxrf));
+      fixture.componentInstance.openForm();
+      fixture.componentInstance.form.patchValue({
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: '+15',
+        purchasePrice: '9,80',
+      });
+      fixture.componentInstance.savePosition();
+      tick();
+
+      expect(positionServiceMock.create).toHaveBeenCalledWith('wallet-1', {
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: 15,
+        averagePrice: 9.8,
+      });
+    }));
+
+    it('deve rejeitar -N na criação de posição', () => {
+      fixture.componentInstance.openForm();
+      fixture.componentInstance.form.patchValue({ quantity: '-5' });
+      expect(
+        fixture.componentInstance.form.get('quantity')?.invalid,
+      ).toBeTrue();
+    });
+  });
 });
