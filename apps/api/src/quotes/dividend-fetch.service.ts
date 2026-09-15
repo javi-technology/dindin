@@ -1,5 +1,4 @@
 import { AssetType } from 'dindin-models';
-import YahooFinance from 'yahoo-finance2';
 import { ActiveAsset } from '../assets/asset.service';
 
 export interface DividendInfo {
@@ -46,17 +45,10 @@ interface StockDividendsResponse {
 const BRAPI_FII_DIVIDENDS_URL = 'https://brapi.dev/api/v2/fii/dividends';
 const BRAPI_STOCKS_DIVIDENDS_URL = 'https://brapi.dev/api/v2/stocks/dividends';
 
-// Endpoint de FIIs aceita até 20 símbolos por requisição.
+// Os endpoints de proventos de FIIs e de ações aceitam até 20 símbolos por
+// requisição (limite do plano Pro); acima disso a Brapi responde 400.
 const FII_BATCH_SIZE = 20;
-// Endpoint de ações — usamos um limite conservador para evitar problemas
-// de planos com restrições similares.
 const STOCKS_BATCH_SIZE = 20;
-
-// Yahoo Finance não possui endpoint de lote para dividendos; consultamos
-// símbolo a símbolo. O limite evita chamadas excessivas em carteiras muito
-// grandes caso a Brapi falhe completamente.
-const YAHOO_MAX_TICKERS = 50;
-const YAHOO_LOOKBACK_DAYS = 365;
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -238,125 +230,6 @@ async function fetchBatches(
   return resultMap;
 }
 
-interface YahooFinanceChartDividendEvent {
-  amount: number;
-  date: Date;
-}
-
-function isYahooFinanceDividendEvent(
-  value: unknown,
-): value is YahooFinanceChartDividendEvent {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'amount' in value &&
-    typeof (value as { amount: unknown }).amount === 'number' &&
-    Number.isFinite((value as { amount: number }).amount) &&
-    'date' in value &&
-    (value as { date: unknown }).date instanceof Date
-  );
-}
-
-function buildYahooTicker(ticker: string): string {
-  return `${ticker}.SA`;
-}
-
-/**
- * O `chart` do Yahoo só informa a data ex (data com) de cada provento. A data
- * de pagamento vem de `calendarEvents.dividendDate`, que só é aceita quando a
- * data ex do `calendarEvents` é a mesma do provento usado para o valor —
- * senão ela se refere a outro evento (ex.: o próximo provento anunciado).
- */
-async function fetchYahooPaymentDate(
-  yahooFinance: InstanceType<typeof YahooFinance>,
-  ticker: string,
-  exDividendDate: Date,
-): Promise<Date | undefined> {
-  try {
-    const summary = await yahooFinance.quoteSummary(buildYahooTicker(ticker), {
-      modules: ['calendarEvents'],
-    });
-    const calendar = summary.calendarEvents;
-    const calendarExDate = toDateOnly(calendar?.exDividendDate);
-    const sameEvent =
-      calendarExDate !== undefined &&
-      calendarExDate === toDateOnly(exDividendDate);
-    if (sameEvent && toDateOnly(calendar?.dividendDate)) {
-      return calendar?.dividendDate;
-    }
-  } catch (error) {
-    console.error(
-      '[fetchYahooFinanceDividends] Erro ao buscar data de pagamento no Yahoo Finance:',
-      {
-        ticker,
-        message: toError(error).message,
-      },
-    );
-  }
-  return undefined;
-}
-
-function yahooLookbackStartDate(): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - YAHOO_LOOKBACK_DAYS);
-  return date;
-}
-
-async function fetchYahooFinanceDividends(
-  tickers: string[],
-): Promise<MonthlyDividendResult[]> {
-  const output: MonthlyDividendResult[] = [];
-  const startDate = yahooLookbackStartDate();
-  const yahooFinance = new YahooFinance();
-
-  for (const ticker of tickers.slice(0, YAHOO_MAX_TICKERS)) {
-    try {
-      const chart = await yahooFinance.chart(buildYahooTicker(ticker), {
-        period1: startDate,
-        period2: new Date(),
-        events: 'div',
-      });
-
-      const dividends = chart.events?.dividends;
-      if (!dividends || typeof dividends !== 'object') {
-        continue;
-      }
-
-      const events = Object.values(dividends).filter(
-        isYahooFinanceDividendEvent,
-      );
-      if (events.length === 0) {
-        continue;
-      }
-
-      const sorted = [...events].sort(
-        (a, b) => b.date.getTime() - a.date.getTime(),
-      );
-      const latest = sorted[0];
-      const paymentDate = await fetchYahooPaymentDate(
-        yahooFinance,
-        ticker,
-        latest.date,
-      );
-
-      output.push({
-        ticker: ticker.toUpperCase(),
-        ...dividendInfo(latest.amount, paymentDate),
-      });
-    } catch (error) {
-      console.error(
-        '[fetchYahooFinanceDividends] Erro ao buscar dividendos no Yahoo Finance:',
-        {
-          ticker,
-          message: toError(error).message,
-        },
-      );
-    }
-  }
-
-  return output;
-}
-
 export async function fetchMonthlyDividends(
   assets: ActiveAsset[],
 ): Promise<Map<string, DividendInfo>> {
@@ -388,28 +261,18 @@ export async function fetchMonthlyDividends(
     }),
   ]);
 
+  // A Brapi é a fonte oficial e única de proventos (issue #212): tickers sem
+  // retorno ficam sem provento, sem consulta a outras fontes.
   const merged = new Map<string, DividendInfo>();
   for (const [ticker, value] of fiiMap) merged.set(ticker, value);
   for (const [ticker, value] of stocksMap) merged.set(ticker, value);
-
-  const allTickers = new Set([...fiiTickers, ...stockTickers]);
-  const missingTickers = [...allTickers].filter(
-    (ticker) => !merged.has(ticker.toUpperCase()),
-  );
-
-  if (missingTickers.length > 0) {
-    const yahooResults = await fetchYahooFinanceDividends(missingTickers);
-    for (const { ticker, ...info } of yahooResults) {
-      merged.set(ticker, info);
-    }
-  }
 
   const withoutPaymentDate = [...merged.entries()]
     .filter(([, info]) => !info.paymentDate)
     .map(([ticker]) => ticker);
   if (withoutPaymentDate.length > 0) {
     console.warn(
-      '[fetchMonthlyDividends] Tickers com provento sem data de pagamento em nenhuma fonte:',
+      '[fetchMonthlyDividends] Tickers com provento sem data de pagamento na Brapi:',
       { tickers: withoutPaymentDate },
     );
   }

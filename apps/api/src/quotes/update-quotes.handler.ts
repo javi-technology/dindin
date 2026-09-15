@@ -1,5 +1,4 @@
 import { fetchQuotes, QuoteResult } from './brapi.service';
-import { fetchYahooQuotes } from './yahoo-quote.service';
 import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
@@ -9,15 +8,12 @@ import { listActiveAssetTickers } from '../assets/asset.service';
 // conforme o catálogo de ativos crescer.
 const BATCH_SIZE = 10;
 
-type QuoteSource = 'brapi' | 'yahoo';
-
-interface SourcedQuote extends QuoteResult {
-  source: QuoteSource;
-}
+// A Brapi é a fonte oficial e única de cotações e proventos (issue #212).
+const QUOTE_SOURCE = 'brapi';
 
 async function processTickerQuote(
   ticker: string,
-  quote: SourcedQuote,
+  quote: QuoteResult,
   dividend: DividendInfo | undefined,
 ): Promise<void> {
   try {
@@ -25,11 +21,11 @@ async function processTickerQuote(
       ticker,
       quote.price,
       dividend?.monthlyDividend,
-      quote.source,
+      QUOTE_SOURCE,
       dividend?.paymentDate,
     );
     console.log(
-      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${quote.source}).`,
+      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${QUOTE_SOURCE}).`,
     );
   } catch (error) {
     console.error(`[updateAllQuotes] Erro ao atualizar ${ticker}:`, {
@@ -39,49 +35,28 @@ async function processTickerQuote(
 }
 
 /**
- * Busca cotações na Brapi e, para os tickers que ficaram sem preço (ou se a
- * Brapi falhar por completo), tenta o Yahoo Finance como fallback.
+ * Busca cotações na Brapi, a fonte oficial e única do DinDin.
  *
- * Lança erro apenas quando a Brapi falhou E nenhuma fonte retornou cotação,
- * para que o scheduler acione o retry.
+ * Tickers sem cotação são apenas logados. Lança erro quando a Brapi falha por
+ * completo, para que o scheduler acione o retry.
  */
-async function fetchQuotesWithFallback(
+async function fetchBrapiQuotes(
   tickerList: string[],
-): Promise<Map<string, SourcedQuote>> {
-  const quotes = new Map<string, SourcedQuote>();
-  let brapiError: Error | undefined;
-
+): Promise<Map<string, QuoteResult>> {
+  let quotes: Map<string, QuoteResult>;
   try {
-    for (const [ticker, quote] of await fetchQuotes(tickerList)) {
-      quotes.set(ticker, { ...quote, source: 'brapi' });
-    }
+    quotes = await fetchQuotes(tickerList);
   } catch (error) {
-    brapiError = error as Error;
+    const brapiError = error as Error;
     console.error('[updateAllQuotes] Erro ao buscar cotações na Brapi:', {
       message: brapiError.message,
     });
-  }
-
-  const missingTickers = tickerList.filter((ticker) => !quotes.has(ticker));
-  if (missingTickers.length > 0) {
-    const yahooQuotes = await fetchYahooQuotes(missingTickers);
-    for (const [ticker, quote] of yahooQuotes) {
-      quotes.set(ticker, { ...quote, source: 'yahoo' });
-    }
-    console.log(
-      `[updateAllQuotes] Fallback Yahoo: ${yahooQuotes.size} de ${missingTickers.length} ticker(s) recuperado(s).`,
-    );
-  }
-
-  if (brapiError && quotes.size === 0) {
-    throw new Error(
-      `Nenhuma cotação obtida (Brapi e Yahoo Finance falharam): ${brapiError.message}`,
-    );
+    throw new Error(`Nenhuma cotação obtida na Brapi: ${brapiError.message}`);
   }
 
   const withoutQuote = tickerList.filter((ticker) => !quotes.has(ticker));
   if (withoutQuote.length > 0) {
-    console.warn('[updateAllQuotes] Tickers sem cotação em nenhuma fonte:', {
+    console.warn('[updateAllQuotes] Tickers sem cotação na Brapi:', {
       tickers: withoutQuote,
     });
   }
@@ -118,7 +93,7 @@ export async function updateAllQuotes(): Promise<void> {
     );
 
     const tickerList = assetList.map((asset) => asset.ticker);
-    const quotes = await fetchQuotesWithFallback(tickerList);
+    const quotes = await fetchBrapiQuotes(tickerList);
 
     let dividends: Map<string, DividendInfo>;
     try {
@@ -140,10 +115,8 @@ export async function updateAllQuotes(): Promise<void> {
       );
     }
 
-    const bySource = { brapi: 0, yahoo: 0 };
-    for (const quote of quotes.values()) bySource[quote.source]++;
     console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s) (brapi: ${bySource.brapi}, yahoo: ${bySource.yahoo}).`,
+      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s) via Brapi.`,
     );
   } catch (error) {
     console.error('[updateAllQuotes] error:', {
