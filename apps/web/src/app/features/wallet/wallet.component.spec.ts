@@ -1105,7 +1105,9 @@ describe('WalletComponent', () => {
 
     it('não deve salvar quando o resultado não for maior que zero', fakeAsync(() => {
       editWith({ quantity: '-32' });
-      expect(fixture.componentInstance.form.get('quantity')?.invalid).toBeTrue();
+      expect(
+        fixture.componentInstance.form.get('quantity')?.invalid,
+      ).toBeTrue();
 
       fixture.componentInstance.savePosition();
       tick();
@@ -1144,7 +1146,9 @@ describe('WalletComponent', () => {
     it('deve rejeitar -N na criação de posição', () => {
       fixture.componentInstance.openForm();
       fixture.componentInstance.form.patchValue({ quantity: '-5' });
-      expect(fixture.componentInstance.form.get('quantity')?.invalid).toBeTrue();
+      expect(
+        fixture.componentInstance.form.get('quantity')?.invalid,
+      ).toBeTrue();
     });
   });
 });

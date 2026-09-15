@@ -6,7 +6,10 @@ import {
 describe('position-quantity.util', () => {
   describe('resolveQuantity', () => {
     it('usa o valor informado como total', () => {
-      expect(resolveQuantity('59', 32)).toEqual({ mode: 'total', quantity: 59 });
+      expect(resolveQuantity('59', 32)).toEqual({
+        mode: 'total',
+        quantity: 59,
+      });
     });
 
     it('aceita número como total', () => {
