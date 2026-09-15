@@ -15,17 +15,19 @@ interface BrapiResponse {
   results: BrapiResult[];
 }
 
+// O endpoint de cotações v2 atende ações, FIIs e ETFs na mesma chamada.
 const BRAPI_BASE_URL = 'https://brapi.dev/api/v2/stocks/quote';
 
-// O plano gratuito da Brapi permite apenas 1 ativo por requisição
-// (planos pagos permitem mais — ver BRAPI_MAX_SYMBOLS_PER_REQUEST).
-const DEFAULT_MAX_SYMBOLS_PER_REQUEST = 1;
+// O plano Pro da Brapi aceita até 20 ativos por requisição; acima disso a
+// API responde 400 (QUOTES_PER_REQUEST_EXCEEDED). BRAPI_MAX_SYMBOLS_PER_REQUEST
+// permite reduzir o lote (ex.: plano com limite menor), nunca ultrapassar 20.
+const MAX_SYMBOLS_PER_REQUEST = 20;
 
 function getMaxSymbolsPerRequest(): number {
   const parsed = Number(process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST);
   return Number.isInteger(parsed) && parsed > 0
-    ? parsed
-    : DEFAULT_MAX_SYMBOLS_PER_REQUEST;
+    ? Math.min(parsed, MAX_SYMBOLS_PER_REQUEST)
+    : MAX_SYMBOLS_PER_REQUEST;
 }
 
 function toError(error: unknown): Error {
