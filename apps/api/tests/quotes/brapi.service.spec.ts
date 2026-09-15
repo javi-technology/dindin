@@ -49,47 +49,51 @@ describe('BrapiService — fetchQuotes', () => {
       });
     });
 
-    it('deve retornar cotações para múltiplos tickers, um por requisição (limite do plano gratuito)', async () => {
-      const quoteBySymbol: Record<
-        string,
-        { regularMarketPrice: number; regularMarketTime: string }
-      > = {
-        HGLG11: {
-          regularMarketPrice: 165.5,
-          regularMarketTime: '2026-07-15T18:00:00-03:00',
-        },
-        MXRF11: {
-          regularMarketPrice: 10.32,
-          regularMarketTime: '2026-07-15T18:00:00-03:00',
-        },
-        KNRI11: {
-          regularMarketPrice: 152.0,
-          regularMarketTime: '2026-07-15T18:00:00-03:00',
-        },
-      };
-
-      const fetchMock = jest.fn().mockImplementation((url: string) => {
-        const symbol = new URL(url).searchParams.get('symbols') as string;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: jest.fn().mockResolvedValue({
-            results: [{ symbol, data: quoteBySymbol[symbol] }],
-          }),
-        });
+    it('deve retornar cotações de ações e FIIs na mesma requisição (até 20 ativos, limite do plano Pro)', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          results: [
+            {
+              symbol: 'HGLG11',
+              data: {
+                regularMarketPrice: 165.5,
+                regularMarketTime: '2026-07-15T18:00:00-03:00',
+              },
+            },
+            {
+              symbol: 'MXRF11',
+              data: {
+                regularMarketPrice: 10.32,
+                regularMarketTime: '2026-07-15T18:00:00-03:00',
+              },
+            },
+            {
+              symbol: 'PETR4',
+              data: {
+                regularMarketPrice: 48.92,
+                regularMarketTime: '2026-07-15T18:00:00-03:00',
+              },
+            },
+          ],
+        }),
       });
       globalThis.fetch = fetchMock;
 
-      const result = await fetchQuotes(['HGLG11', 'MXRF11', 'KNRI11']);
+      const result = await fetchQuotes(['HGLG11', 'MXRF11', 'PETR4']);
 
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toContain(
+        'brapi.dev/api/v2/stocks/quote?symbols=HGLG11%2CMXRF11%2CPETR4',
+      );
       expect(result.size).toBe(3);
       expect(result.get('HGLG11')?.price).toBe(165.5);
       expect(result.get('MXRF11')?.price).toBe(10.32);
-      expect(result.get('KNRI11')?.price).toBe(152.0);
+      expect(result.get('PETR4')?.price).toBe(48.92);
     });
 
-    it('deve chamar uma requisição por ticker (plano gratuito permite 1 ativo por requisição) com Authorization header', async () => {
+    it('deve enviar a chave via header Authorization, e não na query string', async () => {
       const fetchMock = jest.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -97,25 +101,52 @@ describe('BrapiService — fetchQuotes', () => {
       });
       globalThis.fetch = fetchMock;
 
-      await fetchQuotes(['HGLG11', 'MXRF11']);
+      await fetchQuotes(['HGLG11']);
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-
-      const firstUrl = fetchMock.mock.calls[0][0] as string;
-      const secondUrl = fetchMock.mock.calls[1][0] as string;
-      expect(firstUrl).toContain(
-        'brapi.dev/api/v2/stocks/quote?symbols=HGLG11',
-      );
-      expect(secondUrl).toContain(
-        'brapi.dev/api/v2/stocks/quote?symbols=MXRF11',
-      );
-      expect(firstUrl).not.toContain('token=');
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).not.toContain('token=');
 
       const options = fetchMock.mock.calls[0][1] as Record<string, unknown>;
       expect(options).toBeDefined();
       expect((options.headers as Record<string, string>)['Authorization']).toBe(
         'Bearer test-api-key',
       );
+    });
+
+    it('deve agrupar em lotes de 20 tickers por padrão', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ results: [] }),
+      });
+      globalThis.fetch = fetchMock;
+      const tickers = Array.from({ length: 45 }, (_, i) => `TICK${i}11`);
+
+      await fetchQuotes(tickers);
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const symbolsPerCall = fetchMock.mock.calls.map(
+        ([url]) =>
+          (new URL(url as string).searchParams.get('symbols') as string).split(
+            ',',
+          ).length,
+      );
+      expect(symbolsPerCall).toEqual([20, 20, 5]);
+    });
+
+    it('deve limitar BRAPI_MAX_SYMBOLS_PER_REQUEST a 20, o máximo aceito pela Brapi', async () => {
+      process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = '50';
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({ results: [] }),
+      });
+      globalThis.fetch = fetchMock;
+      const tickers = Array.from({ length: 25 }, (_, i) => `TICK${i}11`);
+
+      await fetchQuotes(tickers);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('deve respeitar BRAPI_MAX_SYMBOLS_PER_REQUEST para agrupar tickers por requisição', async () => {
@@ -135,7 +166,7 @@ describe('BrapiService — fetchQuotes', () => {
     });
 
     it.each(['0', '-1', 'abc', '1.5', ''])(
-      'deve usar o padrão (1 ticker por requisição) quando BRAPI_MAX_SYMBOLS_PER_REQUEST for inválido (%s)',
+      'deve usar o padrão (20 tickers por requisição) quando BRAPI_MAX_SYMBOLS_PER_REQUEST for inválido (%s)',
       async (invalidValue) => {
         process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = invalidValue;
         const fetchMock = jest.fn().mockResolvedValue({
@@ -144,16 +175,18 @@ describe('BrapiService — fetchQuotes', () => {
           json: jest.fn().mockResolvedValue({ results: [] }),
         });
         globalThis.fetch = fetchMock;
+        const tickers = Array.from({ length: 20 }, (_, i) => `TICK${i}11`);
 
-        await fetchQuotes(['HGLG11', 'MXRF11']);
+        await fetchQuotes(tickers);
 
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
       },
     );
   });
 
   describe('falha parcial entre lotes', () => {
     it('deve continuar buscando os demais lotes quando um deles falha', async () => {
+      process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = '1';
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
