@@ -241,6 +241,96 @@ describe('BrapiService — fetchQuotes', () => {
     });
   });
 
+  describe('lote recusado pela Brapi', () => {
+    function quoteFor(symbol: string, price: number) {
+      return {
+        symbol,
+        requestedSymbol: symbol,
+        data: {
+          regularMarketPrice: price,
+          regularMarketTime: '2026-07-15T18:00:00-03:00',
+        },
+      };
+    }
+
+    it('deve buscar ticker a ticker um lote que falhou, sem perder os tickers válidos', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const prices: Record<string, number> = { HGLG11: 165.5, KNRI11: 152 };
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes(',') || symbols === 'MXRF11') {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: jest.fn().mockResolvedValue({}),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            results: [quoteFor(symbols, prices[symbols])],
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchQuotes(['HGLG11', 'MXRF11', 'KNRI11']);
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(result.get('HGLG11')?.price).toBe(165.5);
+      expect(result.get('KNRI11')?.price).toBe(152);
+      expect(result.has('MXRF11')).toBe(false);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[fetchQuotes] Erro ao buscar lote de tickers:',
+        expect.objectContaining({ tickers: ['MXRF11'] }),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it.each([401, 403, 429])(
+      'não deve repetir ticker a ticker quando a Brapi responde %s (erro que afeta todas as requisições)',
+      async (status) => {
+        const consoleErrorSpy = jest
+          .spyOn(console, 'error')
+          .mockImplementation(() => {});
+        mockFetch({}, status);
+
+        await expect(fetchQuotes(['HGLG11', 'MXRF11'])).rejects.toThrow(
+          `Brapi API returned status ${status}`,
+        );
+        expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+        consoleErrorSpy.mockRestore();
+      },
+    );
+  });
+
+  describe('ticker renomeado', () => {
+    it('deve indexar a cotação pelo símbolo solicitado quando a Brapi retorna o ticker novo', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'BHIA3',
+            requestedSymbol: 'VIIA3',
+            data: {
+              regularMarketPrice: 7.5,
+              regularMarketTime: '2026-07-15T18:00:00-03:00',
+            },
+          },
+        ],
+      });
+
+      const result = await fetchQuotes(['VIIA3']);
+
+      expect(result.get('VIIA3')?.price).toBe(7.5);
+      expect(result.has('BHIA3')).toBe(false);
+    });
+  });
+
   describe('ticker não encontrado', () => {
     it('deve ignorar tickers sem regularMarketPrice (null)', async () => {
       mockFetch({

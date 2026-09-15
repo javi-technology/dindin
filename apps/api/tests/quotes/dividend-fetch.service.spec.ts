@@ -322,6 +322,194 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
     });
   });
 
+  describe('ETFs', () => {
+    it('não deve consultar proventos de ETFs, que a Brapi não fornece e que fazem o lote de ações ser recusado', async () => {
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes('BOVA11')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: jest.fn().mockResolvedValue({ code: 'FII_DIVIDENDS_MISUSE' }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            results: [
+              {
+                symbol: 'PETR4',
+                requestedSymbol: 'PETR4',
+                data: {
+                  cashDividends: [
+                    {
+                      rate: 1.25,
+                      paymentDate: '2026-07-15T03:00:00.000Z',
+                      label: 'DIVIDENDO',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+        { ticker: 'BOVA11', assetType: 'ETF' },
+      ]);
+
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+      expect(result.has('BOVA11')).toBe(false);
+      const urls = fetchMock.mock.calls.map((call) => call[0] as string);
+      expect(urls.some((u) => u.includes('BOVA11'))).toBe(false);
+    });
+  });
+
+  describe('lote recusado pela Brapi', () => {
+    function stockResult(symbol: string, rate: number) {
+      return {
+        symbol,
+        requestedSymbol: symbol,
+        data: {
+          cashDividends: [
+            {
+              rate,
+              paymentDate: '2026-07-15T03:00:00.000Z',
+              label: 'DIVIDENDO',
+            },
+          ],
+        },
+      };
+    }
+
+    it('deve buscar ticker a ticker um lote de ações recusado, sem perder as ações válidas', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const rates: Record<string, number> = { PETR4: 1.25, VALE3: 2.1 };
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes('XPTO11')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: jest.fn().mockResolvedValue({ code: 'FII_DIVIDENDS_MISUSE' }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            results: symbols.split(',').map((t) => stockResult(t, rates[t])),
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+        { ticker: 'XPTO11', assetType: 'OTHER' },
+        { ticker: 'VALE3', assetType: 'STOCK' },
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+      expect(result.get('VALE3')?.monthlyDividend).toBe(2.1);
+      expect(result.has('XPTO11')).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('deve buscar ticker a ticker um lote de FIIs que falhou', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes(',')) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: jest.fn().mockResolvedValue({}),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            dividends: [
+              {
+                symbol: symbols,
+                label: 'RENDIMENTO',
+                rate: 0.9,
+                paymentDate: '2026-07-14T00:00:00.000Z',
+              },
+            ],
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'MXRF11', assetType: 'FII' },
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.9);
+      expect(result.get('MXRF11')?.monthlyDividend).toBe(0.9);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('não deve repetir ticker a ticker quando a Brapi recusa a autenticação (401)', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      mockFetch({ error: 'Unauthorized' }, 401);
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'MXRF11', assetType: 'FII' },
+      ]);
+
+      expect(result.size).toBe(0);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('ticker renomeado', () => {
+    it('deve indexar o provento da ação pelo símbolo solicitado quando a Brapi retorna o ticker novo', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'BHIA3',
+            requestedSymbol: 'VIIA3',
+            data: {
+              cashDividends: [
+                {
+                  rate: 0.3,
+                  paymentDate: '2026-07-15T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'VIIA3', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('VIIA3')?.monthlyDividend).toBe(0.3);
+      expect(result.has('BHIA3')).toBe(false);
+    });
+  });
+
   describe('falha parcial', () => {
     it('deve logar erro e continuar quando um lote falha', async () => {
       const consoleErrorSpy = jest
