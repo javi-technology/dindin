@@ -1,33 +1,16 @@
 import { fetchMonthlyDividends } from '../../src/quotes/dividend-fetch.service';
 import { ActiveAsset } from '../../src/assets/asset.service';
-import YahooFinance from 'yahoo-finance2';
-
-jest.mock('yahoo-finance2', () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
 
 describe('DividendFetchService — fetchMonthlyDividends', () => {
   const originalFetch = globalThis.fetch;
-  const chartMock = jest.fn();
-  const quoteSummaryMock = jest.fn();
-  const YahooFinanceMock = YahooFinance as unknown as jest.Mock;
 
   beforeEach(() => {
     process.env.BRAPI_API_KEY = 'test-api-key';
-    chartMock.mockReset();
-    quoteSummaryMock.mockReset();
-    quoteSummaryMock.mockResolvedValue({});
-    YahooFinanceMock.mockImplementation(() => ({
-      chart: chartMock,
-      quoteSummary: quoteSummaryMock,
-    }));
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     delete process.env.BRAPI_API_KEY;
-    YahooFinanceMock.mockReset();
   });
 
   function mockFetch(response: unknown, status = 200) {
@@ -167,7 +150,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
     });
   });
 
-  describe('Ações e ETFs', () => {
+  describe('Ações', () => {
     it('deve retornar o último dividendo em dinheiro de cada ação', async () => {
       mockFetch({
         results: [
@@ -339,6 +322,194 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
     });
   });
 
+  describe('ETFs', () => {
+    it('não deve consultar proventos de ETFs, que a Brapi não fornece e que fazem o lote de ações ser recusado', async () => {
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes('BOVA11')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: jest.fn().mockResolvedValue({ code: 'FII_DIVIDENDS_MISUSE' }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            results: [
+              {
+                symbol: 'PETR4',
+                requestedSymbol: 'PETR4',
+                data: {
+                  cashDividends: [
+                    {
+                      rate: 1.25,
+                      paymentDate: '2026-07-15T03:00:00.000Z',
+                      label: 'DIVIDENDO',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+        { ticker: 'BOVA11', assetType: 'ETF' },
+      ]);
+
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+      expect(result.has('BOVA11')).toBe(false);
+      const urls = fetchMock.mock.calls.map((call) => call[0] as string);
+      expect(urls.some((u) => u.includes('BOVA11'))).toBe(false);
+    });
+  });
+
+  describe('lote recusado pela Brapi', () => {
+    function stockResult(symbol: string, rate: number) {
+      return {
+        symbol,
+        requestedSymbol: symbol,
+        data: {
+          cashDividends: [
+            {
+              rate,
+              paymentDate: '2026-07-15T03:00:00.000Z',
+              label: 'DIVIDENDO',
+            },
+          ],
+        },
+      };
+    }
+
+    it('deve buscar ticker a ticker um lote de ações recusado, sem perder as ações válidas', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const rates: Record<string, number> = { PETR4: 1.25, VALE3: 2.1 };
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes('XPTO11')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: jest.fn().mockResolvedValue({ code: 'FII_DIVIDENDS_MISUSE' }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            results: symbols.split(',').map((t) => stockResult(t, rates[t])),
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'PETR4', assetType: 'STOCK' },
+        { ticker: 'XPTO11', assetType: 'OTHER' },
+        { ticker: 'VALE3', assetType: 'STOCK' },
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
+      expect(result.get('VALE3')?.monthlyDividend).toBe(2.1);
+      expect(result.has('XPTO11')).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('deve buscar ticker a ticker um lote de FIIs que falhou', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        const symbols = new URL(url).searchParams.get('symbols') as string;
+        if (symbols.includes(',')) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: jest.fn().mockResolvedValue({}),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            dividends: [
+              {
+                symbol: symbols,
+                label: 'RENDIMENTO',
+                rate: 0.9,
+                paymentDate: '2026-07-14T00:00:00.000Z',
+              },
+            ],
+          }),
+        });
+      });
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'MXRF11', assetType: 'FII' },
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.9);
+      expect(result.get('MXRF11')?.monthlyDividend).toBe(0.9);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('não deve repetir ticker a ticker quando a Brapi recusa a autenticação (401)', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      mockFetch({ error: 'Unauthorized' }, 401);
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'HGLG11', assetType: 'FII' },
+        { ticker: 'MXRF11', assetType: 'FII' },
+      ]);
+
+      expect(result.size).toBe(0);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('ticker renomeado', () => {
+    it('deve indexar o provento da ação pelo símbolo solicitado quando a Brapi retorna o ticker novo', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'BHIA3',
+            requestedSymbol: 'VIIA3',
+            data: {
+              cashDividends: [
+                {
+                  rate: 0.3,
+                  paymentDate: '2026-07-15T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends([
+        { ticker: 'VIIA3', assetType: 'STOCK' },
+      ]);
+
+      expect(result.get('VIIA3')?.monthlyDividend).toBe(0.3);
+      expect(result.has('BHIA3')).toBe(false);
+    });
+  });
+
   describe('falha parcial', () => {
     it('deve logar erro e continuar quando um lote falha', async () => {
       const consoleErrorSpy = jest
@@ -356,68 +527,8 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
     });
   });
 
-  describe('fallback Yahoo Finance', () => {
-    function buildChartResponse(
-      dividends: Array<{ date: Date; amount: number }>,
-    ) {
-      const events: Record<string, { amount: number; date: Date }> = {};
-      for (const dividend of dividends) {
-        events[String(dividend.date.getTime())] = dividend;
-      }
-      return { events: { dividends: events } };
-    }
-
-    it('deve buscar dividendos no Yahoo Finance quando a Brapi falhar', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockImplementation((ticker: string) => {
-        if (ticker === 'PETR4.SA') {
-          return Promise.resolve(
-            buildChartResponse([
-              { date: new Date('2026-06-15T03:00:00.000Z'), amount: 1.1 },
-              { date: new Date('2026-07-15T03:00:00.000Z'), amount: 1.25 },
-            ]),
-          );
-        }
-        return Promise.resolve({ events: {} });
-      });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
-      expect(chartMock).toHaveBeenCalledWith(
-        'PETR4.SA',
-        expect.objectContaining({
-          period1: expect.any(Date),
-          period2: expect.any(Date),
-          events: 'div',
-        }),
-      );
-    });
-
-    it('deve buscar FIIs no Yahoo Finance quando a Brapi não retornar resultado', async () => {
-      mockFetch({ dividends: [] });
-      chartMock.mockImplementation((ticker: string) => {
-        if (ticker === 'HGLG11.SA') {
-          return Promise.resolve(
-            buildChartResponse([
-              { date: new Date('2026-06-12T03:00:00.000Z'), amount: 0.9 },
-              { date: new Date('2026-07-14T03:00:00.000Z'), amount: 0.92 },
-            ]),
-          );
-        }
-        return Promise.resolve({ events: {} });
-      });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'HGLG11', assetType: 'FII' },
-      ]);
-
-      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.92);
-    });
-
-    it('deve complementar resultados parciais da Brapi com dados do Yahoo Finance', async () => {
+  describe('Brapi como fonte única', () => {
+    it('deve retornar sem provento os tickers que a Brapi não retornou', async () => {
       const fetchMock = jest.fn().mockImplementation((url: string) => {
         if (url.includes('/api/v2/fii/dividends')) {
           return Promise.resolve({
@@ -442,171 +553,22 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         });
       });
       globalThis.fetch = fetchMock;
-      chartMock.mockImplementation((ticker: string) => {
-        if (ticker === 'PETR4.SA') {
-          return Promise.resolve(
-            buildChartResponse([
-              { date: new Date('2026-07-15T03:00:00.000Z'), amount: 1.25 },
-            ]),
-          );
-        }
-        return Promise.resolve({ events: {} });
-      });
 
       const result = await fetchMonthlyDividends([
         { ticker: 'HGLG11', assetType: 'FII' },
         { ticker: 'PETR4', assetType: 'STOCK' },
       ]);
 
-      expect(result.get('HGLG11')?.monthlyDividend).toBe(0.9);
-      expect(result.get('PETR4')?.monthlyDividend).toBe(1.25);
-    });
-
-    it('deve usar a data de pagamento do calendarEvents do Yahoo Finance', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue(
-        buildChartResponse([
-          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
-        ]),
-      );
-      quoteSummaryMock.mockResolvedValue({
-        calendarEvents: {
-          exDividendDate: new Date('2026-07-01T00:00:00.000Z'),
-          dividendDate: new Date('2026-07-15T00:00:00.000Z'),
-        },
+      expect(result.get('HGLG11')).toEqual({
+        monthlyDividend: 0.9,
+        paymentDate: '2026-07-14',
       });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')).toEqual({
-        monthlyDividend: 1.25,
-        paymentDate: '2026-07-15',
-      });
-      expect(quoteSummaryMock).toHaveBeenCalledWith('PETR4.SA', {
-        modules: ['calendarEvents'],
-      });
-    });
-
-    it('não deve usar a data ex (data com) do Yahoo Finance como data de pagamento', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue(
-        buildChartResponse([
-          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
-        ]),
-      );
-      quoteSummaryMock.mockResolvedValue({ calendarEvents: {} });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
-    });
-
-    it('deve ignorar dividendDate do Yahoo anterior à data ex do último provento', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue(
-        buildChartResponse([
-          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
-        ]),
-      );
-      quoteSummaryMock.mockResolvedValue({
-        calendarEvents: {
-          dividendDate: new Date('2026-03-15T00:00:00.000Z'),
-        },
-      });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
-    });
-
-    it('deve ignorar dividendDate do Yahoo quando a data ex do calendarEvents for de outro provento', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue(
-        buildChartResponse([
-          { date: new Date('2026-07-01T13:00:00.000Z'), amount: 1.25 },
-        ]),
-      );
-      quoteSummaryMock.mockResolvedValue({
-        calendarEvents: {
-          exDividendDate: new Date('2026-09-20T00:00:00.000Z'),
-          dividendDate: new Date('2026-10-15T00:00:00.000Z'),
-        },
-      });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
-    });
-
-    it('deve manter o valor quando a consulta de calendarEvents do Yahoo falhar', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue(
-        buildChartResponse([
-          { date: new Date('2026-07-01T03:00:00.000Z'), amount: 1.25 },
-        ]),
-      );
-      quoteSummaryMock.mockRejectedValue(new Error('Timeout'));
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.get('PETR4')).toEqual({ monthlyDividend: 1.25 });
-    });
-
-    it('deve ignorar ticker quando Yahoo Finance retornar eventos vazios', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue({ events: {} });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.has('PETR4')).toBe(false);
-    });
-
-    it('deve ignorar ticker quando Yahoo Finance lançar erro', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockRejectedValue(new Error('Timeout'));
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
-      expect(result.has('PETR4')).toBe(false);
-    });
-
-    it('deve ignorar dividendos inválidos do Yahoo Finance', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
-      chartMock.mockResolvedValue({
-        events: {
-          dividends: {
-            '1721001600000': {
-              date: new Date('2026-07-15T03:00:00.000Z'),
-              amount: NaN,
-            },
-          },
-        },
-      });
-
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
-
       expect(result.has('PETR4')).toBe(false);
     });
   });
 
   describe('tickers sem data de pagamento', () => {
-    it('deve logar os tickers com provento mas sem data de pagamento em nenhuma fonte', async () => {
+    it('deve logar os tickers com provento mas sem data de pagamento na Brapi', async () => {
       const consoleWarnSpy = jest
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
@@ -633,7 +595,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       ]);
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[fetchMonthlyDividends] Tickers com provento sem data de pagamento em nenhuma fonte:',
+        '[fetchMonthlyDividends] Tickers com provento sem data de pagamento na Brapi:',
         { tickers: ['XPLG11'] },
       );
       consoleWarnSpy.mockRestore();

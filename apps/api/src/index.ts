@@ -299,7 +299,7 @@ export const api = onRequest(
 
 // Cloud Function agendada para atualizar cotações 1x ao dia, às 18:30, após o
 // fechamento da B3 (o pregão pode ir até ~18h fora do horário de verão dos EUA).
-// Ver issues #10, #22 e #192 — busca cotações via Brapi (fallback Yahoo Finance)
+// Ver issues #10, #22, #192 e #212 — busca cotações via Brapi (fonte única)
 // e salva em `quotes/{ticker}` + histórico.
 // O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
 // em process.env dentro da execução. Configurar com:
