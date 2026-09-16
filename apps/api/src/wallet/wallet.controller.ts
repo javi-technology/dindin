@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Wallet } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { deleteDocumentCascading } from '../firestore/cascade-delete';
 
 // Códigos de moeda ISO 4217 aceitos pela aplicação.
 // Ampliar conforme necessário.
@@ -161,10 +162,10 @@ export async function deleteWallet(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // TODO(#10): remover sub-coleção positions/{positionId} antes de deletar a carteira.
-    // O Firestore não apaga documentos filhos automaticamente; use batch delete ou
-    // uma Cloud Function acionada por onDelete para evitar dados órfãos.
-    await walletRef.delete();
+    // Remove as posições em cascata antes da carteira: o Firestore não apaga
+    // documentos filhos automaticamente, e posições órfãs ficariam inacessíveis
+    // pela API, que só as alcança a partir da carteira (issue #219).
+    await deleteDocumentCascading(walletRef, ['positions']);
     res.status(204).send();
   } catch (error) {
     console.error('[deleteWallet] error:', {

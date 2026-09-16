@@ -57,6 +57,17 @@ function createFirestoreMock(wallets: WalletData[] = []) {
         return Promise.resolve();
       }),
       delete: jest.fn().mockResolvedValue(undefined),
+      // Uma carteira tem a subcoleção `positions`, percorrida na exclusão em
+      // cascata (issue #219). Aqui ela é vazia; o caso com posições usa
+      // createFirestoreMockWithPositions.
+      collection: jest.fn((subPath: string) => {
+        if (subPath !== 'positions') {
+          throw new Error(`Unexpected subcollection: ${subPath}`);
+        }
+        return {
+          get: jest.fn().mockResolvedValue({ docs: [], empty: true, size: 0 }),
+        };
+      }),
     });
   });
 

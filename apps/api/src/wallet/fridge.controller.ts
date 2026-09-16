@@ -4,6 +4,7 @@ import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePrice } from '../quotes/quote-history.service';
+import { deleteDocumentCascading } from '../firestore/cascade-delete';
 
 function uid(req: Request): string {
   return (req as AuthRequest).user!.uid;
@@ -172,12 +173,11 @@ export async function deleteFridge(req: Request, res: Response): Promise<void> {
     }
 
     // Remove os itens da geladeira em cascata antes de deletar a geladeira.
-    // O Firestore não cascadeia deletes automaticamente.
-    const itemsSnapshot = await fridgeRef.collection('fridgeItems').get();
-    const batch = getFirestore().batch();
-    itemsSnapshot.docs.forEach((itemDoc) => batch.delete(itemDoc.ref));
-    batch.delete(fridgeRef);
-    await batch.commit();
+    // O Firestore não cascadeia deletes automaticamente. A exclusão vai em
+    // lotes de 500 porque é o limite de operações de um batch: a versão
+    // anterior punha todos os itens num único batch, então uma geladeira com
+    // mais de 500 itens falhava no commit e não era excluída (issue #219).
+    await deleteDocumentCascading(fridgeRef, ['fridgeItems']);
 
     res.status(204).send();
   } catch (error) {
