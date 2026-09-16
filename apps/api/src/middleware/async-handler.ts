@@ -18,6 +18,24 @@ function statusCodeOf(error: unknown): number {
 }
 
 /**
+ * Se a mensagem do erro pode ir para o cliente (convenção do `http-errors`).
+ *
+ * Por padrão só 4xx expõem: são falhas de negócio escritas para o usuário. Um
+ * 5xx só expõe quando a aplicação marca `expose: true`, como o 502 da
+ * ai-suggestion, cujo texto é de interface. Sem essa marca, um erro de
+ * biblioteca que traga `statusCode` — os do SDK da Stripe trazem — teria o
+ * texto interno repassado ao cliente.
+ */
+function exposeOf(error: unknown, statusCode: number): boolean {
+  const expose =
+    typeof error === 'object' && error !== null && 'expose' in error
+      ? (error as { expose?: unknown }).expose
+      : undefined;
+
+  return typeof expose === 'boolean' ? expose : statusCode < 500;
+}
+
+/**
  * Envolve um handler de rota, capturando qualquer erro não tratado (issue #222).
  *
  * Antes, cada um dos ~55 handlers repetia `try` → `console.error` → 500. Além
@@ -51,16 +69,12 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       // quebraria a resposta que o cliente já está recebendo.
       if (res.headersSent) return;
 
-      // Só o 500 troca a mensagem pela genérica, ficando o detalhe apenas no
-      // log. O corte é no 500 e não em todo 5xx porque a distinção é usada de
-      // propósito: `createError(..., 500)` carrega detalhe interno
-      // ("OPENROUTER_API_KEY não configurada"), enquanto
-      // `createError('Falha ao consultar o provedor de IA', 502)` é texto
-      // escrito para a tela do usuário.
+      // Mensagem não exposta fica só no log, acima.
       const code = statusCodeOf(error);
       res.status(code).json({
-        error:
-          code === 500 ? 'Internal server error' : (error as Error).message,
+        error: exposeOf(error, code)
+          ? (error as Error).message
+          : 'Internal server error',
       });
     }
   };
