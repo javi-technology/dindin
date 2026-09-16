@@ -11,12 +11,14 @@ trigger: always_on
 
 ## Formatação
 
-- Código formatado com **Prettier** antes de commitar.
+- Código formatado com **Prettier** (`npm run format`) antes de commitar.
 - Código analisado com **ESLint** (`npm run lint`) antes de commitar. Flat config:
   `eslint.config.mjs` na raiz (api e packages) e `apps/web/eslint.config.mjs`
   (angular-eslint, incluindo regras de template `.html`).
-- **husky** + **lint-staged** rodam Prettier e `eslint --fix` no hook `pre-commit`.
-- O job `lint` do CI bloqueia o deploy.
+- **Não há hook de pre-commit**: rodar `npm run format` e `npm run lint`
+  manualmente antes de cada commit.
+- O job `lint` do CI bloqueia o deploy. A formatação **não** é verificada no CI,
+  então depende de rodar o Prettier antes do commit.
 
 ## Locale Brasileiro em Campos Numéricos
 
