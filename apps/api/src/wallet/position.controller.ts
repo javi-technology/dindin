@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { Position, AssetType, FridgeItem } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePrice } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { asyncHandler } from '../middleware/async-handler';
 import {
   uid,
@@ -31,17 +31,13 @@ function isValidAssetType(value: unknown): value is AssetType {
  * cotação (ver issue #86).
  */
 async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
-  const tickers = [...new Set(positions.map((position) => position.ticker))];
-  const prices = await Promise.all(
-    tickers.map((ticker) => getQuotePrice(ticker)),
-  );
-  const priceByTicker = new Map(
-    tickers.map((ticker, i) => [ticker, prices[i]]),
+  const priceByTicker = await getQuotePricesByTicker(
+    positions.map((position) => position.ticker),
   );
 
-  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes`
-  // (ou undefined, removido do JSON de resposta), mesmo que a posição
-  // ainda tenha um valor antigo denormalizado no Firestore.
+  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes` (ou
+  // undefined, removido do JSON de resposta), mesmo que o documento ainda
+  // tenha um valor antigo denormalizado no Firestore.
   return positions.map((position) => ({
     ...position,
     currentPrice: priceByTicker.get(position.ticker),

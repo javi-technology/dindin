@@ -65,20 +65,27 @@ function createCatalogStubs(
     })),
   };
 
+  // O preço é resolvido por getAll() numa única viagem (issue #221), então o
+  // doc() só precisa devolver a referência e o getAll faz a leitura em lote.
   const quotesCollection = {
-    doc: jest.fn((ticker: string) => ({
-      get: jest.fn().mockResolvedValue(
-        pricesByTicker[ticker] !== undefined
-          ? {
-              exists: true,
-              data: () => ({ ticker, price: pricesByTicker[ticker] }),
-            }
-          : { exists: false, data: () => undefined },
-      ),
-    })),
+    doc: jest.fn((ticker: string) => ({ id: ticker })),
   };
 
-  return { assetsCollection, quotesCollection };
+  const getAll = jest.fn((...refs: { id: string }[]) =>
+    Promise.resolve(
+      refs.map((ref) =>
+        pricesByTicker[ref.id] !== undefined
+          ? {
+              id: ref.id,
+              exists: true,
+              data: () => ({ ticker: ref.id, price: pricesByTicker[ref.id] }),
+            }
+          : { id: ref.id, exists: false, data: () => undefined },
+      ),
+    ),
+  );
+
+  return { assetsCollection, quotesCollection, getAll };
 }
 
 function createFirestoreMock(
@@ -307,6 +314,7 @@ function createFirestoreMock(
       if (path === 'quotes') return catalog.quotesCollection;
       throw new Error(`Unexpected collection: ${path}`);
     }),
+    getAll: catalog.getAll,
     batch: jest.fn(() => batchMock),
     batchMock,
   };

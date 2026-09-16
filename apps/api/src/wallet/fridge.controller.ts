@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePrice } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { asyncHandler } from '../middleware/async-handler';
 import {
@@ -19,16 +19,12 @@ import {
  * gravado em cada item pelo job agendado (ver issue #86).
  */
 async function withCurrentPrices(items: FridgeItem[]): Promise<FridgeItem[]> {
-  const tickers = [...new Set(items.map((item) => item.ticker))];
-  const prices = await Promise.all(
-    tickers.map((ticker) => getQuotePrice(ticker)),
-  );
-  const priceByTicker = new Map(
-    tickers.map((ticker, i) => [ticker, prices[i]]),
+  const priceByTicker = await getQuotePricesByTicker(
+    items.map((item) => item.ticker),
   );
 
-  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes`
-  // (ou undefined, removido do JSON de resposta), mesmo que o item ainda
+  // Sempre sobrescreve currentPrice com o valor resolvido de `quotes` (ou
+  // undefined, removido do JSON de resposta), mesmo que o documento ainda
   // tenha um valor antigo denormalizado no Firestore.
   return items.map((item) => ({
     ...item,
