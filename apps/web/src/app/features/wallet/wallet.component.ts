@@ -19,6 +19,7 @@ import {
 } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
   FormBuilder,
   FormGroup,
@@ -65,6 +66,7 @@ import {
     LucidePencil,
     LucideTrash2,
     LucideRefrigerator,
+    ConfirmDialogComponent,
   ],
   templateUrl: './wallet.component.html',
 })

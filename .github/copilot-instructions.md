@@ -170,6 +170,11 @@ Monorepo estruturado da seguinte forma:
 
 - **Não usar** `window.confirm`, `window.alert` ou `window.prompt` nativos.
 - Sempre usar **modal customizado** para confirmação de exclusão ou ações destrutivas.
+- Para confirmação, usar o componente compartilhado
+  `shared/components/confirm-dialog` (`<app-confirm-dialog>`), que já traz
+  `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
+  preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
+  markup do modal na feature.
 
 ### Logs
 
