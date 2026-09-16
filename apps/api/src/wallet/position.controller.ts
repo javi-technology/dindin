@@ -2,9 +2,14 @@ import { Request, Response } from 'express';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { Position, AssetType, FridgeItem } from 'dindin-models';
-import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePrice } from '../quotes/quote-history.service';
+import { asyncHandler } from '../middleware/async-handler';
+import {
+  uid,
+  positionsCollection,
+  fridgesCollection,
+} from '../firestore/paths';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -13,19 +18,6 @@ const ASSET_TYPES = new Set<AssetType>([
   'REIT',
   'OTHER',
 ]);
-
-function uid(req: Request): string {
-  return (req as AuthRequest).user!.uid;
-}
-
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
 
 function isValidAssetType(value: unknown): value is AssetType {
   return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
@@ -134,33 +126,21 @@ function validatePositionBody(
   return { valid: true };
 }
 
-export async function listPositions(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const listPositions = asyncHandler(
+  'listPositions',
+  async (req: Request, res: Response) => {
     const walletId = req.params.walletId;
     const snapshot = await positionsCollection(uid(req), walletId).get();
     const positions = snapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Position,
     );
     res.json(await withCurrentPrices(positions));
-  } catch (error) {
-    console.error('[listPositions] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function createPosition(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const createPosition = asyncHandler(
+  'createPosition',
+  async (req: Request, res: Response) => {
     const walletId = req.params.walletId;
     const body = req.body as Partial<Position>;
 
@@ -200,20 +180,12 @@ export async function createPosition(
       positionData,
     );
     res.status(201).json({ id: docRef.id, ...positionData });
-  } catch (error) {
-    console.error('[createPosition] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getPosition(req: Request, res: Response): Promise<void> {
-  try {
+export const getPosition = asyncHandler(
+  'getPosition',
+  async (req: Request, res: Response) => {
     const { walletId, id } = req.params;
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
@@ -225,23 +197,12 @@ export async function getPosition(req: Request, res: Response): Promise<void> {
     const position = { id: doc.id, ...doc.data() } as Position;
     const [withPrice] = await withCurrentPrices([position]);
     res.json(withPrice);
-  } catch (error) {
-    console.error('[getPosition] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      positionId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updatePosition(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const updatePosition = asyncHandler(
+  'updatePosition',
+  async (req: Request, res: Response) => {
     const { walletId, id } = req.params;
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
@@ -294,24 +255,12 @@ export async function updatePosition(
     const updatedPosition = { id, ...doc.data(), ...updates } as Position;
     const [withPrice] = await withCurrentPrices([updatedPosition]);
     res.json(withPrice);
-  } catch (error) {
-    console.error('[updatePosition] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      positionId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function deletePosition(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const deletePosition = asyncHandler(
+  'deletePosition',
+  async (req: Request, res: Response) => {
     const { walletId, id } = req.params;
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
@@ -323,20 +272,12 @@ export async function deletePosition(
 
     await positionRef.delete();
     res.status(204).send();
-  } catch (error) {
-    console.error('[deletePosition] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      positionId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function moveToFridge(req: Request, res: Response): Promise<void> {
-  try {
+export const moveToFridge = asyncHandler(
+  'moveToFridge',
+  async (req: Request, res: Response) => {
     const userId = uid(req);
     const { walletId, id: positionId } = req.params;
     const { fridgeId, targetPrice } = req.body as {
@@ -375,11 +316,7 @@ export async function moveToFridge(req: Request, res: Response): Promise<void> {
     const positionData = positionDoc.data() as Position;
 
     // Verifica se a geladeira existe
-    const fridgeRef = getFirestore()
-      .collection('users')
-      .doc(userId)
-      .collection('fridges')
-      .doc(fridgeId);
+    const fridgeRef = fridgesCollection(userId).doc(fridgeId);
     const fridgeDoc = await fridgeRef.get();
 
     if (!fridgeDoc.exists) {
@@ -411,15 +348,5 @@ export async function moveToFridge(req: Request, res: Response): Promise<void> {
     await batch.commit();
 
     res.status(201).json({ id: fridgeItemRef.id, ...fridgeItemData });
-  } catch (error) {
-    console.error('[moveToFridge] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      positionId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);

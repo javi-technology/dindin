@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { asyncHandler } from '../middleware/async-handler';
+import { uid } from '../firestore/paths';
 import { parseBbFileName } from './bb-pdf.parser';
 import { saveBbPdf } from './storage.service';
 import {
@@ -15,85 +16,63 @@ import {
   getSavedSuggestion,
 } from './ai-suggestion.service';
 
-function uid(req: Request): string {
-  return (req as AuthRequest).user!.uid;
+// O mapeamento de `error.statusCode` para status HTTP, antes repetido em seis
+// handlers deste arquivo, passou para o asyncHandler (issue #222): basta
+// deixar o erro subir com o statusCode que o serviço anexou.
+
+function monthQuery(req: Request): string | undefined {
+  return typeof req.query.month === 'string' ? req.query.month : undefined;
 }
 
-function statusCode(error: unknown): number {
-  return typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as { statusCode?: unknown }).statusCode === 'number'
-    ? (error as { statusCode: number }).statusCode
-    : 500;
+function suggestionTab(value: unknown): 'renda' | 'ganho' {
+  return value === 'ganho' ? 'ganho' : 'renda';
 }
 
-export async function listRecommended(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const listRecommended = asyncHandler(
+  'listRecommended',
+  async (_req: Request, res: Response) => {
     res.json(await listRecommendedWallets());
-  } catch (error) {
-    console.error('[listRecommended] error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getLatestRecommended(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
-    const wallet = await getRecommendedWallet(
-      typeof req.query.month === 'string' ? req.query.month : undefined,
-    );
+export const getLatestRecommended = asyncHandler(
+  'getLatestRecommended',
+  async (req: Request, res: Response) => {
+    const wallet = await getRecommendedWallet(monthQuery(req));
+
     if (!wallet) {
       res.status(404).json({ error: 'Carteira recomendada não encontrada' });
       return;
     }
-    res.json(wallet);
-  } catch (error) {
-    console.error('[getLatestRecommended] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
 
-export async function compareRecommended(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+    res.json(wallet);
+  },
+);
+
+export const compareRecommended = asyncHandler(
+  'compareRecommended',
+  async (req: Request, res: Response) => {
     const selectedWallet = req.query.wallet === 'ganho' ? 'ganho' : 'renda';
+
     res.json(
       await compareWithWallet(
         uid(req),
         req.params.walletId,
-        typeof req.query.month === 'string' ? req.query.month : undefined,
+        monthQuery(req),
         selectedWallet,
       ),
     );
-  } catch (error) {
-    console.error('[compareRecommended] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
+  },
+);
 
-export async function importRecommended(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const importRecommended = asyncHandler(
+  'importRecommended',
+  async (req: Request, res: Response) => {
     const { fileName, contentBase64 } = req.body as {
       fileName?: unknown;
       contentBase64?: unknown;
     };
+
     if (
       typeof fileName !== 'string' ||
       typeof contentBase64 !== 'string' ||
@@ -102,7 +81,9 @@ export async function importRecommended(
       res.status(400).json({ error: 'fileName ou conteúdo inválido' });
       return;
     }
+
     const buffer = Buffer.from(contentBase64, 'base64');
+
     let wallet;
     try {
       wallet = await buildRecommendedWallet(
@@ -110,120 +91,92 @@ export async function importRecommended(
         `wallets/fii-bb/${fileName}`,
       );
     } catch (error) {
+      // Falha ao interpretar o PDF enviado é erro do cliente, não interno.
       const inputError = error as Error & { statusCode?: number };
       inputError.statusCode = 400;
       throw inputError;
     }
+
     const sourceFile = await saveBbPdf(fileName, buffer);
     res
       .status(201)
       .json(await persistRecommendedWallet({ ...wallet, sourceFile }));
-  } catch (error) {
-    console.error('[importRecommended] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
+  },
+);
 
-export async function confirmRecommended(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const confirmRecommended = asyncHandler(
+  'confirmRecommended',
+  async (req: Request, res: Response) => {
     res.json(await confirmRecommendedWallet(req.params.id));
-  } catch (error) {
-    console.error('[confirmRecommended] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
+  },
+);
 
-function suggestionTab(value: unknown): 'renda' | 'ganho' {
-  return value === 'ganho' ? 'ganho' : 'renda';
-}
+export const getSuggestion = asyncHandler(
+  'getSuggestion',
+  async (req: Request, res: Response) => {
+    const walletId =
+      typeof req.query.walletId === 'string' ? req.query.walletId : undefined;
+    const month = monthQuery(req);
 
-export async function getSuggestion(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  const walletId =
-    typeof req.query.walletId === 'string' ? req.query.walletId : undefined;
-  const month =
-    typeof req.query.month === 'string' ? req.query.month : undefined;
-  if (!walletId || !month) {
-    res.status(400).json({ error: 'walletId e month são obrigatórios' });
-    return;
-  }
+    if (!walletId || !month) {
+      res.status(400).json({ error: 'walletId e month são obrigatórios' });
+      return;
+    }
 
-  try {
     const suggestion = await getSavedSuggestion(
       uid(req),
       walletId,
       month,
       suggestionTab(req.query.tab),
     );
+
     if (!suggestion) {
       res.status(404).json({ error: 'Sugestão não encontrada' });
       return;
     }
+
     res.json(suggestion);
-  } catch (error) {
-    console.error('[getSuggestion] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
+  },
+);
 
-export async function generateSuggestion(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  const { walletId, month, tab, contribution } = req.body as {
-    walletId?: unknown;
-    month?: unknown;
-    tab?: unknown;
-    contribution?: unknown;
-  };
-  if (
-    typeof walletId !== 'string' ||
-    typeof month !== 'string' ||
-    (tab !== 'renda' && tab !== 'ganho')
-  ) {
-    res.status(400).json({ error: 'walletId, month e tab são obrigatórios' });
-    return;
-  }
-  if (
-    contribution !== undefined &&
-    (typeof contribution !== 'number' ||
-      !Number.isFinite(contribution) ||
-      contribution < 0)
-  ) {
-    res.status(400).json({ error: 'contribution inválido' });
-    return;
-  }
+export const generateSuggestion = asyncHandler(
+  'generateSuggestion',
+  async (req: Request, res: Response) => {
+    const { walletId, month, tab, contribution } = req.body as {
+      walletId?: unknown;
+      month?: unknown;
+      tab?: unknown;
+      contribution?: unknown;
+    };
 
-  try {
-    const force = req.query.force === 'true';
+    if (
+      typeof walletId !== 'string' ||
+      typeof month !== 'string' ||
+      (tab !== 'renda' && tab !== 'ganho')
+    ) {
+      res.status(400).json({ error: 'walletId, month e tab são obrigatórios' });
+      return;
+    }
+
+    if (
+      contribution !== undefined &&
+      (typeof contribution !== 'number' ||
+        !Number.isFinite(contribution) ||
+        contribution < 0)
+    ) {
+      res.status(400).json({ error: 'contribution inválido' });
+      return;
+    }
+
     const suggestion = await generateSuggestionForUser(
       uid(req),
       walletId,
       month,
       tab,
-      force,
+      req.query.force === 'true',
       contribution,
     );
+
     res.status(201).json(suggestion);
-  } catch (error) {
-    console.error('[generateSuggestion] error:', error);
-    const code = statusCode(error);
-    res.status(code).json({
-      error: code === 500 ? 'Internal server error' : (error as Error).message,
-    });
-  }
-}
+  },
+);

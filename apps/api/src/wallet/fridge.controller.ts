@@ -1,31 +1,17 @@
 import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
-import { AuthRequest } from '../middleware/auth.middleware';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePrice } from '../quotes/quote-history.service';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
-
-function uid(req: Request): string {
-  return (req as AuthRequest).user!.uid;
-}
-
-function fridgesCollection(userId: string) {
-  return getFirestore().collection('users').doc(userId).collection('fridges');
-}
-
-function itemsCollection(userId: string, fridgeId: string) {
-  return fridgesCollection(userId).doc(fridgeId).collection('fridgeItems');
-}
-
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
+import { asyncHandler } from '../middleware/async-handler';
+import {
+  uid,
+  fridgesCollection,
+  fridgeItemsCollection,
+  positionsCollection,
+  walletsCollection,
+} from '../firestore/paths';
 
 /**
  * Resolve o `currentPrice` de cada item a partir da collection `quotes`
@@ -52,8 +38,9 @@ async function withCurrentPrices(items: FridgeItem[]): Promise<FridgeItem[]> {
 
 /* ---------- Fridge CRUD ---------- */
 
-export async function listFridges(req: Request, res: Response): Promise<void> {
-  try {
+export const listFridges = asyncHandler(
+  'listFridges',
+  async (req: Request, res: Response) => {
     const userId = uid(req);
     const snapshot = await fridgesCollection(userId).get();
     const fridges = snapshot.docs.map((doc) => ({
@@ -61,18 +48,12 @@ export async function listFridges(req: Request, res: Response): Promise<void> {
       ...doc.data(),
     }));
     res.json(fridges);
-  } catch (error) {
-    console.error('[listFridges] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function createFridge(req: Request, res: Response): Promise<void> {
-  try {
+export const createFridge = asyncHandler(
+  'createFridge',
+  async (req: Request, res: Response) => {
     const { name, description } = req.body as Partial<Fridge>;
 
     if (!name) {
@@ -91,19 +72,12 @@ export async function createFridge(req: Request, res: Response): Promise<void> {
 
     const docRef = await fridgesCollection(uid(req)).add(fridgeData);
     res.status(201).json({ id: docRef.id, ...fridgeData });
-  } catch (error) {
-    console.error('[createFridge] error:', {
-      uid: uid(req),
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getFridge(req: Request, res: Response): Promise<void> {
-  try {
+export const getFridge = asyncHandler(
+  'getFridge',
+  async (req: Request, res: Response) => {
     const fridgeId = req.params.id;
     const doc = await fridgesCollection(uid(req)).doc(fridgeId).get();
 
@@ -113,19 +87,12 @@ export async function getFridge(req: Request, res: Response): Promise<void> {
     }
 
     res.json({ id: doc.id, ...doc.data() });
-  } catch (error) {
-    console.error('[getFridge] error:', {
-      uid: uid(req),
-      fridgeId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updateFridge(req: Request, res: Response): Promise<void> {
-  try {
+export const updateFridge = asyncHandler(
+  'updateFridge',
+  async (req: Request, res: Response) => {
     const fridgeId = req.params.id;
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
@@ -149,20 +116,12 @@ export async function updateFridge(req: Request, res: Response): Promise<void> {
 
     const updatedDoc = await fridgeRef.get();
     res.json({ id: fridgeId, ...updatedDoc.data() });
-  } catch (error) {
-    console.error('[updateFridge] error:', {
-      uid: uid(req),
-      fridgeId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function deleteFridge(req: Request, res: Response): Promise<void> {
-  try {
+export const deleteFridge = asyncHandler(
+  'deleteFridge',
+  async (req: Request, res: Response) => {
     const fridgeId = req.params.id;
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
@@ -180,16 +139,8 @@ export async function deleteFridge(req: Request, res: Response): Promise<void> {
     await deleteDocumentCascading(fridgeRef, ['fridgeItems']);
 
     res.status(204).send();
-  } catch (error) {
-    console.error('[deleteFridge] error:', {
-      uid: uid(req),
-      fridgeId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 /* ---------- FridgeItem CRUD ---------- */
 
@@ -270,31 +221,25 @@ function validateItemBody(
   return { valid: true };
 }
 
-export async function listItems(req: Request, res: Response): Promise<void> {
-  try {
+export const listItems = asyncHandler(
+  'listItems',
+  async (req: Request, res: Response) => {
     const { fridgeId } = req.params;
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const snapshot = await itemsCollection(userId, fridgeId).get();
+    const snapshot = await fridgeItemsCollection(userId, fridgeId).get();
     const items = snapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as FridgeItem,
     );
     res.json(await withCurrentPrices(items));
-  } catch (error) {
-    console.error('[listItems] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function createItem(req: Request, res: Response): Promise<void> {
-  try {
+export const createItem = asyncHandler(
+  'createItem',
+  async (req: Request, res: Response) => {
     const { fridgeId } = req.params;
     const userId = uid(req);
     const body = req.body as Partial<FridgeItem>;
@@ -328,28 +273,20 @@ export async function createItem(req: Request, res: Response): Promise<void> {
       updatedAt: now,
     };
 
-    const docRef = await itemsCollection(userId, fridgeId).add(itemData);
+    const docRef = await fridgeItemsCollection(userId, fridgeId).add(itemData);
     res.status(201).json({ id: docRef.id, ...itemData });
-  } catch (error) {
-    console.error('[createItem] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getItem(req: Request, res: Response): Promise<void> {
-  try {
+export const getItem = asyncHandler(
+  'getItem',
+  async (req: Request, res: Response) => {
     const { fridgeId, id } = req.params;
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const doc = await itemsCollection(userId, fridgeId).doc(id).get();
+    const doc = await fridgeItemsCollection(userId, fridgeId).doc(id).get();
 
     if (!doc.exists) {
       res.status(404).json({ error: 'Item not found' });
@@ -359,26 +296,18 @@ export async function getItem(req: Request, res: Response): Promise<void> {
     const item = { id: doc.id, ...doc.data() } as FridgeItem;
     const [withPrice] = await withCurrentPrices([item]);
     res.json(withPrice);
-  } catch (error) {
-    console.error('[getItem] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      itemId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updateItem(req: Request, res: Response): Promise<void> {
-  try {
+export const updateItem = asyncHandler(
+  'updateItem',
+  async (req: Request, res: Response) => {
     const { fridgeId, id } = req.params;
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const itemRef = itemsCollection(userId, fridgeId).doc(id);
+    const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
@@ -422,27 +351,18 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
     const item = { id, ...updatedDoc.data() } as FridgeItem;
     const [withPrice] = await withCurrentPrices([item]);
     res.json(withPrice);
-  } catch (error) {
-    console.error('[updateItem] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      itemId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function deleteItem(req: Request, res: Response): Promise<void> {
-  try {
+export const deleteItem = asyncHandler(
+  'deleteItem',
+  async (req: Request, res: Response) => {
     const { fridgeId, id } = req.params;
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const itemRef = itemsCollection(userId, fridgeId).doc(id);
+    const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
@@ -452,20 +372,12 @@ export async function deleteItem(req: Request, res: Response): Promise<void> {
 
     await itemRef.delete();
     res.status(204).send();
-  } catch (error) {
-    console.error('[deleteItem] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      itemId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function unfreezeItem(req: Request, res: Response): Promise<void> {
-  try {
+export const unfreezeItem = asyncHandler(
+  'unfreezeItem',
+  async (req: Request, res: Response) => {
     const userId = uid(req);
     const { fridgeId, id } = req.params;
     const { walletId } = req.body as { walletId?: unknown };
@@ -475,18 +387,14 @@ export async function unfreezeItem(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const itemRef = itemsCollection(userId, fridgeId).doc(id);
+    const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
     const itemDoc = await itemRef.get();
     if (!itemDoc.exists) {
       res.status(404).json({ error: 'Fridge item not found' });
       return;
     }
 
-    const walletRef = getFirestore()
-      .collection('users')
-      .doc(userId)
-      .collection('wallets')
-      .doc(walletId);
+    const walletRef = walletsCollection(userId).doc(walletId);
     const walletDoc = await walletRef.get();
     if (!walletDoc.exists) {
       res.status(404).json({ error: 'Wallet not found' });
@@ -512,15 +420,5 @@ export async function unfreezeItem(req: Request, res: Response): Promise<void> {
     await batch.commit();
 
     res.status(201).json({ id: positionRef.id, ...positionData });
-  } catch (error) {
-    console.error('[unfreezeItem] error:', {
-      uid: uid(req),
-      fridgeId: req.params.fridgeId,
-      itemId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);

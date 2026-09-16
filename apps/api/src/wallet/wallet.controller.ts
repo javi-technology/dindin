@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
 import { Wallet } from 'dindin-models';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
+import { uid, walletsCollection } from '../firestore/paths';
 
 // Códigos de moeda ISO 4217 aceitos pela aplicação.
 // Ampliar conforme necessário.
@@ -19,33 +19,23 @@ const SUPPORTED_CURRENCIES = new Set([
   'ARS',
 ]);
 
-function walletsCollection(userId: string) {
-  return getFirestore().collection('users').doc(userId).collection('wallets');
+/** Mensagem de erro de moeda não suportada, com a lista de aceitas. */
+function unsupportedCurrencyError(currency: string): string {
+  return `Currency '${currency}' is not supported. Accepted values: ${[...SUPPORTED_CURRENCIES].join(', ')}`;
 }
 
-/** Retorna o uid do usuário autenticado. O authMiddleware garante que sempre está presente. */
-function uid(req: Request): string {
-  return (req as AuthRequest).user!.uid;
-}
-
-export async function listWallets(req: Request, res: Response): Promise<void> {
-  try {
-    const userId = uid(req);
-    const snapshot = await walletsCollection(userId).get();
+export const listWallets = asyncHandler(
+  'listWallets',
+  async (req: Request, res: Response) => {
+    const snapshot = await walletsCollection(uid(req)).get();
     const wallets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     res.json(wallets);
-  } catch (error) {
-    console.error('[listWallets] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function createWallet(req: Request, res: Response): Promise<void> {
-  try {
+export const createWallet = asyncHandler(
+  'createWallet',
+  async (req: Request, res: Response) => {
     const { name, description, currency } = req.body as Partial<Wallet>;
 
     if (!name || !currency) {
@@ -54,9 +44,7 @@ export async function createWallet(req: Request, res: Response): Promise<void> {
     }
 
     if (!SUPPORTED_CURRENCIES.has(currency)) {
-      res.status(400).json({
-        error: `Currency '${currency}' is not supported. Accepted values: ${[...SUPPORTED_CURRENCIES].join(', ')}`,
-      });
+      res.status(400).json({ error: unsupportedCurrencyError(currency) });
       return;
     }
 
@@ -72,21 +60,13 @@ export async function createWallet(req: Request, res: Response): Promise<void> {
 
     const docRef = await walletsCollection(uid(req)).add(walletData);
     res.status(201).json({ id: docRef.id, ...walletData });
-  } catch (error) {
-    console.error('[createWallet] error:', {
-      uid: uid(req),
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getWallet(req: Request, res: Response): Promise<void> {
-  try {
-    const walletId = req.params.id;
-    const doc = await walletsCollection(uid(req)).doc(walletId).get();
+export const getWallet = asyncHandler(
+  'getWallet',
+  async (req: Request, res: Response) => {
+    const doc = await walletsCollection(uid(req)).doc(req.params.id).get();
 
     if (!doc.exists) {
       res.status(404).json({ error: 'Wallet not found' });
@@ -94,19 +74,12 @@ export async function getWallet(req: Request, res: Response): Promise<void> {
     }
 
     res.json({ id: doc.id, ...doc.data() });
-  } catch (error) {
-    console.error('[getWallet] error:', {
-      uid: uid(req),
-      walletId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updateWallet(req: Request, res: Response): Promise<void> {
-  try {
+export const updateWallet = asyncHandler(
+  'updateWallet',
+  async (req: Request, res: Response) => {
     const walletId = req.params.id;
     const walletRef = walletsCollection(uid(req)).doc(walletId);
     const doc = await walletRef.get();
@@ -121,14 +94,13 @@ export async function updateWallet(req: Request, res: Response): Promise<void> {
     >;
 
     if (currency !== undefined && !SUPPORTED_CURRENCIES.has(currency)) {
-      res.status(400).json({
-        error: `Currency '${currency}' is not supported. Accepted values: ${[...SUPPORTED_CURRENCIES].join(', ')}`,
-      });
+      res.status(400).json({ error: unsupportedCurrencyError(currency) });
       return;
     }
 
-    const updatedAt = new Date().toISOString();
-    const updates: Partial<Wallet> & { updatedAt: string } = { updatedAt };
+    const updates: Partial<Wallet> & { updatedAt: string } = {
+      updatedAt: new Date().toISOString(),
+    };
 
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
@@ -137,24 +109,14 @@ export async function updateWallet(req: Request, res: Response): Promise<void> {
     await walletRef.update(updates);
 
     // Mescla em memória para evitar segunda leitura no Firestore
-    const updatedWallet = { id: walletId, ...doc.data(), ...updates };
-    res.json(updatedWallet);
-  } catch (error) {
-    console.error('[updateWallet] error:', {
-      uid: uid(req),
-      walletId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+    res.json({ id: walletId, ...doc.data(), ...updates });
+  },
+);
 
-export async function deleteWallet(req: Request, res: Response): Promise<void> {
-  try {
-    const walletId = req.params.id;
-    const walletRef = walletsCollection(uid(req)).doc(walletId);
+export const deleteWallet = asyncHandler(
+  'deleteWallet',
+  async (req: Request, res: Response) => {
+    const walletRef = walletsCollection(uid(req)).doc(req.params.id);
     const doc = await walletRef.get();
 
     if (!doc.exists) {
@@ -167,13 +129,5 @@ export async function deleteWallet(req: Request, res: Response): Promise<void> {
     // pela API, que só as alcança a partir da carteira (issue #219).
     await deleteDocumentCascading(walletRef, ['positions']);
     res.status(204).send();
-  } catch (error) {
-    console.error('[deleteWallet] error:', {
-      uid: uid(req),
-      walletId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);

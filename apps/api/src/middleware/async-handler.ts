@@ -5,6 +5,19 @@ import { AuthRequest } from './auth.middleware';
 type RouteHandler = (req: Request, res: Response) => Promise<void> | void;
 
 /**
+ * Status HTTP anexado ao erro pelo próprio serviço, quando a falha é de
+ * negócio e não interna — um PDF ilegível é 400, não 500.
+ */
+function statusCodeOf(error: unknown): number {
+  const statusCode =
+    typeof error === 'object' && error !== null && 'statusCode' in error
+      ? (error as { statusCode?: unknown }).statusCode
+      : undefined;
+
+  return typeof statusCode === 'number' ? statusCode : 500;
+}
+
+/**
  * Envolve um handler de rota, capturando qualquer erro não tratado (issue #222).
  *
  * Antes, cada um dos ~55 handlers repetia `try` → `console.error` → 500. Além
@@ -36,9 +49,19 @@ export function asyncHandler(name: string, handler: RouteHandler) {
 
       // Um handler pode falhar depois de já ter respondido; um segundo status
       // quebraria a resposta que o cliente já está recebendo.
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Internal server error' });
-      }
+      if (res.headersSent) return;
+
+      // Só o 500 troca a mensagem pela genérica, ficando o detalhe apenas no
+      // log. O corte é no 500 e não em todo 5xx porque a distinção é usada de
+      // propósito: `createError(..., 500)` carrega detalhe interno
+      // ("OPENROUTER_API_KEY não configurada"), enquanto
+      // `createError('Falha ao consultar o provedor de IA', 502)` é texto
+      // escrito para a tela do usuário.
+      const code = statusCodeOf(error);
+      res.status(code).json({
+        error:
+          code === 500 ? 'Internal server error' : (error as Error).message,
+      });
     }
   };
 }

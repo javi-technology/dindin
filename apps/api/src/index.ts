@@ -268,7 +268,10 @@ app.put(
   confirmRecommended,
 );
 
-// Middleware global de tratamento de erros não capturados
+// Rede de segurança para erros que não nascem dentro de um handler de rota e
+// por isso não passam pelo asyncHandler (issue #222): body malformado no
+// express.json/raw, falha do rate limiter e do middleware de log. Os handlers
+// de rota tratam o próprio erro no wrapper e não chegam aqui.
 app.use(
   (err: Error, req: Request, res: Response, _next: NextFunction): void => {
     console.error('[unhandledError]', {

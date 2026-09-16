@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
 import { Dividend, Position, AssetType } from 'dindin-models';
-import { AuthRequest } from '../middleware/auth.middleware';
 import {
   buildMonthlyDividendReport,
   isValidPaymentDate,
@@ -10,6 +8,13 @@ import {
 } from './monthly-report.service';
 import { recordMonthlyDividends } from './dividend-record.service';
 import { computeMonthlyIncome } from './monthly-income.service';
+import { asyncHandler } from '../middleware/async-handler';
+import {
+  uid,
+  dividendsCollection,
+  positionsCollection,
+  walletsCollection,
+} from '../firestore/paths';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -18,23 +23,6 @@ const ASSET_TYPES = new Set<AssetType>([
   'REIT',
   'OTHER',
 ]);
-
-function uid(req: Request): string {
-  return (req as AuthRequest).user!.uid;
-}
-
-function dividendsCollection(userId: string) {
-  return getFirestore().collection('users').doc(userId).collection('dividends');
-}
-
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
 
 async function getAllUserPositions(
   userId: string,
@@ -47,11 +35,7 @@ async function getAllUserPositions(
     );
   }
 
-  const walletsSnapshot = await getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .get();
+  const walletsSnapshot = await walletsCollection(userId).get();
 
   const positionsByWallet = await Promise.all(
     walletsSnapshot.docs.map((walletDoc) =>
@@ -134,32 +118,21 @@ function validateDividendBody(
   return { valid: true };
 }
 
-export async function listDividends(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const listDividends = asyncHandler(
+  'listDividends',
+  async (req: Request, res: Response) => {
     const snapshot = await dividendsCollection(uid(req)).get();
     const dividends = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
     res.json(dividends);
-  } catch (error) {
-    console.error('[listDividends] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function createDividend(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const createDividend = asyncHandler(
+  'createDividend',
+  async (req: Request, res: Response) => {
     const body = req.body as Partial<Dividend>;
 
     const validation = validateDividendBody(body);
@@ -186,19 +159,12 @@ export async function createDividend(
 
     const docRef = await dividendsCollection(uid(req)).add(dividendData);
     res.status(201).json({ id: docRef.id, ...dividendData });
-  } catch (error) {
-    console.error('[createDividend] error:', {
-      uid: uid(req),
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getDividend(req: Request, res: Response): Promise<void> {
-  try {
+export const getDividend = asyncHandler(
+  'getDividend',
+  async (req: Request, res: Response) => {
     const { id } = req.params;
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
@@ -208,22 +174,12 @@ export async function getDividend(req: Request, res: Response): Promise<void> {
     }
 
     res.json({ id: doc.id, ...doc.data() });
-  } catch (error) {
-    console.error('[getDividend] error:', {
-      uid: uid(req),
-      dividendId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updateDividend(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const updateDividend = asyncHandler(
+  'updateDividend',
+  async (req: Request, res: Response) => {
     const { id } = req.params;
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
@@ -280,17 +236,8 @@ export async function updateDividend(
 
     const updatedDividend = { ...current, ...updates, id };
     res.json(updatedDividend);
-  } catch (error) {
-    console.error('[updateDividend] error:', {
-      uid: uid(req),
-      dividendId: req.params.id,
-      body: req.body,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 interface MonthlyDividendProjection {
   ticker: string;
@@ -396,11 +343,9 @@ function latestDividendByTicker(
     .filter((projection) => projection.quantity > 0);
 }
 
-export async function getDividendProjection(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const getDividendProjection = asyncHandler(
+  'getDividendProjection',
+  async (req: Request, res: Response) => {
     const userId = uid(req);
     const [dividendsSnapshot, positions] = await Promise.all([
       dividendsCollection(userId).get(),
@@ -416,21 +361,12 @@ export async function getDividendProjection(
     );
 
     res.json({ projections, total });
-  } catch (error) {
-    console.error('[getDividendProjection] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getMonthlyDividendReport(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const getMonthlyDividendReport = asyncHandler(
+  'getMonthlyDividendReport',
+  async (req: Request, res: Response) => {
     const queryYear = req.query.year;
     let year = new Date().getFullYear();
 
@@ -456,32 +392,16 @@ export async function getMonthlyDividendReport(
     );
 
     res.json(buildMonthlyDividendReport(dividends, year));
-  } catch (error) {
-    console.error('[getMonthlyDividendReport] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function postMonthlyDividendRecord(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const postMonthlyDividendRecord = asyncHandler(
+  'postMonthlyDividendRecord',
+  async (req: Request, res: Response) => {
     const dividends = await recordMonthlyDividends(uid(req));
     res.status(201).json(dividends);
-  } catch (error) {
-    console.error('[postMonthlyDividendRecord] error:', {
-      uid: uid(req),
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 interface TickerDividendYield {
   ticker: string;
@@ -503,11 +423,9 @@ function roundYield(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export async function getDividendYield(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const getDividendYield = asyncHandler(
+  'getDividendYield',
+  async (req: Request, res: Response) => {
     const { walletId } = req.params;
     const userId = uid(req);
 
@@ -577,22 +495,12 @@ export async function getDividendYield(
     };
 
     res.json(response);
-  } catch (error) {
-    console.error('[getDividendYield] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function getMonthlyIncome(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const getMonthlyIncome = asyncHandler(
+  'getMonthlyIncome',
+  async (req: Request, res: Response) => {
     const { walletId } = req.params;
     const userId = uid(req);
     const { byTicker, total, totalFromFridge } = await computeMonthlyIncome(
@@ -600,22 +508,12 @@ export async function getMonthlyIncome(
       walletId,
     );
     res.json({ byTicker, total, totalFromFridge });
-  } catch (error) {
-    console.error('[getMonthlyIncome] error:', {
-      uid: uid(req),
-      walletId: req.params.walletId,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function deleteDividend(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const deleteDividend = asyncHandler(
+  'deleteDividend',
+  async (req: Request, res: Response) => {
     const { id } = req.params;
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
@@ -627,13 +525,5 @@ export async function deleteDividend(
 
     await dividendRef.delete();
     res.status(204).send();
-  } catch (error) {
-    console.error('[deleteDividend] error:', {
-      uid: uid(req),
-      dividendId: req.params.id,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);

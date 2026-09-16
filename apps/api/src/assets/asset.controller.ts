@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Asset, AssetType } from 'dindin-models';
+import { asyncHandler } from '../middleware/async-handler';
 
 const VALID_ASSET_TYPES: AssetType[] = ['FII', 'STOCK', 'ETF', 'REIT', 'OTHER'];
 
@@ -12,38 +13,25 @@ function assetsCollection() {
  * Lista os ativos disponíveis no catálogo para seleção em posições/itens
  * da geladeira. Apenas ativos com `active: true` são retornados.
  */
-export async function listAssets(req: Request, res: Response): Promise<void> {
-  try {
+export const listAssets = asyncHandler(
+  'listAssets',
+  async (req: Request, res: Response) => {
     const snapshot = await assetsCollection().where('active', '==', true).get();
     const assets = snapshot.docs.map((doc) => doc.data());
     res.json(assets);
-  } catch (error) {
-    console.error('[listAssets] error:', {
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function listAllAssets(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const listAllAssets = asyncHandler(
+  'listAllAssets',
+  async (req: Request, res: Response) => {
     const snapshot = await assetsCollection().get();
     const assets = snapshot.docs
       .map((doc) => doc.data() as Asset)
       .sort((a, b) => a.ticker.localeCompare(b.ticker));
     res.json(assets);
-  } catch (error) {
-    console.error('[listAllAssets] error:', {
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 interface AssetBodyValid {
   valid: true;
@@ -121,8 +109,9 @@ function validateAssetBody(
  * custom claim `admin: true`. O ticker é normalizado para uppercase e
  * usado como id do documento.
  */
-export async function createAsset(req: Request, res: Response): Promise<void> {
-  try {
+export const createAsset = asyncHandler(
+  'createAsset',
+  async (req: Request, res: Response) => {
     const validation = validateAssetBody(req.body ?? {});
     if (!validation.valid) {
       res.status(400).json({ error: validation.errors.join('; ') });
@@ -155,17 +144,12 @@ export async function createAsset(req: Request, res: Response): Promise<void> {
     await docRef.set(asset);
 
     res.status(201).json(asset);
-  } catch (error) {
-    console.error('[createAsset] error:', {
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
-export async function updateAsset(req: Request, res: Response): Promise<void> {
-  try {
+export const updateAsset = asyncHandler(
+  'updateAsset',
+  async (req: Request, res: Response) => {
     const normalizedTicker = req.params.ticker.trim().toUpperCase();
     const docRef = assetsCollection().doc(normalizedTicker);
     const existing = await docRef.get();
@@ -201,11 +185,5 @@ export async function updateAsset(req: Request, res: Response): Promise<void> {
     await docRef.update(patch);
     const updated = await docRef.get();
     res.json(updated.data());
-  } catch (error) {
-    console.error('[updateAsset] error:', {
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
