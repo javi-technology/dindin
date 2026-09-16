@@ -1605,6 +1605,7 @@ describe('ai-suggestion.service', () => {
 
     await expect(callOpenRouter('sistema', 'usuario')).rejects.toMatchObject({
       statusCode: 502,
+      expose: true,
       message: 'Falha ao consultar o provedor de IA',
     });
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -1621,6 +1622,7 @@ describe('ai-suggestion.service', () => {
 
     await expect(callOpenRouter('sistema', 'usuario')).rejects.toMatchObject({
       statusCode: 502,
+      expose: true,
       message: 'Falha ao consultar o provedor de IA',
     });
   });

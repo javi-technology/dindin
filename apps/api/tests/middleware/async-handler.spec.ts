@@ -145,8 +145,12 @@ describe('asyncHandler', () => {
   // O recommended-wallet.controller anexava `statusCode` ao erro e repetia, em
   // seis handlers, o mapeamento para status + mensagem. O wrapper assume isso.
   describe('erro com statusCode', () => {
-    function errorWithStatus(message: string, statusCode: number): Error {
-      return Object.assign(new Error(message), { statusCode });
+    function errorWithStatus(
+      message: string,
+      statusCode: number,
+      extra: Record<string, unknown> = {},
+    ): Error {
+      return Object.assign(new Error(message), { statusCode, ...extra });
     }
 
     it('deve responder com o status do erro e a mensagem em 4xx', async () => {
@@ -200,15 +204,15 @@ describe('asyncHandler', () => {
       });
     });
 
-    // O corte é no 500, não em todo 5xx. A ai-suggestion.service usa os dois
-    // de propósito: 500 para detalhe interno ("OPENROUTER_API_KEY não
-    // configurada") e 502 para mensagem escrita para a tela do usuário.
-    it('deve expor a mensagem em 502, que é texto de interface', async () => {
-      const handler = jest
-        .fn()
-        .mockRejectedValue(
-          errorWithStatus('Falha ao consultar o provedor de IA', 502),
-        );
+    // Em 5xx a mensagem só sai quando a aplicação marcou o erro com
+    // `expose: true` (convenção do http-errors). O 502 da ai-suggestion é
+    // texto de interface e vem marcado; erros de bibliotecas não.
+    it('deve expor a mensagem de 5xx marcado com expose', async () => {
+      const handler = jest.fn().mockRejectedValue(
+        errorWithStatus('Falha ao consultar o provedor de IA', 502, {
+          expose: true,
+        }),
+      );
       const res = createResponse();
 
       await asyncHandler('generateSuggestion', handler)(
@@ -219,6 +223,47 @@ describe('asyncHandler', () => {
       expect(res.status).toHaveBeenCalledWith(502);
       expect(res.json).toHaveBeenCalledWith({
         error: 'Falha ao consultar o provedor de IA',
+      });
+    });
+
+    // Os erros do SDK da Stripe trazem statusCode. Antes o billing trocava a
+    // mensagem de qualquer 5xx pela genérica; o texto cru da Stripe não pode
+    // chegar ao cliente.
+    it('não deve expor a mensagem de 5xx sem expose, como os da Stripe', async () => {
+      const stripeError = Object.assign(
+        new Error('An error occurred with our connection to Stripe.'),
+        { type: 'StripeConnectionError', statusCode: 503 },
+      );
+      const handler = jest.fn().mockRejectedValue(stripeError);
+      const res = createResponse();
+
+      await asyncHandler('createCheckoutSession', handler)(
+        createRequest(),
+        res as unknown as Response,
+      );
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal server error',
+      });
+    });
+
+    it('deve permitir esconder a mensagem de 4xx com expose false', async () => {
+      const handler = jest
+        .fn()
+        .mockRejectedValue(
+          errorWithStatus('detalhe sensível', 400, { expose: false }),
+        );
+      const res = createResponse();
+
+      await asyncHandler('importRecommended', handler)(
+        createRequest(),
+        res as unknown as Response,
+      );
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal server error',
       });
     });
 
