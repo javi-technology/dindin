@@ -80,22 +80,88 @@ describe('configuração do ESLint', () => {
   });
 
   describe('pre-commit', () => {
-    it('deve rodar eslint --fix nos arquivos TypeScript via lint-staged', () => {
-      const pkg = readJson('package.json');
-      const lintStaged = pkg['lint-staged'] as Record<string, string[]>;
+    type Task = (files: string[]) => string | string[];
 
-      // Mais de um glob pode alcançar `.ts` (o do Prettier também), então o
-      // que importa é existir um glob que alcance `.ts` e rode o eslint.
-      const eslintPatterns = Object.entries(lintStaged)
-        .filter(([, commands]) => commands.join(' ').includes('eslint --fix'))
-        .map(([pattern]) => pattern);
+    async function loadConfig(): Promise<Record<string, Task>> {
+      const module = await import(join(repoRoot, 'lint-staged.config.cjs'));
+      return (module.default ?? module) as Record<string, Task>;
+    }
 
-      expect(eslintPatterns.length).toBeGreaterThan(0);
+    function commandsFor(config: Record<string, Task>, file: string): string[] {
+      const extension = file.slice(file.lastIndexOf('.') + 1);
+      const globs = Object.keys(config).filter((glob) =>
+        glob
+          .replace(/[*{}.]/g, ' ')
+          .split(/[\s,]+/)
+          .includes(extension),
+      );
+      return globs.flatMap((glob) => {
+        const result = config[glob]([join(repoRoot, file)]);
+        return Array.isArray(result) ? result : [result];
+      });
+    }
+
+    it('deve manter a configuração fora do package.json', () => {
+      expect(readJson('package.json')['lint-staged']).toBeUndefined();
+      expect(existsSync(join(repoRoot, 'lint-staged.config.cjs'))).toBe(true);
+    });
+
+    // Globs sobrepostos rodam em paralelo no lint-staged: Prettier e ESLint
+    // reescreveriam o mesmo arquivo ao mesmo tempo e um descartaria o outro.
+    it('deve alcançar cada .ts por um único glob', async () => {
+      const config = await loadConfig();
+      const globsDoTs = Object.keys(config).filter((glob) =>
+        glob
+          .replace(/[*{}.]/g, ' ')
+          .split(/[\s,]+/)
+          .includes('ts'),
+      );
+
+      expect(globsDoTs).toHaveLength(1);
+    });
+
+    it('deve rodar eslint antes do prettier, na mesma sequência', async () => {
+      const commands = commandsFor(await loadConfig(), 'apps/api/src/index.ts');
+
+      const eslint = commands.findIndex((c) => c.startsWith('eslint --fix'));
+      const prettier = commands.findIndex((c) =>
+        c.startsWith('prettier --write'),
+      );
+      expect(eslint).toBeGreaterThanOrEqual(0);
+      expect(prettier).toBeGreaterThan(eslint);
+    });
+
+    // Rodando da raiz, o ESLint usa a config da raiz, que ignora apps/web.
+    it('deve analisar .ts do frontend com a config do web', async () => {
+      const commands = commandsFor(
+        await loadConfig(),
+        'apps/web/src/app/app.config.ts',
+      );
+
       expect(
-        eslintPatterns.some(
-          (pattern) => pattern.includes('.ts') || pattern.includes(',ts'),
+        commands.some((c) =>
+          c.startsWith('eslint --fix --config apps/web/eslint.config.mjs'),
         ),
       ).toBe(true);
+    });
+
+    it('deve analisar templates .html do frontend', async () => {
+      const commands = commandsFor(
+        await loadConfig(),
+        'apps/web/src/app/app.component.html',
+      );
+
+      expect(
+        commands.some((c) =>
+          c.startsWith('eslint --fix --config apps/web/eslint.config.mjs'),
+        ),
+      ).toBe(true);
+    });
+
+    it('não deve usar a config do web para arquivos da API', async () => {
+      const commands = commandsFor(await loadConfig(), 'apps/api/src/index.ts');
+
+      expect(commands.join(' ')).not.toContain('apps/web/eslint.config.mjs');
     });
   });
 
