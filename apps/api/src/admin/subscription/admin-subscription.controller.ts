@@ -16,6 +16,7 @@ import {
   toPublicSubscription,
   toStripeState,
 } from '../../billing/entitlement.service';
+import { asyncHandler } from '../../middleware/async-handler';
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
@@ -63,8 +64,9 @@ async function getSubscriptions(uids: string[]): Promise<UserSubscription[]> {
 }
 
 /** Lista usuários do Firebase Auth com o estado de assinatura, filtrando por e-mail. */
-export async function listUsers(req: Request, res: Response): Promise<void> {
-  try {
+export const listUsers = asyncHandler(
+  'listUsers',
+  async (req: Request, res: Response) => {
     const search =
       typeof req.query.search === 'string'
         ? req.query.search.trim().toLowerCase()
@@ -75,14 +77,8 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
       .slice(0, ADMIN_USERS_LIMIT);
     const subscriptions = await getSubscriptions(users.map((u) => u.uid));
     res.json(users.map((user, i) => toAdminUser(user, subscriptions[i])));
-  } catch (error) {
-    console.error('[admin.listUsers] error:', {
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 function parseGrantBody(
   body: Record<string, unknown>,
@@ -122,11 +118,9 @@ async function findAuthUser(uid: string): Promise<UserRecord | null> {
 }
 
 /** Concede acesso manual (`provider: 'manual'`) a um usuário. */
-export async function grantSubscription(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const grantSubscription = asyncHandler(
+  'grantSubscription',
+  async (req: Request, res: Response) => {
     const parsed = parseGrantBody(req.body);
     if ('error' in parsed) {
       res.status(400).json({ error: parsed.error });
@@ -181,22 +175,13 @@ export async function grantSubscription(
     }
 
     res.json(toAdminUser(user, result));
-  } catch (error) {
-    console.error('[admin.grantSubscription] error:', {
-      uid: req.params.uid,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);
 
 /** Revoga uma concessão manual. Assinaturas Stripe se cancelam pelo portal. */
-export async function revokeSubscription(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const revokeSubscription = asyncHandler(
+  'revokeSubscription',
+  async (req: Request, res: Response) => {
     const { uid } = req.params;
     const ref = subscriptionDoc(uid);
     // Leitura e gravação na mesma transação: o webhook pode ativar a Stripe
@@ -243,12 +228,5 @@ export async function revokeSubscription(
 
     const user = (await findAuthUser(uid)) ?? ({ uid } as UserRecord);
     res.json(toAdminUser(user, result.subscription));
-  } catch (error) {
-    console.error('[admin.revokeSubscription] error:', {
-      uid: req.params.uid,
-      message: (error as Error).message,
-      stack: (error as Error).stack,
-    });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-}
+  },
+);

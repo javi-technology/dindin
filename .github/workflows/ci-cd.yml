@@ -100,6 +100,29 @@ jobs:
       - name: npm audit (runtime, high+)
         run: npm audit --audit-level=high --omit=dev
 
+  # Análise estática de todo o monorepo (issue #220). Roda em paralelo com os
+  # builds e bloqueia o deploy, para que problema de lint não chegue na main.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -188,6 +211,7 @@ jobs:
     needs:
       - version
       - audit
+      - lint
       - build-and-test-api
       - build-and-test-web
     # Executa apenas em push direto na main, após CI passar.

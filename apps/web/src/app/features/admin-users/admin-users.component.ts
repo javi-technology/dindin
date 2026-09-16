@@ -1,10 +1,10 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 import {
   LucideArrowLeft,
   LucideSearch,
@@ -57,13 +57,14 @@ const GRANT_ERROR_MESSAGES: Record<number, string> = {
     LucideSearch,
     LucideShieldCheck,
     LucideShieldOff,
+    ConfirmDialogComponent,
   ],
   templateUrl: './admin-users.component.html',
 })
-export class AdminUsersComponent implements OnInit, OnDestroy {
+export class AdminUsersComponent implements OnInit {
   private readonly adminUserService = inject(AdminUserService);
   private readonly fb = inject(FormBuilder);
-  private readonly destroy$ = new Subject<void>();
+  private readonly destroyRef = inject(DestroyRef);
 
   users = signal<AdminUser[]>([]);
   loading = signal(false);
@@ -84,17 +85,12 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
     this.search();
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
   search(): void {
     this.loading.set(true);
     this.error.set(null);
     this.adminUserService
       .list(this.searchControl.value.trim())
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (users) => {
           this.users.set(users);
@@ -184,7 +180,7 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
           this.grantForm.getRawValue().currentPeriodEnd,
         ),
       })
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.saving.set(false);
@@ -220,7 +216,7 @@ export class AdminUsersComponent implements OnInit, OnDestroy {
     this.revokeError.set(null);
     this.adminUserService
       .revoke(user.uid)
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.saving.set(false);

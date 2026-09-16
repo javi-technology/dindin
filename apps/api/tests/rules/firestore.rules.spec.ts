@@ -4,7 +4,7 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
 
@@ -30,33 +30,60 @@ beforeEach(async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Coleções de domínio (issue #218)
+//
+// Toda escrita nas coleções de domínio passa pela API, que valida moeda,
+// tipo de ativo, quantidade e preço antes de gravar. O frontend nunca escreve
+// direto no Firestore — só consome a API via HttpClient. Por isso as regras
+// concedem apenas leitura ao proprietário: escrita é exclusiva do Admin SDK,
+// que ignora as regras. Assim não há caminho que contorne a validação.
+//
+// Como consequência, os testes semeiam dados via `withSecurityRulesDisabled`
+// (mesmo padrão já usado em `assets` e `patrimonySnapshots`), e não mais
+// escrevendo pelo contexto do cliente.
+// ---------------------------------------------------------------------------
+
+/** Semeia um documento ignorando as regras, simulando a API/Admin SDK. */
+function seed(path: string, data: Record<string, unknown>): Promise<void> {
+  return testEnv.withSecurityRulesDisabled((context) =>
+    setDoc(doc(context.firestore(), path), data),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – users', () => {
-  it('deve permitir que usuário leia seu próprio documento', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(alice.firestore(), 'users/alice');
+  const userPath = 'users/alice';
 
-    await assertSucceeds(setDoc(ref, { email: 'alice@example.com' }));
-    await assertSucceeds(getDoc(ref));
+  it('deve permitir que usuário leia seu próprio documento', async () => {
+    await seed(userPath, { email: 'alice@example.com' });
+    const alice = testEnv.authenticatedContext('alice');
+
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), userPath)),
+    );
+    expect(snapshot.data()?.email).toBe('alice@example.com');
+  });
+
+  it('deve negar que o proprietário escreva no próprio documento', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), userPath), { email: 'alice@example.com' }),
+    );
   });
 
   it('deve negar que usuário leia documento de outro usuário', async () => {
-    const alice = testEnv.authenticatedContext('alice');
+    await seed(userPath, { email: 'alice@example.com' });
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(doc(alice.firestore(), 'users/alice'), {
-        email: 'alice@example.com',
-      }),
-    );
-    await assertFails(getDoc(doc(bob.firestore(), 'users/alice')));
+    await assertFails(getDoc(doc(bob.firestore(), userPath)));
   });
 
   it('deve negar acesso não autenticado a users', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(getDoc(doc(unauth.firestore(), 'users/alice')));
+    await assertFails(getDoc(doc(unauth.firestore(), userPath)));
   });
 });
 
@@ -65,43 +92,59 @@ describe('Firestore rules – users', () => {
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – wallets', () => {
-  it('deve permitir que usuário autenticado leia suas próprias wallets', async () => {
+  const walletPath = 'users/alice/wallets/main';
+
+  it('deve permitir que o proprietário leia suas próprias wallets', async () => {
+    await seed(walletPath, { balance: 100 });
     const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(alice.firestore(), 'users/alice/wallets/main');
 
-    await assertSucceeds(setDoc(ref, { balance: 100 }));
-    const snapshot = await assertSucceeds(getDoc(ref));
-
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), walletPath)),
+    );
     expect(snapshot.exists()).toBe(true);
     expect(snapshot.data()?.balance).toBe(100);
   });
 
-  it('deve negar que usuário leia wallets de outro usuário', async () => {
+  it('deve negar que o proprietário crie wallets', async () => {
     const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), walletPath), { balance: 100 }),
+    );
+  });
+
+  it('deve negar que o proprietário atualize wallets', async () => {
+    await seed(walletPath, { balance: 100 });
+    const alice = testEnv.authenticatedContext('alice');
+
+    await assertFails(
+      updateDoc(doc(alice.firestore(), walletPath), { balance: 999 }),
+    );
+  });
+
+  it('deve negar que o proprietário exclua wallets', async () => {
+    await seed(walletPath, { balance: 100 });
+    const alice = testEnv.authenticatedContext('alice');
+
+    await assertFails(deleteDoc(doc(alice.firestore(), walletPath)));
+  });
+
+  it('deve negar que usuário leia wallets de outro usuário', async () => {
+    await seed(walletPath, { balance: 100 });
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(doc(alice.firestore(), 'users/alice/wallets/main'), {
-        balance: 100,
-      }),
-    );
-    await assertFails(getDoc(doc(bob.firestore(), 'users/alice/wallets/main')));
+    await assertFails(getDoc(doc(bob.firestore(), walletPath)));
   });
 
   it('deve negar que usuário escreva em wallets de outro usuário', async () => {
     const bob = testEnv.authenticatedContext('bob');
     await assertFails(
-      setDoc(doc(bob.firestore(), 'users/alice/wallets/main'), {
-        balance: 100,
-      }),
+      setDoc(doc(bob.firestore(), walletPath), { balance: 100 }),
     );
   });
 
   it('deve negar acesso não autenticado a wallets', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(
-      getDoc(doc(unauth.firestore(), 'users/alice/wallets/main')),
-    );
+    await assertFails(getDoc(doc(unauth.firestore(), walletPath)));
   });
 });
 
@@ -110,51 +153,65 @@ describe('Firestore rules – wallets', () => {
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – positions', () => {
-  it('deve permitir que usuário leia suas próprias positions', async () => {
+  const positionPath = 'users/alice/wallets/main/positions/pos-1';
+
+  it('deve permitir que o proprietário leia suas próprias positions', async () => {
+    await seed(positionPath, { ticker: 'HGLG11', quantity: 10 });
     const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(
-      alice.firestore(),
-      'users/alice/wallets/main/positions/HGLG11',
+
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), positionPath)),
     );
-
-    await assertSucceeds(setDoc(ref, { ticker: 'HGLG11', quantity: 10 }));
-    const snapshot = await assertSucceeds(getDoc(ref));
-
     expect(snapshot.data()?.ticker).toBe('HGLG11');
   });
 
-  it('deve negar que usuário leia positions de outro usuário', async () => {
+  it('deve negar que o proprietário crie positions', async () => {
     const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), positionPath), {
+        ticker: 'HGLG11',
+        quantity: 10,
+      }),
+    );
+  });
+
+  // Regressão do motivo da issue: sem esta regra o cliente gravaria uma
+  // posição com quantidade negativa, que a API rejeitaria com 400.
+  it('deve negar que o proprietário grave quantidade inválida direto', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), positionPath), {
+        ticker: 'HGLG11',
+        quantity: -999,
+        assetType: 'INVALIDO',
+      }),
+    );
+  });
+
+  it('deve negar que o proprietário exclua positions', async () => {
+    await seed(positionPath, { ticker: 'HGLG11', quantity: 10 });
+    const alice = testEnv.authenticatedContext('alice');
+
+    await assertFails(deleteDoc(doc(alice.firestore(), positionPath)));
+  });
+
+  it('deve negar que usuário leia positions de outro usuário', async () => {
+    await seed(positionPath, { ticker: 'HGLG11', quantity: 10 });
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(
-        doc(alice.firestore(), 'users/alice/wallets/main/positions/HGLG11'),
-        { ticker: 'HGLG11' },
-      ),
-    );
-    await assertFails(
-      getDoc(doc(bob.firestore(), 'users/alice/wallets/main/positions/HGLG11')),
-    );
+    await assertFails(getDoc(doc(bob.firestore(), positionPath)));
   });
 
   it('deve negar que usuário escreva em positions de outro usuário', async () => {
     const bob = testEnv.authenticatedContext('bob');
     await assertFails(
-      setDoc(
-        doc(bob.firestore(), 'users/alice/wallets/main/positions/HGLG11'),
-        { ticker: 'HGLG11' },
-      ),
+      setDoc(doc(bob.firestore(), positionPath), { ticker: 'HGLG11' }),
     );
   });
 
   it('deve negar acesso não autenticado a positions', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(
-      getDoc(
-        doc(unauth.firestore(), 'users/alice/wallets/main/positions/HGLG11'),
-      ),
-    );
+    await assertFails(getDoc(doc(unauth.firestore(), positionPath)));
   });
 });
 
@@ -163,44 +220,42 @@ describe('Firestore rules – positions', () => {
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – fridges', () => {
-  it('deve permitir que usuário leia suas próprias fridges', async () => {
+  const fridgePath = 'users/alice/fridges/fridge-1';
+
+  it('deve permitir que o proprietário leia suas próprias fridges', async () => {
+    await seed(fridgePath, { name: 'Geladeira Principal' });
     const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(alice.firestore(), 'users/alice/fridges/principal');
 
-    await assertSucceeds(setDoc(ref, { name: 'Geladeira Principal' }));
-    const snapshot = await assertSucceeds(getDoc(ref));
-
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), fridgePath)),
+    );
     expect(snapshot.data()?.name).toBe('Geladeira Principal');
   });
 
-  it('deve negar que usuário leia fridges de outro usuário', async () => {
+  it('deve negar que o proprietário escreva em fridges', async () => {
     const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), fridgePath), { name: 'Geladeira' }),
+    );
+  });
+
+  it('deve negar que usuário leia fridges de outro usuário', async () => {
+    await seed(fridgePath, { name: 'Geladeira Principal' });
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(doc(alice.firestore(), 'users/alice/fridges/principal'), {
-        name: 'Geladeira Principal',
-      }),
-    );
-    await assertFails(
-      getDoc(doc(bob.firestore(), 'users/alice/fridges/principal')),
-    );
+    await assertFails(getDoc(doc(bob.firestore(), fridgePath)));
   });
 
   it('deve negar que usuário escreva em fridges de outro usuário', async () => {
     const bob = testEnv.authenticatedContext('bob');
     await assertFails(
-      setDoc(doc(bob.firestore(), 'users/alice/fridges/principal'), {
-        name: 'Geladeira Principal',
-      }),
+      setDoc(doc(bob.firestore(), fridgePath), { name: 'Geladeira' }),
     );
   });
 
   it('deve negar acesso não autenticado a fridges', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(
-      getDoc(doc(unauth.firestore(), 'users/alice/fridges/principal')),
-    );
+    await assertFails(getDoc(doc(unauth.firestore(), fridgePath)));
   });
 });
 
@@ -209,65 +264,42 @@ describe('Firestore rules – fridges', () => {
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – fridgeItems', () => {
-  it('deve permitir que usuário leia seus próprios fridgeItems', async () => {
+  const itemPath = 'users/alice/fridges/fridge-1/fridgeItems/item-1';
+
+  it('deve permitir que o proprietário leia seus próprios fridgeItems', async () => {
+    await seed(itemPath, { ticker: 'XPML11', targetPrice: 100 });
     const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(
-      alice.firestore(),
-      'users/alice/fridges/principal/fridgeItems/XPML11',
+
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), itemPath)),
     );
-
-    await assertSucceeds(setDoc(ref, { ticker: 'XPML11', targetPrice: 100 }));
-    const snapshot = await assertSucceeds(getDoc(ref));
-
     expect(snapshot.data()?.ticker).toBe('XPML11');
   });
 
-  it('deve negar que usuário leia fridgeItems de outro usuário', async () => {
+  it('deve negar que o proprietário escreva em fridgeItems', async () => {
     const alice = testEnv.authenticatedContext('alice');
+    await assertFails(
+      setDoc(doc(alice.firestore(), itemPath), { ticker: 'XPML11' }),
+    );
+  });
+
+  it('deve negar que usuário leia fridgeItems de outro usuário', async () => {
+    await seed(itemPath, { ticker: 'XPML11', targetPrice: 100 });
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(
-        doc(
-          alice.firestore(),
-          'users/alice/fridges/principal/fridgeItems/XPML11',
-        ),
-        { ticker: 'XPML11' },
-      ),
-    );
-    await assertFails(
-      getDoc(
-        doc(
-          bob.firestore(),
-          'users/alice/fridges/principal/fridgeItems/XPML11',
-        ),
-      ),
-    );
+    await assertFails(getDoc(doc(bob.firestore(), itemPath)));
   });
 
   it('deve negar que usuário escreva em fridgeItems de outro usuário', async () => {
     const bob = testEnv.authenticatedContext('bob');
     await assertFails(
-      setDoc(
-        doc(
-          bob.firestore(),
-          'users/alice/fridges/principal/fridgeItems/XPML11',
-        ),
-        { ticker: 'XPML11' },
-      ),
+      setDoc(doc(bob.firestore(), itemPath), { ticker: 'XPML11' }),
     );
   });
 
   it('deve negar acesso não autenticado a fridgeItems', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(
-      getDoc(
-        doc(
-          unauth.firestore(),
-          'users/alice/fridges/principal/fridgeItems/XPML11',
-        ),
-      ),
-    );
+    await assertFails(getDoc(doc(unauth.firestore(), itemPath)));
   });
 });
 
@@ -276,60 +308,45 @@ describe('Firestore rules – fridgeItems', () => {
 // ---------------------------------------------------------------------------
 
 describe('Firestore rules – dividends', () => {
-  it('deve permitir que usuário leia seus próprios dividends', async () => {
+  const dividendPath = 'users/alice/dividends/div-1';
+  const dividend = {
+    ticker: 'HGLG11',
+    amountPerShare: 0.82,
+    quantity: 100,
+    totalAmount: 82,
+    paymentDate: '2026-01-15',
+  };
+
+  it('deve permitir que o proprietário leia seus próprios dividends', async () => {
+    await seed(dividendPath, dividend);
     const alice = testEnv.authenticatedContext('alice');
-    const ref = doc(alice.firestore(), 'users/alice/dividends/div-1');
 
-    await assertSucceeds(
-      setDoc(ref, {
-        ticker: 'HGLG11',
-        amountPerShare: 0.82,
-        quantity: 100,
-        totalAmount: 82,
-        paymentDate: '2026-01-15',
-      }),
+    const snapshot = await assertSucceeds(
+      getDoc(doc(alice.firestore(), dividendPath)),
     );
-    const snapshot = await assertSucceeds(getDoc(ref));
-
     expect(snapshot.data()?.ticker).toBe('HGLG11');
   });
 
-  it('deve negar que usuário leia dividends de outro usuário', async () => {
+  it('deve negar que o proprietário escreva em dividends', async () => {
     const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), dividendPath), dividend));
+  });
+
+  it('deve negar que usuário leia dividends de outro usuário', async () => {
+    await seed(dividendPath, dividend);
     const bob = testEnv.authenticatedContext('bob');
 
-    await assertSucceeds(
-      setDoc(doc(alice.firestore(), 'users/alice/dividends/div-1'), {
-        ticker: 'HGLG11',
-        amountPerShare: 0.82,
-        quantity: 100,
-        totalAmount: 82,
-        paymentDate: '2026-01-15',
-      }),
-    );
-    await assertFails(
-      getDoc(doc(bob.firestore(), 'users/alice/dividends/div-1')),
-    );
+    await assertFails(getDoc(doc(bob.firestore(), dividendPath)));
   });
 
   it('deve negar que usuário escreva em dividends de outro usuário', async () => {
     const bob = testEnv.authenticatedContext('bob');
-    await assertFails(
-      setDoc(doc(bob.firestore(), 'users/alice/dividends/div-1'), {
-        ticker: 'HGLG11',
-        amountPerShare: 0.82,
-        quantity: 100,
-        totalAmount: 82,
-        paymentDate: '2026-01-15',
-      }),
-    );
+    await assertFails(setDoc(doc(bob.firestore(), dividendPath), dividend));
   });
 
   it('deve negar acesso não autenticado a dividends', async () => {
     const unauth = testEnv.unauthenticatedContext();
-    await assertFails(
-      getDoc(doc(unauth.firestore(), 'users/alice/dividends/div-1')),
-    );
+    await assertFails(getDoc(doc(unauth.firestore(), dividendPath)));
   });
 });
 
@@ -394,12 +411,7 @@ describe('Firestore rules – patrimonySnapshots', () => {
   });
 
   it('deve negar que outro usuário leia snapshots', async () => {
-    const alice = testEnv.authenticatedContext('alice');
     const bob = testEnv.authenticatedContext('bob');
-    const ref = doc(
-      alice.firestore(),
-      'users/alice/patrimonySnapshots/2026-08-27',
-    );
     await testEnv.withSecurityRulesDisabled((context) =>
       setDoc(
         doc(context.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),

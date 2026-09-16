@@ -21,7 +21,7 @@ jest.mock('firebase-admin/firestore', () => ({
 
 import { app } from '../../src/index';
 import { computeMonthlyIncome } from '../../src/dividend/monthly-income.service';
-import { Position, Quote, Fridge, FridgeItem } from 'dindin-models';
+import { Position, Quote, FridgeItem } from 'dindin-models';
 
 interface TestFridge {
   id: string;

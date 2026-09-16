@@ -49,10 +49,23 @@ const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investiment
 export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
 
-type StatusError = Error & { statusCode?: number };
+type StatusError = Error & { statusCode?: number; expose?: boolean };
 
-function createError(message: string, statusCode: number): StatusError {
-  return Object.assign(new Error(message), { statusCode });
+/**
+ * `expose: true` libera a mensagem para o cliente mesmo em 5xx. Só vale para
+ * texto escrito para a tela; detalhe interno ("OPENROUTER_API_KEY não
+ * configurada") não recebe a marca e sai como mensagem genérica.
+ */
+function createError(
+  message: string,
+  statusCode: number,
+  { expose }: { expose?: boolean } = {},
+): StatusError {
+  return Object.assign(
+    new Error(message),
+    { statusCode },
+    expose === undefined ? {} : { expose },
+  );
 }
 
 function suggestionsCollection(uid: string) {
@@ -747,7 +760,9 @@ export async function callOpenRouter(
       response = await request(retryBody);
       if (!response.ok) {
         await logResponseError(response);
-        throw createError('Falha ao consultar o provedor de IA', 502);
+        throw createError('Falha ao consultar o provedor de IA', 502, {
+          expose: true,
+        });
       }
     }
     const data: unknown = await response.json();
@@ -764,7 +779,9 @@ export async function callOpenRouter(
         '[callOpenRouter] resposta inesperada',
         serialized.slice(0, 500),
       );
-      throw createError('Falha ao consultar o provedor de IA', 502);
+      throw createError('Falha ao consultar o provedor de IA', 502, {
+        expose: true,
+      });
     }
     const result = data as {
       model: string;
@@ -780,7 +797,9 @@ export async function callOpenRouter(
       throw error;
     }
     console.error('[callOpenRouter] falha', error);
-    throw createError('Falha ao consultar o provedor de IA', 502);
+    throw createError('Falha ao consultar o provedor de IA', 502, {
+      expose: true,
+    });
   } finally {
     clearTimeout(timeout);
   }

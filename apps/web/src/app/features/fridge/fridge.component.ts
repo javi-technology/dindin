@@ -1,5 +1,6 @@
 import { Component, HostListener, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
   FormBuilder,
   FormGroup,
@@ -34,6 +35,7 @@ import {
     LucidePencil,
     LucideTrash2,
     LucideFlame,
+    ConfirmDialogComponent,
   ],
   templateUrl: './fridge.component.html',
 })

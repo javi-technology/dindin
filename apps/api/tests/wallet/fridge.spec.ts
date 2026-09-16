@@ -65,20 +65,27 @@ function createCatalogStubs(
     })),
   };
 
+  // O preço é resolvido por getAll() numa única viagem (issue #221), então o
+  // doc() só precisa devolver a referência e o getAll faz a leitura em lote.
   const quotesCollection = {
-    doc: jest.fn((ticker: string) => ({
-      get: jest.fn().mockResolvedValue(
-        pricesByTicker[ticker] !== undefined
-          ? {
-              exists: true,
-              data: () => ({ ticker, price: pricesByTicker[ticker] }),
-            }
-          : { exists: false, data: () => undefined },
-      ),
-    })),
+    doc: jest.fn((ticker: string) => ({ id: ticker })),
   };
 
-  return { assetsCollection, quotesCollection };
+  const getAll = jest.fn((...refs: { id: string }[]) =>
+    Promise.resolve(
+      refs.map((ref) =>
+        pricesByTicker[ref.id] !== undefined
+          ? {
+              id: ref.id,
+              exists: true,
+              data: () => ({ ticker: ref.id, price: pricesByTicker[ref.id] }),
+            }
+          : { id: ref.id, exists: false, data: () => undefined },
+      ),
+    ),
+  );
+
+  return { assetsCollection, quotesCollection, getAll };
 }
 
 function createFirestoreMock(
@@ -307,6 +314,7 @@ function createFirestoreMock(
       if (path === 'quotes') return catalog.quotesCollection;
       throw new Error(`Unexpected collection: ${path}`);
     }),
+    getAll: catalog.getAll,
     batch: jest.fn(() => batchMock),
     batchMock,
   };
@@ -569,6 +577,39 @@ describe('Fridge CRUD', () => {
         expect.objectContaining({ id: 'item-1' }),
       );
       expect(batch.commit).toHaveBeenCalled();
+    });
+
+    // Um batch do Firestore aceita no máximo 500 operações. A cascata antiga
+    // punha todos os itens num único batch, então uma geladeira com mais de
+    // 500 itens falhava no commit e não era excluída (issue #219).
+    it('deve remover os itens em lotes de no máximo 500', async () => {
+      const items: FridgeItem[] = Array.from({ length: 501 }, (_, index) => ({
+        id: `item-${index}`,
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 5,
+        transferredPrice: 95.0,
+        targetPrice: 110.0,
+        currentPrice: 100.0,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }));
+      firestoreMock = createFirestoreMock([baseFridge], items);
+
+      const response = await request(app)
+        .delete('/api/fridges/fridge-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+
+      const batch = (firestoreMock as any).batchMock;
+      // 501 itens não cabem num batch: exige mais de um commit.
+      expect(batch.commit.mock.calls.length).toBeGreaterThan(1);
+      expect(
+        batch.operations.filter(
+          (operation: unknown[]) => operation[0] === 'delete',
+        ),
+      ).toHaveLength(501);
     });
 
     it('deve retornar 404 para geladeira inexistente', async () => {

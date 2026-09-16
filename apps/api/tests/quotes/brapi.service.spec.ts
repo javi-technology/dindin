@@ -1,4 +1,4 @@
-import { fetchQuotes, QuoteResult } from '../../src/quotes/brapi.service';
+import { fetchQuotes } from '../../src/quotes/brapi.service';
 
 describe('BrapiService — fetchQuotes', () => {
   const originalFetch = globalThis.fetch;

@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Subject } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -42,6 +43,7 @@ type WalletTab = 'renda' | 'ganho';
     LucideSparkles,
     LucideUpload,
     LucideX,
+    ConfirmDialogComponent,
   ],
   templateUrl: './recommended-wallet.component.html',
 })

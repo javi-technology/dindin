@@ -12,6 +12,7 @@ npm run api:build --workspace=apps/api         # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
 npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run lint                                  # análise estática (ESLint)
 npm run format                                # formatar com Prettier
 npm run format:check                          # verificar formatação
 firebase deploy                               # deploy completo

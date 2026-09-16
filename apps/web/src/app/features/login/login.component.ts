@@ -24,7 +24,7 @@ export class LoginComponent {
     try {
       await this.authService.loginWithEmail(this.email, this.password);
       await this.router.navigate(['/']);
-    } catch (err) {
+    } catch {
       this.error = 'E-mail ou senha inválidos.';
     } finally {
       this.loading = false;
@@ -37,7 +37,7 @@ export class LoginComponent {
     try {
       await this.authService.loginWithGoogle();
       await this.router.navigate(['/']);
-    } catch (err) {
+    } catch {
       this.error = 'Erro ao fazer login com Google.';
     } finally {
       this.loading = false;
