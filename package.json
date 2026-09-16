@@ -18,14 +18,6 @@
     "format:check": "prettier --check .",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,md,html,css,scss,yml,yaml}": [
-      "prettier --write"
-    ],
-    "*.ts": [
-      "eslint --fix"
-    ]
-  },
   "devDependencies": {
     "eslint": "^9.39.5",
     "firebase-tools": "^15.30.0",

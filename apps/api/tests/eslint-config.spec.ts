@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'fs';
+import { createRequire } from 'module';
 import { join } from 'path';
 
 // ---------------------------------------------------------------------------
@@ -82,9 +83,13 @@ describe('configuração do ESLint', () => {
   describe('pre-commit', () => {
     type Task = (files: string[]) => string | string[];
 
+    // O config é CommonJS; import() dinâmico exigiria --experimental-vm-modules.
     async function loadConfig(): Promise<Record<string, Task>> {
-      const module = await import(join(repoRoot, 'lint-staged.config.cjs'));
-      return (module.default ?? module) as Record<string, Task>;
+      const load = createRequire(__filename);
+      return load(join(repoRoot, 'lint-staged.config.cjs')) as Record<
+        string,
+        Task
+      >;
     }
 
     function commandsFor(config: Record<string, Task>, file: string): string[] {
