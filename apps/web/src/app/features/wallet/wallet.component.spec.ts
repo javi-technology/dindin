@@ -1151,4 +1151,83 @@ describe('WalletComponent', () => {
       ).toBeTrue();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Cancelamento de requisição em voo (issue #224)
+  //
+  // Trocar de carteira com uma requisição pendente descarta a resposta antiga,
+  // para que dados da carteira anterior não sobrescrevam os da nova. Esse
+  // comportamento existia via Subjects de abort, mas não tinha teste — o que
+  // tornava arriscado trocar o mecanismo por switchMap.
+  // -------------------------------------------------------------------------
+  describe('troca de carteira com requisição pendente', () => {
+    const duasCarteiras: Wallet[] = [
+      wallets[0],
+      {
+        id: 'wallet-2',
+        ownerId: 'user-123',
+        name: 'Carteira Secundária',
+        currency: 'BRL',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const posicaoDaSegunda: Position[] = [
+      {
+        ...positions[0],
+        id: 'position-da-wallet-2',
+        walletId: 'wallet-2',
+        ticker: 'MXRF11',
+      },
+    ];
+
+    it('deve descartar a resposta obsoleta da carteira anterior', fakeAsync(() => {
+      walletServiceMock.list.and.returnValue(of(duasCarteiras));
+      // A primeira carteira responde devagar; a segunda, na hora.
+      positionServiceMock.list.and.callFake((walletId: string) =>
+        walletId === 'wallet-1'
+          ? of(positions).pipe(delay(500))
+          : of(posicaoDaSegunda),
+      );
+
+      fixture = TestBed.createComponent(WalletComponent);
+      fixture.detectChanges();
+      tick();
+
+      const component = fixture.componentInstance;
+      component.selectWallet(duasCarteiras[1]);
+      tick();
+
+      expect(component.positions().map((p) => p.id)).toEqual([
+        'position-da-wallet-2',
+      ]);
+
+      // A resposta atrasada da wallet-1 chega depois e deve ser ignorada.
+      tick(600);
+
+      expect(component.positions().map((p) => p.id)).toEqual([
+        'position-da-wallet-2',
+      ]);
+      expect(component.selectedWallet()?.id).toBe('wallet-2');
+    }));
+
+    it('deve encerrar o carregamento após a troca', fakeAsync(() => {
+      walletServiceMock.list.and.returnValue(of(duasCarteiras));
+      positionServiceMock.list.and.callFake((walletId: string) =>
+        walletId === 'wallet-1'
+          ? of(positions).pipe(delay(500))
+          : of(posicaoDaSegunda),
+      );
+
+      fixture = TestBed.createComponent(WalletComponent);
+      fixture.detectChanges();
+      tick();
+
+      fixture.componentInstance.selectWallet(duasCarteiras[1]);
+      tick(600);
+
+      expect(fixture.componentInstance.loading()).toBe(false);
+    }));
+  });
 });

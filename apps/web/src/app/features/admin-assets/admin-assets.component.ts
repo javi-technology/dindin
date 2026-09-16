@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -7,8 +8,6 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { takeUntil } from 'rxjs/operators';
-import { Subject } from 'rxjs';
 import { AssetService } from '../../core/services/asset.service';
 import { Asset } from 'dindin-models';
 import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
@@ -26,10 +25,10 @@ import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
   ],
   templateUrl: './admin-assets.component.html',
 })
-export class AdminAssetsComponent implements OnInit, OnDestroy {
+export class AdminAssetsComponent implements OnInit {
   private readonly assetService = inject(AssetService);
   private readonly fb = inject(FormBuilder);
-  private readonly destroy$ = new Subject<void>();
+  private readonly destroyRef = inject(DestroyRef);
 
   assets = signal<Asset[]>([]);
   loading = signal(false);
@@ -58,18 +57,13 @@ export class AdminAssetsComponent implements OnInit, OnDestroy {
     this.loadAssets();
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
   private loadAssets(): void {
     this.loading.set(true);
     this.error.set(null);
     this.formError.set(null);
     this.assetService
       .listAll()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.assets.set(response);
@@ -104,7 +98,7 @@ export class AdminAssetsComponent implements OnInit, OnDestroy {
       ? this.assetService.update(editingTicker, payload)
       : this.assetService.create({ ticker, ...payload });
 
-    request.pipe(takeUntil(this.destroy$)).subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (asset) => {
         this.successMessage.set(
           editingTicker

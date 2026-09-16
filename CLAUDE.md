@@ -163,6 +163,16 @@ Regras:
 - Campos de preço/valor monetário devem aceitar vírgula como separador decimal (ex: `1,55`, `0,95`).
 - Fazer parse correto desses valores para número antes de enviar à API.
 
+### Subscriptions em Componentes
+
+- Encerrar toda subscription com **`takeUntilDestroyed`** (`@angular/core/rxjs-interop`).
+  Fora de contexto de injeção, passar o `DestroyRef`: `takeUntilDestroyed(this.destroyRef)`.
+- **Não** criar `Subject` de destruição (`destroy$`) nem `ngOnDestroy` só para
+  limpar subscription: esquecer o `next()` vaza sem erro de compilação ou teste.
+- Para **cancelar requisição em voo** (ex.: trocar de carteira antes da resposta
+  chegar), usar `switchMap` sobre um `Subject` do parâmetro, não um `Subject` de
+  abort manual. Cancelamento e destruição são preocupações diferentes.
+
 ### Confirmação de Ações Destrutivas
 
 - **Não usar** `window.confirm`, `window.alert` ou `window.prompt` nativos.

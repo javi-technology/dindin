@@ -32,3 +32,13 @@ trigger: always_on
 
 - Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).
 - Em produção, considerar logger estruturado.
+
+## Subscriptions em Componentes
+
+- Encerrar toda subscription com **`takeUntilDestroyed`** (`@angular/core/rxjs-interop`).
+  Fora de contexto de injeção, passar o `DestroyRef`: `takeUntilDestroyed(this.destroyRef)`.
+- **Não** criar `Subject` de destruição (`destroy$`) nem `ngOnDestroy` só para
+  limpar subscription: esquecer o `next()` vaza sem erro de compilação ou teste.
+- Para **cancelar requisição em voo** (ex.: trocar de carteira antes da resposta
+  chegar), usar `switchMap` sobre um `Subject` do parâmetro, não um `Subject` de
+  abort manual. Cancelamento e destruição são preocupações diferentes.
