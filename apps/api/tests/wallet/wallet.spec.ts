@@ -144,6 +144,73 @@ function createFailingFirestoreMock() {
   };
 }
 
+/**
+ * Mock com a subcoleção `positions` da carteira e um `batch()` que registra as
+ * operações (issue #219). Usado para provar que excluir a carteira remove as
+ * posições em cascata, em lotes que respeitam o limite do Firestore.
+ */
+function createFirestoreMockWithPositions(
+  wallet: WalletData,
+  positionIds: string[],
+) {
+  const deletedRefs: string[] = [];
+  const commits: number[] = [];
+  let pendingDeletes = 0;
+
+  const positionDocs = positionIds.map((id) => ({
+    id,
+    ref: { path: `positions/${id}` },
+  }));
+
+  const walletRef = {
+    id: wallet.id,
+    path: `wallets/${wallet.id}`,
+    get: jest.fn().mockResolvedValue(createWalletSnapshot(wallet)),
+    delete: jest.fn().mockResolvedValue(undefined),
+    collection: jest.fn((subPath: string) => {
+      if (subPath !== 'positions') {
+        throw new Error(`Unexpected subcollection: ${subPath}`);
+      }
+      return {
+        get: jest.fn().mockResolvedValue({
+          docs: positionDocs,
+          empty: positionDocs.length === 0,
+          size: positionDocs.length,
+        }),
+      };
+    }),
+  };
+
+  const firestore = {
+    collection: jest.fn((path: string) => {
+      if (path !== 'users') throw new Error(`Unexpected collection: ${path}`);
+      return {
+        doc: jest.fn(() => ({
+          collection: jest.fn((subPath: string) => {
+            if (subPath !== 'wallets') {
+              throw new Error(`Unexpected subcollection: ${subPath}`);
+            }
+            return { doc: jest.fn(() => walletRef) };
+          }),
+        })),
+      };
+    }),
+    batch: jest.fn(() => ({
+      delete: jest.fn((ref: { path: string }) => {
+        deletedRefs.push(ref.path);
+        pendingDeletes += 1;
+      }),
+      commit: jest.fn(() => {
+        commits.push(pendingDeletes);
+        pendingDeletes = 0;
+        return Promise.resolve();
+      }),
+    })),
+  };
+
+  return { firestore, deletedRefs, commits, walletRef };
+}
+
 describe('Wallet CRUD', () => {
   const authHeader = 'Bearer valid-token';
   const baseWallet: WalletData = {
@@ -370,6 +437,62 @@ describe('Wallet CRUD', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toHaveProperty('error');
+    });
+
+    // O Firestore não cascadeia deletes: sem isso as posições ficariam órfãs
+    // e inacessíveis pela API, que só as alcança a partir da carteira.
+    it('deve remover as posições da carteira antes de excluí-la', async () => {
+      const mock = createFirestoreMockWithPositions(baseWallet, [
+        'pos-1',
+        'pos-2',
+        'pos-3',
+      ]);
+      firestoreMock = mock.firestore;
+
+      const response = await request(app)
+        .delete('/api/wallets/wallet-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+      expect(mock.deletedRefs).toEqual([
+        'positions/pos-1',
+        'positions/pos-2',
+        'positions/pos-3',
+      ]);
+      expect(mock.walletRef.delete).toHaveBeenCalled();
+    });
+
+    it('deve excluir a carteira sem posições sem abrir batch vazio', async () => {
+      const mock = createFirestoreMockWithPositions(baseWallet, []);
+      firestoreMock = mock.firestore;
+
+      const response = await request(app)
+        .delete('/api/wallets/wallet-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+      expect(mock.commits).toEqual([]);
+      expect(mock.walletRef.delete).toHaveBeenCalled();
+    });
+
+    // Um batch do Firestore aceita no máximo 500 operações; acima disso o
+    // commit falha e a carteira não seria excluída.
+    it('deve remover as posições em lotes de no máximo 500', async () => {
+      const positionIds = Array.from(
+        { length: 501 },
+        (_, index) => `pos-${index}`,
+      );
+      const mock = createFirestoreMockWithPositions(baseWallet, positionIds);
+      firestoreMock = mock.firestore;
+
+      const response = await request(app)
+        .delete('/api/wallets/wallet-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+      expect(mock.deletedRefs).toHaveLength(501);
+      expect(mock.commits).toEqual([500, 1]);
+      expect(mock.commits.every((operations) => operations <= 500)).toBe(true);
     });
   });
 });

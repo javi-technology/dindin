@@ -571,6 +571,39 @@ describe('Fridge CRUD', () => {
       expect(batch.commit).toHaveBeenCalled();
     });
 
+    // Um batch do Firestore aceita no máximo 500 operações. A cascata antiga
+    // punha todos os itens num único batch, então uma geladeira com mais de
+    // 500 itens falhava no commit e não era excluída (issue #219).
+    it('deve remover os itens em lotes de no máximo 500', async () => {
+      const items: FridgeItem[] = Array.from({ length: 501 }, (_, index) => ({
+        id: `item-${index}`,
+        fridgeId: 'fridge-1',
+        ticker: 'HGLG11',
+        quantity: 5,
+        transferredPrice: 95.0,
+        targetPrice: 110.0,
+        currentPrice: 100.0,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }));
+      firestoreMock = createFirestoreMock([baseFridge], items);
+
+      const response = await request(app)
+        .delete('/api/fridges/fridge-1')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(204);
+
+      const batch = (firestoreMock as any).batchMock;
+      // 501 itens não cabem num batch: exige mais de um commit.
+      expect(batch.commit.mock.calls.length).toBeGreaterThan(1);
+      expect(
+        batch.operations.filter(
+          (operation: unknown[]) => operation[0] === 'delete',
+        ),
+      ).toHaveLength(501);
+    });
+
     it('deve retornar 404 para geladeira inexistente', async () => {
       firestoreMock = createFirestoreMock([]);
 
