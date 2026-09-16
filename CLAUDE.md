@@ -82,9 +82,9 @@ Regras:
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>`
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha)
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop`, referenciando a issue (`Closes #N`)
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`)
 5. Merge após revisão
 
 ## Testes
@@ -117,6 +117,14 @@ git checkout -b issue-<numero_issue>
 
 - Branch da issue: **exatamente** `issue-<numero_issue>` (ex: `issue-3`).
 - Toda implementação parte da `develop` e retorna para `develop` via PR.
+- **Exceção — stacked PR:** quando for solicitado stacked PR, é permitido criar a
+  branch `issue-<N>` a partir da branch de outra issue da pilha
+  (`git checkout -b issue-<N> issue-<anterior>`), e o PR aponta para essa branch.
+  Só o primeiro PR da pilha aponta para `develop`.
+  - Os PRs são revisados e mergeados **na ordem da pilha**.
+  - Correção numa branch da base exige atualizar as de cima em ordem
+    (`git rebase --onto <base-nova> <ponta-antiga> issue-<N>`) e reenviar com
+    `git push --force-with-lease`, nunca `--force` puro.
 - A `develop` deve estar sincronizada com a `main` antes de criar nova branch.
 - Nunca commitar diretamente na `main` ou `develop`.
 
