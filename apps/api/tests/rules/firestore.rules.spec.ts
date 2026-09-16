@@ -394,12 +394,7 @@ describe('Firestore rules – patrimonySnapshots', () => {
   });
 
   it('deve negar que outro usuário leia snapshots', async () => {
-    const alice = testEnv.authenticatedContext('alice');
     const bob = testEnv.authenticatedContext('bob');
-    const ref = doc(
-      alice.firestore(),
-      'users/alice/patrimonySnapshots/2026-08-27',
-    );
     await testEnv.withSecurityRulesDisabled((context) =>
       setDoc(
         doc(context.firestore(), 'users/alice/patrimonySnapshots/2026-08-27'),

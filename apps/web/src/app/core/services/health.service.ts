@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
@@ -11,9 +11,8 @@ interface HealthResponse {
   providedIn: 'root',
 })
 export class HealthService {
+  private readonly http = inject(HttpClient);
   private readonly apiUrl = '/api/health';
-
-  constructor(private http: HttpClient) {}
 
   check(): Observable<HealthResponse> {
     return this.http.get<HealthResponse>(this.apiUrl);

@@ -16,10 +16,10 @@ Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 4 (frontend
 
 Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
 
-| Campo      | Valores                      | Critério                                                         |
-| ---------- | ---------------------------- | ---------------------------------------------------------------- |
-| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5) |
-| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                   |
+| Campo      | Valores                      | Critério                                                                                              |
+| ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5)                               |
+| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                                                        |
 | `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
 ```bash
@@ -55,6 +55,7 @@ Regras:
 | Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
 
 ### Regras de Teste Frontend
+
 - Os testes unitários do frontend devem ser **browserless**.
 - O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
 - Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
@@ -102,6 +103,7 @@ Regras:
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
 - Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
+
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
@@ -119,6 +121,7 @@ npm run api:build --workspace=apps/api         # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
 npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run lint                                  # análise estática (ESLint)
 npm run format                                # formatar com Prettier
 npm run format:check                          # verificar formatação
 firebase deploy                               # deploy completo
@@ -142,7 +145,11 @@ Monorepo estruturado da seguinte forma:
 ### Formatação
 
 - Código formatado com **Prettier** antes de commitar.
-- **husky** + **lint-staged** rodam Prettier no hook `pre-commit`.
+- Código analisado com **ESLint** (`npm run lint`) antes de commitar. Flat config:
+  `eslint.config.mjs` na raiz (api e packages) e `apps/web/eslint.config.mjs`
+  (angular-eslint, incluindo regras de template `.html`).
+- **husky** + **lint-staged** rodam Prettier e `eslint --fix` no hook `pre-commit`.
+- O job `lint` do CI bloqueia o deploy.
 
 ### Locale Brasileiro em Campos Numéricos
 
@@ -194,4 +201,3 @@ rtk proxy <cmd>       # Run raw (no filtering) but track usage
 - **Sempre responder em português do Brasil (pt-BR)**.
 - **Mensagens de Commit**: Devem ser sempre em português, no imperativo (ex: "adiciona", "corrige", "ajusta").
 - Todas as interações, explicações e comentários devem ser feitos neste idioma.
-

@@ -1818,10 +1818,6 @@ describe('ai-suggestion.service', () => {
       get: jest.fn().mockResolvedValue({ exists: false }),
       set: jest.fn(),
     };
-    const query = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ size: 0 }),
-    };
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {

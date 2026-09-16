@@ -84,13 +84,18 @@ describe('configuração do ESLint', () => {
       const pkg = readJson('package.json');
       const lintStaged = pkg['lint-staged'] as Record<string, string[]>;
 
-      const tsPattern = Object.keys(lintStaged).find((pattern) =>
-        pattern.includes('ts'),
-      );
-      expect(tsPattern).toBeDefined();
-      expect(lintStaged[tsPattern as string].join(' ')).toContain(
-        'eslint --fix',
-      );
+      // Mais de um glob pode alcançar `.ts` (o do Prettier também), então o
+      // que importa é existir um glob que alcance `.ts` e rode o eslint.
+      const eslintPatterns = Object.entries(lintStaged)
+        .filter(([, commands]) => commands.join(' ').includes('eslint --fix'))
+        .map(([pattern]) => pattern);
+
+      expect(eslintPatterns.length).toBeGreaterThan(0);
+      expect(
+        eslintPatterns.some(
+          (pattern) => pattern.includes('.ts') || pattern.includes(',ts'),
+        ),
+      ).toBe(true);
     });
   });
 

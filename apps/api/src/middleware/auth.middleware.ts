@@ -35,7 +35,7 @@ export async function authMiddleware(
     const decoded = await getAuth().verifyIdToken(token);
     req.user = { uid: decoded.uid, admin: decoded.admin === true };
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

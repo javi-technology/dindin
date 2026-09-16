@@ -20,7 +20,6 @@ if (!uid) {
     '[setAdminClaim] UID do usuário não informado.\nUso: npm run set:admin-claim -- <uid>',
   );
   process.exitCode = 1;
-  // eslint-disable-next-line no-process-exit
   process.exit(1);
 }
 

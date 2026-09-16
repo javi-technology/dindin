@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -26,7 +26,7 @@ import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
   ],
   templateUrl: './admin-assets.component.html',
 })
-export class AdminAssetsComponent implements OnInit {
+export class AdminAssetsComponent implements OnInit, OnDestroy {
   private readonly assetService = inject(AssetService);
   private readonly fb = inject(FormBuilder);
   private readonly destroy$ = new Subject<void>();
