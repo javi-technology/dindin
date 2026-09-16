@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { asyncHandler } from '../middleware/async-handler';
 import { getStripe, getAppBaseUrl } from './stripe.client';
 import { getOrCreateCustomer } from './stripe-customer.service';
 import { getSubscription } from './entitlement.service';
@@ -13,20 +14,6 @@ import {
   reserveCheckoutSession,
 } from './checkout-session.service';
 
-function sendError(res: Response, context: string, error: unknown): void {
-  console.error(`[${context}] error:`, error);
-  const status =
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as { statusCode?: unknown }).statusCode === 'number'
-      ? (error as { statusCode: number }).statusCode
-      : 500;
-  res.status(status).json({
-    error: status >= 500 ? 'Internal server error' : (error as Error).message,
-  });
-}
-
 function sendAlreadySubscribed(res: Response): void {
   res.status(409).json({
     error: 'Assinatura já ativa',
@@ -34,11 +21,9 @@ function sendAlreadySubscribed(res: Response): void {
   });
 }
 
-export async function createCheckoutSession(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const createCheckoutSession = asyncHandler(
+  'createCheckoutSession',
+  async (req: Request, res: Response) => {
     const { interval } = req.body ?? {};
     if (interval !== 'month' && interval !== 'year') {
       res.status(400).json({ error: 'interval inválido' });
@@ -74,16 +59,12 @@ export async function createCheckoutSession(
     }
 
     res.json({ url: reservation.url });
-  } catch (error) {
-    sendError(res, 'createCheckoutSession', error);
-  }
-}
+  },
+);
 
-export async function createPortalSession(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  try {
+export const createPortalSession = asyncHandler(
+  'createPortalSession',
+  async (req: Request, res: Response) => {
     const uid = (req as AuthRequest).user!.uid;
     const subscription = await getSubscription(uid);
     if (!subscription.providerCustomerId) {
@@ -109,10 +90,8 @@ export async function createPortalSession(
     });
 
     res.json({ url: session.url });
-  } catch (error) {
-    sendError(res, 'createPortalSession', error);
-  }
-}
+  },
+);
 
 export async function handleWebhook(
   req: Request,

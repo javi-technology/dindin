@@ -26,7 +26,6 @@ jest.mock('../../src/recommended-wallet/bb-pdf.parser', () => ({
 }));
 
 import {
-  buildRecommendedWallet,
   compareWithWallet,
   importBbWallet,
   persistRecommendedWallet,

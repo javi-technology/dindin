@@ -1,4 +1,3 @@
-import type { AiSuggestionTab } from 'dindin-models';
 import type { AiSuggestionInput } from './ai-suggestion.service';
 
 export const SYSTEM_PROMPT = `Você é um analista de FIIs que responde em pt-BR.

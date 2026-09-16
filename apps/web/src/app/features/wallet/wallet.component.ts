@@ -1,14 +1,25 @@
 import {
   Component,
+  DestroyRef,
   HostListener,
   OnInit,
-  OnDestroy,
   inject,
   signal,
   computed,
 } from '@angular/core';
-import { Subject, takeUntil, finalize, merge } from 'rxjs';
+import {
+  EMPTY,
+  Observable,
+  Subject,
+  catchError,
+  finalize,
+  merge,
+  switchMap,
+  tap,
+} from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
   FormBuilder,
   FormGroup,
@@ -55,20 +66,24 @@ import {
     LucidePencil,
     LucideTrash2,
     LucideRefrigerator,
+    ConfirmDialogComponent,
   ],
   templateUrl: './wallet.component.html',
 })
-export class WalletComponent implements OnInit, OnDestroy {
+export class WalletComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly positionService = inject(PositionService);
   private readonly fridgeService = inject(FridgeService);
   private readonly assetService = inject(AssetService);
   private readonly dividendService = inject(DividendService);
   private readonly fb = inject(FormBuilder);
-  private readonly destroy$ = new Subject<void>();
-  private positionsAbort$ = new Subject<void>();
-  private dividendYieldAbort$ = new Subject<void>();
-  private monthlyIncomeAbort$ = new Subject<void>();
+  private readonly destroyRef = inject(DestroyRef);
+  /**
+   * Carteira a carregar. O switchMap sobre este Subject cancela a requisição
+   * em voo quando outra carteira é escolhida, para que a resposta atrasada da
+   * anterior não sobrescreva os dados da nova (issue #224).
+   */
+  private readonly walletToLoad$ = new Subject<string>();
 
   wallets = signal<Wallet[]>([]);
   selectedWallet = signal<Wallet | null>(null);
@@ -143,12 +158,21 @@ export class WalletComponent implements OnInit, OnDestroy {
     return found?.monthlyIncome ?? 0;
   };
 
+  constructor() {
+    this.walletToLoad$
+      .pipe(
+        switchMap((walletId) => this.walletData$(walletId)),
+        takeUntilDestroyed(),
+      )
+      .subscribe();
+  }
+
   ngOnInit(): void {
     merge(
       this.form.controls['quantity'].valueChanges,
       this.form.controls['purchasePrice'].valueChanges,
     )
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.syncAveragePrice());
     this.loadWallets();
     this.loadFridges();
@@ -158,7 +182,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private loadAssets(): void {
     this.assetService
       .list()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.assets.set(response);
@@ -175,7 +199,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   private loadFridges(): void {
     this.fridgeService
       .listFridges()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => this.fridges.set(response),
         error: () => {},
@@ -186,7 +210,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.walletService
       .list()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.wallets.set(response);
@@ -209,7 +233,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.walletService
       .create({ name: 'Carteira Principal', currency: 'BRL' })
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (wallet) => {
           this.wallets.set([wallet]);
@@ -225,36 +249,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   selectWallet(wallet: Wallet): void {
     this.selectedWallet.set(wallet);
-    this.abortPendingPositionsRequest();
-    this.abortPendingDividendYieldRequest();
-    this.abortPendingMonthlyIncomeRequest();
     this.loadPositions(wallet.id);
-  }
-
-  ngOnDestroy(): void {
-    this.abortPendingPositionsRequest();
-    this.abortPendingDividendYieldRequest();
-    this.abortPendingMonthlyIncomeRequest();
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
-  private abortPendingPositionsRequest(): void {
-    this.positionsAbort$.next();
-    this.positionsAbort$.complete();
-    this.positionsAbort$ = new Subject<void>();
-  }
-
-  private abortPendingDividendYieldRequest(): void {
-    this.dividendYieldAbort$.next();
-    this.dividendYieldAbort$.complete();
-    this.dividendYieldAbort$ = new Subject<void>();
-  }
-
-  private abortPendingMonthlyIncomeRequest(): void {
-    this.monthlyIncomeAbort$.next();
-    this.monthlyIncomeAbort$.complete();
-    this.monthlyIncomeAbort$ = new Subject<void>();
   }
 
   onWalletChange(event: Event): void {
@@ -265,61 +260,49 @@ export class WalletComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Dispara o carregamento da carteira, cancelando o anterior. */
   loadPositions(walletId: string): void {
+    this.walletToLoad$.next(walletId);
+  }
+
+  /**
+   * Carrega posições e, em seguida, os dois agregados que dependem delas.
+   * Cada trecho trata o próprio erro e segue com EMPTY, para que a falha de
+   * um agregado não cancele o outro nem impeça o `finalize`.
+   */
+  private walletData$(walletId: string): Observable<unknown> {
     this.loading.set(true);
     this.error.set(null);
-    this.positionService
-      .list(walletId)
-      .pipe(
-        takeUntil(this.destroy$),
-        takeUntil(this.positionsAbort$),
-        finalize(() => this.loading.set(false)),
-      )
-      .subscribe({
-        next: (response) => {
-          this.positions.set(response);
-          this.loadDividendYield(walletId);
-          this.loadMonthlyIncome(walletId);
-        },
-        error: () => {
-          this.error.set('Erro ao carregar posições.');
-        },
-      });
-  }
 
-  private loadDividendYield(walletId: string): void {
-    this.dividendService
-      .getDividendYield(walletId)
-      .pipe(
-        takeUntil(this.dividendYieldAbort$),
-        finalize(() => this.loading.set(false)),
-      )
-      .subscribe({
-        next: (response) => {
-          this.dividendYield.set(response);
-          this.error.set(null);
-        },
-        error: () => {
-          this.error.set('Erro ao carregar dividend yield.');
-        },
-      });
-  }
-
-  private loadMonthlyIncome(walletId: string): void {
-    this.dividendService
-      .getMonthlyIncome(walletId)
-      .pipe(
-        takeUntil(this.monthlyIncomeAbort$),
-        finalize(() => this.loading.set(false)),
-      )
-      .subscribe({
-        next: (response) => {
-          this.monthlyIncome.set(response);
-        },
-        error: () => {
-          this.error.set('Erro ao carregar renda mensal.');
-        },
-      });
+    return this.positionService.list(walletId).pipe(
+      tap((response) => this.positions.set(response)),
+      switchMap(() =>
+        merge(
+          this.dividendService.getDividendYield(walletId).pipe(
+            tap((response) => {
+              this.dividendYield.set(response);
+              this.error.set(null);
+            }),
+            catchError(() => {
+              this.error.set('Erro ao carregar dividend yield.');
+              return EMPTY;
+            }),
+          ),
+          this.dividendService.getMonthlyIncome(walletId).pipe(
+            tap((response) => this.monthlyIncome.set(response)),
+            catchError(() => {
+              this.error.set('Erro ao carregar renda mensal.');
+              return EMPTY;
+            }),
+          ),
+        ),
+      ),
+      catchError(() => {
+        this.error.set('Erro ao carregar posições.');
+        return EMPTY;
+      }),
+      finalize(() => this.loading.set(false)),
+    );
   }
 
   openForm(position: Position | null = null): void {
@@ -454,7 +437,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     if (editing) {
       this.positionService
         .update(wallet.id, editing.id, payload)
-        .pipe(takeUntil(this.destroy$))
+        .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: () => {
             this.closeForm();
@@ -469,7 +452,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     } else {
       this.positionService
         .create(wallet.id, payload)
-        .pipe(takeUntil(this.destroy$))
+        .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: () => {
             this.closeForm();
@@ -495,7 +478,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
     this.positionService
       .delete(wallet.id, position.id)
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.deleteConfirmPosition.set(null);
@@ -545,7 +528,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
     this.positionService
       .moveToFridge(wallet.id, position.id, { fridgeId, targetPrice })
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.closeMoveToFridge();

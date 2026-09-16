@@ -41,8 +41,6 @@ updates:
           - 'jasmine-core'
           - '@types/jasmine'
           - 'prettier'
-          - 'husky'
-          - 'lint-staged'
           - 'typescript'
       minor-and-patch:
         patterns:

@@ -1605,6 +1605,7 @@ describe('ai-suggestion.service', () => {
 
     await expect(callOpenRouter('sistema', 'usuario')).rejects.toMatchObject({
       statusCode: 502,
+      expose: true,
       message: 'Falha ao consultar o provedor de IA',
     });
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -1621,6 +1622,7 @@ describe('ai-suggestion.service', () => {
 
     await expect(callOpenRouter('sistema', 'usuario')).rejects.toMatchObject({
       statusCode: 502,
+      expose: true,
       message: 'Falha ao consultar o provedor de IA',
     });
   });
@@ -1817,10 +1819,6 @@ describe('ai-suggestion.service', () => {
     const doc = {
       get: jest.fn().mockResolvedValue({ exists: false }),
       set: jest.fn(),
-    };
-    const query = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ size: 0 }),
     };
     firestoreMock = {
       collection: jest.fn((name: string) => {

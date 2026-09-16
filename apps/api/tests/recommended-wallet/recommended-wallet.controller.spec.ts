@@ -327,6 +327,7 @@ describe('recommended-wallet.controller', () => {
       }),
       Object.assign(new Error('Falha ao consultar o provedor de IA'), {
         statusCode: 502,
+        expose: true,
       }),
     ]) {
       generateSuggestionMock.mockRejectedValueOnce(error);

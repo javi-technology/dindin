@@ -16,10 +16,10 @@ Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 4 (frontend
 
 Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
 
-| Campo      | Valores                      | Critério                                                         |
-| ---------- | ---------------------------- | ---------------------------------------------------------------- |
-| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5) |
-| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                   |
+| Campo      | Valores                      | Critério                                                                                              |
+| ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5)                               |
+| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                                                        |
 | `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
 ```bash
@@ -55,6 +55,7 @@ Regras:
 | Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
 
 ### Regras de Teste Frontend
+
 - Os testes unitários do frontend devem ser **browserless**.
 - O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
 - Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
@@ -77,6 +78,14 @@ git checkout -b issue-<numero_issue>
 
 - Branch da issue: **exatamente** `issue-<numero_issue>` (ex: `issue-3`).
 - Toda implementação parte da `develop` e retorna para `develop` via PR.
+- **Exceção — stacked PR:** quando for solicitado stacked PR, é permitido criar a
+  branch `issue-<N>` a partir da branch de outra issue da pilha
+  (`git checkout -b issue-<N> issue-<anterior>`), e o PR aponta para essa branch.
+  Só o primeiro PR da pilha aponta para `develop`.
+  - Os PRs são revisados e mergeados **na ordem da pilha**.
+  - Correção numa branch da base exige atualizar as de cima em ordem
+    (`git rebase --onto <base-nova> <ponta-antiga> issue-<N>`) e reenviar com
+    `git push --force-with-lease`, nunca `--force` puro.
 - A `develop` deve estar sincronizada com a `main` antes de criar nova branch.
 - Nunca commitar diretamente na `main` ou `develop`.
 
@@ -102,12 +111,13 @@ Regras:
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
 - Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
+
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>`
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha)
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop`, referenciando a issue (`Closes #N`)
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`)
 5. Merge após revisão
 
 ## Comandos
@@ -119,6 +129,7 @@ npm run api:build --workspace=apps/api         # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
 npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run lint                                  # análise estática (ESLint)
 npm run format                                # formatar com Prettier
 npm run format:check                          # verificar formatação
 firebase deploy                               # deploy completo
@@ -141,18 +152,39 @@ Monorepo estruturado da seguinte forma:
 
 ### Formatação
 
-- Código formatado com **Prettier** antes de commitar.
-- **husky** + **lint-staged** rodam Prettier no hook `pre-commit`.
+- Código formatado com **Prettier** (`npm run format`) antes de commitar.
+- Código analisado com **ESLint** (`npm run lint`) antes de commitar. Flat config:
+  `eslint.config.mjs` na raiz (api e packages) e `apps/web/eslint.config.mjs`
+  (angular-eslint, incluindo regras de template `.html`).
+- **Não há hook de pre-commit**: rodar `npm run format` e `npm run lint`
+  manualmente antes de cada commit.
+- O job `lint` do CI bloqueia o deploy. A formatação **não** é verificada no CI,
+  então depende de rodar o Prettier antes do commit.
 
 ### Locale Brasileiro em Campos Numéricos
 
 - Campos de preço/valor monetário devem aceitar vírgula como separador decimal (ex: `1,55`, `0,95`).
 - Fazer parse correto desses valores para número antes de enviar à API.
 
-### Confirmação de Ações Destrutivas
+### Subscriptions em Componentes
+
+- Encerrar toda subscription com **`takeUntilDestroyed`** (`@angular/core/rxjs-interop`).
+  Fora de contexto de injeção, passar o `DestroyRef`: `takeUntilDestroyed(this.destroyRef)`.
+- **Não** criar `Subject` de destruição (`destroy$`) nem `ngOnDestroy` só para
+  limpar subscription: esquecer o `next()` vaza sem erro de compilação ou teste.
+- Para **cancelar requisição em voo** (ex.: trocar de carteira antes da resposta
+  chegar), usar `switchMap` sobre um `Subject` do parâmetro, não um `Subject` de
+  abort manual. Cancelamento e destruição são preocupações diferentes.
+
+## Confirmação de Ações Destrutivas
 
 - **Não usar** `window.confirm`, `window.alert` ou `window.prompt` nativos.
 - Sempre usar **modal customizado** para confirmação de exclusão ou ações destrutivas.
+- Para confirmação, usar o componente compartilhado
+  `shared/components/confirm-dialog` (`<app-confirm-dialog>`), que já traz
+  `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
+  preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
+  markup do modal na feature.
 
 ### Logs
 
@@ -194,4 +226,3 @@ rtk proxy <cmd>       # Run raw (no filtering) but track usage
 - **Sempre responder em português do Brasil (pt-BR)**.
 - **Mensagens de Commit**: Devem ser sempre em português, no imperativo (ex: "adiciona", "corrige", "ajusta").
 - Todas as interações, explicações e comentários devem ser feitos neste idioma.
-
