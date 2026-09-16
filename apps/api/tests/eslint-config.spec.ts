@@ -1,12 +1,13 @@
+import { execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
-import { createRequire } from 'module';
 import { join } from 'path';
 
 // ---------------------------------------------------------------------------
 // Testes da configuração do ESLint (issue #220)
 // Até esta issue o monorepo só tinha Prettier (formatação), sem nenhuma
 // análise estática. Estes testes garantem que o ESLint existe, é exposto por
-// script em cada workspace, roda no pre-commit e bloqueia o deploy no CI.
+// script em cada workspace e bloqueia o deploy no CI. Não há hook de
+// pre-commit (issue #235): o CI é a barreira.
 // ---------------------------------------------------------------------------
 
 const repoRoot = join(__dirname, '..', '..', '..');
@@ -80,93 +81,52 @@ describe('configuração do ESLint', () => {
     });
   });
 
-  describe('pre-commit', () => {
-    type Task = (files: string[]) => string | string[];
+  // O .husky/pre-commit foi removido em 33dd6f9, mas o script prepare seguia
+  // recriando .husky/_ e apontando core.hooksPath para ele a cada install, e
+  // a documentação afirmava que o hook rodava Prettier e ESLint (issue #235).
+  describe('sem hook de pre-commit', () => {
+    it('não deve instalar o husky no prepare', () => {
+      expect(scripts('package.json').prepare ?? '').not.toContain('husky');
+    });
 
-    // O config é CommonJS; import() dinâmico exigiria --experimental-vm-modules.
-    async function loadConfig(): Promise<Record<string, Task>> {
-      const load = createRequire(__filename);
-      return load(join(repoRoot, 'lint-staged.config.cjs')) as Record<
-        string,
-        Task
-      >;
-    }
+    it('não deve depender de husky nem de lint-staged', () => {
+      const deps = devDependencies('package.json');
 
-    function commandsFor(config: Record<string, Task>, file: string): string[] {
-      const extension = file.slice(file.lastIndexOf('.') + 1);
-      const globs = Object.keys(config).filter((glob) =>
-        glob
-          .replace(/[*{}.]/g, ' ')
-          .split(/[\s,]+/)
-          .includes(extension),
-      );
-      return globs.flatMap((glob) => {
-        const result = config[glob]([join(repoRoot, file)]);
-        return Array.isArray(result) ? result : [result];
-      });
-    }
+      expect(deps).not.toHaveProperty('husky');
+      expect(deps).not.toHaveProperty('lint-staged');
+    });
 
-    it('deve manter a configuração fora do package.json', () => {
+    it('não deve ter configuração do lint-staged', () => {
       expect(readJson('package.json')['lint-staged']).toBeUndefined();
-      expect(existsSync(join(repoRoot, 'lint-staged.config.cjs'))).toBe(true);
+      expect(existsSync(join(repoRoot, 'lint-staged.config.cjs'))).toBe(false);
     });
 
-    // Globs sobrepostos rodam em paralelo no lint-staged: Prettier e ESLint
-    // reescreveriam o mesmo arquivo ao mesmo tempo e um descartaria o outro.
-    it('deve alcançar cada .ts por um único glob', async () => {
-      const config = await loadConfig();
-      const globsDoTs = Object.keys(config).filter((glob) =>
-        glob
-          .replace(/[*{}.]/g, ' ')
-          .split(/[\s,]+/)
-          .includes('ts'),
+    it('não deve versionar nada em .husky', () => {
+      const tracked = execSync('git ls-files .husky', {
+        cwd: repoRoot,
+        encoding: 'utf-8',
+      });
+
+      expect(tracked.trim()).toBe('');
+    });
+
+    it('não deve agrupar husky nem lint-staged no Dependabot', () => {
+      const dependabot = readFileSync(
+        join(repoRoot, '.github', 'dependabot.yml'),
+        'utf-8',
       );
 
-      expect(globsDoTs).toHaveLength(1);
+      expect(dependabot).not.toMatch(/husky|lint-staged/);
     });
 
-    it('deve rodar eslint antes do prettier, na mesma sequência', async () => {
-      const commands = commandsFor(await loadConfig(), 'apps/api/src/index.ts');
+    it.each([
+      'CLAUDE.md',
+      '.github/copilot-instructions.md',
+      '.devin/rules/code-standards.md',
+    ])('não deve documentar hook de pre-commit em %s', (file) => {
+      const content = readFileSync(join(repoRoot, file), 'utf-8');
 
-      const eslint = commands.findIndex((c) => c.startsWith('eslint --fix'));
-      const prettier = commands.findIndex((c) =>
-        c.startsWith('prettier --write'),
-      );
-      expect(eslint).toBeGreaterThanOrEqual(0);
-      expect(prettier).toBeGreaterThan(eslint);
-    });
-
-    // Rodando da raiz, o ESLint usa a config da raiz, que ignora apps/web.
-    it('deve analisar .ts do frontend com a config do web', async () => {
-      const commands = commandsFor(
-        await loadConfig(),
-        'apps/web/src/app/app.config.ts',
-      );
-
-      expect(
-        commands.some((c) =>
-          c.startsWith('eslint --fix --config apps/web/eslint.config.mjs'),
-        ),
-      ).toBe(true);
-    });
-
-    it('deve analisar templates .html do frontend', async () => {
-      const commands = commandsFor(
-        await loadConfig(),
-        'apps/web/src/app/app.component.html',
-      );
-
-      expect(
-        commands.some((c) =>
-          c.startsWith('eslint --fix --config apps/web/eslint.config.mjs'),
-        ),
-      ).toBe(true);
-    });
-
-    it('não deve usar a config do web para arquivos da API', async () => {
-      const commands = commandsFor(await loadConfig(), 'apps/api/src/index.ts');
-
-      expect(commands.join(' ')).not.toContain('apps/web/eslint.config.mjs');
+      expect(content).not.toMatch(/husky|lint-staged/i);
     });
   });
 
