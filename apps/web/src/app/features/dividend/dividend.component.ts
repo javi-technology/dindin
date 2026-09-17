@@ -1,4 +1,11 @@
-import { Component, OnInit, DestroyRef, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, of, switchMap } from 'rxjs';
@@ -8,8 +15,17 @@ import {
   MonthlyIncomeItem,
 } from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
-import { formatCurrency, formatDate } from '../../shared/utils/format.util';
+import {
+  formatCurrency,
+  formatDate,
+  formatPercent,
+} from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
+import {
+  aggregateDividendYield,
+  lastMonthSummary,
+  monthlyAverage,
+} from '../../shared/utils/dividend-kpi.util';
 
 @Component({
   selector: 'app-dividend',
@@ -34,10 +50,39 @@ export class DividendComponent implements OnInit {
   recording = signal(false);
   recordSuccess = signal<string | null>(null);
   recordError = signal<string | null>(null);
+  dividendYield = signal<number>(0);
+
+  readonly yearTotal = computed(() => this.report()?.total ?? 0);
+  readonly monthlyAverage = computed(() => monthlyAverage(this.report()));
+  readonly lastMonth = computed(() => lastMonthSummary(this.report()));
 
   ngOnInit(): void {
     this.loadMonthlyIncome();
+    this.loadDividendYield();
     this.loadReport(this.selectedYear());
+  }
+
+  private loadDividendYield(): void {
+    this.walletService
+      .list()
+      .pipe(
+        switchMap((wallets) =>
+          wallets.length === 0
+            ? of([])
+            : forkJoin(
+                wallets.map((wallet) =>
+                  this.dividendService.getDividendYield(wallet.id),
+                ),
+              ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (responses) => {
+          this.dividendYield.set(aggregateDividendYield(responses).yield);
+        },
+        error: () => this.dividendYield.set(0),
+      });
   }
 
   private loadMonthlyIncome(): void {
@@ -145,6 +190,11 @@ export class DividendComponent implements OnInit {
       .replace(' de ', '/');
   }
 
+  absolute(value: number): number {
+    return Math.abs(value);
+  }
+
   formatCurrency = formatCurrency;
   formatDate = formatDate;
+  formatPercent = formatPercent;
 }

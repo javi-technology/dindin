@@ -103,7 +103,9 @@ describe('dividend-kpi.util', () => {
     });
 
     it('deve omitir a variação quando há apenas um mês', () => {
-      const resumo = lastMonthSummary(report([{ month: '2026-01', total: 80 }]));
+      const resumo = lastMonthSummary(
+        report([{ month: '2026-01', total: 80 }]),
+      );
 
       expect(resumo?.total).toBe(80);
       expect(resumo?.variation).toBeNull();
