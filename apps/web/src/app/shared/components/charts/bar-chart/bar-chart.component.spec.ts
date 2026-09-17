@@ -116,6 +116,39 @@ describe('BarChartComponent', () => {
     ).toBeNull();
   });
 
+  it('deve posicionar a linha de média no averageValue informado', () => {
+    fixture.componentRef.setInput('series', series);
+    fixture.componentRef.setInput('averageValue', 150);
+    fixture.detectChanges();
+
+    const linha = element().querySelector('[data-testid="bar-chart-average"]');
+
+    // 150 de 200 (maior valor) => 75% da altura útil, medida a partir da base.
+    expect(Number(linha?.getAttribute('y1'))).toBeCloseTo(61.25, 2);
+  });
+
+  it('deve preferir o averageValue à média calculada da série', () => {
+    fixture.componentRef.setInput('series', series);
+    fixture.componentRef.setInput('averageLine', true);
+    fixture.componentRef.setInput('averageValue', 200);
+    fixture.detectChanges();
+
+    const linha = element().querySelector('[data-testid="bar-chart-average"]');
+
+    // 200 é o maior valor da série, então a linha fica no topo da área útil.
+    expect(Number(linha?.getAttribute('y1'))).toBeCloseTo(20, 2);
+  });
+
+  it('deve omitir a linha quando o averageValue não é positivo', () => {
+    fixture.componentRef.setInput('series', series);
+    fixture.componentRef.setInput('averageValue', 0);
+    fixture.detectChanges();
+
+    expect(
+      element().querySelector('[data-testid="bar-chart-average"]'),
+    ).toBeNull();
+  });
+
   it('deve dimensionar as barras na horizontal pela largura', () => {
     fixture.componentRef.setInput('series', series);
     fixture.componentRef.setInput('orientation', 'horizontal');
