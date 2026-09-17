@@ -6,12 +6,15 @@ export interface BarChartItem {
   value: number;
   /** Destaca a barra (ex: mês corrente). */
   highlight?: boolean;
+  /** Texto exibido ao fim da barra na horizontal, no lugar do valor formatado. */
+  valueLabel?: string;
 }
 
 export interface BarChartBar {
   label: string;
   value: number;
   highlight: boolean;
+  valueLabel: string | null;
   x: number;
   y: number;
   width: number;
@@ -163,6 +166,7 @@ export class BarChartComponent {
         label: item.label,
         value: item.value,
         highlight: item.highlight === true,
+        valueLabel: item.valueLabel ?? null,
         x: slotStart + (slot - barWidth) / 2,
         y: VERTICAL.bottom - height,
         width: barWidth,
@@ -186,6 +190,7 @@ export class BarChartComponent {
         label: item.label,
         value: item.value,
         highlight: item.highlight === true,
+        valueLabel: item.valueLabel ?? null,
         x: HORIZONTAL.left,
         y,
         width,

@@ -405,6 +405,33 @@ describe('DividendComponent', () => {
     ).toBe(2);
   });
 
+  it('deve exibir o gráfico de concentração por ticker', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="concentration-chart"]',
+    );
+
+    expect(grafico?.querySelector('[data-testid="bar-chart"]')).toBeTruthy();
+    expect(grafico?.querySelectorAll('[data-testid="bar"]').length).toBe(2);
+    expect(grafico?.textContent).toContain('HGLG11');
+    expect(grafico?.textContent).toContain('90,0%');
+  });
+
+  it('deve manter o total por ticker em bloco recolhível', async () => {
+    await setup();
+
+    const detalhe = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="ticker-details"]',
+    );
+
+    expect(detalhe?.tagName.toLowerCase()).toBe('details');
+    expect(
+      detalhe?.querySelectorAll('[data-testid="report-ticker-total-row"]')
+        .length,
+    ).toBe(2);
+  });
+
   it('deve exibir uma linha por mês com rótulo e total', async () => {
     await setup();
 
