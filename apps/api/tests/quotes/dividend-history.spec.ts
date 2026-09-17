@@ -1,10 +1,10 @@
 import request from 'supertest';
-import { QuoteHistory } from 'dindin-models';
+import { MonthlyDividendHistory } from 'dindin-models';
 
 const verifyIdTokenMock = jest.fn();
 let firestoreMock: any;
-let historyDocs: Record<string, Partial<QuoteHistory>[]>;
-let capturedCutoff: string | undefined;
+let historyDocs: Record<string, Partial<MonthlyDividendHistory>[]>;
+let capturedLimit: number | undefined;
 
 jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
@@ -33,27 +33,28 @@ function createFirestoreMock() {
       return {
         doc: jest.fn((ticker: string) => ({
           collection: jest.fn((subPath: string) => {
-            if (subPath !== 'history') {
-              throw new Error(`Unexpected subcollection: ${subPath}`);
-            }
-
+            expect(subPath).toBe('dividendHistory');
             return {
-              where: jest.fn((field: string, op: string, value: string) => {
-                capturedCutoff = value;
-                expect(field).toBe('date');
-                expect(op).toBe('>=');
+              orderBy: jest.fn((field: string, direction: string) => {
+                expect(field).toBe('month');
+                expect(direction).toBe('desc');
                 return {
-                  orderBy: jest.fn(() => ({
-                    get: jest.fn().mockResolvedValue({
-                      // O Firestore devolve do mais recente para o mais antigo.
-                      docs: (historyDocs[ticker] ?? [])
-                        .filter((item) => (item.date as string) >= value)
-                        .sort((a, b) =>
-                          (b.date as string).localeCompare(a.date as string),
-                        )
-                        .map((item) => ({ data: () => ({ ...item }) })),
-                    }),
-                  })),
+                  limit: jest.fn((value: number) => {
+                    capturedLimit = value;
+                    return {
+                      get: jest.fn().mockResolvedValue({
+                        // Um documento por mês, do mais recente ao mais antigo.
+                        docs: (historyDocs[ticker] ?? [])
+                          .sort((a, b) =>
+                            (b.month as string).localeCompare(
+                              a.month as string,
+                            ),
+                          )
+                          .slice(0, value)
+                          .map((item) => ({ data: () => ({ ...item }) })),
+                      }),
+                    };
+                  }),
                 };
               }),
             };
@@ -64,8 +65,16 @@ function createFirestoreMock() {
   };
 }
 
-const entry = (date: string, monthlyDividend: unknown): Partial<QuoteHistory> =>
-  ({ date, price: 100, monthlyDividend, source: 'brapi' }) as never;
+const entry = (
+  date: string,
+  monthlyDividend: unknown,
+): Partial<MonthlyDividendHistory> =>
+  ({
+    month: date.slice(0, 7),
+    date,
+    monthlyDividend,
+    updatedAt: `${date}T12:00:00Z`,
+  }) as never;
 
 describe('GET /api/quotes/:ticker/dividend-history', () => {
   beforeEach(() => {
@@ -73,7 +82,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
     // 2026 sairiam da janela conforme o tempo passa.
     jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
-    capturedCutoff = undefined;
+    capturedLimit = undefined;
     historyDocs = {
       HGLG11: [
         entry('2026-03-15', 1.1),
