@@ -166,23 +166,3 @@ export async function getQuoteHistory(
 
   return snapshot.docs.map((doc) => doc.data() as QuoteHistory);
 }
-
-/**
- * Snapshots de um ticker a partir de uma data (`YYYY-MM-DD`), do mais recente
- * para o mais antigo.
- *
- * Existe separado de `getQuoteHistory` porque a janela do histórico de
- * proventos é definida por período, não por contagem: o job grava um snapshot
- * por dia, então limitar por quantidade devolveria "os últimos N dias".
- */
-export async function getQuoteHistorySince(
-  ticker: string,
-  sinceDate: string,
-): Promise<QuoteHistory[]> {
-  const snapshot = await historyCollection(ticker)
-    .where('date', '>=', sinceDate)
-    .orderBy('date', 'desc')
-    .get();
-
-  return snapshot.docs.map((doc) => doc.data() as QuoteHistory);
-}

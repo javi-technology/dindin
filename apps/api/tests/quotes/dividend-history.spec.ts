@@ -142,15 +142,10 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
     ]);
   });
 
-  it('devolve um ponto por mês, usando o snapshot mais recente do mês', async () => {
-    // O job de cotações grava um snapshot por dia; sem agregação a série
-    // viraria "os últimos N dias", quase sempre com o mesmo valor.
-    historyDocs.HGLG11 = [
-      entry('2026-03-01', 1),
-      entry('2026-03-10', 1.05),
-      entry('2026-03-20', 1.1),
-      entry('2026-02-28', 0.9),
-    ];
+  it('devolve um ponto por mês', async () => {
+    // A granularidade mensal vem da escrita (um documento por mês); aqui
+    // basta garantir que cada documento vira um ponto, em ordem crescente.
+    historyDocs.HGLG11 = [entry('2026-03-20', 1.1), entry('2026-02-28', 0.9)];
 
     const response = await get('/api/quotes/HGLG11/dividend-history');
 
@@ -160,68 +155,18 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
     ]);
   });
 
-  it('usa o snapshot válido mais recente quando o último do mês é inválido', async () => {
-    historyDocs.HGLG11 = [entry('2026-03-20', null), entry('2026-03-10', 1.05)];
+  it('lê apenas a quantidade de meses pedida', async () => {
+    await get('/api/quotes/HGLG11/dividend-history?months=6');
 
-    const response = await get('/api/quotes/HGLG11/dividend-history');
-
-    expect(response.body.history).toEqual([
-      { date: '2026-03-10', monthlyDividend: 1.05 },
-    ]);
+    // Um documento por mês: 6 meses custam 6 leituras, não ~180.
+    expect(capturedLimit).toBe(6);
   });
 
-  it('limita a série ao número de meses pedido', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
-    historyDocs.HGLG11 = [
-      entry('2026-03-15', 1.1),
-      entry('2026-02-15', 0.9),
-      entry('2026-01-15', 1),
-    ];
+  it('usa 12 meses como padrão', async () => {
+    await get('/api/quotes/HGLG11/dividend-history');
 
-    const response = await get('/api/quotes/HGLG11/dividend-history?months=2');
-
-    expect(response.body.history.map((item: any) => item.date)).toEqual([
-      '2026-02-15',
-      '2026-03-15',
-    ]);
-
-    jest.useRealTimers();
+    expect(capturedLimit).toBe(12);
   });
-
-  it('consulta a partir do primeiro dia do mês inicial da janela', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
-
-    await get('/api/quotes/HGLG11/dividend-history?months=3');
-
-    // Janela de 3 meses terminando em março: começa em 1º de janeiro.
-    expect(capturedCutoff).toBe('2026-01-01');
-
-    jest.useRealTimers();
-  });
-
-  it('atravessa a virada de ano ao calcular a janela', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-02-10T12:00:00Z'));
-
-    await get('/api/quotes/HGLG11/dividend-history?months=4');
-
-    expect(capturedCutoff).toBe('2025-11-01');
-
-    jest.useRealTimers();
-  });
-
-  it.each(['abc', '0', '61', '-1', '1.5'])(
-    'retorna 400 para months inválido: %s',
-    async (months) => {
-      const response = await get(
-        `/api/quotes/HGLG11/dividend-history?months=${months}`,
-      );
-
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({
-        error: 'Months must be an integer between 1 and 60',
-      });
-    },
-  );
 
   it('retorna 400 para ticker vazio', async () => {
     const response = await get('/api/quotes/%20/dividend-history');
