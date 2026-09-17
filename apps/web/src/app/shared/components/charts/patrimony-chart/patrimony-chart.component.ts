@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { PatrimonySnapshot } from 'dindin-models';
-import { formatCompactCurrency } from '../../../shared/utils/format.util';
+import { formatCompactCurrency } from '../../../utils/format.util';
 
 interface ChartPoint {
   x: number;

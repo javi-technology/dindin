@@ -17,8 +17,8 @@ import { HealthService } from '../../core/services/health.service';
 import { PatrimonyService } from '../../core/services/patrimony.service';
 import { formatCurrency } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
-import { PatrimonyChartComponent } from './patrimony-chart/patrimony-chart.component';
-import { CompositionChartComponent } from './composition-chart/composition-chart.component';
+import { PatrimonyChartComponent } from '../../shared/components/charts/patrimony-chart/patrimony-chart.component';
+import { CompositionChartComponent } from '../../shared/components/charts/composition-chart/composition-chart.component';
 
 @Component({
   selector: 'app-dashboard',
