@@ -369,6 +369,42 @@ describe('DividendComponent', () => {
     ).toContain('Erro ao carregar proventos');
   });
 
+  it('deve exibir o gráfico de barras com os 12 meses do ano', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="monthly-chart"]',
+    );
+
+    expect(grafico?.querySelector('[data-testid="bar-chart"]')).toBeTruthy();
+    expect(grafico?.querySelectorAll('[data-testid="bar"]').length).toBe(12);
+  });
+
+  it('deve alinhar a linha de média do gráfico com a média mensal exibida', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="monthly-chart"]',
+    );
+    const linha = grafico?.querySelector('[data-testid="bar-chart-average"]');
+
+    // Média de 150 sobre o maior mês (180): 83,33% da altura útil.
+    expect(Number(linha?.getAttribute('y1'))).toBeCloseTo(47.5, 1);
+  });
+
+  it('deve manter o detalhamento por mês em bloco recolhível', async () => {
+    await setup();
+
+    const detalhe = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="month-details"]',
+    );
+
+    expect(detalhe?.tagName.toLowerCase()).toBe('details');
+    expect(
+      detalhe?.querySelectorAll('[data-testid="report-month-row"]').length,
+    ).toBe(2);
+  });
+
   it('deve exibir uma linha por mês com rótulo e total', async () => {
     await setup();
 
