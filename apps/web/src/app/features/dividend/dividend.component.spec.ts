@@ -34,6 +34,7 @@ describe('DividendComponent', () => {
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getMonthlyIncome',
       'getMonthlyReport',
+      'getDividendYield',
       'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
@@ -86,7 +87,87 @@ describe('DividendComponent', () => {
         availableYears: [2026, 2025],
       }),
     );
+    dividendServiceMock.getDividendYield.and.returnValue(
+      of({
+        byTicker: [],
+        total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
+      }),
+    );
     dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
+  });
+
+  const kpi = (testid: string): string =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector(`[data-testid="${testid}"]`)
+      ?.textContent?.trim() ?? '';
+
+  describe('indicadores', () => {
+    it('deve exibir o total recebido no ano selecionado', async () => {
+      await setup();
+
+      expect(kpi('kpi-year-total')).toContain('300,00');
+    });
+
+    it('deve exibir a média mensal dos meses com provento', async () => {
+      await setup();
+
+      expect(kpi('kpi-average')).toContain('150,00');
+    });
+
+    it('deve exibir o último mês recebido com a variação sobre o anterior', async () => {
+      await setup();
+
+      expect(kpi('kpi-last-month')).toContain('120,00');
+      expect(kpi('kpi-last-month-variation')).toContain('33,33');
+    });
+
+    it('deve omitir a variação quando há apenas um mês registrado', async () => {
+      dividendServiceMock.getMonthlyReport.and.returnValue(
+        of({
+          year: 2026,
+          months: [{ month: '2026-01', total: 180, byTicker: [] }],
+          byTicker: [],
+          total: 180,
+          availableYears: [2026],
+        }),
+      );
+
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-last-month-variation"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve exibir o dividend yield agregando todas as carteiras', async () => {
+      walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
+      dividendServiceMock.getDividendYield.and.returnValues(
+        of({
+          byTicker: [],
+          total: { annualIncome: 1000, currentValue: 10000, yield: 10 },
+        }),
+        of({
+          byTicker: [],
+          total: { annualIncome: 200, currentValue: 10000, yield: 2 },
+        }),
+      );
+
+      await setup();
+
+      expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith('w1');
+      expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith('w2');
+      expect(kpi('kpi-yield')).toContain('6,00');
+    });
+
+    it('deve exibir o yield zerado quando não há carteiras', async () => {
+      walletServiceMock.list.and.returnValue(of([]));
+
+      await setup();
+
+      expect(kpi('kpi-yield')).toContain('0,00');
+    });
   });
 
   it('deve usar a mesma fonte mensal da carteira ao inicializar', async () => {
