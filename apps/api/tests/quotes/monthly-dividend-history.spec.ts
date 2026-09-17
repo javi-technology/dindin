@@ -25,7 +25,10 @@ interface Captured {
  */
 function createFirestoreMock(
   dividendDocs: { month: string; monthlyDividend: number; date: string }[] = [],
-): { captured: Record<string, Captured>; capturedLimit?: number } {
+): {
+  captured: Record<string, Captured>;
+  state: { capturedLimit?: number };
+} {
   const captured: Record<string, Captured> = {
     history: { docIds: [], saved: [] },
     dividendHistory: { docIds: [], saved: [] },
@@ -70,11 +73,7 @@ function createFirestoreMock(
     }),
   };
 
-  return Object.assign({ captured }, state, {
-    get capturedLimit() {
-      return state.capturedLimit;
-    },
-  });
+  return { captured, state };
 }
 
 describe('histórico mensal de proventos', () => {
@@ -168,7 +167,7 @@ describe('histórico mensal de proventos', () => {
       const history = await getMonthlyDividendHistory('HGLG11', 2);
 
       // Um documento por mês: o limite da query é exato, sem varrer os dias.
-      expect(mock.capturedLimit).toBe(2);
+      expect(mock.state.capturedLimit).toBe(2);
       expect(history.map((item) => item.month)).toEqual(['2026-02', '2026-03']);
     });
   });
