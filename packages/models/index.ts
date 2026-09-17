@@ -129,6 +129,21 @@ export interface QuoteHistory {
   source: string;
 }
 
+/**
+ * Provento por cota de um mês — subcoleção `quotes/{ticker}/dividendHistory`
+ * (id do doc = `YYYY-MM`).
+ *
+ * Existe separado de `QuoteHistory` porque o preço muda todo dia e o provento
+ * não: guardar um documento por mês faz a leitura do histórico de proventos
+ * custar ~12 documentos por ticker em vez de ~365.
+ */
+export interface MonthlyDividendHistory {
+  month: string; // YYYY-MM
+  date: string; // YYYY-MM-DD — dia do último snapshot que alimentou o mês
+  monthlyDividend: number;
+  updatedAt: string; // ISO-8601
+}
+
 /** Snapshot diário do patrimônio do usuário — subcoleção `patrimonySnapshots` (id do doc = date) */
 export interface PatrimonySnapshot {
   id: string;
