@@ -1,10 +1,7 @@
 import { QuoteHistory } from 'dindin-models';
 import { buildMonthlyEntries } from '../../src/quotes/dividend-history-backfill';
 
-const snapshot = (
-  date: string,
-  monthlyDividend: unknown,
-): QuoteHistory =>
+const snapshot = (date: string, monthlyDividend: unknown): QuoteHistory =>
   ({ date, price: 100, monthlyDividend, source: 'brapi' }) as never;
 
 describe('buildMonthlyEntries', () => {
@@ -16,8 +13,16 @@ describe('buildMonthlyEntries', () => {
     ]);
 
     expect(entries).toEqual([
-      jasmineLike({ month: '2026-02', date: '2026-02-28', monthlyDividend: 0.9 }),
-      jasmineLike({ month: '2026-03', date: '2026-03-20', monthlyDividend: 1.1 }),
+      jasmineLike({
+        month: '2026-02',
+        date: '2026-02-28',
+        monthlyDividend: 0.9,
+      }),
+      jasmineLike({
+        month: '2026-03',
+        date: '2026-03-20',
+        monthlyDividend: 1.1,
+      }),
     ]);
   });
 
@@ -39,7 +44,11 @@ describe('buildMonthlyEntries', () => {
     ]);
 
     expect(entries).toEqual([
-      jasmineLike({ month: '2026-03', date: '2026-03-10', monthlyDividend: 1.05 }),
+      jasmineLike({
+        month: '2026-03',
+        date: '2026-03-10',
+        monthlyDividend: 1.05,
+      }),
     ]);
   });
 

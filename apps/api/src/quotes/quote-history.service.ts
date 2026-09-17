@@ -79,7 +79,10 @@ async function saveMonthlyDividendHistory(
   date: string,
   updatedAt: string,
 ): Promise<void> {
-  if (typeof monthlyDividend !== 'number' || !Number.isFinite(monthlyDividend)) {
+  if (
+    typeof monthlyDividend !== 'number' ||
+    !Number.isFinite(monthlyDividend)
+  ) {
     return;
   }
 
