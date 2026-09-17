@@ -95,10 +95,44 @@ describe('histórico mensal de proventos', () => {
       expect(mock.captured.dividendHistory.docIds).toEqual(['2026-03']);
       expect(mock.captured.dividendHistory.saved[0]).toEqual({
         month: '2026-03',
-        date: '2026-03-20',
+        date: '2026-03-15',
         monthlyDividend: 0.92,
         updatedAt: expect.any(String),
       });
+    });
+
+    it('deve usar o mês do pagamento, não o mês em que o job rodou', async () => {
+      const mock = createFirestoreMock();
+
+      // A Brapi devolve sempre o último provento anunciado. Num pagador
+      // trimestral, o job de abril e o de maio ainda veem o provento pago em
+      // março: chavear pelo mês da execução criaria três pagamentos onde
+      // houve um.
+      await saveQuoteHistory('ITSA4', 11.2, 0.2, 'brapi', '2026-01-15');
+
+      expect(mock.captured.dividendHistory.docIds).toEqual(['2026-01']);
+      expect(mock.captured.dividendHistory.saved[0]).toEqual({
+        month: '2026-01',
+        date: '2026-01-15',
+        monthlyDividend: 0.2,
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('deve cair no mês corrente quando não há data de pagamento', async () => {
+      const mock = createFirestoreMock();
+
+      await saveQuoteHistory('HGLG11', 165.5, 0.92, 'brapi');
+
+      expect(mock.captured.dividendHistory.docIds).toEqual(['2026-03']);
+    });
+
+    it('deve ignorar data de pagamento em formato inválido', async () => {
+      const mock = createFirestoreMock();
+
+      await saveQuoteHistory('HGLG11', 165.5, 0.92, 'brapi', '15/03/2026');
+
+      expect(mock.captured.dividendHistory.docIds).toEqual(['2026-03']);
     });
 
     it('deve sobrescrever o documento do mês a cada execução', async () => {
