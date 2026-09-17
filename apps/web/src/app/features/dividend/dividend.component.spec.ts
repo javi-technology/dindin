@@ -114,10 +114,39 @@ describe('DividendComponent', () => {
       expect(kpi('kpi-average')).toContain('150,00');
     });
 
-    it('deve exibir o último mês recebido com a variação sobre o anterior', async () => {
+    it('deve exibir o último mês recebido', async () => {
       await setup();
 
       expect(kpi('kpi-last-month')).toContain('120,00');
+    });
+
+    it('deve omitir a variação quando o mês anterior não teve provento', async () => {
+      // O relatório padrão tem janeiro e março: fevereiro não é comparável.
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-last-month-variation"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve exibir a variação sobre o mês de calendário anterior', async () => {
+      dividendServiceMock.getMonthlyReport.and.returnValue(
+        of({
+          year: 2026,
+          months: [
+            { month: '2026-02', total: 90, byTicker: [] },
+            { month: '2026-03', total: 120, byTicker: [] },
+          ],
+          byTicker: [],
+          total: 210,
+          availableYears: [2026],
+        }),
+      );
+
+      await setup();
+
       expect(kpi('kpi-last-month-variation')).toContain('33,33');
     });
 

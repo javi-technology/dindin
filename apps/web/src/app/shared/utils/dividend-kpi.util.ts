@@ -55,7 +55,12 @@ export function lastMonthSummary(
   }
 
   const last = months[months.length - 1];
-  const previous = months[months.length - 2];
+  // `months` é esparso — só traz meses com provento. Comparar com o item
+  // anterior da lista compararia junho com janeiro e chamaria isso de
+  // "mês anterior", então a busca é pelo mês de calendário anterior.
+  const previous = months.find(
+    (month) => month.month === previousMonthOf(last.month),
+  );
 
   return {
     month: last.month,
@@ -65,4 +70,13 @@ export function lastMonthSummary(
         ? ((last.total - previous.total) / previous.total) * 100
         : null,
   };
+}
+
+/** Mês de calendário anterior a `YYYY-MM`, virando o ano quando preciso. */
+function previousMonthOf(month: string): string {
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5, 7));
+  return monthNumber === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(monthNumber - 1).padStart(2, '0')}`;
 }

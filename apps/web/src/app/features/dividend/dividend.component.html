@@ -91,7 +91,17 @@
             <p class="text-3xl font-bold text-gray-900" data-testid="kpi-yield">
               {{ formatPercent(dividendYield()) }}
             </p>
-            <p class="text-sm mt-2 text-gray-500">Projeção anual</p>
+            @if (yieldNeedsRecords()) {
+              <p
+                class="text-sm mt-2 text-amber-700"
+                data-testid="kpi-yield-note"
+              >
+                Calculado sobre os proventos já registrados. Use "Registrar
+                proventos do mês" para alimentar o histórico.
+              </p>
+            } @else {
+              <p class="text-sm mt-2 text-gray-500">Projeção anual</p>
+            }
           </div>
         </div>
 

@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, of, switchMap } from 'rxjs';
+import { forkJoin, of, shareReplay, switchMap } from 'rxjs';
 import {
   DividendService,
   MonthlyDividendReport,
@@ -38,6 +38,13 @@ export class DividendComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly destroyRef = inject(DestroyRef);
 
+  /**
+   * Lista de carteiras compartilhada: projeção mensal e dividend yield
+   * partem dela e, sem o compartilhamento, cada um dispararia seu próprio
+   * GET idêntico ao abrir a tela.
+   */
+  private readonly wallets$ = this.walletService.list().pipe(shareReplay(1));
+
   byTicker = signal<MonthlyIncomeItem[]>([]);
   total = signal<number>(0);
   totalFromFridge = signal<number>(0);
@@ -52,6 +59,14 @@ export class DividendComponent implements OnInit {
   recordError = signal<string | null>(null);
   dividendYield = signal<number>(0);
 
+  /**
+   * O yield vem da coleção `dividends` (proventos registrados), enquanto a
+   * projeção vem das cotações. Sem esse aviso, quem nunca registrou proventos
+   * vê "Projeção: R$ 450,00" ao lado de "DY: 0,00%" e conclui que há defeito.
+   */
+  readonly yieldNeedsRecords = computed(
+    () => this.dividendYield() === 0 && this.total() > 0,
+  );
   readonly yearTotal = computed(() => this.report()?.total ?? 0);
   readonly monthlyAverage = computed(() => monthlyAverage(this.report()));
   readonly lastMonth = computed(() => lastMonthSummary(this.report()));
@@ -63,8 +78,7 @@ export class DividendComponent implements OnInit {
   }
 
   private loadDividendYield(): void {
-    this.walletService
-      .list()
+    this.wallets$
       .pipe(
         switchMap((wallets) =>
           wallets.length === 0
@@ -86,8 +100,7 @@ export class DividendComponent implements OnInit {
   }
 
   private loadMonthlyIncome(): void {
-    this.walletService
-      .list()
+    this.wallets$
       .pipe(
         switchMap((wallets) =>
           wallets.length === 0
