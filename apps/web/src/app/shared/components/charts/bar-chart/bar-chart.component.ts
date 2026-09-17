@@ -59,7 +59,14 @@ const TICK_COUNT = 4;
 export class BarChartComponent {
   readonly series = input.required<BarChartItem[]>();
   readonly orientation = input<BarChartOrientation>('vertical');
+  /** Exibe a linha de média calculada a partir da própria série. */
   readonly averageLine = input(false);
+  /**
+   * Média informada por quem usa o gráfico, para casos em que ela não é a
+   * média simples da série (ex: média só dos meses com provento registrado).
+   * Quando informada, tem precedência sobre `averageLine`.
+   */
+  readonly averageValue = input<number | null>(null);
   readonly ariaLabel = input('Gráfico de barras');
 
   readonly hasData = computed(() => this.series().length > 0);
@@ -94,14 +101,24 @@ export class BarChartComponent {
 
   /** Posição da linha de média, ou `null` quando ela não deve ser exibida. */
   readonly averagePosition = computed<number | null>(() => {
-    if (!this.averageLine() || !this.hasData() || this.max() <= 0) {
+    const explicit = this.averageValue();
+    if (explicit === null && !this.averageLine()) {
+      return null;
+    }
+    if (!this.hasData() || this.max() <= 0) {
       return null;
     }
 
     const series = this.series();
     const average =
+      explicit ??
       series.reduce((sum, item) => sum + this.safeValue(item.value), 0) /
-      series.length;
+        series.length;
+
+    if (average <= 0) {
+      return null;
+    }
+
     const ratio = average / this.max();
 
     return this.isHorizontal()
