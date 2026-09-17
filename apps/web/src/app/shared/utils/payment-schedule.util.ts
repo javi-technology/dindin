@@ -88,9 +88,7 @@ export function buildPaymentSchedule(
       return {
         date,
         items: group,
-        total: round(
-          group.reduce((sum, item) => sum + item.monthlyIncome, 0),
-        ),
+        total: round(group.reduce((sum, item) => sum + item.monthlyIncome, 0)),
         daysUntil,
         relativeLabel: relativeLabel(daysUntil),
       };

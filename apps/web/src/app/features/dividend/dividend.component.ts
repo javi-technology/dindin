@@ -23,6 +23,7 @@ import {
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
 import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
+import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
 import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
 import {
   aggregateDividendYield,
@@ -66,6 +67,8 @@ export class DividendComponent implements OnInit {
   recordSuccess = signal<string | null>(null);
   recordError = signal<string | null>(null);
   dividendYield = signal<number>(0);
+  /** Data de referência da agenda; sobrescrita nos testes. */
+  today = signal<Date>(new Date());
 
   /**
    * O yield vem da coleção `dividends` (proventos registrados), enquanto a
@@ -83,6 +86,9 @@ export class DividendComponent implements OnInit {
   );
   readonly tickerConcentration = computed(() =>
     buildTickerConcentration(this.report()),
+  );
+  readonly schedule = computed(() =>
+    buildPaymentSchedule(this.byTicker(), this.today()),
   );
 
   ngOnInit(): void {
