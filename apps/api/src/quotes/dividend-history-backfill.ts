@@ -8,7 +8,15 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
  * por mês, com o snapshot válido mais recente de cada mês.
  *
  * Usado apenas no backfill (#255): a partir dele o job mantém a coleção
- * mensal atualizada sozinho.
+ * mensal atualizada sozinho, chaveando pelo mês do **pagamento**.
+ *
+ * Limitação conhecida do histórico legado: `QuoteHistory` não guarda
+ * `dividendPaymentDate`, então aqui o mês só pode vir da data do snapshot.
+ * Para um pagador trimestral, o mesmo provento aparece nos meses seguintes e
+ * será registrado em cada um deles. Não há como distinguir esse caso de um
+ * fundo mensal que paga sempre o mesmo valor, porque a informação que os
+ * separa nunca foi gravada. Os meses preenchidos por este backfill são,
+ * portanto, uma aproximação; os gravados a partir de agora são exatos.
  */
 export function buildMonthlyEntries(
   snapshots: QuoteHistory[],
