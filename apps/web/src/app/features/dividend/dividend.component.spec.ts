@@ -1,8 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { Wallet } from 'dindin-models';
 import { DividendComponent } from './dividend.component';
-import { DividendService } from '../../core/services/dividend.service';
+import {
+  DividendHistoryResponse,
+  DividendService,
+} from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
 
 describe('DividendComponent', () => {
@@ -156,6 +159,41 @@ describe('DividendComponent', () => {
           .querySelector('[data-testid="card-trend"]')
           ?.getAttribute('data-trend'),
       ).toBe('up');
+    });
+
+    it('deve limitar quantas requisições de histórico correm em paralelo', async () => {
+      const tickers = Array.from({ length: 10 }, (_, index) => ({
+        ticker: `T${index}`,
+        quantity: 1,
+        monthlyDividend: 1,
+        monthlyIncome: 1,
+      }));
+      dividendServiceMock.getMonthlyIncome.and.returnValue(
+        of({ byTicker: tickers, total: 10, totalFromFridge: 0 }),
+      );
+
+      // Subjects não completam sozinhos, então medem a concorrência real:
+      // com `of()` cada requisição terminaria antes da próxima começar.
+      const pendentes: Subject<DividendHistoryResponse>[] = [];
+      dividendServiceMock.getDividendHistory.and.callFake(() => {
+        const subject = new Subject<DividendHistoryResponse>();
+        pendentes.push(subject);
+        return subject.asObservable();
+      });
+
+      await setup();
+
+      expect(pendentes.length).toBe(4);
+
+      // Ao concluir as primeiras, as seguintes entram na fila.
+      pendentes
+        .slice(0, 4)
+        .forEach((subject, index) =>
+          subject.next({ ticker: `T${index}`, history: [] }),
+        );
+      pendentes.slice(0, 4).forEach((subject) => subject.complete());
+
+      expect(pendentes.length).toBe(8);
     });
 
     it('deve renderizar o card mesmo quando o histórico falha', async () => {

@@ -72,6 +72,17 @@ describe('SparklineComponent', () => {
     expect(new Set(ys).size).toBe(1);
   });
 
+  it('deve marcar o último ponto sem distorção horizontal', () => {
+    fixture.componentRef.setInput('values', [1, 2, 3]);
+    fixture.detectChanges();
+
+    // Com preserveAspectRatio="none" um <circle> vira elipse achatada, então
+    // o marcador é desenhado como retângulo arredondado.
+    expect(svg()?.querySelector('circle')).toBeNull();
+    const marcador = svg()?.querySelector('[data-testid="sparkline-last"]');
+    expect(marcador).toBeTruthy();
+  });
+
   it('deve aplicar o aria-label informado', () => {
     fixture.componentRef.setInput('values', [1, 2]);
     fixture.componentRef.setInput('ariaLabel', 'Histórico do HGLG11');
