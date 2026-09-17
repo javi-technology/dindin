@@ -240,6 +240,29 @@
                 </ul>
               </div>
             }
+
+            @if (hiddenScheduleCount() > 0) {
+              <div
+                class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+                data-testid="schedule-paywall"
+              >
+                <h3 class="text-base font-semibold text-gray-900">
+                  Mais {{ hiddenScheduleCount() }}
+                  {{ hiddenScheduleCount() === 1 ? 'data' : 'datas' }} de
+                  pagamento para assinantes
+                </h3>
+                <p class="mt-2 text-sm text-gray-700">
+                  O plano gratuito mostra as 2 datas mais próximas de hoje. Os
+                  totais acima já consideram todos os pagamentos.
+                </p>
+                <a
+                  routerLink="/assinatura"
+                  class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+                  data-testid="schedule-paywall-cta"
+                  >Assinar</a
+                >
+              </div>
+            }
           </section>
         }
 
@@ -319,6 +342,28 @@
                 </article>
               }
             </div>
+
+            @if (hiddenCount() > 0) {
+              <div
+                class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+                data-testid="projections-paywall"
+              >
+                <h3 class="text-base font-semibold text-gray-900">
+                  Mais {{ hiddenCount() }}
+                  {{ hiddenCount() === 1 ? 'ativo' : 'ativos' }} para assinantes
+                </h3>
+                <p class="mt-2 text-sm text-gray-700">
+                  O plano gratuito mostra a projeção de 3 ativos. Assine para
+                  ver a projeção de todos.
+                </p>
+                <a
+                  routerLink="/assinatura"
+                  class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+                  data-testid="projections-paywall-cta"
+                  >Assinar</a
+                >
+              </div>
+            }
           </section>
         }
       </div>

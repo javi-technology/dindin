@@ -27,10 +27,25 @@ export interface MonthlyIncomeItem {
   paymentDate?: string; // YYYY-MM-DD
 }
 
+/** Totais da agenda calculados na API sobre todos os ativos da carteira. */
+export interface ScheduleTotals {
+  upcomingTotal: number;
+  paidTotal: number;
+}
+
 export interface MonthlyIncomeResponse {
   byTicker: MonthlyIncomeItem[];
   total: number;
   totalFromFridge: number;
+  /** Recorte gratuito aplicado pela API (#262). */
+  limited?: boolean;
+  /** Ativos das datas de pagamento liberadas; ausente quando não há recorte. */
+  scheduleItems?: MonthlyIncomeItem[];
+  scheduleTotals?: ScheduleTotals;
+  /** Tickers omitidos em `byTicker` pelo recorte gratuito. */
+  hiddenTickers?: string[];
+  /** Datas de pagamento omitidas na agenda pelo recorte gratuito. */
+  hiddenPaymentDates?: string[];
 }
 
 export interface TickerTotal {
