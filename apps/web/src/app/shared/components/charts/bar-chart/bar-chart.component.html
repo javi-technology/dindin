@@ -1,0 +1,92 @@
+@if (!hasData()) {
+  <p data-testid="bar-chart-empty" class="text-gray-600">
+    Nenhum dado para exibir no período.
+  </p>
+} @else {
+  <svg
+    [attr.viewBox]="viewBox()"
+    class="w-full h-auto"
+    role="img"
+    [attr.aria-label]="ariaLabel()"
+    data-testid="bar-chart"
+  >
+    @for (tick of yTicks(); track tick.position) {
+      <line
+        [attr.x1]="verticalLeft"
+        [attr.x2]="verticalRight"
+        [attr.y1]="tick.position"
+        [attr.y2]="tick.position"
+        stroke="#e5e7eb"
+        stroke-width="1"
+      />
+      <text
+        [attr.x]="verticalLeft - 7"
+        [attr.y]="tick.position + 4"
+        text-anchor="end"
+        class="fill-gray-500 text-[10px]"
+      >
+        {{ tick.label }}
+      </text>
+    }
+
+    @for (bar of bars(); track bar.label) {
+      <rect
+        [attr.x]="bar.x"
+        [attr.y]="bar.y"
+        [attr.width]="bar.width"
+        [attr.height]="bar.height"
+        [attr.fill]="bar.highlight ? '#1d4ed8' : '#2563eb'"
+        [attr.data-highlight]="bar.highlight ? 'true' : null"
+        rx="3"
+        data-testid="bar"
+      >
+        <title>{{ bar.label }}: {{ formatCompactCurrency(bar.value) }}</title>
+      </rect>
+      <text
+        [attr.x]="bar.labelX"
+        [attr.y]="bar.labelY"
+        [attr.text-anchor]="isHorizontal() ? 'end' : 'middle'"
+        class="fill-gray-500 text-[10px]"
+        data-testid="bar-label"
+      >
+        {{ bar.label }}
+      </text>
+      @if (isHorizontal()) {
+        <text
+          [attr.x]="bar.valueX"
+          [attr.y]="bar.labelY"
+          class="fill-gray-700 text-[10px]"
+          data-testid="bar-value"
+        >
+          {{ bar.valueLabel ?? formatCompactCurrency(bar.value) }}
+        </text>
+      }
+    }
+
+    @if (averagePosition(); as average) {
+      @if (isHorizontal()) {
+        <line
+          [attr.x1]="average"
+          [attr.x2]="average"
+          y1="0"
+          [attr.y2]="bars().length * 32"
+          stroke="#f59e0b"
+          stroke-width="2"
+          stroke-dasharray="4 4"
+          data-testid="bar-chart-average"
+        />
+      } @else {
+        <line
+          [attr.x1]="verticalLeft"
+          [attr.x2]="verticalRight"
+          [attr.y1]="average"
+          [attr.y2]="average"
+          stroke="#f59e0b"
+          stroke-width="2"
+          stroke-dasharray="4 4"
+          data-testid="bar-chart-average"
+        />
+      }
+    }
+  </svg>
+}

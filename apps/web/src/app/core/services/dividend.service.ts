@@ -52,6 +52,20 @@ export interface MonthlyDividendReport {
   availableYears: number[];
 }
 
+export interface DividendHistoryEntry {
+  date: string;
+  monthlyDividend: number;
+}
+
+export interface DividendHistoryResponse {
+  ticker: string;
+  history: DividendHistoryEntry[];
+}
+
+export interface DividendHistoryBatchResponse {
+  byTicker: Record<string, DividendHistoryEntry[]>;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -75,6 +89,30 @@ export class DividendService {
     return year === undefined
       ? this.http.get<MonthlyDividendReport>(url)
       : this.http.get<MonthlyDividendReport>(url, { params: { year } });
+  }
+
+  getDividendHistory(
+    ticker: string,
+    months = 12,
+  ): Observable<DividendHistoryResponse> {
+    return this.http.get<DividendHistoryResponse>(
+      `/api/quotes/${encodeURIComponent(ticker)}/dividend-history`,
+      { params: { months } },
+    );
+  }
+
+  /**
+   * Histórico de vários tickers numa requisição — a tela de Proventos monta
+   * um sparkline por ativo, e uma chamada por ticker esbarraria no rate limit.
+   */
+  getDividendHistoryBatch(
+    tickers: string[],
+    months = 12,
+  ): Observable<DividendHistoryBatchResponse> {
+    return this.http.get<DividendHistoryBatchResponse>(
+      '/api/quotes/dividend-history',
+      { params: { tickers: tickers.join(','), months } },
+    );
   }
 
   recordMonthlyDividends(): Observable<Dividend[]> {

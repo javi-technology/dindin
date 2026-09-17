@@ -34,6 +34,8 @@ describe('DividendComponent', () => {
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
       'getMonthlyIncome',
       'getMonthlyReport',
+      'getDividendYield',
+      'getDividendHistoryBatch',
       'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
@@ -86,7 +88,263 @@ describe('DividendComponent', () => {
         availableYears: [2026, 2025],
       }),
     );
+    dividendServiceMock.getDividendYield.and.returnValue(
+      of({
+        byTicker: [],
+        total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
+      }),
+    );
+    dividendServiceMock.getDividendHistoryBatch.and.callFake(
+      (tickers: string[]) =>
+        of({
+          byTicker: Object.fromEntries(
+            tickers.map((ticker) => [
+              ticker,
+              [
+                { date: '2026-07-15', monthlyDividend: 0.8 },
+                { date: '2026-08-15', monthlyDividend: 0.85 },
+                { date: '2026-09-15', monthlyDividend: 0.9 },
+              ],
+            ]),
+          ),
+        }),
+    );
     dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
+  });
+
+  describe('cards por ticker', () => {
+    const cards = (): NodeListOf<Element> =>
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="ticker-card"]',
+      );
+
+    it('deve exibir um card por ticker no lugar da tabela', async () => {
+      await setup();
+
+      expect(cards().length).toBe(2);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="monthly-income-table"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve destacar o valor por cota e o total do ticker', async () => {
+      await setup();
+
+      const primeiro = cards()[0];
+
+      expect(
+        primeiro.querySelector('[data-testid="card-dividend-per-share"]')
+          ?.textContent,
+      ).toContain('0,90');
+      expect(primeiro.textContent).toContain('HGLG11');
+      expect(primeiro.textContent).toContain('135,00');
+    });
+
+    it('deve exibir o sparkline a partir do histórico carregado', async () => {
+      await setup();
+
+      expect(
+        cards()[0].querySelector('[data-testid="sparkline"]'),
+      ).toBeTruthy();
+    });
+
+    it('deve exibir a tendência de alta do provento por cota', async () => {
+      await setup();
+
+      expect(
+        cards()[0]
+          .querySelector('[data-testid="card-trend"]')
+          ?.getAttribute('data-trend'),
+      ).toBe('up');
+    });
+
+    it('deve buscar o histórico de todos os tickers numa requisição', async () => {
+      // Uma requisição por ticker faria uma carteira diversificada esbarrar
+      // no rate limit de 100/min por IP ao abrir a tela.
+      await setup();
+
+      expect(dividendServiceMock.getDividendHistoryBatch).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(dividendServiceMock.getDividendHistoryBatch).toHaveBeenCalledWith([
+        'HGLG11',
+        'XPLG11',
+      ]);
+    });
+
+    it('deve renderizar o card mesmo quando o histórico falha', async () => {
+      dividendServiceMock.getDividendHistoryBatch.and.returnValue(
+        throwError(() => new Error('falha')),
+      );
+
+      await setup();
+
+      expect(cards().length).toBe(2);
+      expect(cards()[0].querySelector('[data-testid="sparkline"]')).toBeNull();
+      expect(cards()[0].textContent).toContain('HGLG11');
+    });
+  });
+
+  const kpi = (testid: string): string =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector(`[data-testid="${testid}"]`)
+      ?.textContent?.trim() ?? '';
+
+  describe('indicadores', () => {
+    it('deve exibir o total recebido no ano selecionado', async () => {
+      await setup();
+
+      expect(kpi('kpi-year-total')).toContain('300,00');
+    });
+
+    it('deve exibir a média mensal dos meses com provento', async () => {
+      await setup();
+
+      expect(kpi('kpi-average')).toContain('150,00');
+    });
+
+    it('deve exibir o último mês recebido', async () => {
+      await setup();
+
+      expect(kpi('kpi-last-month')).toContain('120,00');
+    });
+
+    it('deve omitir a variação quando o mês anterior não teve provento', async () => {
+      // O relatório padrão tem janeiro e março: fevereiro não é comparável.
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-last-month-variation"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve exibir a variação sobre o mês de calendário anterior', async () => {
+      dividendServiceMock.getMonthlyReport.and.returnValue(
+        of({
+          year: 2026,
+          months: [
+            { month: '2026-02', total: 90, byTicker: [] },
+            { month: '2026-03', total: 120, byTicker: [] },
+          ],
+          byTicker: [],
+          total: 210,
+          availableYears: [2026],
+        }),
+      );
+
+      await setup();
+
+      expect(kpi('kpi-last-month-variation')).toContain('33,33');
+    });
+
+    it('deve omitir a variação quando há apenas um mês registrado', async () => {
+      dividendServiceMock.getMonthlyReport.and.returnValue(
+        of({
+          year: 2026,
+          months: [{ month: '2026-01', total: 180, byTicker: [] }],
+          byTicker: [],
+          total: 180,
+          availableYears: [2026],
+        }),
+      );
+
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-last-month-variation"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve exibir o dividend yield agregando todas as carteiras', async () => {
+      walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
+      dividendServiceMock.getDividendYield.and.returnValues(
+        of({
+          byTicker: [],
+          total: { annualIncome: 1000, currentValue: 10000, yield: 10 },
+        }),
+        of({
+          byTicker: [],
+          total: { annualIncome: 200, currentValue: 10000, yield: 2 },
+        }),
+      );
+
+      await setup();
+
+      expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith('w1');
+      expect(dividendServiceMock.getDividendYield).toHaveBeenCalledWith('w2');
+      expect(kpi('kpi-yield')).toContain('6,00');
+    });
+
+    it('deve recarregar o dividend yield após registrar os proventos do mês', async () => {
+      // O aviso do próprio tile manda usar esse botão para alimentar o
+      // histórico; se o yield não recarrega, a ação não produz o efeito
+      // que a interface promete.
+      dividendServiceMock.getDividendYield.and.returnValues(
+        of({
+          byTicker: [],
+          total: { annualIncome: 0, currentValue: 22000, yield: 0 },
+        }),
+        of({
+          byTicker: [],
+          total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
+        }),
+      );
+
+      await setup();
+      expect(kpi('kpi-yield')).toContain('0,00');
+
+      (
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="record-monthly-button"]',
+        ) as HTMLButtonElement
+      ).click();
+      fixture.detectChanges();
+
+      expect(kpi('kpi-yield')).toContain('9,60');
+    });
+
+    it('deve carregar a lista de carteiras uma única vez', async () => {
+      await setup();
+
+      expect(walletServiceMock.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve sinalizar quando o yield depende de proventos ainda não registrados', async () => {
+      dividendServiceMock.getDividendYield.and.returnValue(
+        of({
+          byTicker: [],
+          total: { annualIncome: 0, currentValue: 22000, yield: 0 },
+        }),
+      );
+
+      await setup();
+
+      expect(kpi('kpi-yield-note')).toContain('Registrar proventos do mês');
+    });
+
+    it('não deve sinalizar nada quando há yield calculado', async () => {
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-yield-note"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve exibir o yield zerado quando não há carteiras', async () => {
+      walletServiceMock.list.and.returnValue(of([]));
+
+      await setup();
+
+      expect(kpi('kpi-yield')).toContain('0,00');
+    });
   });
 
   it('deve usar a mesma fonte mensal da carteira ao inicializar', async () => {
@@ -114,27 +372,24 @@ describe('DividendComponent', () => {
   it('deve listar proventos por ticker', async () => {
     await setup();
 
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '[data-testid="monthly-income-table"] tbody tr',
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"]',
     );
-    expect(rows.length).toBe(2);
-    expect(rows[0].textContent).toContain('HGLG11');
-    expect(rows[1].textContent).toContain('XPLG11');
+    expect(cards.length).toBe(2);
+    expect(cards[0].textContent).toContain('HGLG11');
+    expect(cards[1].textContent).toContain('XPLG11');
   });
 
   it('deve exibir a data de pagamento de cada provento', async () => {
     await setup();
 
-    const table = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="monthly-income-table"]',
+    const dates = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"] [data-testid="payment-date"]',
     );
-    expect(table?.querySelector('thead')?.textContent).toContain(
-      'Data de pagamento',
-    );
-    const dates = table?.querySelectorAll('[data-testid="payment-date"]');
-    expect(dates?.length).toBe(2);
-    expect(dates?.[0].textContent?.trim()).toBe('15/09/2026');
-    expect(dates?.[1].textContent?.trim()).toBe('—');
+
+    expect(dates.length).toBe(2);
+    expect(dates[0].textContent?.trim()).toBe('15/09/2026');
+    expect(dates[1].textContent?.trim()).toBe('—');
   });
 
   it('deve consolidar várias carteiras contando a geladeira uma única vez', async () => {
@@ -172,11 +427,11 @@ describe('DividendComponent', () => {
     await setup();
 
     expect(fixture.componentInstance.total()).toBe(45);
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '[data-testid="monthly-income-table"] tbody tr',
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"]',
     );
-    expect(rows.length).toBe(1);
-    expect(rows[0].textContent).toContain('15');
+    expect(cards.length).toBe(1);
+    expect(cards[0].textContent).toContain('15');
   });
 
   it('deve exibir mensagem vazia quando não há carteiras', async () => {
@@ -200,6 +455,155 @@ describe('DividendComponent', () => {
         '[data-testid="error-message"]',
       )?.textContent,
     ).toContain('Erro ao carregar proventos');
+  });
+
+  it('deve destacar o mês corrente segundo a data de referência', async () => {
+    await setup();
+    fixture.componentInstance.today.set(new Date(2026, 5, 10));
+    fixture.detectChanges();
+
+    const barras = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="monthly-chart"] [data-testid="bar"]',
+    );
+    const destacadas = Array.from(barras).filter(
+      (barra) => barra.getAttribute('data-highlight') === 'true',
+    );
+
+    expect(destacadas.length).toBe(1);
+    // Junho é o sexto mês: mesma data de referência usada pela agenda.
+    expect(barras[5].getAttribute('data-highlight')).toBe('true');
+  });
+
+  it('deve exibir o gráfico de barras com os 12 meses do ano', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="monthly-chart"]',
+    );
+
+    expect(grafico?.querySelector('[data-testid="bar-chart"]')).toBeTruthy();
+    expect(grafico?.querySelectorAll('[data-testid="bar"]').length).toBe(12);
+  });
+
+  it('deve alinhar a linha de média do gráfico com a média mensal exibida', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="monthly-chart"]',
+    );
+    const linha = grafico?.querySelector('[data-testid="bar-chart-average"]');
+
+    // Média de 150 sobre o maior mês (180): 83,33% da altura útil.
+    expect(Number(linha?.getAttribute('y1'))).toBeCloseTo(47.5, 1);
+  });
+
+  it('deve manter o detalhamento por mês em bloco recolhível', async () => {
+    await setup();
+
+    const detalhe = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="month-details"]',
+    );
+
+    expect(detalhe?.tagName.toLowerCase()).toBe('details');
+    expect(
+      detalhe?.querySelectorAll('[data-testid="report-month-row"]').length,
+    ).toBe(2);
+  });
+
+  describe('agenda de pagamentos', () => {
+    const comHoje = async (ano: number, mes: number, dia: number) => {
+      await setup();
+      fixture.componentInstance.today.set(new Date(ano, mes - 1, dia));
+      fixture.detectChanges();
+    };
+
+    it('deve agrupar os pagamentos a receber por data', async () => {
+      await comHoje(2026, 9, 10);
+
+      const dias = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="schedule-upcoming"] [data-testid="schedule-day"]',
+      );
+
+      expect(dias.length).toBe(1);
+      expect(dias[0].textContent).toContain('em 5 dias');
+      expect(dias[0].textContent).toContain('15/09/2026');
+      expect(dias[0].textContent).toContain('HGLG11');
+    });
+
+    it('deve destacar o valor por cota de cada ticker', async () => {
+      await comHoje(2026, 9, 10);
+
+      const valorCota = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="schedule-dividend-per-share"]',
+      );
+
+      expect(valorCota?.textContent).toContain('0,90');
+    });
+
+    it('deve mover para já pagos as datas anteriores a hoje', async () => {
+      await comHoje(2026, 9, 20);
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="schedule-paid"] [data-testid="schedule-day"]',
+        ).length,
+      ).toBe(1);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="schedule-upcoming"] [data-testid="schedule-day"]',
+        ).length,
+      ).toBe(0);
+    });
+
+    it('deve avisar que a agenda cobre apenas as carteiras', async () => {
+      // `byTicker` traz só posições; a geladeira entra apenas no total da
+      // projeção, então sem a nota os números parecem não fechar.
+      await comHoje(2026, 9, 10);
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="schedule-scope-note"]',
+        )?.textContent,
+      ).toContain('geladeira');
+    });
+
+    it('deve listar à parte os tickers sem data anunciada', async () => {
+      await comHoje(2026, 9, 10);
+
+      const semData = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="schedule-without-date"]',
+      );
+
+      expect(semData?.textContent).toContain('XPLG11');
+      expect(semData?.textContent).not.toContain('HGLG11');
+    });
+  });
+
+  it('deve exibir o gráfico de concentração por ticker', async () => {
+    await setup();
+
+    const grafico = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="concentration-chart"]',
+    );
+
+    expect(grafico?.querySelector('[data-testid="bar-chart"]')).toBeTruthy();
+    expect(grafico?.querySelectorAll('[data-testid="bar"]').length).toBe(2);
+    expect(grafico?.textContent).toContain('HGLG11');
+    expect(grafico?.textContent).toContain('90,0%');
+  });
+
+  it('deve manter o total por ticker em bloco recolhível', async () => {
+    await setup();
+
+    const detalhe = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="ticker-details"]',
+    );
+
+    expect(detalhe?.tagName.toLowerCase()).toBe('details');
+    expect(
+      detalhe?.querySelectorAll('[data-testid="report-ticker-total-row"]')
+        .length,
+    ).toBe(2);
   });
 
   it('deve exibir uma linha por mês com rótulo e total', async () => {

@@ -1,9 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { Position } from 'dindin-models';
-import {
-  formatCurrency,
-  formatPercent,
-} from '../../../shared/utils/format.util';
+import { formatCurrency, formatPercent } from '../../../utils/format.util';
 
 export interface CompositionSlice {
   label: string;

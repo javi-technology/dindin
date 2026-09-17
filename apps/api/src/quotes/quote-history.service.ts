@@ -1,5 +1,5 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { Quote, QuoteHistory } from 'dindin-models';
+import { MonthlyDividendHistory, Quote, QuoteHistory } from 'dindin-models';
 
 function quotesCollection() {
   return getFirestore().collection('quotes');
@@ -7,6 +7,10 @@ function quotesCollection() {
 
 function historyCollection(ticker: string) {
   return quotesCollection().doc(ticker).collection('history');
+}
+
+function dividendHistoryCollection(ticker: string) {
+  return quotesCollection().doc(ticker).collection('dividendHistory');
 }
 
 function todayDate(): string {
@@ -57,6 +61,79 @@ export async function saveQuoteHistory(
 
   await quoteRef.set(quoteData);
   await historyCollection(ticker).doc(docId).set(historyData);
+  await saveMonthlyDividendHistory(
+    ticker,
+    resolvedMonthlyDividend,
+    resolvedPaymentDate,
+    date,
+    now,
+  );
+}
+
+/**
+ * Registra o provento por cota no mês do **pagamento**, sobrescrevendo o
+ * documento a cada execução do job.
+ *
+ * O `history` acumula um snapshot por dia porque o preço muda todo dia; o
+ * provento só muda quando um novo é anunciado. Manter um documento por mês
+ * aqui é o que permite ao endpoint de histórico ler ~12 documentos por ticker
+ * em vez de varrer ~365 e descartar quase todos.
+ *
+ * A chave é o mês do pagamento, não o da execução: a Brapi devolve sempre o
+ * último provento anunciado, então num pagador trimestral os jobs dos meses
+ * seguintes ainda veem o mesmo provento. Chavear pela execução registraria
+ * três pagamentos onde houve um.
+ */
+async function saveMonthlyDividendHistory(
+  ticker: string,
+  monthlyDividend: number,
+  paymentDate: string | undefined,
+  today: string,
+  updatedAt: string,
+): Promise<void> {
+  if (
+    typeof monthlyDividend !== 'number' ||
+    !Number.isFinite(monthlyDividend)
+  ) {
+    return;
+  }
+
+  // Sem data anunciada (ou em formato inesperado), o mês corrente é a melhor
+  // aproximação disponível.
+  const date = isIsoDate(paymentDate) ? paymentDate : today;
+  const month = date.slice(0, 7);
+  const data: MonthlyDividendHistory = {
+    month,
+    date,
+    monthlyDividend,
+    updatedAt,
+  };
+
+  await dividendHistoryCollection(ticker).doc(month).set(data);
+}
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/**
+ * Proventos mensais de um ticker, do mais antigo para o mais recente.
+ *
+ * Como há um documento por mês, o `limit` da consulta corresponde exatamente
+ * ao número de pontos devolvidos.
+ */
+export async function getMonthlyDividendHistory(
+  ticker: string,
+  months: number,
+): Promise<MonthlyDividendHistory[]> {
+  const snapshot = await dividendHistoryCollection(ticker)
+    .orderBy('month', 'desc')
+    .limit(months)
+    .get();
+
+  return snapshot.docs
+    .map((doc) => doc.data() as MonthlyDividendHistory)
+    .reverse();
 }
 
 /** Máximo de documentos aceitos numa chamada de `getAll` do Firestore. */
