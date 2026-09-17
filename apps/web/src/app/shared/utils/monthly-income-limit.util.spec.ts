@@ -123,6 +123,92 @@ describe('buildFreeView', () => {
     expect(view.hiddenCount).toBe(0);
   });
 
+  it('deve esconder o ticker cortado em qualquer carteira', () => {
+    // A API recorta cada carteira: somar só a parcela que sobrou mostraria
+    // quantidade e renda menores que as reais.
+    const responses: MonthlyIncomeResponse[] = [
+      {
+        byTicker: [item('BBBB11', 45, '2026-09-16')],
+        scheduleItems: [item('BBBB11', 45, '2026-09-16')],
+        total: 245,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: ['AAAA11'],
+        hiddenPaymentDates: [],
+      },
+      {
+        byTicker: [item('AAAA11', 5, '2026-09-16')],
+        scheduleItems: [item('AAAA11', 5, '2026-09-16')],
+        total: 5,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+      },
+    ];
+
+    const view = buildFreeView(responses, TODAY);
+
+    expect(view.byTicker.map((i) => i.ticker)).toEqual(['BBBB11']);
+    expect(view.scheduleItems.map((i) => i.ticker)).toEqual(['BBBB11']);
+    expect(view.hiddenCount).toBe(1);
+  });
+
+  it('deve esconder a data cortada em qualquer carteira', () => {
+    const responses: MonthlyIncomeResponse[] = [
+      {
+        byTicker: [item('AAAA11', 45, '2026-09-16')],
+        scheduleItems: [item('AAAA11', 45, '2026-09-16')],
+        total: 45,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: ['2026-09-18'],
+      },
+      {
+        byTicker: [item('BBBB11', 5, '2026-09-18')],
+        scheduleItems: [item('BBBB11', 5, '2026-09-18')],
+        total: 5,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+      },
+    ];
+
+    const view = buildFreeView(responses, TODAY);
+
+    expect(view.scheduleItems.map((i) => i.ticker)).toEqual(['AAAA11']);
+    expect(view.hiddenScheduleCount).toBe(1);
+  });
+
+  it('deve contar os ativos sem data anunciada bloqueados na agenda', () => {
+    const responses: MonthlyIncomeResponse[] = [
+      {
+        byTicker: [item('AAAA11', 45, '2026-09-16')],
+        scheduleItems: [item('AAAA11', 45, '2026-09-16')],
+        total: 45,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        hiddenScheduleTickers: ['CCCC11'],
+      },
+      {
+        byTicker: [],
+        scheduleItems: [],
+        total: 0,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        hiddenScheduleTickers: ['CCCC11', 'DDDD11'],
+      },
+    ];
+
+    expect(buildFreeView(responses, TODAY).hiddenWithoutDateCount).toBe(2);
+  });
+
   it('deve manter as 2 datas mais próximas de hoje na agenda', () => {
     const responses: MonthlyIncomeResponse[] = [
       {

@@ -842,6 +842,34 @@ describe('DividendComponent', () => {
       );
     });
 
+    it('deve avisar sobre os ativos sem data anunciada bloqueados', async () => {
+      // Sem o aviso, a seção "sem data de pagamento anunciada" simplesmente
+      // desapareceria para quem não assina.
+      await comRecorte({ hiddenScheduleTickers: ['ZZZZ11'] });
+
+      expect(el('[data-testid="schedule-paywall"]')?.textContent).toContain(
+        'sem data',
+      );
+    });
+
+    it('deve exibir o total já pago mesmo sem data liberada no período', async () => {
+      // As 2 datas liberadas podem cair todas no futuro; o total de pagos
+      // continua real e precisa aparecer.
+      await comRecorte({
+        scheduleItems: [item('BBBB11', 39.1, '2026-09-20')],
+        hiddenPaymentDates: ['2026-08-25', '2026-09-11'],
+      });
+
+      expect(el('[data-testid="schedule-paid"]')?.textContent).toContain(
+        '148,56',
+      );
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="schedule-paid"] [data-testid="schedule-day"]',
+        ).length,
+      ).toBe(0);
+    });
+
     it('não deve exibir paywall quando nada foi bloqueado', async () => {
       await comRecorte({
         hiddenTickers: [],

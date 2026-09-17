@@ -1,6 +1,7 @@
 import {
   FREE_SCHEDULE_DATE_LIMIT,
   FREE_TICKER_LIMIT,
+  appToday,
   computeScheduleTotals,
   limitMonthlyIncome,
 } from '../../src/dividend/monthly-income-limit.service';
@@ -95,13 +96,14 @@ describe('monthly-income-limit – limitMonthlyIncome', () => {
   it('deve ignorar ativos sem data de pagamento na agenda', () => {
     const items = [item('AAAA11', 10), item('BBBB11', 10, '2026-09-16')];
 
-    const { scheduleItems, hiddenPaymentDates } = limitMonthlyIncome(
-      items,
-      TODAY,
-    );
+    const { scheduleItems, hiddenPaymentDates, hiddenScheduleTickers } =
+      limitMonthlyIncome(items, TODAY);
 
     expect(scheduleItems.map((i) => i.ticker)).toEqual(['BBBB11']);
     expect(hiddenPaymentDates).toEqual([]);
+    // A seção "sem data anunciada" some no plano gratuito: sem esta lista o
+    // ativo sumiria da tela sem nenhum aviso.
+    expect(hiddenScheduleTickers).toEqual(['AAAA11']);
   });
 
   it('não deve esconder nada quando cabe no limite', () => {
@@ -130,6 +132,18 @@ describe('monthly-income-limit – limitMonthlyIncome', () => {
 
     expect(scheduleItems.map((i) => i.ticker)).toEqual(['BBBB11']);
     expect(hiddenPaymentDates).toEqual([]);
+  });
+});
+
+describe('monthly-income-limit – appToday', () => {
+  it('deve usar o dia no fuso de São Paulo, não o do servidor em UTC', () => {
+    // 17/09 às 22h em São Paulo já é 18/09 em UTC; a tela do usuário diz 17.
+    expect(appToday(new Date('2026-09-18T01:00:00Z')).toISOString()).toBe(
+      '2026-09-17T00:00:00.000Z',
+    );
+    expect(appToday(new Date('2026-09-17T12:00:00Z')).toISOString()).toBe(
+      '2026-09-17T00:00:00.000Z',
+    );
   });
 });
 
