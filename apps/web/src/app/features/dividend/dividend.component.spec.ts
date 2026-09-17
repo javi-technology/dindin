@@ -405,6 +405,63 @@ describe('DividendComponent', () => {
     ).toBe(2);
   });
 
+  describe('agenda de pagamentos', () => {
+    const comHoje = async (ano: number, mes: number, dia: number) => {
+      await setup();
+      fixture.componentInstance.today.set(new Date(ano, mes - 1, dia));
+      fixture.detectChanges();
+    };
+
+    it('deve agrupar os pagamentos a receber por data', async () => {
+      await comHoje(2026, 9, 10);
+
+      const dias = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="schedule-upcoming"] [data-testid="schedule-day"]',
+      );
+
+      expect(dias.length).toBe(1);
+      expect(dias[0].textContent).toContain('em 5 dias');
+      expect(dias[0].textContent).toContain('15/09/2026');
+      expect(dias[0].textContent).toContain('HGLG11');
+    });
+
+    it('deve destacar o valor por cota de cada ticker', async () => {
+      await comHoje(2026, 9, 10);
+
+      const valorCota = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="schedule-dividend-per-share"]',
+      );
+
+      expect(valorCota?.textContent).toContain('0,90');
+    });
+
+    it('deve mover para já pagos as datas anteriores a hoje', async () => {
+      await comHoje(2026, 9, 20);
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="schedule-paid"] [data-testid="schedule-day"]',
+        ).length,
+      ).toBe(1);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="schedule-upcoming"] [data-testid="schedule-day"]',
+        ).length,
+      ).toBe(0);
+    });
+
+    it('deve listar à parte os tickers sem data anunciada', async () => {
+      await comHoje(2026, 9, 10);
+
+      const semData = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="schedule-without-date"]',
+      );
+
+      expect(semData?.textContent).toContain('XPLG11');
+      expect(semData?.textContent).not.toContain('HGLG11');
+    });
+  });
+
   it('deve exibir o gráfico de concentração por ticker', async () => {
     await setup();
 
