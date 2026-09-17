@@ -78,9 +78,6 @@ const entry = (
 
 describe('GET /api/quotes/:ticker/dividend-history', () => {
   beforeEach(() => {
-    // A janela do endpoint é relativa a hoje; sem data fixa os fixtures de
-    // 2026 sairiam da janela conforme o tempo passa.
-    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
     capturedLimit = undefined;
     historyDocs = {
@@ -94,7 +91,6 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
     jest.clearAllMocks();
   });
 

@@ -60,7 +60,10 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
-import { getDividendHistory } from './quotes/dividend-history.controller';
+import {
+  getDividendHistory,
+  getDividendHistoryBatch,
+} from './quotes/dividend-history.controller';
 import {
   createAsset,
   listAllAssets,
@@ -200,6 +203,9 @@ app.delete(
   revokeSubscription,
 );
 
+// A rota em lote vem antes da rota por ticker: sem isso "dividend-history"
+// seria capturado como :ticker.
+app.get('/api/quotes/dividend-history', getDividendHistoryBatch);
 app.get('/api/quotes/:ticker/dividend-history', getDividendHistory);
 
 app.get('/api/wallets', listWallets);

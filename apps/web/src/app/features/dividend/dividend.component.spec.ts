@@ -1,11 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, Subject, throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { Wallet } from 'dindin-models';
 import { DividendComponent } from './dividend.component';
-import {
-  DividendHistoryResponse,
-  DividendService,
-} from '../../core/services/dividend.service';
+import { DividendService } from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
 
 describe('DividendComponent', () => {
@@ -38,7 +35,7 @@ describe('DividendComponent', () => {
       'getMonthlyIncome',
       'getMonthlyReport',
       'getDividendYield',
-      'getDividendHistory',
+      'getDividendHistoryBatch',
       'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
@@ -97,15 +94,20 @@ describe('DividendComponent', () => {
         total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
       }),
     );
-    dividendServiceMock.getDividendHistory.and.callFake((ticker: string) =>
-      of({
-        ticker,
-        history: [
-          { date: '2026-07-15', monthlyDividend: 0.8 },
-          { date: '2026-08-15', monthlyDividend: 0.85 },
-          { date: '2026-09-15', monthlyDividend: 0.9 },
-        ],
-      }),
+    dividendServiceMock.getDividendHistoryBatch.and.callFake(
+      (tickers: string[]) =>
+        of({
+          byTicker: Object.fromEntries(
+            tickers.map((ticker) => [
+              ticker,
+              [
+                { date: '2026-07-15', monthlyDividend: 0.8 },
+                { date: '2026-08-15', monthlyDividend: 0.85 },
+                { date: '2026-09-15', monthlyDividend: 0.9 },
+              ],
+            ]),
+          ),
+        }),
     );
     dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
   });
@@ -161,43 +163,22 @@ describe('DividendComponent', () => {
       ).toBe('up');
     });
 
-    it('deve limitar quantas requisições de histórico correm em paralelo', async () => {
-      const tickers = Array.from({ length: 10 }, (_, index) => ({
-        ticker: `T${index}`,
-        quantity: 1,
-        monthlyDividend: 1,
-        monthlyIncome: 1,
-      }));
-      dividendServiceMock.getMonthlyIncome.and.returnValue(
-        of({ byTicker: tickers, total: 10, totalFromFridge: 0 }),
-      );
-
-      // Subjects não completam sozinhos, então medem a concorrência real:
-      // com `of()` cada requisição terminaria antes da próxima começar.
-      const pendentes: Subject<DividendHistoryResponse>[] = [];
-      dividendServiceMock.getDividendHistory.and.callFake(() => {
-        const subject = new Subject<DividendHistoryResponse>();
-        pendentes.push(subject);
-        return subject.asObservable();
-      });
-
+    it('deve buscar o histórico de todos os tickers numa requisição', async () => {
+      // Uma requisição por ticker faria uma carteira diversificada esbarrar
+      // no rate limit de 100/min por IP ao abrir a tela.
       await setup();
 
-      expect(pendentes.length).toBe(4);
-
-      // Ao concluir as primeiras, as seguintes entram na fila.
-      pendentes
-        .slice(0, 4)
-        .forEach((subject, index) =>
-          subject.next({ ticker: `T${index}`, history: [] }),
-        );
-      pendentes.slice(0, 4).forEach((subject) => subject.complete());
-
-      expect(pendentes.length).toBe(8);
+      expect(dividendServiceMock.getDividendHistoryBatch).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(dividendServiceMock.getDividendHistoryBatch).toHaveBeenCalledWith([
+        'HGLG11',
+        'XPLG11',
+      ]);
     });
 
     it('deve renderizar o card mesmo quando o histórico falha', async () => {
-      dividendServiceMock.getDividendHistory.and.returnValue(
+      dividendServiceMock.getDividendHistoryBatch.and.returnValue(
         throwError(() => new Error('falha')),
       );
 
