@@ -82,7 +82,9 @@ export class DividendComponent implements OnInit {
   readonly monthlyAverage = computed(() => monthlyAverage(this.report()));
   readonly lastMonth = computed(() => lastMonthSummary(this.report()));
   readonly monthlySeries = computed(() =>
-    buildMonthlySeries(this.report(), this.selectedYear()),
+    // Mesma data de referência da agenda: o destaque do mês corrente e o
+    // "hoje" dos pagamentos não podem divergir.
+    buildMonthlySeries(this.report(), this.selectedYear(), this.today()),
   );
   readonly tickerConcentration = computed(() =>
     buildTickerConcentration(this.report()),

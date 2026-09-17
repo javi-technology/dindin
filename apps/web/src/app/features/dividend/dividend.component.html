@@ -107,9 +107,16 @@
 
         @if (byTicker().length > 0) {
           <section data-testid="payment-schedule">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">
+            <h2 class="text-xl font-semibold text-gray-900 mb-1">
               Agenda de pagamentos
             </h2>
+            <p
+              class="text-sm text-gray-500 mb-4"
+              data-testid="schedule-scope-note"
+            >
+              Considera apenas os ativos das carteiras; o total da geladeira
+              aparece no card de projeção.
+            </p>
 
             @if (schedule().upcoming.length > 0) {
               <div class="mb-6" data-testid="schedule-upcoming">
