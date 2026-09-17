@@ -25,16 +25,27 @@ import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
 import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
 import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
 import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
+import { SparklineComponent } from '../../shared/components/charts/sparkline/sparkline.component';
+import {
+  DividendTrend,
+  dividendTrend,
+} from '../../shared/utils/dividend-trend.util';
 import {
   aggregateDividendYield,
   lastMonthSummary,
   monthlyAverage,
 } from '../../shared/utils/dividend-kpi.util';
 
+interface TickerCard {
+  item: MonthlyIncomeItem;
+  history: number[];
+  trend: DividendTrend | null;
+}
+
 @Component({
   selector: 'app-dividend',
   standalone: true,
-  imports: [CommonModule, BarChartComponent],
+  imports: [CommonModule, BarChartComponent, SparklineComponent],
   templateUrl: './dividend.component.html',
 })
 export class DividendComponent implements OnInit {
@@ -69,6 +80,8 @@ export class DividendComponent implements OnInit {
   dividendYield = signal<number>(0);
   /** Data de referência da agenda; sobrescrita nos testes. */
   today = signal<Date>(new Date());
+  /** Provento por cota ao longo do tempo, por ticker. */
+  history = signal<Record<string, number[]>>({});
 
   /**
    * O yield vem da coleção `dividends` (proventos registrados), enquanto a
@@ -92,6 +105,13 @@ export class DividendComponent implements OnInit {
   readonly schedule = computed(() =>
     buildPaymentSchedule(this.byTicker(), this.today()),
   );
+  readonly cards = computed<TickerCard[]>(() => {
+    const history = this.history();
+    return this.byTicker().map((item) => {
+      const values = history[item.ticker] ?? [];
+      return { item, history: values, trend: dividendTrend(values) };
+    });
+  });
 
   ngOnInit(): void {
     this.loadMonthlyIncome();
@@ -142,12 +162,38 @@ export class DividendComponent implements OnInit {
           this.total.set(aggregated.total);
           this.totalFromFridge.set(aggregated.totalFromFridge);
           this.loading.set(false);
+          this.loadHistories(aggregated.byTicker);
         },
         error: () => {
           this.error.set('Erro ao carregar proventos');
           this.loading.set(false);
         },
       });
+  }
+
+  /**
+   * Carrega o histórico de cada ticker em paralelo, sem bloquear a exibição
+   * dos cards: uma falha isolada apenas deixa aquele card sem sparkline.
+   */
+  private loadHistories(items: MonthlyIncomeItem[]): void {
+    for (const item of items) {
+      this.dividendService
+        .getDividendHistory(item.ticker)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (response) => {
+            this.history.update((current) => ({
+              ...current,
+              [item.ticker]: response.history.map(
+                (entry) => entry.monthlyDividend,
+              ),
+            }));
+          },
+          error: () => {
+            // Card segue renderizado sem o gráfico de histórico.
+          },
+        });
+    }
   }
 
   private loadReport(year: number): void {
@@ -225,6 +271,18 @@ export class DividendComponent implements OnInit {
       .format(new Date(year, monthNumber - 1, 1))
       .replace(/\./g, '')
       .replace(' de ', '/');
+  }
+
+  trendSymbol(trend: DividendTrend): string {
+    if (trend === 'up') return '▲';
+    return trend === 'down' ? '▼' : '=';
+  }
+
+  trendLabel(trend: DividendTrend): string {
+    if (trend === 'up') return 'Provento por cota subiu';
+    return trend === 'down'
+      ? 'Provento por cota caiu'
+      : 'Provento por cota estável';
   }
 
   absolute(value: number): number {

@@ -130,8 +130,7 @@ describe('DividendComponent', () => {
       const primeiro = cards()[0];
 
       expect(
-        primeiro
-          .querySelector('[data-testid="card-dividend-per-share"]')
+        primeiro.querySelector('[data-testid="card-dividend-per-share"]')
           ?.textContent,
       ).toContain('0,90');
       expect(primeiro.textContent).toContain('HGLG11');
@@ -357,27 +356,24 @@ describe('DividendComponent', () => {
   it('deve listar proventos por ticker', async () => {
     await setup();
 
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '[data-testid="monthly-income-table"] tbody tr',
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"]',
     );
-    expect(rows.length).toBe(2);
-    expect(rows[0].textContent).toContain('HGLG11');
-    expect(rows[1].textContent).toContain('XPLG11');
+    expect(cards.length).toBe(2);
+    expect(cards[0].textContent).toContain('HGLG11');
+    expect(cards[1].textContent).toContain('XPLG11');
   });
 
   it('deve exibir a data de pagamento de cada provento', async () => {
     await setup();
 
-    const table = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="monthly-income-table"]',
+    const dates = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"] [data-testid="payment-date"]',
     );
-    expect(table?.querySelector('thead')?.textContent).toContain(
-      'Data de pagamento',
-    );
-    const dates = table?.querySelectorAll('[data-testid="payment-date"]');
-    expect(dates?.length).toBe(2);
-    expect(dates?.[0].textContent?.trim()).toBe('15/09/2026');
-    expect(dates?.[1].textContent?.trim()).toBe('—');
+
+    expect(dates.length).toBe(2);
+    expect(dates[0].textContent?.trim()).toBe('15/09/2026');
+    expect(dates[1].textContent?.trim()).toBe('—');
   });
 
   it('deve consolidar várias carteiras contando a geladeira uma única vez', async () => {
@@ -415,11 +411,11 @@ describe('DividendComponent', () => {
     await setup();
 
     expect(fixture.componentInstance.total()).toBe(45);
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '[data-testid="monthly-income-table"] tbody tr',
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="ticker-card"]',
     );
-    expect(rows.length).toBe(1);
-    expect(rows[0].textContent).toContain('15');
+    expect(cards.length).toBe(1);
+    expect(cards[0].textContent).toContain('15');
   });
 
   it('deve exibir mensagem vazia quando não há carteiras', async () => {

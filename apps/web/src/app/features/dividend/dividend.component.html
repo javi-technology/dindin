@@ -246,52 +246,80 @@
         @if (byTicker().length === 0) {
           <p class="text-gray-600">Nenhum provento registrado.</p>
         } @else {
-          <div class="overflow-x-auto">
-            <table
-              class="w-full text-left border-collapse"
-              data-testid="monthly-income-table"
-            >
-              <thead>
-                <tr class="border-b border-gray-200">
-                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Ticker
-                  </th>
-                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Valor/cota
-                  </th>
-                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Quantidade
-                  </th>
-                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Proventos/mês
-                  </th>
-                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                    Data de pagamento
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (item of byTicker(); track item.ticker) {
-                  <tr class="border-b border-gray-100">
-                    <td class="py-3 px-4 text-gray-900">{{ item.ticker }}</td>
-                    <td class="py-3 px-4 text-gray-900">
-                      {{ formatCurrency(item.monthlyDividend) }}
-                    </td>
-                    <td class="py-3 px-4 text-gray-900">{{ item.quantity }}</td>
-                    <td class="py-3 px-4 text-gray-900">
-                      {{ formatCurrency(item.monthlyIncome) }}
-                    </td>
-                    <td
-                      class="py-3 px-4 text-gray-900"
-                      data-testid="payment-date"
-                    >
-                      {{ formatDate(item.paymentDate) }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
+          <section>
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">
+              Projeção por ativo
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              @for (card of cards(); track card.item.ticker) {
+                <article
+                  class="rounded-lg border border-gray-200 p-4"
+                  data-testid="ticker-card"
+                >
+                  <header class="flex items-start justify-between gap-2">
+                    <p class="font-semibold text-gray-900">
+                      {{ card.item.ticker }}
+                    </p>
+                    @if (card.trend) {
+                      <span
+                        class="text-sm font-medium"
+                        [class.text-green-700]="card.trend === 'up'"
+                        [class.text-red-700]="card.trend === 'down'"
+                        [class.text-gray-500]="card.trend === 'stable'"
+                        [attr.data-trend]="card.trend"
+                        [attr.title]="trendLabel(card.trend)"
+                        data-testid="card-trend"
+                      >
+                        {{ trendSymbol(card.trend) }}
+                        <span class="sr-only">{{
+                          trendLabel(card.trend)
+                        }}</span>
+                      </span>
+                    }
+                  </header>
+
+                  <p
+                    class="text-2xl font-bold text-gray-900 mt-2"
+                    data-testid="card-dividend-per-share"
+                  >
+                    {{ formatCurrency(card.item.monthlyDividend) }}
+                  </p>
+                  <p class="text-sm text-gray-500">por cota</p>
+
+                  @if (card.history.length > 1) {
+                    <div class="mt-3">
+                      <app-sparkline
+                        [values]="card.history"
+                        [ariaLabel]="
+                          'Histórico do provento por cota de ' +
+                          card.item.ticker
+                        "
+                      ></app-sparkline>
+                    </div>
+                  }
+
+                  <dl class="mt-3 space-y-1 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Quantidade</dt>
+                      <dd class="text-gray-900">{{ card.item.quantity }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Proventos/mês</dt>
+                      <dd class="font-medium text-gray-900">
+                        {{ formatCurrency(card.item.monthlyIncome) }}
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Pagamento</dt>
+                      <dd class="text-gray-900" data-testid="payment-date">
+                        {{ formatDate(card.item.paymentDate) }}
+                      </dd>
+                    </div>
+                  </dl>
+                </article>
+              }
+            </div>
+          </section>
         }
       </div>
     }
