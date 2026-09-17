@@ -260,6 +260,37 @@ describe('WalletComponent', () => {
     expect(secondRow).toMatch(/R\$\s?3,75/);
   });
 
+  it('deve marcar como bloqueada a projeção recortada no plano gratuito', () => {
+    // A API recorta `byTicker` sem o entitlement `projections` (#262): sem
+    // isso a coluna mostraria R$ 0,00, que é número errado, não bloqueio.
+    fixture.componentInstance.monthlyIncome.set({
+      byTicker: [
+        {
+          ticker: 'HGLG11',
+          quantity: 10,
+          monthlyDividend: 0.9,
+          monthlyIncome: 9,
+        },
+      ],
+      total: 12.75,
+      totalFromFridge: 0,
+      limited: true,
+      hiddenTickers: ['KNRI11'],
+      hiddenPaymentDates: [],
+    });
+    fixture.detectChanges();
+
+    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      'tbody tr',
+    );
+
+    expect(rows[0].textContent).toMatch(/R\$\s?9,00/);
+    expect(
+      rows[1].querySelector('[data-testid="proventos-bloqueado"]'),
+    ).not.toBeNull();
+    expect(rows[1].textContent).not.toMatch(/R\$\s?0,00/);
+  });
+
   it('deve exibir coluna de dividend yield para cada posição', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const rows = compiled.querySelectorAll('tbody tr');

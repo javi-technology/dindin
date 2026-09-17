@@ -151,7 +151,18 @@
                       {{ formatCurrency(totalPosition(position)) }}
                     </td>
                     <td class="py-3 px-4 text-gray-700">
-                      {{ formatCurrency(totalProventosFor(position)) }}
+                      @if (totalProventosFor(position); as proventos) {
+                        {{ formatCurrency(proventos) }}
+                      } @else if (totalProventosFor(position) === null) {
+                        <span
+                          class="text-gray-400"
+                          title="Projeção disponível para assinantes"
+                          data-testid="proventos-bloqueado"
+                          >—</span
+                        >
+                      } @else {
+                        {{ formatCurrency(0) }}
+                      }
                     </td>
                     <td class="py-3 px-4 text-gray-700">
                       {{ formatPercent(dividendYieldFor(position)) }}

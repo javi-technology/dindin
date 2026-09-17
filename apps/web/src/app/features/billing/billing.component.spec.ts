@@ -103,6 +103,19 @@ describe('BillingComponent', () => {
     ).toBeNull();
   });
 
+  it('deve listar os benefícios do plano', async () => {
+    await setup(baseSubscription);
+
+    const benefits = fixture.nativeElement.querySelector(
+      '[data-testid="plan-benefits"]',
+    );
+
+    expect(benefits).not.toBeNull();
+    expect(benefits.textContent).toContain('IA');
+    expect(benefits.textContent).toContain('Projeção completa por ativo');
+    expect(benefits.textContent).toContain('agenda de pagamentos');
+  });
+
   it('deve exibir nota de cancelamento quando a assinatura foi encerrada', async () => {
     await setup({ ...baseSubscription, status: 'canceled' });
 

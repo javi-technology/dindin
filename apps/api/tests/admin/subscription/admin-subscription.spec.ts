@@ -187,7 +187,7 @@ describe('admin – assinaturas de usuários', () => {
             currentPeriodEnd: null,
             cancelAtPeriodEnd: false,
           },
-          entitlements: ['ai'],
+          entitlements: ['ai', 'projections'],
         },
         {
           uid: 'u-b',
@@ -202,7 +202,7 @@ describe('admin – assinaturas de usuários', () => {
             currentPeriodEnd: FUTURE,
             cancelAtPeriodEnd: false,
           },
-          entitlements: ['ai'],
+          entitlements: ['ai', 'projections'],
         },
       ]);
       expect(JSON.stringify(response.body)).not.toContain('cus_9');
@@ -275,7 +275,7 @@ describe('admin – assinaturas de usuários', () => {
           currentPeriodEnd: FUTURE,
         }),
       );
-      expect(response.body[0].entitlements).toEqual(['ai']);
+      expect(response.body[0].entitlements).toEqual(['ai', 'projections']);
     });
 
     it('deve exibir checkout abandonado sobre concessão expirada como manual sem entitlement', async () => {
@@ -409,7 +409,7 @@ describe('admin – assinaturas de usuários', () => {
           currentPeriodEnd: FUTURE,
           cancelAtPeriodEnd: false,
         },
-        entitlements: ['ai'],
+        entitlements: ['ai', 'projections'],
       });
     });
 
@@ -675,7 +675,7 @@ describe('admin – assinaturas de usuários', () => {
       expect(response.body.subscription).toEqual(
         expect.objectContaining({ status: 'active', provider: 'stripe' }),
       );
-      expect(response.body.entitlements).toEqual(['ai']);
+      expect(response.body.entitlements).toEqual(['ai', 'projections']);
     });
 
     it('deve revogar e restaurar provider manual em checkout abandonado', async () => {

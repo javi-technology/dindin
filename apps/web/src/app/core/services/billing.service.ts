@@ -40,6 +40,10 @@ export class BillingService {
     () => this.meState()?.entitlements ?? [],
   );
   readonly hasAi = computed(() => this.entitlements().includes('ai'));
+  /** Projeção completa por ativo e agenda de pagamentos (#262). */
+  readonly hasProjections = computed(() =>
+    this.entitlements().includes('projections'),
+  );
   /**
    * Indica assinatura vigente, independente do acesso de admin. O `/api/me`
    * já devolve concessão manual expirada como `canceled`.
@@ -98,16 +102,7 @@ export class BillingService {
 
   markSubscriptionRequired(): void {
     this.subscriptionRequired.set(true);
-    this.meState.update((me) =>
-      me
-        ? {
-            ...me,
-            entitlements: me.entitlements.filter(
-              (entitlement) => entitlement !== 'ai',
-            ),
-          }
-        : me,
-    );
+    this.meState.update((me) => (me ? { ...me, entitlements: [] } : me));
   }
 
   redirectTo(url: string): void {

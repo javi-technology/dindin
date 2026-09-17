@@ -24,7 +24,7 @@ describe('BillingService', () => {
       currentPeriodEnd: '2026-10-01T00:00:00Z',
       cancelAtPeriodEnd: false,
     },
-    entitlements: ['ai'],
+    entitlements: ['ai', 'projections'],
   };
 
   beforeEach(() => {
@@ -53,8 +53,9 @@ describe('BillingService', () => {
 
     expect(service.loaded()).toBeTrue();
     expect(service.subscription().status).toBe('active');
-    expect(service.entitlements()).toEqual(['ai']);
+    expect(service.entitlements()).toEqual(['ai', 'projections']);
     expect(service.hasAi()).toBeTrue();
+    expect(service.hasProjections()).toBeTrue();
   });
 
   it('deve expor valores padrão antes de carregar', () => {
@@ -68,6 +69,7 @@ describe('BillingService', () => {
     });
     expect(service.entitlements()).toEqual([]);
     expect(service.hasAi()).toBeFalse();
+    expect(service.hasProjections()).toBeFalse();
   });
 
   it('não deve considerar assinante antes de carregar', () => {
@@ -99,7 +101,7 @@ describe('BillingService', () => {
       ...me,
       admin: true,
       subscription: { ...me.subscription, status: 'none' },
-      entitlements: ['ai'],
+      entitlements: ['ai', 'projections'],
     });
 
     expect(service.isSubscriber()).toBeFalse();
@@ -134,7 +136,7 @@ describe('BillingService', () => {
     );
   });
 
-  it('deve marcar assinatura exigida e remover o entitlement de IA', () => {
+  it('deve marcar assinatura exigida e remover os entitlements', () => {
     service.loadMe().subscribe();
     httpMock.expectOne('/api/me').flush(me);
 
@@ -143,6 +145,7 @@ describe('BillingService', () => {
     expect(service.subscriptionRequired()).toBeTrue();
     expect(service.entitlements()).toEqual([]);
     expect(service.hasAi()).toBeFalse();
+    expect(service.hasProjections()).toBeFalse();
   });
 
   it('deve limpar a flag ao recarregar /api/me', () => {

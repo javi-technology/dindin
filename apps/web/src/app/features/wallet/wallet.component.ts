@@ -151,11 +151,17 @@ export class WalletComponent implements OnInit {
     return found?.yield ?? 0;
   };
 
-  totalProventosFor = (position: Position): number => {
-    const found = this.monthlyIncome()?.byTicker.find(
+  /**
+   * `null` quando a projeção do ativo ficou de fora do recorte gratuito
+   * (#262): exibir R$ 0,00 nesse caso seria número errado, não bloqueio.
+   */
+  totalProventosFor = (position: Position): number | null => {
+    const income = this.monthlyIncome();
+    const found = income?.byTicker.find(
       (item) => item.ticker === position.ticker,
     );
-    return found?.monthlyIncome ?? 0;
+    if (found) return found.monthlyIncome;
+    return income?.limited ? null : 0;
   };
 
   constructor() {
