@@ -222,48 +222,67 @@
               Nenhum provento registrado em {{ selectedYear() }}.
             </p>
           } @else {
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="border-b border-gray-200">
-                    <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                      Mês
-                    </th>
-                    <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (month of monthlyReport.months; track month.month) {
-                    <tr
-                      class="border-b border-gray-100"
-                      data-testid="report-month-row"
-                    >
-                      <td class="py-3 px-4 text-gray-900">
-                        {{ formatMonth(month.month) }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-900">
-                        {{ formatCurrency(month.total) }}
-                      </td>
+            <div class="mb-6" data-testid="monthly-chart">
+              <app-bar-chart
+                [series]="monthlySeries()"
+                [averageValue]="monthlyAverage()"
+                [ariaLabel]="'Proventos recebidos por mês em ' + selectedYear()"
+              ></app-bar-chart>
+              <p class="mt-2 text-sm text-gray-500">
+                A linha tracejada marca a média mensal de
+                {{ formatCurrency(monthlyAverage()) }}.
+              </p>
+            </div>
+
+            <details class="mb-6" data-testid="month-details">
+              <summary
+                class="cursor-pointer text-sm font-medium text-gray-700 py-2"
+              >
+                Detalhamento por mês e ticker
+              </summary>
+              <div class="overflow-x-auto mt-2">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-gray-200">
+                      <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                        Mês
+                      </th>
+                      <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                        Total
+                      </th>
                     </tr>
-                    @for (ticker of month.byTicker; track ticker.ticker) {
+                  </thead>
+                  <tbody>
+                    @for (month of monthlyReport.months; track month.month) {
                       <tr
-                        class="border-b border-gray-100 bg-gray-50"
-                        data-testid="report-ticker-row"
+                        class="border-b border-gray-100"
+                        data-testid="report-month-row"
                       >
-                        <td class="py-2 pl-10 pr-4 text-gray-700">
-                          {{ ticker.ticker }}
+                        <td class="py-3 px-4 text-gray-900">
+                          {{ formatMonth(month.month) }}
                         </td>
-                        <td class="py-2 px-4 text-gray-700">
-                          {{ formatCurrency(ticker.total) }}
+                        <td class="py-3 px-4 text-gray-900">
+                          {{ formatCurrency(month.total) }}
                         </td>
                       </tr>
+                      @for (ticker of month.byTicker; track ticker.ticker) {
+                        <tr
+                          class="border-b border-gray-100 bg-gray-50"
+                          data-testid="report-ticker-row"
+                        >
+                          <td class="py-2 pl-10 pr-4 text-gray-700">
+                            {{ ticker.ticker }}
+                          </td>
+                          <td class="py-2 px-4 text-gray-700">
+                            {{ formatCurrency(ticker.total) }}
+                          </td>
+                        </tr>
+                      }
                     }
-                  }
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            </details>
 
             <h3 class="text-lg font-semibold text-gray-900 mt-6 mb-3">
               Total por ticker

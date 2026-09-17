@@ -21,6 +21,8 @@ import {
   formatPercent,
 } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
+import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
+import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
 import {
   aggregateDividendYield,
   lastMonthSummary,
@@ -30,7 +32,7 @@ import {
 @Component({
   selector: 'app-dividend',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, BarChartComponent],
   templateUrl: './dividend.component.html',
 })
 export class DividendComponent implements OnInit {
@@ -75,6 +77,9 @@ export class DividendComponent implements OnInit {
   readonly yearTotal = computed(() => this.report()?.total ?? 0);
   readonly monthlyAverage = computed(() => monthlyAverage(this.report()));
   readonly lastMonth = computed(() => lastMonthSummary(this.report()));
+  readonly monthlySeries = computed(() =>
+    buildMonthlySeries(this.report(), this.selectedYear()),
+  );
 
   ngOnInit(): void {
     this.loadMonthlyIncome();
