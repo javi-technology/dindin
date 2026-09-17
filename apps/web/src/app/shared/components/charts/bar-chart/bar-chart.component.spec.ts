@@ -163,6 +163,18 @@ describe('BarChartComponent', () => {
     });
   });
 
+  it('deve exibir o valueLabel do item no lugar do valor formatado', () => {
+    fixture.componentRef.setInput('series', [
+      { label: 'HGLG11', value: 270, valueLabel: 'R$ 270,00 · 90,0%' },
+    ]);
+    fixture.componentRef.setInput('orientation', 'horizontal');
+    fixture.detectChanges();
+
+    expect(
+      element().querySelector('[data-testid="bar-value"]')?.textContent?.trim(),
+    ).toBe('R$ 270,00 · 90,0%');
+  });
+
   it('deve aplicar o aria-label informado no gráfico', () => {
     fixture.componentRef.setInput('series', series);
     fixture.componentRef.setInput('ariaLabel', 'Proventos por mês');
