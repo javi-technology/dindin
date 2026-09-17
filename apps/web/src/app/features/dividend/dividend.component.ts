@@ -85,6 +85,9 @@ export class DividendComponent implements OnInit {
   readonly hiddenScheduleCount = computed(
     () => this.freeView().hiddenScheduleCount,
   );
+  readonly hiddenWithoutDateCount = computed(
+    () => this.freeView().hiddenWithoutDateCount,
+  );
   total = signal<number>(0);
   totalFromFridge = signal<number>(0);
   loading = signal(true);

@@ -22,6 +22,8 @@ export interface FreeView {
   scheduleItems: MonthlyIncomeItem[];
   hiddenCount: number;
   hiddenScheduleCount: number;
+  /** Ativos sem data anunciada que a agenda deixou de listar. */
+  hiddenWithoutDateCount: number;
   scheduleTotals: ScheduleTotals;
 }
 
@@ -70,13 +72,19 @@ export function buildFreeView(
       scheduleItems: [],
       hiddenCount: 0,
       hiddenScheduleCount: 0,
+      hiddenWithoutDateCount: 0,
       scheduleTotals,
     };
   }
 
+  // Um ticker cortado em uma carteira e mantido em outra viria com a soma
+  // incompleta: melhor tratá-lo como bloqueado do que mostrar valor parcial.
+  const hiddenTickerSet = new Set(
+    responses.flatMap((response) => response.hiddenTickers ?? []),
+  );
   const merged = mergeMonthlyIncomeItems(
     responses.flatMap((response) => response.byTicker),
-  );
+  ).filter((item) => !hiddenTickerSet.has(item.ticker));
   const byTicker = [...merged]
     .sort(
       (a, b) =>
@@ -87,12 +95,22 @@ export function buildFreeView(
 
   const knownTickers = new Set([
     ...merged.map((item) => item.ticker),
-    ...responses.flatMap((response) => response.hiddenTickers ?? []),
+    ...hiddenTickerSet,
   ]);
 
+  // Mesma regra na agenda: data cortada em uma carteira somaria só parte do
+  // pagamento daquele dia.
+  const hiddenDateSet = new Set(
+    responses.flatMap((response) => response.hiddenPaymentDates ?? []),
+  );
   const scheduleCandidates = mergeMonthlyIncomeItems(
     responses.flatMap((response) => response.scheduleItems ?? []),
-  ).filter((item) => item.paymentDate);
+  ).filter(
+    (item) =>
+      item.paymentDate &&
+      !hiddenDateSet.has(item.paymentDate) &&
+      !hiddenTickerSet.has(item.ticker),
+  );
 
   const distanceByDate = new Map<string, number>();
   for (const item of scheduleCandidates) {
@@ -107,10 +125,10 @@ export function buildFreeView(
       .map(([date]) => date),
   );
 
-  const knownDates = new Set([
-    ...distanceByDate.keys(),
-    ...responses.flatMap((response) => response.hiddenPaymentDates ?? []),
-  ]);
+  const knownDates = new Set([...distanceByDate.keys(), ...hiddenDateSet]);
+  const hiddenWithoutDate = new Set(
+    responses.flatMap((response) => response.hiddenScheduleTickers ?? []),
+  );
 
   return {
     limited: true,
@@ -120,6 +138,7 @@ export function buildFreeView(
     ),
     hiddenCount: knownTickers.size - byTicker.length,
     hiddenScheduleCount: knownDates.size - visibleDates.size,
+    hiddenWithoutDateCount: hiddenWithoutDate.size,
     scheduleTotals,
   };
 }

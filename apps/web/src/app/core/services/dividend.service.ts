@@ -46,6 +46,8 @@ export interface MonthlyIncomeResponse {
   hiddenTickers?: string[];
   /** Datas de pagamento omitidas na agenda pelo recorte gratuito. */
   hiddenPaymentDates?: string[];
+  /** Tickers sem data anunciada omitidos da agenda pelo recorte gratuito. */
+  hiddenScheduleTickers?: string[];
 }
 
 export interface TickerTotal {

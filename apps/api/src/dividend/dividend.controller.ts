@@ -9,6 +9,7 @@ import {
 import { recordMonthlyDividends } from './dividend-record.service';
 import { computeMonthlyIncome } from './monthly-income.service';
 import {
+  appToday,
   computeScheduleTotals,
   limitMonthlyIncome,
 } from './monthly-income-limit.service';
@@ -301,9 +302,11 @@ export const getDividendYield = asyncHandler(
 /**
  * Sem o entitlement `projections` (#262), a projeção por ativo e a agenda de
  * pagamentos saem recortadas já daqui — o corte na tela sozinho seria
- * contornável pelo devtools. Os totais continuam calculados sobre tudo, e
- * `hiddenTickers`/`hiddenPaymentDates` (nomes e datas, sem valores) permitem à
- * web contar o que está bloqueado somando as várias carteiras.
+ * contornável pelo devtools. Os totais continuam calculados sobre tudo, e as
+ * listas `hidden*` (nomes e datas, sem valores) permitem à web contar o que
+ * está bloqueado somando as várias carteiras. `scheduleItems` traz os valores
+ * dos ativos das datas liberadas — inclusive de ativos fora dos três cards —,
+ * porque é deles que a agenda é montada.
  */
 export const getMonthlyIncome = asyncHandler(
   'getMonthlyIncome',
@@ -316,7 +319,8 @@ export const getMonthlyIncome = asyncHandler(
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
-    const scheduleTotals = computeScheduleTotals(byTicker);
+    const today = appToday();
+    const scheduleTotals = computeScheduleTotals(byTicker, today);
 
     if (entitled) {
       res.json({
@@ -327,11 +331,12 @@ export const getMonthlyIncome = asyncHandler(
         limited: false,
         hiddenTickers: [],
         hiddenPaymentDates: [],
+        hiddenScheduleTickers: [],
       });
       return;
     }
 
-    const limited = limitMonthlyIncome(byTicker);
+    const limited = limitMonthlyIncome(byTicker, today);
     res.json({
       byTicker: limited.byTicker,
       scheduleItems: limited.scheduleItems,
@@ -341,6 +346,7 @@ export const getMonthlyIncome = asyncHandler(
       limited: true,
       hiddenTickers: limited.hiddenTickers,
       hiddenPaymentDates: limited.hiddenPaymentDates,
+      hiddenScheduleTickers: limited.hiddenScheduleTickers,
     });
   },
 );

@@ -27,7 +27,15 @@ export interface LimitedMonthlyIncome {
   hiddenTickers: string[];
   /** Datas de pagamento omitidas na agenda, em ordem cronológica. */
   hiddenPaymentDates: string[];
+  /**
+   * Tickers sem data anunciada que a agenda deixou de listar. Sem eles a
+   * seção "sem data de pagamento anunciada" sumiria sem aviso nenhum.
+   */
+  hiddenScheduleTickers: string[];
 }
+
+/** Fuso do produto: os usuários são brasileiros, as Functions rodam em UTC. */
+const APP_TIMEZONE = 'America/Sao_Paulo';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 86400000;
@@ -66,12 +74,28 @@ function daysUntil(date: string, today: Date): number | null {
 }
 
 /**
+ * Meia-noite UTC do dia corrente **no fuso do produto**. Em UTC puro, das 21h
+ * à meia-noite de Brasília o servidor viraria o dia antes da tela do usuário e
+ * um pagamento de hoje cairia em "já pagos" enquanto a tela o lista em "a
+ * receber".
+ */
+export function appToday(now: Date = new Date()): Date {
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+  })
+    .format(now)
+    .split('-')
+    .map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/**
  * Totais da agenda sobre **todos** os ativos. O não assinante vê a agenda
  * recortada, mas "Já pagos" e "A receber" continuam valores reais.
  */
 export function computeScheduleTotals(
   items: MonthlyIncomeItem[],
-  today: Date = new Date(),
+  today: Date = appToday(),
 ): ScheduleTotals {
   let upcomingTotal = 0;
   let paidTotal = 0;
@@ -88,7 +112,7 @@ export function computeScheduleTotals(
 
 export function limitMonthlyIncome(
   items: MonthlyIncomeItem[],
-  today: Date = new Date(),
+  today: Date = appToday(),
 ): LimitedMonthlyIncome {
   const byIncome = [...items].sort(
     (a, b) =>
@@ -101,9 +125,13 @@ export function limitMonthlyIncome(
     .sort((a, b) => a.localeCompare(b));
 
   const distanceByDate = new Map<string, number>();
+  const withoutDate: string[] = [];
   for (const item of items) {
     const days = item.paymentDate ? daysUntil(item.paymentDate, today) : null;
-    if (days === null) continue;
+    if (days === null) {
+      withoutDate.push(item.ticker);
+      continue;
+    }
     distanceByDate.set(item.paymentDate!, Math.abs(days));
   }
 
@@ -123,5 +151,6 @@ export function limitMonthlyIncome(
     ),
     hiddenTickers,
     hiddenPaymentDates,
+    hiddenScheduleTickers: withoutDate.sort((a, b) => a.localeCompare(b)),
   };
 }
