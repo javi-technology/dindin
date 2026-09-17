@@ -1,0 +1,23 @@
+@if (hasData()) {
+  <svg
+    [attr.viewBox]="viewBox"
+    class="w-full h-8"
+    preserveAspectRatio="none"
+    role="img"
+    [attr.aria-label]="ariaLabel()"
+    data-testid="sparkline"
+  >
+    <polyline
+      [attr.points]="points()"
+      fill="none"
+      stroke="#2563eb"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      vector-effect="non-scaling-stroke"
+    />
+    @if (lastPoint(); as last) {
+      <circle [attr.cx]="last.x" [attr.cy]="last.y" r="2.5" fill="#1d4ed8" />
+    }
+  </svg>
+}
