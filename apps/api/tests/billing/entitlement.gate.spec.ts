@@ -278,7 +278,7 @@ describe('GET /api/me', () => {
         currentPeriodEnd: FUTURE,
         cancelAtPeriodEnd: false,
       },
-      entitlements: ['ai'],
+      entitlements: ['ai', 'projections'],
     });
     expect(JSON.stringify(response.body)).not.toContain('cus_1');
     expect(JSON.stringify(response.body)).not.toContain('sub_1');
@@ -354,7 +354,7 @@ describe('GET /api/me', () => {
       currentPeriodEnd: FUTURE,
       cancelAtPeriodEnd: false,
     });
-    expect(response.body.entitlements).toEqual(['ai']);
+    expect(response.body.entitlements).toEqual(['ai', 'projections']);
     expect(JSON.stringify(response.body)).not.toContain('sub_1');
   });
 
@@ -369,6 +369,6 @@ describe('GET /api/me', () => {
     expect(response.status).toBe(200);
     expect(response.body.admin).toBe(true);
     expect(response.body.subscription.status).toBe('none');
-    expect(response.body.entitlements).toEqual(['ai']);
+    expect(response.body.entitlements).toEqual(['ai', 'projections']);
   });
 });

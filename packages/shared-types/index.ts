@@ -30,8 +30,12 @@ export interface DividendResponse extends DividendCreateRequest {
 export type SubscriptionStatus =
   'none' | 'trialing' | 'active' | 'past_due' | 'canceled';
 
-/** Recursos liberados mediante assinatura. `ai` cobre sugestão, chat e futuras features de IA. */
-export type Entitlement = 'ai';
+/**
+ * Recursos liberados mediante assinatura. `ai` cobre sugestão, chat e futuras
+ * features de IA; `projections` cobre a projeção completa por ativo e a agenda
+ * de pagamentos (#262).
+ */
+export type Entitlement = 'ai' | 'projections';
 
 export type SubscriptionPlan = 'basic';
 export type SubscriptionInterval = 'month' | 'year';

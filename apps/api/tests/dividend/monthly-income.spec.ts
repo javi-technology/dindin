@@ -22,6 +22,7 @@ jest.mock('firebase-admin/firestore', () => ({
 import { app } from '../../src/index';
 import { computeMonthlyIncome } from '../../src/dividend/monthly-income.service';
 import { Position, Quote, FridgeItem } from 'dindin-models';
+import { UserSubscription } from 'dindin-shared-types';
 
 interface TestFridge {
   id: string;
@@ -32,6 +33,7 @@ function createFirestoreMock(
   positions: Position[] = [],
   quotes: Quote[] = [],
   fridges: TestFridge[] = [],
+  subscription: Partial<UserSubscription> | null = null,
 ) {
   return {
     collection: jest.fn((path: string) => {
@@ -94,6 +96,19 @@ function createFirestoreMock(
                       },
                     })),
                   }),
+                };
+              }
+              if (subPath === 'billing') {
+                return {
+                  doc: jest.fn(() => ({
+                    get: jest
+                      .fn()
+                      .mockResolvedValue(
+                        subscription
+                          ? { exists: true, data: () => subscription }
+                          : { exists: false },
+                      ),
+                  })),
                 };
               }
               throw new Error(`Unexpected subcollection: ${subPath}`);
@@ -433,5 +448,169 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
     expect(response.status).toBe(200);
     expect(response.body.byTicker[0].monthlyIncome).toBe(0);
     expect(response.body.total).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Recorte gratuito da projeção e da agenda (issue #262)
+// ---------------------------------------------------------------------------
+
+describe('GET /api/wallets/:walletId/monthly-income – plano gratuito (#262)', () => {
+  const token = 'valid-token';
+  const MS_PER_DAY = 86400000;
+
+  function isoDate(offsetDays: number): string {
+    return new Date(Date.now() + offsetDays * MS_PER_DAY)
+      .toISOString()
+      .slice(0, 10);
+  }
+
+  const SCENARIO: { ticker: string; income: number; offset: number }[] = [
+    { ticker: 'AAAA11', income: 5, offset: -10 },
+    { ticker: 'BBBB11', income: 45, offset: -3 },
+    { ticker: 'CCCC11', income: 39.1, offset: 1 },
+    { ticker: 'DDDD11', income: 26.1, offset: -3 },
+    { ticker: 'EEEE11', income: 9, offset: 30 },
+  ];
+
+  const positions: Position[] = SCENARIO.map(({ ticker }, index) => ({
+    id: `position-${index}`,
+    walletId: 'wallet-1',
+    ticker,
+    assetType: 'FII',
+    quantity: 10,
+    averagePrice: 100,
+    inFridge: false,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  }));
+
+  const quotes: Quote[] = SCENARIO.map(({ ticker, income, offset }) => ({
+    ticker,
+    price: 100,
+    monthlyDividend: income / 10,
+    dividendPaymentDate: isoDate(offset),
+    updatedAt: '2026-09-01T00:00:00Z',
+    source: 'brapi',
+  }));
+
+  const ACTIVE_SUBSCRIPTION: Partial<UserSubscription> = {
+    status: 'active',
+    plan: 'basic',
+    interval: 'month',
+    provider: 'stripe',
+    providerSubscriptionId: 'sub_1',
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    updatedAt: '2026-09-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function get() {
+    return request(app)
+      .get('/api/wallets/wallet-1/monthly-income')
+      .set('Authorization', `Bearer ${token}`);
+  }
+
+  it('deve limitar a projeção aos 3 ativos de maior renda sem assinatura', async () => {
+    firestoreMock = createFirestoreMock(positions, quotes, []);
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(response.body.limited).toBe(true);
+    expect(response.body.byTicker.map((i: any) => i.ticker)).toEqual([
+      'BBBB11',
+      'CCCC11',
+      'DDDD11',
+    ]);
+    expect(response.body.hiddenTickers).toEqual(['AAAA11', 'EEEE11']);
+    // Os ocultos entram só como nome: nenhuma projeção deles no payload.
+    const detailed = [
+      ...response.body.byTicker,
+      ...response.body.scheduleItems,
+    ];
+    expect(
+      detailed.some((i: any) => i.ticker === 'AAAA11' || i.ticker === 'EEEE11'),
+    ).toBe(false);
+  });
+
+  it('deve limitar a agenda às 2 datas mais próximas de hoje sem assinatura', async () => {
+    firestoreMock = createFirestoreMock(positions, quotes, []);
+
+    const response = await get();
+
+    expect(response.body.scheduleItems.map((i: any) => i.ticker)).toEqual([
+      'BBBB11',
+      'CCCC11',
+      'DDDD11',
+    ]);
+    expect(response.body.hiddenPaymentDates).toEqual([
+      isoDate(-10),
+      isoDate(30),
+    ]);
+  });
+
+  it('deve manter totais completos para quem não assina', async () => {
+    firestoreMock = createFirestoreMock(positions, quotes, []);
+
+    const response = await get();
+
+    expect(response.body.total).toBe(124.2);
+    expect(response.body.totalFromFridge).toBe(0);
+    expect(response.body.scheduleTotals).toEqual({
+      paidTotal: 76.1,
+      upcomingTotal: 48.1,
+    });
+  });
+
+  it('deve devolver tudo para quem assina', async () => {
+    firestoreMock = createFirestoreMock(
+      positions,
+      quotes,
+      [],
+      ACTIVE_SUBSCRIPTION,
+    );
+
+    const response = await get();
+
+    expect(response.body.limited).toBe(false);
+    expect(response.body.byTicker).toHaveLength(5);
+    expect(response.body.scheduleItems).toBeUndefined();
+    expect(response.body.hiddenTickers).toEqual([]);
+    expect(response.body.hiddenPaymentDates).toEqual([]);
+    expect(response.body.total).toBe(124.2);
+  });
+
+  it('deve devolver tudo para admin sem assinatura', async () => {
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123', admin: true });
+    firestoreMock = createFirestoreMock(positions, quotes, []);
+
+    const response = await get();
+
+    expect(response.body.limited).toBe(false);
+    expect(response.body.byTicker).toHaveLength(5);
+  });
+
+  it('não deve marcar limited quando tudo cabe no recorte gratuito', async () => {
+    firestoreMock = createFirestoreMock(
+      positions.slice(1, 4),
+      quotes.slice(1, 4),
+      [],
+    );
+
+    const response = await get();
+
+    expect(response.body.limited).toBe(true);
+    expect(response.body.hiddenTickers).toEqual([]);
+    expect(response.body.hiddenPaymentDates).toEqual([]);
+    expect(response.body.byTicker).toHaveLength(3);
   });
 });

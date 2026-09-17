@@ -7,12 +7,14 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, of, shareReplay, switchMap } from 'rxjs';
 import {
   DividendService,
   MonthlyDividendReport,
   MonthlyIncomeItem,
+  MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
 import {
@@ -21,6 +23,7 @@ import {
   formatPercent,
 } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
+import { buildFreeView } from '../../shared/utils/monthly-income-limit.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
 import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
 import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
@@ -45,7 +48,7 @@ interface TickerCard {
 @Component({
   selector: 'app-dividend',
   standalone: true,
-  imports: [CommonModule, BarChartComponent, SparklineComponent],
+  imports: [CommonModule, RouterLink, BarChartComponent, SparklineComponent],
   templateUrl: './dividend.component.html',
 })
 export class DividendComponent implements OnInit {
@@ -65,7 +68,26 @@ export class DividendComponent implements OnInit {
     // destruído, apesar dos `takeUntilDestroyed` a jusante.
     .pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
-  byTicker = signal<MonthlyIncomeItem[]>([]);
+  /** Respostas cruas das carteiras; o recorte gratuito é derivado delas. */
+  private readonly incomeResponses = signal<MonthlyIncomeResponse[]>([]);
+  /**
+   * Recorte gratuito (#262): sem o entitlement `projections` a API já devolve
+   * menos ativos e menos datas, e aqui o limite é reaplicado sobre o agregado
+   * das carteiras.
+   */
+  readonly freeView = computed(() =>
+    buildFreeView(this.incomeResponses(), this.today()),
+  );
+  readonly byTicker = computed<MonthlyIncomeItem[]>(
+    () => this.freeView().byTicker,
+  );
+  readonly hiddenCount = computed(() => this.freeView().hiddenCount);
+  readonly hiddenScheduleCount = computed(
+    () => this.freeView().hiddenScheduleCount,
+  );
+  readonly hiddenWithoutDateCount = computed(
+    () => this.freeView().hiddenWithoutDateCount,
+  );
   total = signal<number>(0);
   totalFromFridge = signal<number>(0);
   loading = signal(true);
@@ -102,9 +124,25 @@ export class DividendComponent implements OnInit {
   readonly tickerConcentration = computed(() =>
     buildTickerConcentration(this.report()),
   );
-  readonly schedule = computed(() =>
-    buildPaymentSchedule(this.byTicker(), this.today()),
-  );
+  /**
+   * Com recorte, a agenda parte dos itens das datas liberadas — e não do
+   * `byTicker`, que segue outro corte —, mas os totais continuam os da API,
+   * calculados sobre todos os ativos.
+   */
+  readonly schedule = computed(() => {
+    const view = this.freeView();
+    const schedule = buildPaymentSchedule(
+      view.limited ? view.scheduleItems : view.byTicker,
+      this.today(),
+    );
+    return view.limited
+      ? {
+          ...schedule,
+          upcomingTotal: view.scheduleTotals.upcomingTotal,
+          paidTotal: view.scheduleTotals.paidTotal,
+        }
+      : schedule;
+  });
   readonly cards = computed<TickerCard[]>(() => {
     const history = this.history();
     return this.byTicker().map((item) => {
@@ -158,11 +196,11 @@ export class DividendComponent implements OnInit {
       .subscribe({
         next: (responses) => {
           const aggregated = aggregateMonthlyIncome(responses);
-          this.byTicker.set(aggregated.byTicker);
+          this.incomeResponses.set(responses);
           this.total.set(aggregated.total);
           this.totalFromFridge.set(aggregated.totalFromFridge);
           this.loading.set(false);
-          this.loadHistories(aggregated.byTicker);
+          this.loadHistories(this.byTicker());
         },
         error: () => {
           this.error.set('Erro ao carregar proventos');

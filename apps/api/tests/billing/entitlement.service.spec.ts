@@ -345,9 +345,70 @@ describe('entitlement.service – helpers', () => {
     expect(result).not.toHaveProperty('provider');
   });
 
-  it('listEntitlements deve devolver ai apenas quando liberado', () => {
+  it('listEntitlements deve devolver os entitlements apenas quando liberados', () => {
     expect(listEntitlements(NO_SUBSCRIPTION)).toEqual([]);
-    expect(listEntitlements(NO_SUBSCRIPTION, true)).toEqual(['ai']);
-    expect(listEntitlements(sub({ status: 'active' }))).toEqual(['ai']);
+    expect(listEntitlements(NO_SUBSCRIPTION, true)).toEqual([
+      'ai',
+      'projections',
+    ]);
+    expect(listEntitlements(sub({ status: 'active' }))).toEqual([
+      'ai',
+      'projections',
+    ]);
+  });
+});
+
+describe('entitlement.service – projections (#262)', () => {
+  it.each(['active', 'trialing'] as const)(
+    'deve liberar projections com status %s',
+    (status) => {
+      expect(isEntitled(sub({ status }), 'projections', false, NOW)).toBe(true);
+    },
+  );
+
+  it.each(['none', 'canceled'] as const)(
+    'deve negar projections com status %s',
+    (status) => {
+      expect(isEntitled(sub({ status }), 'projections', false, NOW)).toBe(
+        false,
+      );
+    },
+  );
+
+  it('deve liberar projections em past_due dentro da carência', () => {
+    expect(
+      isEntitled(
+        sub({ status: 'past_due', currentPeriodEnd: FUTURE }),
+        'projections',
+        false,
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
+  it('deve negar projections em past_due fora da carência', () => {
+    expect(
+      isEntitled(
+        sub({ status: 'past_due', currentPeriodEnd: PAST }),
+        'projections',
+        false,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it('deve negar projections em concessão manual expirada', () => {
+    expect(
+      isEntitled(
+        sub({ status: 'active', provider: 'manual', currentPeriodEnd: PAST }),
+        'projections',
+        false,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it('deve liberar projections para admin sem assinatura', () => {
+    expect(isEntitled(NO_SUBSCRIPTION, 'projections', true, NOW)).toBe(true);
   });
 });
