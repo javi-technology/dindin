@@ -369,6 +369,23 @@ describe('DividendComponent', () => {
     ).toContain('Erro ao carregar proventos');
   });
 
+  it('deve destacar o mês corrente segundo a data de referência', async () => {
+    await setup();
+    fixture.componentInstance.today.set(new Date(2026, 5, 10));
+    fixture.detectChanges();
+
+    const barras = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="monthly-chart"] [data-testid="bar"]',
+    );
+    const destacadas = Array.from(barras).filter(
+      (barra) => barra.getAttribute('data-highlight') === 'true',
+    );
+
+    expect(destacadas.length).toBe(1);
+    // Junho é o sexto mês: mesma data de referência usada pela agenda.
+    expect(barras[5].getAttribute('data-highlight')).toBe('true');
+  });
+
   it('deve exibir o gráfico de barras com os 12 meses do ano', async () => {
     await setup();
 
@@ -448,6 +465,18 @@ describe('DividendComponent', () => {
           '[data-testid="schedule-upcoming"] [data-testid="schedule-day"]',
         ).length,
       ).toBe(0);
+    });
+
+    it('deve avisar que a agenda cobre apenas as carteiras', async () => {
+      // `byTicker` traz só posições; a geladeira entra apenas no total da
+      // projeção, então sem a nota os números parecem não fechar.
+      await comHoje(2026, 9, 10);
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="schedule-scope-note"]',
+        )?.textContent,
+      ).toContain('geladeira');
     });
 
     it('deve listar à parte os tickers sem data anunciada', async () => {
