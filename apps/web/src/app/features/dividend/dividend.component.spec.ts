@@ -35,6 +35,7 @@ describe('DividendComponent', () => {
       'getMonthlyIncome',
       'getMonthlyReport',
       'getDividendYield',
+      'getDividendHistory',
       'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
@@ -93,7 +94,82 @@ describe('DividendComponent', () => {
         total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
       }),
     );
+    dividendServiceMock.getDividendHistory.and.callFake((ticker: string) =>
+      of({
+        ticker,
+        history: [
+          { date: '2026-07-15', monthlyDividend: 0.8 },
+          { date: '2026-08-15', monthlyDividend: 0.85 },
+          { date: '2026-09-15', monthlyDividend: 0.9 },
+        ],
+      }),
+    );
     dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
+  });
+
+  describe('cards por ticker', () => {
+    const cards = (): NodeListOf<Element> =>
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="ticker-card"]',
+      );
+
+    it('deve exibir um card por ticker no lugar da tabela', async () => {
+      await setup();
+
+      expect(cards().length).toBe(2);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="monthly-income-table"]',
+        ),
+      ).toBeNull();
+    });
+
+    it('deve destacar o valor por cota e o total do ticker', async () => {
+      await setup();
+
+      const primeiro = cards()[0];
+
+      expect(
+        primeiro
+          .querySelector('[data-testid="card-dividend-per-share"]')
+          ?.textContent,
+      ).toContain('0,90');
+      expect(primeiro.textContent).toContain('HGLG11');
+      expect(primeiro.textContent).toContain('135,00');
+    });
+
+    it('deve carregar o histórico de cada ticker e exibir o sparkline', async () => {
+      await setup();
+
+      expect(dividendServiceMock.getDividendHistory).toHaveBeenCalledWith(
+        'HGLG11',
+      );
+      expect(
+        cards()[0].querySelector('[data-testid="sparkline"]'),
+      ).toBeTruthy();
+    });
+
+    it('deve exibir a tendência de alta do provento por cota', async () => {
+      await setup();
+
+      expect(
+        cards()[0]
+          .querySelector('[data-testid="card-trend"]')
+          ?.getAttribute('data-trend'),
+      ).toBe('up');
+    });
+
+    it('deve renderizar o card mesmo quando o histórico falha', async () => {
+      dividendServiceMock.getDividendHistory.and.returnValue(
+        throwError(() => new Error('falha')),
+      );
+
+      await setup();
+
+      expect(cards().length).toBe(2);
+      expect(cards()[0].querySelector('[data-testid="sparkline"]')).toBeNull();
+      expect(cards()[0].textContent).toContain('HGLG11');
+    });
   });
 
   const kpi = (testid: string): string =>

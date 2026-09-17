@@ -52,6 +52,16 @@ export interface MonthlyDividendReport {
   availableYears: number[];
 }
 
+export interface DividendHistoryEntry {
+  date: string;
+  monthlyDividend: number;
+}
+
+export interface DividendHistoryResponse {
+  ticker: string;
+  history: DividendHistoryEntry[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -75,6 +85,16 @@ export class DividendService {
     return year === undefined
       ? this.http.get<MonthlyDividendReport>(url)
       : this.http.get<MonthlyDividendReport>(url, { params: { year } });
+  }
+
+  getDividendHistory(
+    ticker: string,
+    months = 12,
+  ): Observable<DividendHistoryResponse> {
+    return this.http.get<DividendHistoryResponse>(
+      `/api/quotes/${encodeURIComponent(ticker)}/dividend-history`,
+      { params: { months } },
+    );
   }
 
   recordMonthlyDividends(): Observable<Dividend[]> {
