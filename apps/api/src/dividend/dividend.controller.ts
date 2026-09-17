@@ -8,6 +8,11 @@ import {
 } from './monthly-report.service';
 import { recordMonthlyDividends } from './dividend-record.service';
 import { computeMonthlyIncome } from './monthly-income.service';
+import {
+  computeScheduleTotals,
+  limitMonthlyIncome,
+} from './monthly-income-limit.service';
+import { hasEntitlement } from '../billing/entitlement.service';
 import { asyncHandler } from '../middleware/async-handler';
 import { getAllUserPositions } from '../wallet/position-reader';
 import {
@@ -15,6 +20,7 @@ import {
   latestDividendByTicker,
 } from './dividend-calculation.service';
 import { uid, dividendsCollection } from '../firestore/paths';
+import { AuthRequest } from '../middleware/auth.middleware';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -292,16 +298,50 @@ export const getDividendYield = asyncHandler(
   },
 );
 
+/**
+ * Sem o entitlement `projections` (#262), a projeção por ativo e a agenda de
+ * pagamentos saem recortadas já daqui — o corte na tela sozinho seria
+ * contornável pelo devtools. Os totais continuam calculados sobre tudo, e
+ * `hiddenTickers`/`hiddenPaymentDates` (nomes e datas, sem valores) permitem à
+ * web contar o que está bloqueado somando as várias carteiras.
+ */
 export const getMonthlyIncome = asyncHandler(
   'getMonthlyIncome',
   async (req: Request, res: Response) => {
     const { walletId } = req.params;
     const userId = uid(req);
-    const { byTicker, total, totalFromFridge } = await computeMonthlyIncome(
-      userId,
-      walletId,
-    );
-    res.json({ byTicker, total, totalFromFridge });
+    const user = (req as AuthRequest).user;
+    const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
+      computeMonthlyIncome(userId, walletId),
+      hasEntitlement(userId, 'projections', user?.admin === true),
+    ]);
+
+    const scheduleTotals = computeScheduleTotals(byTicker);
+
+    if (entitled) {
+      res.json({
+        byTicker,
+        total,
+        totalFromFridge,
+        scheduleTotals,
+        limited: false,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+      });
+      return;
+    }
+
+    const limited = limitMonthlyIncome(byTicker);
+    res.json({
+      byTicker: limited.byTicker,
+      scheduleItems: limited.scheduleItems,
+      total,
+      totalFromFridge,
+      scheduleTotals,
+      limited: true,
+      hiddenTickers: limited.hiddenTickers,
+      hiddenPaymentDates: limited.hiddenPaymentDates,
+    });
   },
 );
 
