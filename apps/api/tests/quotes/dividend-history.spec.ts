@@ -69,6 +69,9 @@ const entry = (date: string, monthlyDividend: unknown): Partial<QuoteHistory> =>
 
 describe('GET /api/quotes/:ticker/dividend-history', () => {
   beforeEach(() => {
+    // A janela do endpoint é relativa a hoje; sem data fixa os fixtures de
+    // 2026 sairiam da janela conforme o tempo passa.
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
     capturedCutoff = undefined;
     historyDocs = {
@@ -82,6 +85,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
   });
 
@@ -148,10 +152,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
   });
 
   it('usa o snapshot válido mais recente quando o último do mês é inválido', async () => {
-    historyDocs.HGLG11 = [
-      entry('2026-03-20', null),
-      entry('2026-03-10', 1.05),
-    ];
+    historyDocs.HGLG11 = [entry('2026-03-20', null), entry('2026-03-10', 1.05)];
 
     const response = await get('/api/quotes/HGLG11/dividend-history');
 
@@ -161,6 +162,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
   });
 
   it('limita a série ao número de meses pedido', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
     historyDocs.HGLG11 = [
       entry('2026-03-15', 1.1),
       entry('2026-02-15', 0.9),
@@ -173,6 +175,8 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
       '2026-02-15',
       '2026-03-15',
     ]);
+
+    jest.useRealTimers();
   });
 
   it('consulta a partir do primeiro dia do mês inicial da janela', async () => {

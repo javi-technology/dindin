@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
+import { QuoteHistory } from 'dindin-models';
 import { asyncHandler } from '../middleware/async-handler';
-import { getQuoteHistory } from './quote-history.service';
+import { getQuoteHistorySince } from './quote-history.service';
 
 export const MIN_MONTHS = 1;
 export const MAX_MONTHS = 60;
@@ -9,6 +10,52 @@ export const DEFAULT_MONTHS = 12;
 export interface DividendHistoryEntry {
   date: string;
   monthlyDividend: number;
+}
+
+/** Primeiro dia do mês que inicia uma janela de `months` meses terminando hoje. */
+export function windowStartDate(months: number, today = new Date()): string {
+  const start = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - (months - 1), 1),
+  );
+  return start.toISOString().slice(0, 10);
+}
+
+function isValidEntry(entry: QuoteHistory): boolean {
+  return (
+    typeof entry.monthlyDividend === 'number' &&
+    Number.isFinite(entry.monthlyDividend) &&
+    typeof entry.date === 'string'
+  );
+}
+
+/**
+ * Reduz os snapshots a um ponto por mês.
+ *
+ * O job de cotações grava um snapshot por dia, repetindo o mesmo
+ * `monthlyDividend` até a Brapi anunciar um novo provento. Sem essa
+ * agregação o gráfico mostraria os últimos N dias — uma linha plana, em que
+ * a tendência entre pagamentos nunca aparece.
+ *
+ * Recebe os snapshots do mais recente para o mais antigo, então o primeiro
+ * válido de cada mês é o que representa o mês.
+ */
+function aggregateByMonth(entries: QuoteHistory[]): DividendHistoryEntry[] {
+  const byMonth = new Map<string, DividendHistoryEntry>();
+
+  for (const entry of entries) {
+    if (!isValidEntry(entry)) {
+      continue;
+    }
+    const month = entry.date.slice(0, 7);
+    if (!byMonth.has(month)) {
+      byMonth.set(month, {
+        date: entry.date,
+        monthlyDividend: entry.monthlyDividend,
+      });
+    }
+  }
+
+  return [...byMonth.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -28,7 +75,7 @@ export const getDividendHistory = asyncHandler(
     }
 
     const { months } = req.query;
-    let limit = DEFAULT_MONTHS;
+    let window = DEFAULT_MONTHS;
 
     if (months !== undefined) {
       const parsed = Number(months);
@@ -42,25 +89,18 @@ export const getDividendHistory = asyncHandler(
         });
         return;
       }
-      limit = parsed;
+      window = parsed;
     }
 
-    const history = await getQuoteHistory(ticker, limit);
+    const snapshots = await getQuoteHistorySince(
+      ticker,
+      windowStartDate(window),
+    );
 
-    // O Firestore devolve do mais recente para o mais antigo; o gráfico lê da
-    // esquerda para a direita, então a ordem é invertida aqui.
-    const entries: DividendHistoryEntry[] = history
-      .filter(
-        (item) =>
-          typeof item.monthlyDividend === 'number' &&
-          Number.isFinite(item.monthlyDividend),
-      )
-      .map((item) => ({
-        date: item.date,
-        monthlyDividend: item.monthlyDividend,
-      }))
-      .reverse();
+    // A janela já limita o período, mas um histórico com datas futuras (ou
+    // relógio adiantado no job) poderia render mais meses que o pedido.
+    const history = aggregateByMonth(snapshots).slice(-window);
 
-    res.json({ ticker, history: entries });
+    res.json({ ticker, history });
   },
 );
