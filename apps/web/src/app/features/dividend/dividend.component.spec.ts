@@ -1,8 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { Wallet } from 'dindin-models';
 import { DividendComponent } from './dividend.component';
-import { DividendService } from '../../core/services/dividend.service';
+import {
+  DividendService,
+  MonthlyIncomeResponse,
+} from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
 
 describe('DividendComponent', () => {
@@ -17,6 +21,7 @@ describe('DividendComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DividendComponent],
       providers: [
+        provideRouter([]),
         { provide: DividendService, useValue: dividendServiceMock },
         { provide: WalletService, useValue: walletServiceMock },
       ],
@@ -747,5 +752,138 @@ describe('DividendComponent', () => {
         '[data-testid="record-monthly-button"]',
       ),
     ).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Recorte gratuito da projeção e da agenda (issue #262)
+  // -------------------------------------------------------------------------
+  describe('plano gratuito', () => {
+    const item = (
+      ticker: string,
+      monthlyIncome: number,
+      paymentDate?: string,
+    ) => ({
+      ticker,
+      quantity: 10,
+      monthlyDividend: monthlyIncome / 10,
+      monthlyIncome,
+      ...(paymentDate ? { paymentDate } : {}),
+    });
+
+    const comRecorte = async (
+      resposta: Partial<MonthlyIncomeResponse> = {},
+    ) => {
+      dividendServiceMock.getMonthlyIncome.and.returnValue(
+        of({
+          byTicker: [
+            item('AAAA11', 45, '2026-09-11'),
+            item('BBBB11', 39.1, '2026-09-15'),
+            item('CCCC11', 26.1, '2026-09-15'),
+          ],
+          scheduleItems: [
+            item('BBBB11', 39.1, '2026-09-15'),
+            item('CCCC11', 26.1, '2026-09-15'),
+          ],
+          total: 200,
+          totalFromFridge: 0,
+          scheduleTotals: { upcomingTotal: 0, paidTotal: 148.56 },
+          limited: true,
+          hiddenTickers: ['DDDD11', 'EEEE11'],
+          hiddenPaymentDates: ['2026-08-25'],
+          ...resposta,
+        } as MonthlyIncomeResponse),
+      );
+      await setup();
+      fixture.componentInstance.today.set(new Date(2026, 8, 17));
+      fixture.detectChanges();
+    };
+
+    const el = (selector: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector(selector);
+
+    it('deve avisar quantos ativos estão bloqueados na projeção', async () => {
+      await comRecorte();
+
+      const paywall = el('[data-testid="projections-paywall"]');
+
+      expect(paywall).not.toBeNull();
+      expect(paywall?.textContent).toContain('2');
+      expect(el('[data-testid="projections-paywall-cta"]')).not.toBeNull();
+    });
+
+    it('deve avisar quantas datas estão bloqueadas na agenda', async () => {
+      await comRecorte();
+
+      const paywall = el('[data-testid="schedule-paywall"]');
+
+      expect(paywall).not.toBeNull();
+      expect(paywall?.textContent).toContain('1');
+      expect(el('[data-testid="schedule-paywall-cta"]')).not.toBeNull();
+    });
+
+    it('deve montar a agenda a partir dos itens liberados', async () => {
+      await comRecorte();
+
+      const dias = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[data-testid="schedule-day"]',
+      );
+
+      expect(dias.length).toBe(1);
+      expect(dias[0].textContent).toContain('BBBB11');
+      expect(dias[0].textContent).toContain('CCCC11');
+      expect(dias[0].textContent).not.toContain('AAAA11');
+    });
+
+    it('deve exibir os totais completos da agenda', async () => {
+      await comRecorte();
+
+      expect(el('[data-testid="schedule-paid"]')?.textContent).toContain(
+        '148,56',
+      );
+    });
+
+    it('não deve exibir paywall quando nada foi bloqueado', async () => {
+      await comRecorte({
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        scheduleItems: [
+          item('AAAA11', 45, '2026-09-11'),
+          item('BBBB11', 39.1, '2026-09-15'),
+          item('CCCC11', 26.1, '2026-09-15'),
+        ],
+      });
+
+      expect(el('[data-testid="projections-paywall"]')).toBeNull();
+      expect(el('[data-testid="schedule-paywall"]')).toBeNull();
+    });
+
+    it('não deve exibir paywall para quem tem a projeção liberada', async () => {
+      dividendServiceMock.getMonthlyIncome.and.returnValue(
+        of({
+          byTicker: [
+            item('AAAA11', 45, '2026-09-11'),
+            item('BBBB11', 39.1, '2026-09-15'),
+            item('CCCC11', 26.1, '2026-09-15'),
+            item('DDDD11', 10, '2026-08-25'),
+          ],
+          total: 120.2,
+          totalFromFridge: 0,
+          limited: false,
+          hiddenTickers: [],
+          hiddenPaymentDates: [],
+        } as MonthlyIncomeResponse),
+      );
+      await setup();
+      fixture.componentInstance.today.set(new Date(2026, 8, 17));
+      fixture.detectChanges();
+
+      expect(el('[data-testid="projections-paywall"]')).toBeNull();
+      expect(el('[data-testid="schedule-paywall"]')).toBeNull();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll(
+          '[data-testid="ticker-card"]',
+        ).length,
+      ).toBe(4);
+    });
   });
 });
