@@ -161,6 +161,35 @@ describe('DividendComponent', () => {
       expect(kpi('kpi-yield')).toContain('6,00');
     });
 
+    it('deve carregar a lista de carteiras uma única vez', async () => {
+      await setup();
+
+      expect(walletServiceMock.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve sinalizar quando o yield depende de proventos ainda não registrados', async () => {
+      dividendServiceMock.getDividendYield.and.returnValue(
+        of({
+          byTicker: [],
+          total: { annualIncome: 0, currentValue: 22000, yield: 0 },
+        }),
+      );
+
+      await setup();
+
+      expect(kpi('kpi-yield-note')).toContain('Registrar proventos do mês');
+    });
+
+    it('não deve sinalizar nada quando há yield calculado', async () => {
+      await setup();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="kpi-yield-note"]',
+        ),
+      ).toBeNull();
+    });
+
     it('deve exibir o yield zerado quando não há carteiras', async () => {
       walletServiceMock.list.and.returnValue(of([]));
 

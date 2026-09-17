@@ -111,6 +111,30 @@ describe('dividend-kpi.util', () => {
       expect(resumo?.variation).toBeNull();
     });
 
+    it('deve omitir a variação quando o mês anterior não teve provento', () => {
+      // months é esparso: a API só devolve meses com provento registrado.
+      const resumo = lastMonthSummary(
+        report([
+          { month: '2026-01', total: 100 },
+          { month: '2026-06', total: 150 },
+        ]),
+      );
+
+      expect(resumo?.month).toBe('2026-06');
+      expect(resumo?.variation).toBeNull();
+    });
+
+    it('deve comparar com o mês calendário anterior ao virar o ano', () => {
+      const resumo = lastMonthSummary(
+        report([
+          { month: '2025-12', total: 100 },
+          { month: '2026-01', total: 150 },
+        ]),
+      );
+
+      expect(resumo?.variation).toBeCloseTo(50, 4);
+    });
+
     it('deve omitir a variação quando o mês anterior é zero', () => {
       const resumo = lastMonthSummary(
         report([
