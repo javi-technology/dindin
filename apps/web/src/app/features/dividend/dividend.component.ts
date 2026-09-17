@@ -43,7 +43,12 @@ export class DividendComponent implements OnInit {
    * partem dela e, sem o compartilhamento, cada um dispararia seu próprio
    * GET idêntico ao abrir a tela.
    */
-  private readonly wallets$ = this.walletService.list().pipe(shareReplay(1));
+  private readonly wallets$ = this.walletService
+    .list()
+    // `refCount: true` para que a inscrição na fonte caia junto com o último
+    // assinante: sem isso a requisição segue viva depois de o componente ser
+    // destruído, apesar dos `takeUntilDestroyed` a jusante.
+    .pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
   byTicker = signal<MonthlyIncomeItem[]>([]);
   total = signal<number>(0);
@@ -177,6 +182,8 @@ export class DividendComponent implements OnInit {
           );
           this.recording.set(false);
           this.loadReport(currentYear);
+          // O registro alimenta a coleção `dividends`, que é a fonte do yield.
+          this.loadDividendYield();
         },
         error: () => {
           this.recording.set(false);
