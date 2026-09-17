@@ -64,3 +64,27 @@ export async function backfillTickerDividendHistory(
 
   return entries.length;
 }
+
+/**
+ * Tickers a processar no backfill.
+ *
+ * Sem filtro, processa todos. Com um ticker informado, restringe a ele — útil
+ * para validar a migração em um ativo antes de rodar no catálogo inteiro.
+ * Ticker inexistente falha em vez de rodar em silêncio sobre nada, porque a
+ * causa provável é erro de digitação.
+ */
+export function resolveTickers(
+  allTickers: string[],
+  requested?: string,
+): string[] {
+  const normalized = (requested ?? '').trim().toUpperCase();
+  if (normalized.length === 0) {
+    return allTickers;
+  }
+
+  if (!allTickers.includes(normalized)) {
+    throw new Error(`Ticker ${normalized} não encontrado na coleção 'quotes'.`);
+  }
+
+  return [normalized];
+}

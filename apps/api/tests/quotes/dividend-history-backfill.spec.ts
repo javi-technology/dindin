@@ -100,8 +100,6 @@ describe('resolveTickers', () => {
   });
 
   it('deve falhar quando o ticker pedido não existe', () => {
-    expect(() => resolveTickers(todos, 'NAOEXISTE11')).toThrowError(
-      /NAOEXISTE11/,
-    );
+    expect(() => resolveTickers(todos, 'NAOEXISTE11')).toThrow(/NAOEXISTE11/);
   });
 });

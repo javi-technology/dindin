@@ -13,23 +13,34 @@
  *   GOOGLE_APPLICATION_CREDENTIALS=<caminho-da-service-account> \
  *     npm run backfill:dividend-history --workspace=apps/api
  *
+ * Para validar em um ativo antes de rodar em todos, defina BACKFILL_TICKER:
+ *   BACKFILL_TICKER=HGLG11 npm run backfill:dividend-history --workspace=apps/api
+ *
+ * Em CI, use o workflow manual `.github/workflows/backfill-dividend-history.yml`,
+ * que já autentica com a service account do projeto.
+ *
  * Requer credenciais com permissão de escrita no Firestore do projeto.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { backfillTickerDividendHistory } from '../quotes/dividend-history-backfill';
+import {
+  backfillTickerDividendHistory,
+  resolveTickers,
+} from '../quotes/dividend-history-backfill';
 
 async function main(): Promise<void> {
   initializeApp();
 
-  const tickers = (await getFirestore().collection('quotes').get()).docs.map(
+  const allTickers = (await getFirestore().collection('quotes').get()).docs.map(
     (doc) => doc.id,
   );
 
-  if (tickers.length === 0) {
+  if (allTickers.length === 0) {
     console.log('[backfill-dividend-history] nenhum ticker em `quotes`.');
     return;
   }
+
+  const tickers = resolveTickers(allTickers, process.env.BACKFILL_TICKER);
 
   let total = 0;
   for (const ticker of tickers) {

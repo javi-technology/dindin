@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       ticker:
-        description: "Ticker único (ex.: HGLG11). Vazio processa todos."
+        description: 'Ticker único (ex.: HGLG11). Vazio processa todos.'
         required: false
         type: string
 
