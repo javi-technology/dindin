@@ -17,7 +17,15 @@
       vector-effect="non-scaling-stroke"
     />
     @if (lastPoint(); as last) {
-      <circle [attr.cx]="last.x" [attr.cy]="last.y" r="2.5" fill="#1d4ed8" />
+      <rect
+        [attr.x]="last.x"
+        [attr.y]="last.y"
+        [attr.width]="last.size"
+        [attr.height]="last.size"
+        rx="1"
+        fill="#1d4ed8"
+        data-testid="sparkline-last"
+      />
     }
   </svg>
 }

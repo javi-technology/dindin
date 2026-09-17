@@ -40,12 +40,18 @@ export class SparklineComponent {
       .join(' ');
   });
 
+  /**
+   * Marcador do último ponto. O SVG é esticado na horizontal
+   * (`preserveAspectRatio="none"`), o que transformaria um `<circle>` em
+   * elipse achatada, então o marcador é um retângulo com raio de canto.
+   */
   readonly lastPoint = computed(() => {
     const points = this.points();
     if (!points) {
       return null;
     }
     const [x, y] = points.split(' ').pop()!.split(',').map(Number);
-    return { x, y };
+    const size = 5;
+    return { x: x - size / 2, y: y - size / 2, size };
   });
 }
