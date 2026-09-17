@@ -60,6 +60,7 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
+import { getDividendHistory } from './quotes/dividend-history.controller';
 import {
   createAsset,
   listAllAssets,
@@ -198,6 +199,8 @@ app.delete(
   adminRateLimiter,
   revokeSubscription,
 );
+
+app.get('/api/quotes/:ticker/dividend-history', getDividendHistory);
 
 app.get('/api/wallets', listWallets);
 app.post('/api/wallets', createWallet);

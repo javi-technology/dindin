@@ -59,10 +59,7 @@ function createFirestoreMock() {
   };
 }
 
-const entry = (
-  date: string,
-  monthlyDividend: unknown,
-): Partial<QuoteHistory> =>
+const entry = (date: string, monthlyDividend: unknown): Partial<QuoteHistory> =>
   ({ date, price: 100, monthlyDividend, source: 'brapi' }) as never;
 
 describe('GET /api/quotes/:ticker/dividend-history', () => {
