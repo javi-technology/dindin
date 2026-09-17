@@ -135,11 +135,14 @@ export function effectiveStatus(
     : subscription.status;
 }
 
+/** Recursos que o plano básico (e o admin) libera. */
+const BASIC_PLAN_ENTITLEMENTS: Entitlement[] = ['ai', 'projections'];
+
 /**
- * `ai` é liberado quando a assinatura está `trialing`/`active`, ou `past_due`
- * ainda dentro do período pago (carência até `currentPeriodEnd`), ou o
- * usuário é admin. Concessões `manual` expiram em `currentPeriodEnd`
- * (`null` = sem validade).
+ * Todo entitlement do plano básico é liberado quando a assinatura está
+ * `trialing`/`active`, ou `past_due` ainda dentro do período pago (carência
+ * até `currentPeriodEnd`), ou o usuário é admin. Concessões `manual` expiram
+ * em `currentPeriodEnd` (`null` = sem validade).
  */
 export function isEntitled(
   subscription: UserSubscription,
@@ -148,7 +151,7 @@ export function isEntitled(
   now: Date = new Date(),
 ): boolean {
   if (isAdmin) return true;
-  if (entitlement !== 'ai') return false;
+  if (!BASIC_PLAN_ENTITLEMENTS.includes(entitlement)) return false;
 
   const withinPeriod =
     subscription.currentPeriodEnd !== null &&
@@ -183,6 +186,7 @@ export function listEntitlements(
   subscription: UserSubscription,
   isAdmin = false,
 ): Entitlement[] {
-  const all: Entitlement[] = ['ai'];
-  return all.filter((e) => isEntitled(subscription, e, isAdmin));
+  return BASIC_PLAN_ENTITLEMENTS.filter((e) =>
+    isEntitled(subscription, e, isAdmin),
+  );
 }
