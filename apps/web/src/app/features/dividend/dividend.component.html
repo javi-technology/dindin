@@ -285,37 +285,57 @@
             </details>
 
             <h3 class="text-lg font-semibold text-gray-900 mt-6 mb-3">
-              Total por ticker
+              Concentração por ticker
             </h3>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="border-b border-gray-200">
-                    <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                      Ticker
-                    </th>
-                    <th class="py-3 px-4 text-sm font-medium text-gray-700">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (ticker of monthlyReport.byTicker; track ticker.ticker) {
-                    <tr
-                      class="border-b border-gray-100"
-                      data-testid="report-ticker-total-row"
-                    >
-                      <td class="py-3 px-4 text-gray-900">
-                        {{ ticker.ticker }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-900">
-                        {{ formatCurrency(ticker.total) }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+            <div class="mb-4" data-testid="concentration-chart">
+              <app-bar-chart
+                [series]="tickerConcentration()"
+                orientation="horizontal"
+                [ariaLabel]="
+                  'Concentração dos proventos por ticker em ' + selectedYear()
+                "
+              ></app-bar-chart>
             </div>
+
+            <details data-testid="ticker-details">
+              <summary
+                class="cursor-pointer text-sm font-medium text-gray-700 py-2"
+              >
+                Total por ticker em tabela
+              </summary>
+              <div class="overflow-x-auto mt-2">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-gray-200">
+                      <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                        Ticker
+                      </th>
+                      <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (
+                      ticker of monthlyReport.byTicker;
+                      track ticker.ticker
+                    ) {
+                      <tr
+                        class="border-b border-gray-100"
+                        data-testid="report-ticker-total-row"
+                      >
+                        <td class="py-3 px-4 text-gray-900">
+                          {{ ticker.ticker }}
+                        </td>
+                        <td class="py-3 px-4 text-gray-900">
+                          {{ formatCurrency(ticker.total) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </details>
             <p class="mt-4 text-lg font-semibold text-gray-900">
               Total do ano:
               <span data-testid="report-total">

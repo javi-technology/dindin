@@ -22,6 +22,7 @@ import {
 } from '../../shared/utils/format.util';
 import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
+import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
 import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
 import {
   aggregateDividendYield,
@@ -79,6 +80,9 @@ export class DividendComponent implements OnInit {
   readonly lastMonth = computed(() => lastMonthSummary(this.report()));
   readonly monthlySeries = computed(() =>
     buildMonthlySeries(this.report(), this.selectedYear()),
+  );
+  readonly tickerConcentration = computed(() =>
+    buildTickerConcentration(this.report()),
   );
 
   ngOnInit(): void {
