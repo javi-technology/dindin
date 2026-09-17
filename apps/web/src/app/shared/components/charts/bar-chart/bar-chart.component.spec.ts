@@ -61,7 +61,9 @@ describe('BarChartComponent', () => {
     ]);
     fixture.detectChanges();
 
-    expect(element().querySelector('[data-testid="bar-chart-empty"]')).toBeNull();
+    expect(
+      element().querySelector('[data-testid="bar-chart-empty"]'),
+    ).toBeNull();
     expect(bars().length).toBe(2);
     bars().forEach((bar) => {
       expect(Number(bar.getAttribute('height'))).toBe(0);
