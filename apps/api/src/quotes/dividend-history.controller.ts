@@ -19,7 +19,9 @@ function parseMonths(months: unknown): number | null {
   }
 
   const parsed = Number(months);
-  return Number.isInteger(parsed) && parsed >= MIN_MONTHS && parsed <= MAX_MONTHS
+  return Number.isInteger(parsed) &&
+    parsed >= MIN_MONTHS &&
+    parsed <= MAX_MONTHS
     ? parsed
     : null;
 }

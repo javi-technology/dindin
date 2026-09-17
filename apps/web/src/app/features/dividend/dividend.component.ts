@@ -8,17 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  catchError,
-  EMPTY,
-  forkJoin,
-  from,
-  map,
-  mergeMap,
-  of,
-  shareReplay,
-  switchMap,
-} from 'rxjs';
+import { forkJoin, of, shareReplay, switchMap } from 'rxjs';
 import {
   DividendService,
   MonthlyDividendReport,
@@ -45,10 +35,6 @@ import {
   lastMonthSummary,
   monthlyAverage,
 } from '../../shared/utils/dividend-kpi.util';
-
-/** Requisições de histórico simultâneas: uma carteira diversificada pode ter
- * dezenas de ativos, e o sparkline não justifica abrir tudo de uma vez. */
-const HISTORY_CONCURRENCY = 4;
 
 interface TickerCard {
   item: MonthlyIncomeItem;
@@ -190,24 +176,28 @@ export class DividendComponent implements OnInit {
    * dos cards: uma falha isolada apenas deixa aquele card sem sparkline.
    */
   private loadHistories(items: MonthlyIncomeItem[]): void {
-    from(items)
-      .pipe(
-        mergeMap(
-          (item) =>
-            this.dividendService.getDividendHistory(item.ticker).pipe(
-              map((response) => ({ ticker: item.ticker, response })),
-              // Uma falha isolada não pode interromper a fila dos demais.
-              catchError(() => EMPTY),
+    const tickers = items.map((item) => item.ticker);
+    if (tickers.length === 0) {
+      return;
+    }
+
+    this.dividendService
+      .getDividendHistoryBatch(tickers)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.history.set(
+            Object.fromEntries(
+              Object.entries(response.byTicker).map(([ticker, entries]) => [
+                ticker,
+                entries.map((entry) => entry.monthlyDividend),
+              ]),
             ),
-          HISTORY_CONCURRENCY,
-        ),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe(({ ticker, response }) => {
-        this.history.update((current) => ({
-          ...current,
-          [ticker]: response.history.map((entry) => entry.monthlyDividend),
-        }));
+          );
+        },
+        error: () => {
+          // Cards seguem renderizados sem o gráfico de histórico.
+        },
       });
   }
 

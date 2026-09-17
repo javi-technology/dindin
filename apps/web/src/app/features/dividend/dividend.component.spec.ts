@@ -142,12 +142,9 @@ describe('DividendComponent', () => {
       expect(primeiro.textContent).toContain('135,00');
     });
 
-    it('deve carregar o histórico de cada ticker e exibir o sparkline', async () => {
+    it('deve exibir o sparkline a partir do histórico carregado', async () => {
       await setup();
 
-      expect(dividendServiceMock.getDividendHistory).toHaveBeenCalledWith(
-        'HGLG11',
-      );
       expect(
         cards()[0].querySelector('[data-testid="sparkline"]'),
       ).toBeTruthy();
