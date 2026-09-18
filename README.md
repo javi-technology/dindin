@@ -285,8 +285,11 @@ Comportamento em falha, por decisão de projeto:
 
 - Sem `RESEND_API_KEY` ou sem e-mail no Auth, o alerta é criado e o envio é
   pulado com log — o job não quebra.
-- Erro do Resend não marca `notifiedAt`: a execução do dia seguinte tenta de
-  novo, sem criar alerta duplicado.
+- Erro do Resend não marca `notifiedAt`: como o alerta segue `open`, a
+  execução do dia seguinte o devolve como pendência e tenta de novo, sem
+  criar alerta duplicado.
+- Os envios são sequenciais e espaçados (`ALERT_MAIL_INTERVAL_MS`, 600ms por
+  padrão) para respeitar o limite de requisições por segundo do Resend.
 - Cada envio leva uma `Idempotency-Key` estável por alerta, então o retry do
   scheduler não entrega o mesmo e-mail duas vezes.
 

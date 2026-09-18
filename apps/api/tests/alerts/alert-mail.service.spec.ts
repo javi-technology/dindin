@@ -81,7 +81,11 @@ describe('AlertMailService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env = { ...originalEnv, RESEND_API_KEY: 're_chave_secreta' };
+    process.env = {
+      ...originalEnv,
+      RESEND_API_KEY: 're_chave_secreta',
+      ALERT_MAIL_INTERVAL_MS: '0',
+    };
     global.fetch = fetchMock as unknown as typeof fetch;
     fetchMock.mockResolvedValue(okResponse());
     getUserMock.mockResolvedValue({ email: 'investidor@example.com' });
@@ -181,6 +185,28 @@ describe('AlertMailService', () => {
     expect(body.text).toContain('Geladeira FIIs');
     expect(body.html).toContain('HGLG11');
     expect(body.html).toContain('R$ 125,50');
+  });
+
+  it('deve escapar markup vindo do nome da geladeira', async () => {
+    seedFirestore();
+
+    await sendAlertEmails('user-1', [
+      alert({ fridgeName: '<script>alert(1)</script>Minha "geladeira"' }),
+    ]);
+
+    const body = requestBody();
+    expect(body.html).not.toContain('<script>');
+    expect(body.html).toContain('&lt;script&gt;');
+    // o corpo em texto puro não interpreta markup e fica legível
+    expect(body.text).toContain('<script>alert(1)</script>Minha "geladeira"');
+  });
+
+  it('deve escapar markup vindo do ticker', async () => {
+    seedFirestore();
+
+    await sendAlertEmails('user-1', [alert({ ticker: 'HG<b>LG11' })]);
+
+    expect(requestBody().html).not.toContain('<b>');
   });
 
   it('deve incluir o link do app no e-mail', async () => {

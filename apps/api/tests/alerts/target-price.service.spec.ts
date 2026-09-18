@@ -572,3 +572,69 @@ describe('TargetPriceService – notificação dos alertas criados', () => {
     expect(console.error).toHaveBeenCalled();
   });
 });
+
+describe('TargetPriceService – envio dos avisos pelo job', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('deve tentar de novo o aviso que falhou numa execução anterior', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 130 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: {
+            fridgeId: 'fridge-1',
+            fridgeName: 'Geladeira FIIs',
+            ticker: 'HGLG11',
+            targetPrice: 120,
+            currentPrice: 130,
+            status: 'open',
+            createdAt: '2026-09-17T22:15:00Z',
+          },
+        },
+      ],
+    });
+
+    await checkAllTargetPrices();
+
+    expect(sendAlertEmails).toHaveBeenCalledWith(
+      'user-1',
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'fridge-1_HGLG11' }),
+      ]),
+      expect.any(Date),
+    );
+  });
+
+  it('não deve notificar usuários em paralelo (limite de req/s do provedor)', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 125 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      users: ['user-1', 'user-2', 'user-3'],
+    });
+
+    let running = 0;
+    let maxConcurrent = 0;
+    (sendAlertEmails as jest.Mock).mockImplementation(async () => {
+      running += 1;
+      maxConcurrent = Math.max(maxConcurrent, running);
+      await new Promise((resolve) => setImmediate(resolve));
+      running -= 1;
+      return 1;
+    });
+
+    await checkAllTargetPrices();
+
+    expect(sendAlertEmails).toHaveBeenCalledTimes(3);
+    expect(maxConcurrent).toBe(1);
+  });
+});

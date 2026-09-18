@@ -25,6 +25,23 @@ const DEFAULT_FROM = 'DinDin <alertas@javitech.online>';
 // domínio quando houver caixa lá.
 const DEFAULT_REPLY_TO = 'vkremersantos@icloud.com';
 const APP_URL = 'https://dindin-4e720.web.app/geladeira';
+// O Resend limita requisições por segundo; os envios são sequenciais e este
+// intervalo os espaça. Os testes zeram para não esperar de verdade.
+const SEND_INTERVAL_MS = Number(process.env.ALERT_MAIL_INTERVAL_MS ?? 600);
+
+/** Escapa texto do usuário antes de interpolar no corpo HTML. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function formatCurrency(value: number): string {
   // O Intl separa "R$" do valor com espaço não-quebrável; trocar por espaço
@@ -52,12 +69,14 @@ function buildEmail(alert: Alert, to: string) {
     'Este é um aviso automático do DinDin e não é recomendação de investimento.',
   ].join('\n');
 
+  // `ticker` e `fridgeName` são texto do usuário: sem escape, um nome de
+  // geladeira com markup quebraria o e-mail ou injetaria um link arbitrário.
   const html = [
-    `<p><strong>${alert.ticker}</strong> atingiu o preço-alvo que você definiu.</p>`,
+    `<p><strong>${escapeHtml(alert.ticker)}</strong> atingiu o preço-alvo que você definiu.</p>`,
     '<ul>',
     `<li>Preço atual: <strong>${current}</strong></li>`,
     `<li>Preço-alvo: ${target}</li>`,
-    `<li>Geladeira: ${fridge}</li>`,
+    `<li>Geladeira: ${escapeHtml(fridge)}</li>`,
     '</ul>',
     `<p><a href="${APP_URL}">Ver na geladeira</a></p>`,
     '<p style="color:#6b7280;font-size:12px">Este é um aviso automático do DinDin e não é recomendação de investimento.</p>',
@@ -161,6 +180,7 @@ export async function sendAlertEmails(
 
   for (const alert of pending) {
     try {
+      if (sent > 0) await wait(SEND_INTERVAL_MS);
       await postEmail(alert, email, apiKey);
       await userAlerts.doc(alert.id).update({ notifiedAt });
       sent += 1;

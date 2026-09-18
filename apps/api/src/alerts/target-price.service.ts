@@ -184,26 +184,26 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
 
   let created = 0;
   let failed = 0;
+  const toNotify: { userId: string; alerts: Alert[] }[] = [];
 
   for (let i = 0; i < userDocuments.length; i += BATCH_SIZE) {
     const batch = userDocuments.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map(async (userDocument) => {
-        const result = await checkUserTargetPrices(
-          userDocument.id,
-          quotePrices,
-          now,
-        );
-        if (result.created.length > 0) {
-          await sendAlertEmails(userDocument.id, result.created, now);
-        }
-        return result;
-      }),
+      batch.map((userDocument) =>
+        checkUserTargetPrices(userDocument.id, quotePrices, now),
+      ),
     );
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         created += result.value.created.length;
+        const alerts = [
+          ...result.value.created,
+          ...result.value.pendingNotification,
+        ];
+        if (alerts.length > 0) {
+          toNotify.push({ userId: batch[index].id, alerts });
+        }
       } else {
         failed += 1;
         console.error(
@@ -214,7 +214,21 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
     });
   }
 
+  // A checagem é paralela porque só toca no Firestore. O envio é serial: o
+  // Resend limita requisições por segundo e um 429 adiaria o aviso em um dia.
+  let notified = 0;
+  for (const { userId, alerts } of toNotify) {
+    try {
+      notified += await sendAlertEmails(userId, alerts, now);
+    } catch (error) {
+      failed += 1;
+      console.error(`[checkAllTargetPrices] Erro ao notificar ${userId}:`, {
+        message: (error as Error).message,
+      });
+    }
+  }
+
   console.log(
-    `[checkAllTargetPrices] Concluído. ${created} alerta(s) criado(s), ${failed} falha(s).`,
+    `[checkAllTargetPrices] Concluído. ${created} alerta(s) criado(s), ${notified} aviso(s) enviado(s), ${failed} falha(s).`,
   );
 }
