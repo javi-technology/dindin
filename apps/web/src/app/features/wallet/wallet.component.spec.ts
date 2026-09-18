@@ -1304,4 +1304,190 @@ describe('WalletComponent', () => {
       expect(fixture.componentInstance.loading()).toBe(false);
     }));
   });
+
+  // -------------------------------------------------------------------------
+  // Ordenação por coluna da tabela de posições (issue #274)
+  // -------------------------------------------------------------------------
+  describe('ordenação da tabela', () => {
+    const position = (
+      id: string,
+      ticker: string,
+      quantity: number,
+      currentPrice?: number,
+    ): Position => ({
+      id,
+      walletId: 'wallet-1',
+      ticker,
+      assetType: 'FII',
+      quantity,
+      averagePrice: 10,
+      ...(currentPrice === undefined ? {} : { currentPrice }),
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    const income = (ticker: string, averageMonthlyIncome: number) => ({
+      ticker,
+      quantity: 1,
+      monthlyDividend: averageMonthlyIncome,
+      monthlyIncome: averageMonthlyIncome,
+      averageMonthlyIncome,
+    });
+    const dy = (ticker: string, value: number) => ({
+      ticker,
+      annualIncome: 0,
+      currentValue: 0,
+      yield: value,
+    });
+
+    const tickers = (): string[] =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+      ).map((row) => row.querySelector('td')?.textContent?.trim() ?? '');
+    const header = (column: string): HTMLElement =>
+      (fixture.nativeElement as HTMLElement).querySelector(
+        `th[data-sort-column="${column}"]`,
+      ) as HTMLElement;
+    const sortBy = (column: string): void => {
+      header(column).querySelector('button')!.click();
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      const component = fixture.componentInstance;
+      // KNRI11 sem cotação: sem preço atual nem total.
+      component.positions.set([
+        position('p1', 'XPML11', 10, 100),
+        position('p2', 'BTLG11', 30, 50),
+        position('p3', 'KNRI11', 5),
+      ]);
+      component.monthlyIncome.set({
+        byTicker: [
+          income('XPML11', 8),
+          income('BTLG11', 8),
+          income('KNRI11', 2),
+        ],
+        total: 18,
+        totalFromFridge: 0,
+      });
+      component.dividendYield.set({
+        byTicker: [dy('XPML11', 9), dy('BTLG11', 7), dy('KNRI11', 11)],
+        total: { annualIncome: 0, currentValue: 0, yield: 8 },
+      });
+      fixture.detectChanges();
+    });
+
+    it('deve ordenar por Ticker crescente ao abrir a tela', () => {
+      expect(tickers()).toEqual(['BTLG11', 'KNRI11', 'XPML11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('ascending');
+      for (const column of [
+        'quantity',
+        'currentPrice',
+        'total',
+        'monthlyIncome',
+        'dividendYield',
+      ]) {
+        expect(header(column).getAttribute('aria-sort')).toBe('none');
+      }
+    });
+
+    it('não deve tornar a coluna Ações ordenável', () => {
+      const headers = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        'thead th',
+      );
+      const acoes = headers[headers.length - 1];
+      expect(acoes.textContent).toContain('Ações');
+      expect(acoes.hasAttribute('aria-sort')).toBeFalse();
+      expect(acoes.querySelector('button')).toBeNull();
+    });
+
+    it('deve alternar entre crescente e decrescente na mesma coluna', () => {
+      sortBy('ticker');
+      expect(tickers()).toEqual(['XPML11', 'KNRI11', 'BTLG11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('descending');
+
+      sortBy('ticker');
+      expect(tickers()).toEqual(['BTLG11', 'KNRI11', 'XPML11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('ascending');
+    });
+
+    it('deve passar a ordenar outra coluna em ordem crescente', () => {
+      sortBy('ticker'); // desc
+      sortBy('quantity');
+
+      expect(tickers()).toEqual(['KNRI11', 'XPML11', 'BTLG11']);
+      expect(header('quantity').getAttribute('aria-sort')).toBe('ascending');
+      expect(header('ticker').getAttribute('aria-sort')).toBe('none');
+    });
+
+    it('deve manter posições sem valor no fim nas duas direções', () => {
+      sortBy('total');
+      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
+
+      sortBy('total');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+
+      sortBy('currentPrice');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+    });
+
+    it('deve desempatar pelo Ticker em ordem alfabética', () => {
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['KNRI11', 'BTLG11', 'XPML11']);
+
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+    });
+
+    it('deve ordenar por DY com o valor exibido', () => {
+      sortBy('dividendYield');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+    });
+
+    it('deve levar ao fim a projeção bloqueada no plano gratuito', () => {
+      fixture.componentInstance.monthlyIncome.set({
+        byTicker: [income('XPML11', 8), income('BTLG11', 3)],
+        total: 18,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: ['KNRI11'],
+        hiddenPaymentDates: [],
+      });
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
+    });
+
+    it('não deve alterar a linha de totais', () => {
+      const tfoot = (): string =>
+        (fixture.nativeElement as HTMLElement).querySelector('tfoot')
+          ?.textContent ?? '';
+      const before = tfoot();
+
+      sortBy('total');
+      sortBy('total');
+
+      expect(tfoot()).toBe(before);
+    });
+
+    it('deve manter a ordenação escolhida ao trocar de carteira', () => {
+      sortBy('total');
+      sortBy('total');
+
+      fixture.componentInstance.selectWallet({
+        ...wallets[0],
+        id: 'wallet-2',
+        name: 'Outra',
+      });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.sort()).toEqual({
+        column: 'total',
+        direction: 'desc',
+      });
+      expect(header('total').getAttribute('aria-sort')).toBe('descending');
+    });
+  });
 });
