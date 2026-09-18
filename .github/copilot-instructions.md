@@ -33,6 +33,43 @@ gh project item-edit --project-id <project_id> --id <item_id> --field-id <priori
 
 - Uma issue sem `Estimate`, `Size` e `Priority` não está pronta para ser trabalhada.
 
+#### Status do card no GitHub Projects
+
+O `Status` acompanha o andamento e é atualizado em três momentos — o board só
+serve para saber o que está em andamento se ele refletir a realidade:
+
+| Momento                                                       | Status        |
+| ------------------------------------------------------------- | ------------- |
+| Issue criada, com `Estimate`, `Size` e `Priority` preenchidos | `Ready`       |
+| Branch `issue-<N>` criada                                     | `In progress` |
+| PR aberto                                                     | `In review`   |
+
+- **Antes de criar a branch**, garantir que o card esteja em `Ready`: um card em
+  `Backlog` sinaliza que a issue ainda não foi refinada.
+- A transição para `In progress` acompanha a criação da branch, não o primeiro
+  commit.
+- Em stacked PR, cada issue da pilha segue o ciclo por conta própria.
+
+```bash
+# id do item da issue no project
+gh project item-list 4 --owner javi-technology --format json
+
+gh project item-edit --project-id <project_id> --id <item_id> \
+  --field-id <status_id> --single-select-option-id <opcao_id>
+```
+
+Ids atuais do project (reconferir com `gh project field-list 4 --owner javi-technology`):
+
+| Referência    | Id                               |
+| ------------- | -------------------------------- |
+| `project_id`  | `PVT_kwDODUNtT84Bc4Zk`           |
+| `status_id`   | `PVTSSF_lADODUNtT84Bc4ZkzhXd-0o` |
+| `Backlog`     | `f75ad846`                       |
+| `Ready`       | `61e4505c`                       |
+| `In progress` | `47fc9ee4`                       |
+| `In review`   | `df73e18b`                       |
+| `Done`        | `98236657`                       |
+
 ### TDD Estrito (Red → Green → Refactor)
 
 Todo desenvolvimento segue TDD. Não há exceção.
@@ -114,10 +151,10 @@ Regras:
 
 ### Fluxo Completo de Tarefa
 
-1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha)
+1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`)
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão
 
 ## Comandos
