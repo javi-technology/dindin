@@ -22,7 +22,10 @@ export interface MonthlyIncomeItem {
   ticker: string;
   quantity: number;
   monthlyDividend: number;
+  /** Valor do último evento: é o que a agenda de pagamentos mostra. */
   monthlyIncome: number;
+  /** Média mensal dos proventos de 12 meses: a renda do ativo (#280). */
+  averageMonthlyIncome: number;
   paymentDate?: string; // YYYY-MM-DD
 }
 

@@ -160,8 +160,22 @@ export class WalletComponent implements OnInit {
     const found = income?.byTicker.find(
       (item) => item.ticker === position.ticker,
     );
-    if (found) return found.monthlyIncome;
+    if (found) return found.averageMonthlyIncome;
     return income?.limited ? null : 0;
+  };
+
+  /**
+   * Valor do último provento, exibido como informação secundária só quando
+   * difere da média de 12 meses (ativo que não paga todo mês, #280).
+   */
+  lastProventoFor = (position: Position): number | null => {
+    const found = this.monthlyIncome()?.byTicker.find(
+      (item) => item.ticker === position.ticker,
+    );
+    if (!found || found.monthlyIncome === found.averageMonthlyIncome) {
+      return null;
+    }
+    return found.monthlyIncome;
   };
 
   constructor() {

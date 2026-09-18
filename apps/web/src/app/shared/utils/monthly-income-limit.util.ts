@@ -85,10 +85,12 @@ export function buildFreeView(
   const merged = mergeMonthlyIncomeItems(
     responses.flatMap((response) => response.byTicker),
   ).filter((item) => !hiddenTickerSet.has(item.ticker));
+  // Mesma renda que a tela mostra por ativo: a média de 12 meses (#280).
   const byTicker = [...merged]
     .sort(
       (a, b) =>
-        b.monthlyIncome - a.monthlyIncome || a.ticker.localeCompare(b.ticker),
+        b.averageMonthlyIncome - a.averageMonthlyIncome ||
+        a.ticker.localeCompare(b.ticker),
     )
     .slice(0, FREE_TICKER_LIMIT)
     .sort((a, b) => a.ticker.localeCompare(b.ticker));
