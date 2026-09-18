@@ -1,36 +1,59 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { RouterLink } from '@angular/router';
-import { EMPTY, Subject } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { EMPTY, Observable, Subject, forkJoin, of } from 'rxjs';
+import { catchError, switchMap, tap } from 'rxjs/operators';
 import { RecommendedWalletService } from '../../core/services/recommended-wallet.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService } from '../../core/services/billing.service';
+import { PositionService } from '../../core/services/position.service';
+import { AssetService } from '../../core/services/asset.service';
 import {
   RecommendedWallet,
   RecommendedWalletAsset,
   RecommendedWalletComparison,
   AiSuggestion,
+  AiSuggestionAppliedItem,
+  AiSuggestionFallbackAllocation,
   AiSuggestionItem,
+  Asset,
+  Position,
   Wallet,
 } from 'dindin-models';
 import {
   formatCurrency,
   formatPercent,
   parseBrlNumber,
+  parseDecimal,
 } from '../../shared/utils/format.util';
+import { weightedAveragePrice } from '../../shared/utils/position-quantity.util';
 import {
   LucideArrowLeft,
   LucideCheck,
   LucideSparkles,
   LucideUpload,
+  LucideWallet,
   LucideX,
 } from '@lucide/angular';
 
 type WalletTab = 'renda' | 'ganho';
+
+/** Compra da sugestão que o usuário está lançando na carteira (#276). */
+interface ApplyTarget {
+  ticker: string;
+  /** FII de origem, quando a compra é uma alternativa de redistribuição. */
+  fallbackFor?: string;
+}
 
 @Component({
   selector: 'app-recommended-wallet',
@@ -42,6 +65,7 @@ type WalletTab = 'renda' | 'ganho';
     LucideCheck,
     LucideSparkles,
     LucideUpload,
+    LucideWallet,
     LucideX,
     ConfirmDialogComponent,
   ],
@@ -52,6 +76,9 @@ export class RecommendedWalletComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly authService = inject(AuthService);
   private readonly billingService = inject(BillingService);
+  private readonly positionService = inject(PositionService);
+  private readonly assetService = inject(AssetService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly compareRequest$ = new Subject<{
     walletId: string;
     month: string;
@@ -94,6 +121,19 @@ export class RecommendedWalletComponent implements OnInit {
   isAdmin = signal(false);
   confirmModalOpen = signal(false);
 
+  applyTarget = signal<ApplyTarget | null>(null);
+  applyQuantity = signal('');
+  applyPrice = signal('');
+  applyPositions = signal<Position[] | null>(null);
+  applyAssets = signal<Asset[]>([]);
+  applyError = signal<string | null>(null);
+  applySaving = signal(false);
+  /**
+   * A posição já foi gravada nesta tentativa e só o registro na sugestão
+   * falhou: repetir não pode lançar a compra de novo na carteira.
+   */
+  private applyPositionDone = false;
+
   months = computed(() =>
     this.recommendedWallets().map((wallet) => wallet.month),
   );
@@ -116,6 +156,70 @@ export class RecommendedWalletComponent implements OnInit {
   );
   showPaywall = computed(
     () => this.billingService.loaded() && !this.hasAiAccess(),
+  );
+
+  selectedWalletName = computed(
+    () =>
+      this.wallets().find((wallet) => wallet.id === this.selectedWalletId())
+        ?.name ?? '',
+  );
+  applyExisting = computed<Position | null>(() => {
+    const target = this.applyTarget();
+    const positions = this.applyPositions();
+    if (!target || !positions) return null;
+    return (
+      positions.find(
+        (position) =>
+          position.ticker.toUpperCase() === target.ticker.toUpperCase(),
+      ) ?? null
+    );
+  });
+  applyAssetType = computed(() => {
+    const target = this.applyTarget();
+    if (!target) return null;
+    return (
+      this.applyExisting()?.assetType ??
+      this.applyAssets().find(
+        (asset) => asset.ticker.toUpperCase() === target.ticker.toUpperCase(),
+      )?.assetType ??
+      null
+    );
+  });
+  /** Quantidade e preço médio antes → depois da compra. */
+  applyPreview = computed(() => {
+    const quantity = parseDecimal(this.applyQuantity());
+    const price = parseDecimal(this.applyPrice());
+    if (
+      quantity === null ||
+      price === null ||
+      quantity <= 0 ||
+      price <= 0 ||
+      this.applyPositions() === null
+    ) {
+      return null;
+    }
+    const existing = this.applyExisting();
+    return {
+      quantity,
+      price,
+      currentQuantity: existing?.quantity ?? 0,
+      newQuantity: (existing?.quantity ?? 0) + quantity,
+      currentAverage: existing?.averagePrice ?? null,
+      newAverage: existing
+        ? weightedAveragePrice(
+            existing.quantity,
+            existing.averagePrice,
+            quantity,
+            price,
+          )
+        : price,
+    };
+  });
+  canConfirmApply = computed(
+    () =>
+      this.applyPreview() !== null &&
+      this.applyAssetType() !== null &&
+      !this.applySaving(),
   );
 
   ngOnInit(): void {
@@ -254,6 +358,136 @@ export class RecommendedWalletComponent implements OnInit {
     return quantity === 1 ? 'cota' : 'cotas';
   }
 
+  appliedEntry(
+    ticker: string,
+    fallbackFor?: string,
+  ): AiSuggestionAppliedItem | null {
+    return (
+      this.suggestion()?.appliedItems?.find(
+        (applied) =>
+          applied.ticker.toUpperCase() === ticker.toUpperCase() &&
+          applied.fallbackFor?.toUpperCase() === fallbackFor?.toUpperCase(),
+      ) ?? null
+    );
+  }
+
+  openApply(
+    item: AiSuggestionItem,
+    alternative?: AiSuggestionFallbackAllocation,
+  ): void {
+    const walletId = this.selectedWalletId();
+    if (!walletId) return;
+
+    const source = alternative ?? item;
+    this.applyTarget.set({
+      ticker: source.ticker,
+      ...(alternative ? { fallbackFor: item.ticker } : {}),
+    });
+    this.applyQuantity.set(
+      source.suggestedQuantity === undefined
+        ? ''
+        : String(source.suggestedQuantity),
+    );
+    this.applyPrice.set(
+      source.referencePrice === undefined
+        ? ''
+        : String(source.referencePrice).replace('.', ','),
+    );
+    this.applyError.set(null);
+    this.applyPositions.set(null);
+    this.applyPositionDone = false;
+
+    forkJoin([
+      this.positionService.list(walletId),
+      // Sem catálogo ainda dá para atualizar uma posição existente.
+      this.assetService.list().pipe(catchError(() => of([] as Asset[]))),
+    ])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ([positions, assets]) => {
+          this.applyPositions.set(positions);
+          this.applyAssets.set(assets);
+        },
+        error: () =>
+          this.applyError.set('Não foi possível carregar a carteira.'),
+      });
+  }
+
+  onApplyInput(field: 'quantity' | 'price', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    (field === 'quantity' ? this.applyQuantity : this.applyPrice).set(value);
+  }
+
+  closeApply(): void {
+    this.applyTarget.set(null);
+    this.applyError.set(null);
+  }
+
+  confirmApply(): void {
+    const target = this.applyTarget();
+    const preview = this.applyPreview();
+    const assetType = this.applyAssetType();
+    const walletId = this.selectedWalletId();
+    const suggestion = this.suggestion();
+    if (
+      !target ||
+      !preview ||
+      !assetType ||
+      !walletId ||
+      !suggestion ||
+      !this.canConfirmApply()
+    ) {
+      return;
+    }
+
+    const existing = this.applyExisting();
+    const savePosition$: Observable<unknown> = this.applyPositionDone
+      ? of(null)
+      : existing
+        ? this.positionService.update(walletId, existing.id, {
+            quantity: preview.newQuantity,
+            averagePrice: preview.newAverage,
+          })
+        : this.positionService.create(walletId, {
+            ticker: target.ticker,
+            assetType,
+            quantity: preview.quantity,
+            averagePrice: preview.price,
+          });
+
+    this.applySaving.set(true);
+    this.applyError.set(null);
+    savePosition$
+      .pipe(
+        tap(() => (this.applyPositionDone = true)),
+        switchMap(() =>
+          this.recommendedWalletService.applySuggestionItem(suggestion.id, {
+            ticker: target.ticker,
+            ...(target.fallbackFor ? { fallbackFor: target.fallbackFor } : {}),
+            quantity: preview.quantity,
+            price: preview.price,
+          }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (updated) => {
+          this.applySaving.set(false);
+          this.suggestion.set(updated);
+          this.closeApply();
+          this.refreshComparison();
+        },
+        error: () => {
+          this.applySaving.set(false);
+          this.applyError.set(
+            this.applyPositionDone
+              ? 'A compra foi lançada na carteira, mas não foi possível marcar o item como aplicado. Confirme de novo para tentar só a marcação.'
+              : 'Não foi possível atualizar a carteira. Tente novamente.',
+          );
+        },
+      });
+  }
+
   generateSuggestion(force = false): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
@@ -364,6 +598,14 @@ export class RecommendedWalletComponent implements OnInit {
       month,
       tab: this.selectedTab(),
     });
+  }
+
+  /** Recompara sem limpar a sugestão exibida. */
+  private refreshComparison(): void {
+    const walletId = this.selectedWalletId();
+    const month = this.selectedMonth();
+    if (!walletId || !month) return;
+    this.compareRequest$.next({ walletId, month, tab: this.selectedTab() });
   }
 
   private loadSavedSuggestion(): void {

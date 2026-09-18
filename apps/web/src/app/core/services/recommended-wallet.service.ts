@@ -8,6 +8,13 @@ import {
   RecommendedWalletComparison,
 } from 'dindin-models';
 
+export interface ApplySuggestionItemPayload {
+  ticker: string;
+  fallbackFor?: string;
+  quantity: number;
+  price: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -79,6 +86,17 @@ export class RecommendedWalletService {
         ...(contribution === undefined ? {} : { contribution }),
       },
       { params },
+    );
+  }
+
+  /** Marca uma compra da sugestão como lançada na carteira (#276). */
+  applySuggestionItem(
+    suggestionId: string,
+    body: ApplySuggestionItemPayload,
+  ): Observable<AiSuggestion> {
+    return this.http.post<AiSuggestion>(
+      `${this.apiUrl}/suggestions/${suggestionId}/applied`,
+      body,
     );
   }
 
