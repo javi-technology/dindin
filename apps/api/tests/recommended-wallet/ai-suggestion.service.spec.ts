@@ -104,6 +104,7 @@ describe('ai-suggestion.service', () => {
       total: 2.5,
       totalFromFridge: 0,
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+      averageMonthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
     consoleErrorSpy = jest
       .spyOn(console, 'error')
