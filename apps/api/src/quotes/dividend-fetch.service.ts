@@ -2,12 +2,20 @@ import { AssetType } from 'dindin-models';
 import { ActiveAsset } from '../assets/asset.service';
 import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 
+export interface PaidDividendEvent {
+  paymentDate: string; // YYYY-MM-DD
+  rate: number;
+}
+
 export interface DividendInfo {
   monthlyDividend: number;
   paymentDate?: string; // YYYY-MM-DD
   // Soma dos proventos pagos nos 12 meses até hoje. Ausente quando nenhum
   // evento tem data: sem ela não há como saber a periodicidade.
   annualDividend?: number;
+  // Eventos pagos nos 12 meses até hoje, do mais antigo para o mais recente.
+  // É daqui que o sync registra os proventos dos usuários (#112).
+  paidEvents?: PaidDividendEvent[];
 }
 
 interface FiiDividendEvent {
@@ -93,41 +101,51 @@ function dividendInfo(
   return date ? { monthlyDividend, paymentDate: date } : { monthlyDividend };
 }
 
-interface PaidEvent {
+interface RawDividendEvent {
   rate: number;
   paymentDate: unknown;
 }
 
 /**
- * Soma os proventos pagos em (hoje − 12 meses, hoje]. Eventos anunciados e
- * ainda não pagos ficam de fora, senão um pagador mensal somaria 13 meses.
+ * Eventos pagos em (hoje − 12 meses, hoje]. Os anunciados e ainda não pagos
+ * ficam de fora, senão um pagador mensal somaria 13 meses.
  */
-function annualDividend(events: PaidEvent[], today: Date): number | undefined {
-  const dates = events.map((event) => toDateOnly(event.paymentDate));
-  if (dates.every((date) => date === undefined)) {
+function paidEventsInLastYear(
+  events: RawDividendEvent[],
+  today: Date,
+): PaidDividendEvent[] | undefined {
+  const dated = events.flatMap((event) => {
+    const paymentDate = toDateOnly(event.paymentDate);
+    return paymentDate ? [{ paymentDate, rate: event.rate }] : [];
+  });
+  if (dated.length === 0) {
     return undefined;
   }
 
   const end = today.toISOString().slice(0, 10);
   const start = `${Number(end.slice(0, 4)) - 1}${end.slice(4)}`;
-  const total = events.reduce((sum, event, index) => {
-    const date = dates[index];
-    return date !== undefined && date > start && date <= end
-      ? sum + event.rate
-      : sum;
-  }, 0);
-
-  // Evita resíduos de ponto flutuante (ex.: 1.25 + 1.1 = 2.3499999...).
-  return Math.round(total * 1e6) / 1e6;
+  return dated
+    .filter(({ paymentDate }) => paymentDate > start && paymentDate <= end)
+    .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
 }
 
-function withAnnualDividend(
+function withPaidEvents(
   info: DividendInfo,
-  events: PaidEvent[],
+  events: RawDividendEvent[],
   today: Date,
 ): DividendInfo {
-  const annual = annualDividend(events, today);
-  return annual === undefined ? info : { ...info, annualDividend: annual };
+  const paidEvents = paidEventsInLastYear(events, today);
+  if (paidEvents === undefined) {
+    return info;
+  }
+
+  const total = paidEvents.reduce((sum, event) => sum + event.rate, 0);
+  return {
+    ...info,
+    // Evita resíduos de ponto flutuante (ex.: 1.25 + 1.1 = 2.3499999...).
+    annualDividend: Math.round(total * 1e6) / 1e6,
+    paidEvents,
+  };
 }
 
 function isValidRate(rate: unknown): rate is number {
@@ -182,7 +200,7 @@ async function fetchFiiDividendBatch(
   return new Map(
     [...byTicker.entries()].map(([ticker, event]) => [
       ticker,
-      withAnnualDividend(
+      withPaidEvents(
         dividendInfo(event.rate, event.paymentDate),
         eventsByTicker.get(ticker)!,
         today,
@@ -233,7 +251,7 @@ async function fetchStocksDividendBatch(
     }
     output.set(
       (item.requestedSymbol ?? item.symbol).toUpperCase(),
-      withAnnualDividend(
+      withPaidEvents(
         dividendInfo(latest.rate, latest.paymentDate),
         dividends.filter((dividend) => isValidRate(dividend.rate)),
         today,
