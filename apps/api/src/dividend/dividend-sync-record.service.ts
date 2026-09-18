@@ -16,9 +16,19 @@ import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
  * que a Brapi inclui com data anterior ao último registro. O estado só é
  * gravado depois do commit, então uma falha é refeita na execução seguinte. E
  * só quem tem dia novo ou alterado custa as consultas de quem possui o ativo.
+ *
+ * Quem tem direito ao provento é quem tinha o ativo na data-com, não no dia do
+ * pagamento (#278). Quando a data-com de um evento anunciado chega, o sync
+ * guarda a quantidade de cada usuário em
+ * `dividendSync/{ticker}/snapshots/{comDate}`; o sync roda às 18h30, depois do
+ * fechamento, então a foto é a posição do fim da data-com. No pagamento, vale
+ * a quantidade da foto: quem vendeu no intervalo ainda recebe, quem comprou
+ * não. Evento sem data-com, ou cuja foto não existe (data-com anterior a esta
+ * versão), segue com a quantidade do dia do pagamento.
  */
 
 const SYNC_COLLECTION = 'dividendSync';
+const SNAPSHOTS_COLLECTION = 'snapshots';
 // Limite de operações de um batch do Firestore.
 const BATCH_LIMIT = 500;
 // Id do registro mensal do job que existia antes deste sync (`YYYY-MM_TICKER`).
@@ -28,7 +38,15 @@ interface DividendSyncState {
   // YYYY-MM-DD → valor por cota registrado naquele dia. Espelha os eventos da
   // janela de 12 meses devolvida pela Brapi, então não cresce sem limite.
   recorded: Record<string, number>;
+  // Datas-com com foto guardada. Espelha as datas-com dos eventos recebidos:
+  // a foto que sai da janela é apagada.
+  snapshots?: string[];
   updatedAt: string;
+}
+
+interface QuantitySnapshot {
+  quantities: Record<string, number>; // uid → quantidade na data-com
+  takenAt: string;
 }
 
 function validQuantity(quantity: unknown): number {
@@ -122,6 +140,33 @@ function amountByPaymentDate(
   return amounts;
 }
 
+/**
+ * Quantidade de um usuário com direito a um evento: a da foto da data-com,
+ * quando existe; senão, a atual.
+ */
+function entitledQuantity(
+  userId: string,
+  event: PaidDividendEvent,
+  current: Map<string, number>,
+  snapshots: Map<string, Record<string, number>>,
+): number {
+  const snapshot = event.comDate ? snapshots.get(event.comDate) : undefined;
+  return snapshot ? (snapshot[userId] ?? 0) : (current.get(userId) ?? 0);
+}
+
+async function loadSnapshots(
+  ref: FirebaseFirestore.CollectionReference,
+  comDates: string[],
+): Promise<Map<string, Record<string, number>>> {
+  const docs = await Promise.all(comDates.map((date) => ref.doc(date).get()));
+  const snapshots = new Map<string, Record<string, number>>();
+  docs.forEach((doc, index) => {
+    const data = doc.data() as QuantitySnapshot | undefined;
+    if (doc.exists && data) snapshots.set(comDates[index], data.quantities);
+  });
+  return snapshots;
+}
+
 export async function recordPaidDividends(
   ticker: string,
   events: PaidDividendEvent[],
@@ -129,6 +174,7 @@ export async function recordPaidDividends(
 ): Promise<Dividend[]> {
   const firestore = getFirestore();
   const syncRef = firestore.collection(SYNC_COLLECTION).doc(ticker);
+  const snapshotsRef = syncRef.collection(SNAPSHOTS_COLLECTION);
   const syncSnapshot = await syncRef.get();
   const state = syncSnapshot.data() as DividendSyncState | undefined;
 
@@ -142,27 +188,95 @@ export async function recordPaidDividends(
     .filter((date) => recorded[date] !== amounts.get(date))
     .sort();
 
+  let current: Map<string, number> | undefined;
+  const currentQuantities = async () =>
+    (current ??= await quantityByUser(ticker));
+
+  // Foto das quantidades nas datas-com que chegaram, antes do pagamento.
+  const stored = new Set(state?.snapshots ?? []);
+  const toSnapshot = [
+    ...new Set(
+      events
+        .filter(
+          ({ comDate, paymentDate }) =>
+            comDate && comDate <= today && paymentDate > today,
+        )
+        .map(({ comDate }) => comDate!),
+    ),
+  ]
+    .filter((date) => !stored.has(date))
+    .sort();
+  if (toSnapshot.length > 0) {
+    const snapshot: QuantitySnapshot = {
+      quantities: Object.fromEntries(await currentQuantities()),
+      takenAt: new Date().toISOString(),
+    };
+    await Promise.all(
+      toSnapshot.map((date) => snapshotsRef.doc(date).set(snapshot)),
+    );
+    toSnapshot.forEach((date) => stored.add(date));
+  }
+
   const dividends: Dividend[] = [];
   if (dates.length > 0) {
-    const [quantities, blocked] = await Promise.all([
-      quantityByUser(ticker),
+    const eventsByDate = new Map<string, PaidDividendEvent[]>();
+    for (const event of events) {
+      if (!amounts.has(event.paymentDate)) continue;
+      eventsByDate.set(event.paymentDate, [
+        ...(eventsByDate.get(event.paymentDate) ?? []),
+        event,
+      ]);
+    }
+    const comDates = [
+      ...new Set(
+        dates.flatMap((date) =>
+          eventsByDate
+            .get(date)!
+            .flatMap(({ comDate }) =>
+              comDate && stored.has(comDate) ? [comDate] : [],
+            ),
+        ),
+      ),
+    ];
+
+    const [quantities, blocked, snapshots] = await Promise.all([
+      currentQuantities(),
       blockedMonthsByUser(ticker, dates[0], dates[dates.length - 1]),
+      loadSnapshots(snapshotsRef, comDates),
+    ]);
+    // Quem vendeu depois da data-com só aparece na foto.
+    const users = new Set([
+      ...quantities.keys(),
+      ...[...snapshots.values()].flatMap((snapshot) => Object.keys(snapshot)),
     ]);
 
     const now = new Date().toISOString();
-    for (const [userId, quantity] of [...quantities.entries()].sort(
-      ([a], [b]) => a.localeCompare(b),
-    )) {
+    for (const userId of [...users].sort((a, b) => a.localeCompare(b))) {
       for (const paymentDate of dates) {
         if (blocked.get(userId)?.has(monthOf(paymentDate))) continue;
+        const parts = eventsByDate.get(paymentDate)!.map((event) => ({
+          rate: event.rate,
+          quantity: entitledQuantity(userId, event, quantities, snapshots),
+        }));
+        const quantity = Math.max(...parts.map((part) => part.quantity));
+        if (quantity <= 0) continue;
         const amountPerShare = amounts.get(paymentDate)!;
+        // Proventos do mesmo dia com datas-com diferentes podem ter
+        // quantidades diferentes: cada um soma pela sua, e `quantity` fica
+        // com a maior.
+        const sameQuantity = parts.every((part) => part.quantity === quantity);
+        const totalAmount = roundCurrency(
+          sameQuantity
+            ? amountPerShare * quantity
+            : parts.reduce((sum, part) => sum + part.rate * part.quantity, 0),
+        );
         dividends.push({
           id: `${paymentDate}_${ticker}`,
           userId,
           ticker,
           amountPerShare,
           quantity,
-          totalAmount: roundCurrency(amountPerShare * quantity),
+          totalAmount,
           paymentDate,
           source: 'auto',
           createdAt: now,
@@ -187,9 +301,23 @@ export async function recordPaidDividends(
     }
   }
 
-  if (dates.length > 0 || state === undefined) {
+  // A foto cuja data-com saiu da janela de eventos não é mais usada.
+  const referenced = new Set(events.flatMap(({ comDate }) => comDate ?? []));
+  const pruned = [...stored].filter((date) => !referenced.has(date));
+  await Promise.all(pruned.map((date) => snapshotsRef.doc(date).delete()));
+  const snapshotDates = [...stored]
+    .filter((date) => referenced.has(date))
+    .sort();
+
+  if (
+    dates.length > 0 ||
+    state === undefined ||
+    toSnapshot.length > 0 ||
+    pruned.length > 0
+  ) {
     const nextState: DividendSyncState = {
       recorded: Object.fromEntries(amounts),
+      ...(snapshotDates.length > 0 ? { snapshots: snapshotDates } : {}),
       updatedAt: new Date().toISOString(),
     };
     await syncRef.set(nextState);
