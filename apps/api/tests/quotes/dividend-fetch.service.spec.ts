@@ -119,6 +119,10 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         monthlyDividend: 0.92,
         paymentDate: '2026-07-14',
         annualDividend: 1.82,
+        paidEvents: [
+          { paymentDate: '2026-06-12', rate: 0.9 },
+          { paymentDate: '2026-07-14', rate: 0.92 },
+        ],
       });
     });
 
@@ -219,6 +223,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         monthlyDividend: 1.25,
         paymentDate: '2026-10-15',
         annualDividend: 1.1,
+        paidEvents: [{ paymentDate: '2026-06-15', rate: 1.1 }],
       });
     });
 
@@ -570,6 +575,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         monthlyDividend: 0.9,
         paymentDate: '2026-07-14',
         annualDividend: 0.9,
+        paidEvents: [{ paymentDate: '2026-07-14', rate: 0.9 }],
       });
       expect(result.has('PETR4')).toBe(false);
     });
@@ -693,10 +699,14 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         monthlyDividend: 1,
         paymentDate: '2026-10-14',
         annualDividend: 1.82,
+        paidEvents: [
+          { paymentDate: '2026-06-12', rate: 0.9 },
+          { paymentDate: '2026-09-14', rate: 0.92 },
+        ],
       });
     });
 
-    it('soma os dividendos e JCP de ações pagos nos 12 meses até hoje', async () => {
+    it('lista e soma os dividendos e JCP de ações pagos nos 12 meses até hoje', async () => {
       mockFetch({
         results: [
           {
@@ -707,6 +717,11 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
                   rate: 1.25,
                   paymentDate: '2026-07-15T03:00:00.000Z',
                   label: 'DIVIDENDO',
+                },
+                {
+                  rate: 0.5,
+                  paymentDate: '2026-07-15T03:00:00.000Z',
+                  label: 'JCP',
                 },
                 {
                   rate: 1.1,
@@ -731,7 +746,13 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         today,
       );
 
-      expect(result.get('PETR4')?.annualDividend).toBe(2.35);
+      expect(result.get('PETR4')?.annualDividend).toBe(2.85);
+      // Dividendo e JCP pagos no mesmo dia são eventos distintos.
+      expect(result.get('PETR4')?.paidEvents).toEqual([
+        { paymentDate: '2026-01-15', rate: 1.1 },
+        { paymentDate: '2026-07-15', rate: 1.25 },
+        { paymentDate: '2026-07-15', rate: 0.5 },
+      ]);
     });
 
     it('zera a soma quando nenhum provento foi pago nos últimos 12 meses', async () => {
@@ -763,6 +784,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         monthlyDividend: 2.1,
         paymentDate: '2025-03-10',
         annualDividend: 0,
+        paidEvents: [],
       });
     });
   });
