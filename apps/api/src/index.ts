@@ -323,6 +323,10 @@ export const updateQuotesScheduled = onSchedule(
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['BRAPI_API_KEY'],
+    // Além das cotações, registra os proventos pagos para quem tem cada
+    // ativo (#112); em dia de pagamento de muitos FIIs os 60s padrão não
+    // bastam.
+    timeoutSeconds: 300,
   },
   async () => {
     await updateAllQuotes();
