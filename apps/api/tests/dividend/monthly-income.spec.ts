@@ -193,6 +193,84 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
     });
   });
 
+  it('deve projetar o total pela média mensal dos proventos de 12 meses', async () => {
+    const position = (id: string, ticker: string, quantity: number) => ({
+      id,
+      walletId: 'wallet-1',
+      ticker,
+      assetType: 'STOCK' as const,
+      quantity,
+      averagePrice: 10,
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    const positions: Position[] = [
+      // Semestral: o último provento (1.2) não se repete todo mês.
+      position('position-1', 'PETR4', 100),
+      // Sem soma anual (ainda não sincronizado): mantém o último provento.
+      position('position-2', 'HGLG11', 10),
+    ];
+    const quotes: Quote[] = [
+      {
+        ticker: 'PETR4',
+        price: 38,
+        monthlyDividend: 1.2,
+        dividendPaymentDate: '2026-08-20',
+        annualDividend: 2.4,
+        updatedAt: '2026-09-18T00:00:00Z',
+        source: 'brapi',
+      },
+      {
+        ticker: 'HGLG11',
+        price: 112,
+        monthlyDividend: 0.9,
+        updatedAt: '2026-09-18T00:00:00Z',
+        source: 'brapi',
+      },
+      {
+        ticker: 'ITSA4',
+        price: 10,
+        monthlyDividend: 0.6,
+        annualDividend: 1.2,
+        updatedAt: '2026-09-18T00:00:00Z',
+        source: 'brapi',
+      },
+    ];
+    const fridges: TestFridge[] = [
+      {
+        id: 'fridge-1',
+        items: [
+          {
+            id: 'item-1',
+            fridgeId: 'fridge-1',
+            ticker: 'ITSA4',
+            quantity: 50,
+            transferredPrice: 10,
+            targetPrice: 12,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      },
+    ];
+    firestoreMock = createFirestoreMock(positions, quotes, fridges);
+
+    const income = await computeMonthlyIncome('user-123', 'wallet-1');
+
+    // PETR4 2.4/12 × 100 = 20; HGLG11 0.9 × 10 = 9; ITSA4 1.2/12 × 50 = 5.
+    expect(income.total).toBe(34);
+    expect(income.totalFromFridge).toBe(5);
+    // A agenda mostra o evento anunciado, não a média.
+    expect(income.byTicker).toContainEqual({
+      ticker: 'PETR4',
+      quantity: 100,
+      monthlyDividend: 1.2,
+      monthlyIncome: 120,
+      paymentDate: '2026-08-20',
+    });
+  });
+
   it('deve calcular renda mensal por ticker com base nas quotes', async () => {
     const positions: Position[] = [
       {
