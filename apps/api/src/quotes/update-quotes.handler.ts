@@ -54,8 +54,8 @@ async function processTickerQuote(
       message: (error as Error).message,
     });
   }
-  // Registra os proventos pagos nos usuários (#112). O cursor do registro
-  // só avança após gravar, então uma falha aqui é refeita no próximo sync.
+  // Registra os proventos pagos nos usuários (#112). O estado do registro
+  // só é gravado após o commit, então uma falha aqui é refeita no próximo sync.
   await recordTickerDividends(ticker, dividend, today);
 }
 

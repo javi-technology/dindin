@@ -10,10 +10,12 @@ import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
  * demais já foi trocado pelo anúncio seguinte. O sync recebe da Brapi a lista
  * de eventos pagos e registra cada um no dia do pagamento.
  *
- * `dividendSync/{ticker}.recordedThrough` marca até que data os pagamentos já
- * foram registrados. Ele só avança depois da gravação: um dia sem sync, ou uma
- * falha, é recuperado na execução seguinte. E só quem tem pagamento novo custa
- * as consultas de quem possui o ativo.
+ * `dividendSync/{ticker}.recorded` guarda o valor por cota já registrado em
+ * cada dia de pagamento. Um dia é reprocessado quando é novo ou quando a soma
+ * mudou: um JCP publicado depois do dividendo do mesmo dia, ou um pagamento
+ * que a Brapi inclui com data anterior ao último registro. O estado só é
+ * gravado depois do commit, então uma falha é refeita na execução seguinte. E
+ * só quem tem dia novo ou alterado custa as consultas de quem possui o ativo.
  */
 
 const SYNC_COLLECTION = 'dividendSync';
@@ -23,7 +25,9 @@ const BATCH_LIMIT = 500;
 const LEGACY_AUTO_ID = /^\d{4}-\d{2}_/;
 
 interface DividendSyncState {
-  recordedThrough: string; // YYYY-MM-DD
+  // YYYY-MM-DD → valor por cota registrado naquele dia. Espelha os eventos da
+  // janela de 12 meses devolvida pela Brapi, então não cresce sem limite.
+  recorded: Record<string, number>;
   updatedAt: string;
 }
 
@@ -41,12 +45,6 @@ function roundCurrency(value: number): number {
 
 function monthOf(date: string): string {
   return date.slice(0, 7);
-}
-
-function previousDay(date: string): string {
-  const day = new Date(`${date}T00:00:00.000Z`);
-  day.setUTCDate(day.getUTCDate() - 1);
-  return day.toISOString().slice(0, 10);
 }
 
 // `users/{uid}/...`
@@ -104,11 +102,22 @@ async function blockedMonthsByUser(
   return blocked;
 }
 
-/** Dividendo e JCP pagos no mesmo dia viram um único registro. */
-function amountByPaymentDate(events: PaidDividendEvent[]): Map<string, number> {
+/**
+ * Dividendo e JCP pagos no mesmo dia viram um único registro. Arredonda para
+ * evitar resíduos de ponto flutuante (ex.: 1.25 + 0.5) na comparação com o
+ * valor já registrado.
+ */
+function amountByPaymentDate(
+  events: PaidDividendEvent[],
+  today: string,
+): Map<string, number> {
   const amounts = new Map<string, number>();
   for (const { paymentDate, rate } of events) {
+    if (paymentDate > today) continue;
     amounts.set(paymentDate, (amounts.get(paymentDate) ?? 0) + rate);
+  }
+  for (const [date, amount] of amounts) {
+    amounts.set(date, Math.round(amount * 1e6) / 1e6);
   }
   return amounts;
 }
@@ -123,17 +132,18 @@ export async function recordPaidDividends(
   const syncSnapshot = await syncRef.get();
   const state = syncSnapshot.data() as DividendSyncState | undefined;
 
+  const amounts = amountByPaymentDate(events, today);
   // Na primeira execução não há como saber o que o job antigo já registrou:
-  // considera só os pagamentos de hoje em vez de refazer um ano inteiro.
-  const recordedThrough = state?.recordedThrough ?? previousDay(today);
-  const pending = events.filter(
-    ({ paymentDate }) => paymentDate > recordedThrough && paymentDate <= today,
-  );
+  // os dias anteriores contam como registrados, em vez de refazer um ano.
+  const recorded =
+    state?.recorded ??
+    Object.fromEntries([...amounts.entries()].filter(([date]) => date < today));
+  const dates = [...amounts.keys()]
+    .filter((date) => recorded[date] !== amounts.get(date))
+    .sort();
 
   const dividends: Dividend[] = [];
-  if (pending.length > 0) {
-    const amounts = amountByPaymentDate(pending);
-    const dates = [...amounts.keys()].sort();
+  if (dates.length > 0) {
     const [quantities, blocked] = await Promise.all([
       quantityByUser(ticker),
       blockedMonthsByUser(ticker, dates[0], dates[dates.length - 1]),
@@ -145,9 +155,7 @@ export async function recordPaidDividends(
     )) {
       for (const paymentDate of dates) {
         if (blocked.get(userId)?.has(monthOf(paymentDate))) continue;
-        // Evita resíduos de ponto flutuante ao somar eventos do mesmo dia.
-        const amountPerShare =
-          Math.round(amounts.get(paymentDate)! * 1e6) / 1e6;
+        const amountPerShare = amounts.get(paymentDate)!;
         dividends.push({
           id: `${paymentDate}_${ticker}`,
           userId,
@@ -179,9 +187,9 @@ export async function recordPaidDividends(
     }
   }
 
-  if (pending.length > 0 || state === undefined) {
+  if (dates.length > 0 || state === undefined) {
     const nextState: DividendSyncState = {
-      recordedThrough: today,
+      recorded: Object.fromEntries(amounts),
       updatedAt: new Date().toISOString(),
     };
     await syncRef.set(nextState);
