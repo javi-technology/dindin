@@ -241,6 +241,14 @@ expostos em `GET /api/me`):
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
   `portal-session`.
 
+## Moeda: BRL-only
+
+O app trabalha **apenas com reais** (issue #266, herdada da #105). Projeção de
+proventos, patrimônio e totais consolidados somam valores sem conversão de
+câmbio, então uma carteira em outra moeda seria calculada como se fosse em
+reais. Por isso `POST /api/wallets` e `PUT /api/wallets/:id` rejeitam com 400
+qualquer `currency` diferente de `BRL`. Multimoeda está fora da v1.
+
 ## Alertas de preço-alvo da geladeira
 
 Todo dia às 19:15 (após a atualização de cotações das 18:30 e o snapshot
