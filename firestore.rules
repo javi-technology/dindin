@@ -106,6 +106,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Fila da extensão Trigger Email (issue #265) — escrita exclusiva do
+    // Admin SDK. Liberar escrita ao cliente permitiria enviar e-mail em nome
+    // do domínio para qualquer destinatário.
+    match /mail/{mailId} {
+      allow read, write: if false;
+    }
+
     // Idempotência de webhooks de billing — acesso exclusivo pelo Admin SDK.
     match /billingEvents/{eventId} {
       allow read, write: if false;

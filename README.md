@@ -241,6 +241,43 @@ expostos em `GET /api/me`):
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
   `portal-session`.
 
+## Alertas de preço-alvo da geladeira
+
+Todo dia às 19:15 (após a atualização de cotações das 18:30 e o snapshot
+patrimonial das 19:00), a function `checkTargetPricesScheduled` compara a
+cotação atual de cada item da geladeira com o `targetPrice` definido pelo
+usuário e grava um alerta em `users/{uid}/alerts/{fridgeId}_{ticker}`.
+
+- O alerta nasce `open` e o usuário recebe **um** e-mail. Enquanto o alerta
+  continuar aberto o job não cria outro, então não há aviso diário repetido.
+- Quando o preço volta abaixo do alvo ou o item sai da geladeira, o alerta vira
+  `cleared` e o ativo é rearmado: se voltar ao alvo, um novo aviso é enviado.
+
+### E-mail (extensão Trigger Email)
+
+O envio usa a extensão **`firebase/firestore-send-email`**: a API grava um
+documento em `mail/{alertId}` e a extensão entrega via SMTP. Nenhuma credencial
+de e-mail fica no repositório.
+
+Configuração no projeto `dindin-4e720` (uma vez):
+
+```bash
+firebase ext:install firebase/firestore-send-email --project=dindin-4e720
+```
+
+Parâmetros relevantes:
+
+| Parâmetro                  | Valor                                   |
+| -------------------------- | --------------------------------------- |
+| Email documents collection | `mail`                                  |
+| SMTP connection URI        | URI do provedor SMTP                    |
+| Default FROM address       | ex.: `DinDin <nao-responda@seudominio>` |
+
+O destinatário vem do Firebase Auth (`getAuth().getUser(uid).email`); usuário
+sem e-mail cadastrado tem o alerta criado e o envio pulado com aviso no log.
+A coleção `mail` é fechada para o cliente nas regras do Firestore — só o Admin
+SDK escreve nela.
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).

@@ -5,6 +5,7 @@ import {
   fridgeItemsCollection,
   fridgesCollection,
 } from '../firestore/paths';
+import { sendAlertEmails } from './alert-mail.service';
 
 const BATCH_SIZE = 10;
 
@@ -187,9 +188,17 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
   for (let i = 0; i < userDocuments.length; i += BATCH_SIZE) {
     const batch = userDocuments.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map((userDocument) =>
-        checkUserTargetPrices(userDocument.id, quotePrices, now),
-      ),
+      batch.map(async (userDocument) => {
+        const result = await checkUserTargetPrices(
+          userDocument.id,
+          quotePrices,
+          now,
+        );
+        if (result.created.length > 0) {
+          await sendAlertEmails(userDocument.id, result.created, now);
+        }
+        return result;
+      }),
     );
 
     results.forEach((result, index) => {
