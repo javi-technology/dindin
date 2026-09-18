@@ -150,12 +150,14 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
+            averageMonthlyIncome: 9,
           },
           {
             ticker: 'KNRI11',
             quantity: 5,
             monthlyDividend: 0.75,
             monthlyIncome: 3.75,
+            averageMonthlyIncome: 3.75,
           },
         ],
         total: 12.75,
@@ -260,6 +262,45 @@ describe('WalletComponent', () => {
     expect(secondRow).toMatch(/R\$\s?3,75/);
   });
 
+  it('deve mostrar a média de 12 meses como proventos/mês da posição', () => {
+    // Semestral: o último provento (R$ 120,00) não se repete todo mês (#280).
+    fixture.componentInstance.monthlyIncome.set({
+      byTicker: [
+        {
+          ticker: 'HGLG11',
+          quantity: 10,
+          monthlyDividend: 12,
+          monthlyIncome: 120,
+          averageMonthlyIncome: 20,
+        },
+        {
+          ticker: 'KNRI11',
+          quantity: 5,
+          monthlyDividend: 0.75,
+          monthlyIncome: 3.75,
+          averageMonthlyIncome: 3.75,
+        },
+      ],
+      total: 23.75,
+      totalFromFridge: 0,
+    });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('tbody tr');
+    expect(rows[0].textContent).toMatch(/R\$\s?20,00/);
+    expect(
+      rows[0].querySelector('[data-testid="proventos-ultimo"]')?.textContent,
+    ).toMatch(/R\$\s?120,00/);
+    // Quando o último provento é a própria média, não há o que destacar.
+    expect(
+      rows[1].querySelector('[data-testid="proventos-ultimo"]'),
+    ).toBeNull();
+    expect(compiled.querySelector('thead')?.textContent).toContain(
+      'média dos últimos 12 meses',
+    );
+  });
+
   it('deve marcar como bloqueada a projeção recortada no plano gratuito', () => {
     // A API recorta `byTicker` sem o entitlement `projections` (#262): sem
     // isso a coluna mostraria R$ 0,00, que é número errado, não bloqueio.
@@ -270,6 +311,7 @@ describe('WalletComponent', () => {
           quantity: 10,
           monthlyDividend: 0.9,
           monthlyIncome: 9,
+          averageMonthlyIncome: 9,
         },
       ],
       total: 12.75,
@@ -329,6 +371,7 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
+            averageMonthlyIncome: 9,
           },
         ],
         total: 9,

@@ -18,6 +18,7 @@ describe('aggregateMonthlyIncome', () => {
             quantity: 10,
             monthlyDividend: 1.1,
             monthlyIncome: 11,
+            averageMonthlyIncome: 11,
           },
         ],
         total: 11,
@@ -30,12 +31,14 @@ describe('aggregateMonthlyIncome', () => {
             quantity: 5,
             monthlyDividend: 1.1,
             monthlyIncome: 5.5,
+            averageMonthlyIncome: 5.5,
           },
           {
             ticker: 'XPLG11',
             quantity: 20,
             monthlyDividend: 0.7,
             monthlyIncome: 14,
+            averageMonthlyIncome: 14,
           },
         ],
         total: 19.5,
@@ -49,15 +52,43 @@ describe('aggregateMonthlyIncome', () => {
         quantity: 15,
         monthlyDividend: 1.1,
         monthlyIncome: 16.5,
+        averageMonthlyIncome: 16.5,
       },
       {
         ticker: 'XPLG11',
         quantity: 20,
         monthlyDividend: 0.7,
         monthlyIncome: 14,
+        averageMonthlyIncome: 14,
       },
     ]);
     expect(aggregated.total).toBe(30.5);
+  });
+
+  it('deve somar a média mensal do mesmo ticker em carteiras diferentes', () => {
+    const petr4 = (quantity: number) => ({
+      ticker: 'PETR4',
+      quantity,
+      monthlyDividend: 1.2,
+      monthlyIncome: quantity * 1.2,
+      averageMonthlyIncome: quantity * 0.2,
+    });
+
+    const aggregated = aggregateMonthlyIncome([
+      { byTicker: [petr4(100)], total: 20, totalFromFridge: 0 },
+      { byTicker: [petr4(50)], total: 10, totalFromFridge: 0 },
+    ]);
+
+    expect(aggregated.byTicker).toEqual([
+      {
+        ticker: 'PETR4',
+        quantity: 150,
+        monthlyDividend: 1.2,
+        monthlyIncome: 180,
+        averageMonthlyIncome: 30,
+      },
+    ]);
+    expect(aggregated.total).toBe(30);
   });
 
   it('deve preservar a data de pagamento ao consolidar o mesmo ticker', () => {
@@ -69,6 +100,7 @@ describe('aggregateMonthlyIncome', () => {
             quantity: 10,
             monthlyDividend: 1.1,
             monthlyIncome: 11,
+            averageMonthlyIncome: 11,
           },
         ],
         total: 11,
@@ -81,6 +113,7 @@ describe('aggregateMonthlyIncome', () => {
             quantity: 5,
             monthlyDividend: 1.1,
             monthlyIncome: 5.5,
+            averageMonthlyIncome: 5.5,
             paymentDate: '2026-09-15',
           },
         ],
