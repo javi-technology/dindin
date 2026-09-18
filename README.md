@@ -262,8 +262,9 @@ o envio de novo antes dessa data.
 
 Configuração (uma vez):
 
-1. Verificar o domínio de envio no Resend (recomendado um subdomínio, ex.:
-   `send.javitech.online`) criando os registros DNS que o painel informar.
+1. Verificar o domínio `javitech.online` no Resend criando os registros DNS que
+   o painel informar (DKIM em `resend._domainkey`, mais MX e SPF no subdomínio
+   `send.`, que é o return-path da infra do Resend).
 2. Gerar uma API key com permissão de envio e gravá-la como segredo:
 
    ```bash
@@ -271,8 +272,9 @@ Configuração (uma vez):
    ```
 
 O segredo está vinculado a `checkTargetPricesScheduled` em `apps/api/src/index.ts`.
-O remetente padrão é `DinDin <alertas@send.javitech.online>` e pode ser trocado
-pela variável de ambiente `ALERT_MAIL_FROM`.
+O remetente padrão é `DinDin <alertas@javitech.online>` e pode ser trocado pela
+variável de ambiente `ALERT_MAIL_FROM`. O endereço precisa pertencer ao domínio
+verificado.
 
 Comportamento em falha, por decisão de projeto:
 

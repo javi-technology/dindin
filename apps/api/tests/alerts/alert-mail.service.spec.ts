@@ -140,7 +140,7 @@ describe('AlertMailService', () => {
 
     await sendAlertEmails('user-1', [alert()]);
 
-    expect(requestBody().from).toContain('@send.javitech.online');
+    expect(requestBody().from).toBe('DinDin <alertas@javitech.online>');
   });
 
   it('deve permitir sobrescrever o remetente por variável de ambiente', async () => {

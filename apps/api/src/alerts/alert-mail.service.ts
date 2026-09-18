@@ -16,7 +16,10 @@ import { Alert } from 'dindin-models';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const RESEND_TIMEOUT_MS = 10_000;
-const DEFAULT_FROM = 'DinDin <alertas@send.javitech.online>';
+// O domínio verificado no Resend é o raiz `javitech.online`; o subdomínio
+// `send.` que aparece no DNS é o return-path da infra do Resend, não um
+// domínio de envio — usá-lo no FROM faria o envio ser recusado.
+const DEFAULT_FROM = 'DinDin <alertas@javitech.online>';
 const APP_URL = 'https://dindin-4e720.web.app/geladeira';
 
 function formatCurrency(value: number): string {
