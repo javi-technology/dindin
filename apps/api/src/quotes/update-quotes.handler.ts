@@ -23,6 +23,7 @@ async function processTickerQuote(
       dividend?.monthlyDividend,
       QUOTE_SOURCE,
       dividend?.paymentDate,
+      dividend?.annualDividend,
     );
     console.log(
       `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${QUOTE_SOURCE}).`,
