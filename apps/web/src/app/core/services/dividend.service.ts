@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Dividend } from 'dindin-models';
 
 export interface TickerDividendYield {
   ticker: string;
@@ -130,9 +129,5 @@ export class DividendService {
       '/api/quotes/dividend-history',
       { params: { tickers: tickers.join(','), months } },
     );
-  }
-
-  recordMonthlyDividends(): Observable<Dividend[]> {
-    return this.http.post<Dividend[]>('/api/dividends/record-monthly', {});
   }
 }
