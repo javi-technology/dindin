@@ -703,55 +703,15 @@ describe('DividendComponent', () => {
     ).not.toBeNull();
   });
 
-  it('deve registrar os proventos e recarregar o relatório', async () => {
+  it('não deve oferecer registro manual dos proventos do mês', async () => {
+    // O registro passou a ser feito pelo sync diário de cotações (#112).
     await setup();
-    const reportCallsBefore =
-      dividendServiceMock.getMonthlyReport.calls.count();
-    const button = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="record-monthly-button"]',
-    ) as HTMLButtonElement;
 
-    button.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(dividendServiceMock.recordMonthlyDividends).toHaveBeenCalledWith();
-    expect(dividendServiceMock.getMonthlyReport.calls.count()).toBeGreaterThan(
-      reportCallsBefore,
-    );
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="record-success"]',
-      )?.textContent,
-    ).toContain('Proventos de');
-  });
-
-  it('deve exibir erro ao registrar os proventos', async () => {
-    dividendServiceMock.recordMonthlyDividends.and.returnValue(
-      throwError(() => new Error('Network error')),
-    );
-
-    await setup();
-    const button = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="record-monthly-button"]',
-    ) as HTMLButtonElement;
-
-    button.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="record-error"]',
-      )?.textContent,
-    ).toContain('Erro ao registrar proventos do mês');
     expect(
       (fixture.nativeElement as HTMLElement).querySelector(
         '[data-testid="record-monthly-button"]',
       ),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   // -------------------------------------------------------------------------
