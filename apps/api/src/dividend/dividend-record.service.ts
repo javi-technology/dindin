@@ -46,15 +46,7 @@ export async function recordMonthlyDividends(
     fetchFridgeItems(userId),
   ]);
 
-  const month = monthKey(date);
-
-  // `quotes` guarda só o último provento anunciado. Registrar esse valor todo
-  // mês inventaria pagamentos para quem paga trimestral, semestral ou
-  // anualmente: entra só o evento cujo pagamento cai na competência (#112).
-  const dividendByTicker = new Map<
-    string,
-    { amountPerShare: number; paymentDate: string }
-  >();
+  const monthlyDividendByTicker = new Map<string, number>();
   for (const quoteDoc of quotesSnapshot.docs) {
     const quote = quoteDoc.data() as Quote;
     const ticker = normalizeTicker(quote.ticker || quoteDoc.id);
@@ -62,14 +54,9 @@ export async function recordMonthlyDividends(
       ticker &&
       typeof quote.monthlyDividend === 'number' &&
       Number.isFinite(quote.monthlyDividend) &&
-      quote.monthlyDividend > 0 &&
-      typeof quote.dividendPaymentDate === 'string' &&
-      monthKey(quote.dividendPaymentDate) === month
+      quote.monthlyDividend > 0
     ) {
-      dividendByTicker.set(ticker, {
-        amountPerShare: quote.monthlyDividend,
-        paymentDate: quote.dividendPaymentDate,
-      });
+      monthlyDividendByTicker.set(ticker, quote.monthlyDividend);
     }
   }
 
@@ -88,6 +75,7 @@ export async function recordMonthlyDividends(
     );
   }
 
+  const month = monthKey(date);
   const now = new Date().toISOString();
   const dividendsCollection = userCollection(userId, 'dividends');
   const existingSnapshot = await dividendsCollection
@@ -115,12 +103,15 @@ export async function recordMonthlyDividends(
   for (const ticker of [...quantityByTicker.keys()].sort((a, b) =>
     a.localeCompare(b),
   )) {
-    const event = dividendByTicker.get(ticker);
+    const amountPerShare = monthlyDividendByTicker.get(ticker);
     const quantity = quantityByTicker.get(ticker)!;
-    if (event === undefined || quantity === 0 || manualTickers.has(ticker)) {
+    if (
+      amountPerShare === undefined ||
+      quantity === 0 ||
+      manualTickers.has(ticker)
+    ) {
       continue;
     }
-    const { amountPerShare, paymentDate } = event;
 
     const dividend: Dividend = {
       id: autoDividendId(month, ticker),
@@ -129,7 +120,7 @@ export async function recordMonthlyDividends(
       amountPerShare,
       quantity,
       totalAmount: roundCurrency(amountPerShare * quantity),
-      paymentDate,
+      paymentDate: date,
       source: 'auto',
       createdAt: now,
       updatedAt: now,
@@ -140,14 +131,8 @@ export async function recordMonthlyDividends(
     dividends.push(dividend);
   }
 
-  // Quando a Brapi já anunciou o provento seguinte, o evento pago no mês some
-  // de `quotes`; o registro feito antes continua valendo enquanto o ativo
-  // estiver na carteira e não houver lançamento manual para ele.
   for (const existingDoc of existingAuto) {
-    const ticker = normalizeTicker(existingDoc.data()?.ticker);
-    const stillValid =
-      quantityByTicker.has(ticker) && !manualTickers.has(ticker);
-    if (!desiredIds.has(existingDoc.id) && !stillValid) {
+    if (!desiredIds.has(existingDoc.id)) {
       batch.delete(dividendsCollection.doc(existingDoc.id));
     }
   }
