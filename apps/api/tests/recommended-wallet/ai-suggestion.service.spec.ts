@@ -139,7 +139,7 @@ describe('ai-suggestion.service', () => {
         segment: 'Logísticos',
         weight: 0.2,
         closePrice: 160,
-        monthlyDividend: 1.25,
+        averageMonthlyDividend: 1.25,
       }),
       expect.objectContaining({ ticker: 'XPML11', status: 'extra' }),
     ]);
@@ -150,7 +150,12 @@ describe('ai-suggestion.service', () => {
 
     const extra = input.items.find((item) => item.ticker === 'XPML11');
     expect(extra).toBeDefined();
-    for (const key of ['segment', 'weight', 'closePrice', 'monthlyDividend']) {
+    for (const key of [
+      'segment',
+      'weight',
+      'closePrice',
+      'averageMonthlyDividend',
+    ]) {
       expect(extra).not.toHaveProperty(key);
     }
   });
@@ -592,6 +597,16 @@ describe('ai-suggestion.service', () => {
       'Proventos mensais projetados da carteira: R$ 2.5',
     );
     expect(prompt).toContain('Total disponível para investir: R$ 502.5');
+  });
+
+  it('deve informar no prompt a média mensal de 12 meses por ativo', () => {
+    const prompt = buildUserPrompt(
+      buildSuggestionInput(comparison, 'renda', new Map([['HGLG11', 0.2]])),
+    );
+
+    expect(prompt).toContain('averageMonthlyDividend12m=0.2');
+    expect(prompt).toContain('averageMonthlyDividend12m=indisponível');
+    expect(prompt).not.toContain('monthlyDividend=');
   });
 
   it('deve incluir o status de investidor qualificado no prompt', () => {
@@ -1781,7 +1796,9 @@ describe('ai-suggestion.service', () => {
       byTicker: [],
       total: 15.5,
       totalFromFridge: 13,
-      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+      // Semestral: o último provento (1.5) não se repete todo mês.
+      monthlyDividendByTicker: new Map([['HGLG11', 1.5]]),
+      averageMonthlyDividendByTicker: new Map([['HGLG11', 0.25]]),
     });
     listQualifiedInvestorTickersMock.mockResolvedValue(new Set(['HGLG11']));
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -1862,6 +1879,24 @@ describe('ai-suggestion.service', () => {
       summary: 'Resumo',
       projectedDividends: 15.5,
     });
+    expect(doc.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          projectedDividends: 15.5,
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              ticker: 'HGLG11',
+              averageMonthlyDividend: 0.25,
+            }),
+          ]),
+        }),
+      }),
+    );
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(JSON.stringify(body.messages)).toContain('ticker=HGLG11');
+    expect(JSON.stringify(body.messages)).toContain(
+      'averageMonthlyDividend12m=0.25',
+    );
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         qualifiedInvestor: true,

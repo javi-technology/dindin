@@ -261,6 +261,14 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
     // PETR4 2.4/12 × 100 = 20; HGLG11 0.9 × 10 = 9; ITSA4 1.2/12 × 50 = 5.
     expect(income.total).toBe(34);
     expect(income.totalFromFridge).toBe(5);
+    // Média por ticker, inclusive de quem só está na geladeira (#279).
+    expect(income.averageMonthlyDividendByTicker).toEqual(
+      new Map([
+        ['PETR4', 0.2],
+        ['HGLG11', 0.9],
+        ['ITSA4', 0.1],
+      ]),
+    );
     // A agenda mostra o evento anunciado, não a média.
     expect(income.byTicker).toContainEqual({
       ticker: 'PETR4',
