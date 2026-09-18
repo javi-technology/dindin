@@ -65,6 +65,10 @@ describe('Cloud Functions agendadas', () => {
     it('deve ter retry configurado para falhas', () => {
       expect(options().retryCount).toBe(3);
     });
+
+    it('deve vincular o segredo RESEND_API_KEY para o envio do aviso', () => {
+      expect(options().secrets).toEqual(['RESEND_API_KEY']);
+    });
   });
 
   it('não deve manter os agendamentos diários de madrugada', () => {

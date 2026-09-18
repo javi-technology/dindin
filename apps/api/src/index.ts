@@ -344,11 +344,14 @@ export const savePatrimonySnapshotsScheduled = onSchedule(
 
 // Verificação diária de preço-alvo da geladeira, 15 min após o snapshot
 // patrimonial, para comparar com as cotações já atualizadas do dia (issue #118).
+// O aviso por e-mail usa a API do Resend (issue #265); configurar o segredo com:
+//   firebase functions:secrets:set RESEND_API_KEY
 export const checkTargetPricesScheduled = onSchedule(
   {
     schedule: '15 19 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
+    secrets: ['RESEND_API_KEY'],
     // Varre todos os usuários, com uma leitura por geladeira; os 60s padrão
     // não bastam conforme a base cresce, e o retry reexecutaria a varredura
     // inteira três vezes.

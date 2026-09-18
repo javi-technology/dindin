@@ -253,30 +253,37 @@ usuário e grava um alerta em `users/{uid}/alerts/{fridgeId}_{ticker}`.
 - Quando o preço volta abaixo do alvo ou o item sai da geladeira, o alerta vira
   `cleared` e o ativo é rearmado: se voltar ao alvo, um novo aviso é enviado.
 
-### E-mail (extensão Trigger Email)
+### E-mail (API do Resend)
 
-O envio usa a extensão **`firebase/firestore-send-email`**: a API grava um
-documento em `mail/{alertId}` e a extensão entrega via SMTP. Nenhuma credencial
-de e-mail fica no repositório.
+O aviso é enviado pela **API HTTP do Resend** (`POST https://api.resend.com/emails`)
+direto do job. A extensão Trigger Email do Firebase foi descartada porque o
+Firebase Extensions será desligado em 31/03/2027 — adotá-la obrigaria a migrar
+o envio de novo antes dessa data.
 
-Configuração no projeto `dindin-4e720` (uma vez):
+Configuração (uma vez):
 
-```bash
-firebase ext:install firebase/firestore-send-email --project=dindin-4e720
-```
+1. Verificar o domínio de envio no Resend (recomendado um subdomínio, ex.:
+   `send.javitech.online`) criando os registros DNS que o painel informar.
+2. Gerar uma API key com permissão de envio e gravá-la como segredo:
 
-Parâmetros relevantes:
+   ```bash
+   firebase functions:secrets:set RESEND_API_KEY
+   ```
 
-| Parâmetro                  | Valor                                   |
-| -------------------------- | --------------------------------------- |
-| Email documents collection | `mail`                                  |
-| SMTP connection URI        | URI do provedor SMTP                    |
-| Default FROM address       | ex.: `DinDin <nao-responda@seudominio>` |
+O segredo está vinculado a `checkTargetPricesScheduled` em `apps/api/src/index.ts`.
+O remetente padrão é `DinDin <alertas@send.javitech.online>` e pode ser trocado
+pela variável de ambiente `ALERT_MAIL_FROM`.
 
-O destinatário vem do Firebase Auth (`getAuth().getUser(uid).email`); usuário
-sem e-mail cadastrado tem o alerta criado e o envio pulado com aviso no log.
-A coleção `mail` é fechada para o cliente nas regras do Firestore — só o Admin
-SDK escreve nela.
+Comportamento em falha, por decisão de projeto:
+
+- Sem `RESEND_API_KEY` ou sem e-mail no Auth, o alerta é criado e o envio é
+  pulado com log — o job não quebra.
+- Erro do Resend não marca `notifiedAt`: a execução do dia seguinte tenta de
+  novo, sem criar alerta duplicado.
+- Cada envio leva uma `Idempotency-Key` estável por alerta, então o retry do
+  scheduler não entrega o mesmo e-mail duas vezes.
+
+O destinatário vem do Firebase Auth (`getAuth().getUser(uid).email`).
 
 ## Próximos passos
 

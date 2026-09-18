@@ -5,16 +5,18 @@ import { Alert } from 'dindin-models';
 /**
  * Envio de e-mail dos alertas de preço-alvo (issue #265).
  *
- * O transporte é a extensão `firestore-send-email` (Trigger Email): basta
- * gravar um documento na coleção `mail` e a extensão entrega via SMTP. Assim a
- * API não carrega credencial nem cliente de e-mail, e o teste verifica o
- * documento gravado em vez de mockar um provedor HTTP.
+ * O transporte é a API HTTP do Resend. A extensão Trigger Email seria menos
+ * código, mas o Firebase Extensions será desligado em 31/03/2027: adotá-la
+ * significaria migrar este envio de novo antes dessa data.
  *
- * O id do documento em `mail` é o id do alerta, então uma reexecução do job
- * (retry do scheduler) sobrescreve o mesmo documento em vez de enfileirar um
- * segundo e-mail.
+ * O job não trata falha de envio como erro fatal: o alerta fica sem
+ * `notifiedAt` e a execução do dia seguinte tenta de novo, sem duplicar o
+ * alerta (a dedup vive em `target-price.service.ts`).
  */
 
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const RESEND_TIMEOUT_MS = 10_000;
+const DEFAULT_FROM = 'DinDin <alertas@send.javitech.online>';
 const APP_URL = 'https://dindin-4e720.web.app/geladeira';
 
 function formatCurrency(value: number): string {
@@ -23,10 +25,10 @@ function formatCurrency(value: number): string {
   // interpretam o UTF-8 do corpo em texto puro.
   return value
     .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    .replace(/\u00a0/g, ' ');
+    .replace(/ /g, ' ');
 }
 
-function buildMessage(alert: Alert) {
+function buildEmail(alert: Alert, to: string) {
   const current = formatCurrency(alert.currentPrice);
   const target = formatCurrency(alert.targetPrice);
   const fridge = alert.fridgeName || 'sua geladeira';
@@ -55,6 +57,8 @@ function buildMessage(alert: Alert) {
   ].join('');
 
   return {
+    from: process.env.ALERT_MAIL_FROM ?? DEFAULT_FROM,
+    to: [to],
     subject: `${alert.ticker} atingiu o preço-alvo de ${target}`,
     text,
     html,
@@ -72,9 +76,49 @@ async function userEmail(userId: string): Promise<string | undefined> {
   }
 }
 
+/** Remove a chave do Resend de qualquer texto que vá para o log. */
+function redact(text: string, apiKey: string): string {
+  return text.split(apiKey).join('[redacted]');
+}
+
+async function postEmail(
+  alert: Alert,
+  to: string,
+  apiKey: string,
+): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        // Um retry do scheduler reenviaria o mesmo alerta; a chave é estável
+        // por alerta criado, então o Resend entrega uma vez só. Um novo alerta
+        // do mesmo ticker (após rearme) tem outro `createdAt` e passa.
+        'Idempotency-Key': `${alert.id}_${alert.createdAt}`,
+      },
+      body: JSON.stringify(buildEmail(alert, to)),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body =
+        typeof response.text === 'function' ? await response.text() : '';
+      throw new Error(
+        `Resend respondeu ${response.status}: ${redact(body, apiKey).slice(0, 300)}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
- * Enfileira um e-mail por alerta ainda não notificado e marca `notifiedAt`.
- * Retorna quantos e-mails foram enfileirados.
+ * Envia um e-mail por alerta ainda não notificado e marca `notifiedAt`.
+ * Retorna quantos e-mails foram enviados.
  */
 export async function sendAlertEmails(
   userId: string,
@@ -84,6 +128,14 @@ export async function sendAlertEmails(
   const pending = alerts.filter((alert) => !alert.notifiedAt);
   if (pending.length === 0) return 0;
 
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error(
+      `[sendAlertEmails] RESEND_API_KEY não configurada: ${pending.length} alerta(s) sem aviso`,
+    );
+    return 0;
+  }
+
   const email = await userEmail(userId);
   if (!email) {
     console.warn(
@@ -92,7 +144,6 @@ export async function sendAlertEmails(
     return 0;
   }
 
-  const mail = getFirestore().collection('mail');
   const userAlerts = getFirestore()
     .collection('users')
     .doc(userId)
@@ -102,18 +153,14 @@ export async function sendAlertEmails(
 
   for (const alert of pending) {
     try {
-      await mail.doc(alert.id).set({
-        to: [email],
-        message: buildMessage(alert),
-      });
+      await postEmail(alert, email, apiKey);
       await userAlerts.doc(alert.id).update({ notifiedAt });
       sent += 1;
     } catch (error) {
-      // Uma falha de envio não pode impedir o aviso dos demais ativos: o
-      // alerta segue sem `notifiedAt` e a próxima execução tenta de novo.
+      // Uma falha de envio não pode impedir o aviso dos demais ativos.
       console.error(
-        `[sendAlertEmails] Erro ao enfileirar e-mail de ${alert.ticker} para ${userId}:`,
-        { message: (error as Error).message },
+        `[sendAlertEmails] Erro ao enviar e-mail de ${alert.ticker} para ${userId}:`,
+        { message: redact((error as Error).message, apiKey) },
       );
     }
   }

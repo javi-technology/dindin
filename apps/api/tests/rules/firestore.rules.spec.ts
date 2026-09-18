@@ -469,32 +469,6 @@ describe('Firestore rules – alerts', () => {
 });
 
 // ---------------------------------------------------------------------------
-// mail (issue #265) — fila da extensão Trigger Email
-// ---------------------------------------------------------------------------
-
-describe('Firestore rules – mail', () => {
-  const mailPath = 'mail/fridge-1_HGLG11';
-
-  it('deve negar que o cliente leia a fila de e-mails', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-    await seed(mailPath, { to: ['alice@example.com'] });
-
-    await assertFails(getDoc(doc(alice.firestore(), mailPath)));
-  });
-
-  it('deve negar que o cliente enfileire e-mails', async () => {
-    const alice = testEnv.authenticatedContext('alice');
-
-    await assertFails(
-      setDoc(doc(alice.firestore(), mailPath), {
-        to: ['vitima@example.com'],
-        message: { subject: 'spam', text: 'spam' },
-      }),
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 
