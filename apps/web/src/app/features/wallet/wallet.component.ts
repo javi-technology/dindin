@@ -53,7 +53,25 @@ import {
   LucidePencil,
   LucideTrash2,
   LucideRefrigerator,
+  LucideArrowUp,
+  LucideArrowDown,
+  LucideArrowUpDown,
 } from '@lucide/angular';
+
+export type PositionSortColumn =
+  | 'ticker'
+  | 'quantity'
+  | 'currentPrice'
+  | 'total'
+  | 'monthlyIncome'
+  | 'dividendYield';
+
+export interface PositionSort {
+  column: PositionSortColumn;
+  direction: 'asc' | 'desc';
+}
+
+const tickerCollator = new Intl.Collator('pt-BR');
 
 @Component({
   selector: 'app-wallet',
@@ -66,6 +84,9 @@ import {
     LucidePencil,
     LucideTrash2,
     LucideRefrigerator,
+    LucideArrowUp,
+    LucideArrowDown,
+    LucideArrowUpDown,
     ConfirmDialogComponent,
   ],
   templateUrl: './wallet.component.html',
@@ -92,6 +113,8 @@ export class WalletComponent implements OnInit {
   assetsError = signal<string | null>(null);
   dividendYield = signal<DividendYieldResponse | null>(null);
   monthlyIncome = signal<MonthlyIncomeResponse | null>(null);
+  /** Coluna e direção da tabela de posições (#274). */
+  sort = signal<PositionSort>({ column: 'ticker', direction: 'asc' });
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -177,6 +200,88 @@ export class WalletComponent implements OnInit {
     }
     return found.monthlyIncome;
   };
+
+  readonly sortableColumns: {
+    column: PositionSortColumn;
+    label: string;
+    hint?: string;
+  }[] = [
+    { column: 'ticker', label: 'Ticker' },
+    { column: 'quantity', label: 'Quantidade' },
+    { column: 'currentPrice', label: 'Preço atual' },
+    { column: 'total', label: 'Total' },
+    {
+      column: 'monthlyIncome',
+      label: 'Proventos/mês',
+      hint: 'média dos últimos 12 meses',
+    },
+    { column: 'dividendYield', label: 'DY' },
+  ];
+
+  /**
+   * Posições na ordem escolhida. Quem não tem valor na coluna (sem cotação,
+   * projeção bloqueada) vai para o fim nas duas direções, e empates seguem o
+   * Ticker A→Z para a ordem não oscilar.
+   */
+  sortedPositions = computed(() => {
+    const { column, direction } = this.sort();
+    const factor = direction === 'asc' ? 1 : -1;
+    const byTicker = (a: Position, b: Position) =>
+      tickerCollator.compare(a.ticker, b.ticker);
+
+    return this.positions()
+      .map((position) => ({
+        position,
+        value: this.sortValue(position, column),
+      }))
+      .sort((a, b) => {
+        if (column === 'ticker') {
+          return factor * byTicker(a.position, b.position);
+        }
+        if (a.value === null || b.value === null) {
+          if (a.value !== b.value) return a.value === null ? 1 : -1;
+          return byTicker(a.position, b.position);
+        }
+        return factor * (a.value - b.value) || byTicker(a.position, b.position);
+      })
+      .map(({ position }) => position);
+  });
+
+  toggleSort(column: PositionSortColumn): void {
+    this.sort.update((current) =>
+      current.column === column
+        ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' },
+    );
+  }
+
+  ariaSort(column: PositionSortColumn): 'ascending' | 'descending' | 'none' {
+    const { column: active, direction } = this.sort();
+    if (active !== column) return 'none';
+    return direction === 'asc' ? 'ascending' : 'descending';
+  }
+
+  private sortValue(
+    position: Position,
+    column: PositionSortColumn,
+  ): number | null {
+    switch (column) {
+      case 'quantity':
+        return position.quantity;
+      case 'currentPrice':
+        return position.currentPrice ?? null;
+      case 'total':
+        return position.currentPrice == null
+          ? null
+          : position.quantity * position.currentPrice;
+      case 'monthlyIncome':
+        return this.totalProventosFor(position);
+      case 'dividendYield':
+        return this.dividendYieldFor(position);
+      default:
+        return null;
+    }
+  }
 
   constructor() {
     this.walletToLoad$

@@ -84,27 +84,50 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="border-b border-gray-200">
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Ticker
-                  </th>
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Quantidade
-                  </th>
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Preço atual
-                  </th>
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Total
-                  </th>
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    Proventos/mês
-                    <span class="block text-xs font-normal text-gray-500">
-                      média dos últimos 12 meses
-                    </span>
-                  </th>
-                  <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                    DY
-                  </th>
+                  @for (header of sortableColumns; track header.column) {
+                    <th
+                      class="py-3 px-4 text-sm font-semibold text-gray-700"
+                      [attr.aria-sort]="ariaSort(header.column)"
+                      [attr.data-sort-column]="header.column"
+                    >
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 text-left font-semibold hover:text-gray-900"
+                        (click)="toggleSort(header.column)"
+                      >
+                        {{ header.label }}
+                        @switch (ariaSort(header.column)) {
+                          @case ('ascending') {
+                            <svg
+                              lucideArrowUp
+                              [size]="14"
+                              aria-hidden="true"
+                            ></svg>
+                          }
+                          @case ('descending') {
+                            <svg
+                              lucideArrowDown
+                              [size]="14"
+                              aria-hidden="true"
+                            ></svg>
+                          }
+                          @default {
+                            <svg
+                              lucideArrowUpDown
+                              [size]="14"
+                              class="text-gray-400"
+                              aria-hidden="true"
+                            ></svg>
+                          }
+                        }
+                      </button>
+                      @if (header.hint) {
+                        <span class="block text-xs font-normal text-gray-500">
+                          {{ header.hint }}
+                        </span>
+                      }
+                    </th>
+                  }
                   <th
                     class="py-3 px-4 text-sm font-semibold text-gray-700 text-right"
                   >
@@ -114,7 +137,7 @@
               </thead>
               <tbody>
                 @for (
-                  position of positions();
+                  position of sortedPositions();
                   track position.id;
                   let i = $index
                 ) {
