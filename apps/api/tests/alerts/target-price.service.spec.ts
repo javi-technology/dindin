@@ -9,6 +9,11 @@ jest.mock('firebase-admin/firestore', () => ({
   getFirestore: jest.fn(() => firestoreMock),
 }));
 
+jest.mock('../../src/alerts/alert-mail.service', () => ({
+  sendAlertEmails: jest.fn().mockResolvedValue(0),
+}));
+
+import { sendAlertEmails } from '../../src/alerts/alert-mail.service';
 import {
   checkAllTargetPrices,
   checkUserTargetPrices,
@@ -511,5 +516,59 @@ describe('TargetPriceService – execução do job', () => {
       ([name]: [string]) => name === 'quotes',
     );
     expect(quotesCalls).toHaveLength(1);
+  });
+});
+
+describe('TargetPriceService – notificação dos alertas criados', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('deve enviar e-mail dos alertas criados de cada usuário', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 125 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      users: ['user-1', 'user-2'],
+    });
+
+    await checkAllTargetPrices();
+
+    expect(sendAlertEmails).toHaveBeenCalledTimes(2);
+    expect(sendAlertEmails).toHaveBeenCalledWith(
+      'user-1',
+      expect.arrayContaining([expect.objectContaining({ ticker: 'HGLG11' })]),
+      expect.any(Date),
+    );
+  });
+
+  it('não deve enviar e-mail quando nenhum alerta é criado', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 100 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+    });
+
+    await checkAllTargetPrices();
+
+    expect(sendAlertEmails).not.toHaveBeenCalled();
+  });
+
+  it('deve concluir o job mesmo se a notificação de um usuário falhar', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 125 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      users: ['user-1', 'user-2'],
+    });
+    (sendAlertEmails as jest.Mock).mockRejectedValueOnce(
+      new Error('mail indisponível'),
+    );
+
+    await expect(checkAllTargetPrices()).resolves.toBeUndefined();
+    expect(console.error).toHaveBeenCalled();
   });
 });
