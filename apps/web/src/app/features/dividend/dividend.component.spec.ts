@@ -41,7 +41,6 @@ describe('DividendComponent', () => {
       'getMonthlyReport',
       'getDividendYield',
       'getDividendHistoryBatch',
-      'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
 
@@ -114,7 +113,6 @@ describe('DividendComponent', () => {
           ),
         }),
     );
-    dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
   });
 
   describe('cards por ticker', () => {
@@ -286,34 +284,6 @@ describe('DividendComponent', () => {
       expect(kpi('kpi-yield')).toContain('6,00');
     });
 
-    it('deve recarregar o dividend yield após registrar os proventos do mês', async () => {
-      // O aviso do próprio tile manda usar esse botão para alimentar o
-      // histórico; se o yield não recarrega, a ação não produz o efeito
-      // que a interface promete.
-      dividendServiceMock.getDividendYield.and.returnValues(
-        of({
-          byTicker: [],
-          total: { annualIncome: 0, currentValue: 22000, yield: 0 },
-        }),
-        of({
-          byTicker: [],
-          total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
-        }),
-      );
-
-      await setup();
-      expect(kpi('kpi-yield')).toContain('0,00');
-
-      (
-        (fixture.nativeElement as HTMLElement).querySelector(
-          '[data-testid="record-monthly-button"]',
-        ) as HTMLButtonElement
-      ).click();
-      fixture.detectChanges();
-
-      expect(kpi('kpi-yield')).toContain('9,60');
-    });
-
     it('deve carregar a lista de carteiras uma única vez', async () => {
       await setup();
 
@@ -330,7 +300,9 @@ describe('DividendComponent', () => {
 
       await setup();
 
-      expect(kpi('kpi-yield-note')).toContain('Registrar proventos do mês');
+      // Não há mais botão de registro: os pagamentos entram pelo sync (#112).
+      expect(kpi('kpi-yield-note')).toContain('registrados automaticamente');
+      expect(kpi('kpi-yield-note')).not.toContain('Registrar proventos do mês');
     });
 
     it('não deve sinalizar nada quando há yield calculado', async () => {
