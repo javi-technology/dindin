@@ -16,7 +16,7 @@ export function uid(req: Request): string {
   return (req as AuthRequest).user!.uid;
 }
 
-function userDocument(userId: string) {
+export function userDocument(userId: string) {
   return getFirestore().collection('users').doc(userId);
 }
 
