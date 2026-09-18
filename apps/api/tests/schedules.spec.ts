@@ -50,6 +50,18 @@ describe('Cloud Functions agendadas', () => {
     });
   });
 
+  describe('checkTargetPricesScheduled', () => {
+    const options = () => findScheduleBySchedule('15 19 * * *');
+
+    it('deve rodar 1x ao dia às 19:15 (após cotações e snapshots) no fuso de São Paulo', () => {
+      expect(options().timeZone).toBe('America/Sao_Paulo');
+    });
+
+    it('deve ter retry configurado para falhas', () => {
+      expect(options().retryCount).toBe(3);
+    });
+  });
+
   it('não deve manter os agendamentos diários de madrugada', () => {
     const schedules = mockOnSchedule.mock.calls.map(
       (args) => (args[0] as ScheduleOptions).schedule,

@@ -8,6 +8,7 @@ import {
   Asset,
   Dividend,
   PatrimonySnapshot,
+  Alert,
 } from 'dindin-models';
 
 // ---------------------------------------------------------------------------
@@ -231,5 +232,39 @@ describe('models – PatrimonySnapshot', () => {
 
     expect(snapshot.id).toBe(snapshot.date);
     expect(snapshot.total).toBe(snapshot.totalWallet + snapshot.totalFridge);
+  });
+});
+
+describe('models – Alert', () => {
+  it('deve aceitar um alerta de preço-alvo aberto', () => {
+    const alert: Alert = {
+      id: 'fridge-1_HGLG11',
+      fridgeId: 'fridge-1',
+      fridgeName: 'Geladeira FIIs',
+      ticker: 'HGLG11',
+      targetPrice: 120,
+      currentPrice: 125.5,
+      status: 'open',
+      createdAt: '2026-09-18T22:15:00Z',
+    };
+    expect(alert.status).toBe('open');
+    expect(alert.currentPrice).toBeGreaterThanOrEqual(alert.targetPrice);
+  });
+
+  it('deve aceitar os campos opcionais de notificação e rearme', () => {
+    const alert: Alert = {
+      id: 'fridge-1_MXRF11',
+      fridgeId: 'fridge-1',
+      fridgeName: 'Geladeira FIIs',
+      ticker: 'MXRF11',
+      targetPrice: 11,
+      currentPrice: 10.5,
+      status: 'cleared',
+      createdAt: '2026-09-10T22:15:00Z',
+      notifiedAt: '2026-09-10T22:16:00Z',
+      clearedAt: '2026-09-18T22:15:00Z',
+    };
+    expect(alert.notifiedAt).toBeDefined();
+    expect(alert.clearedAt).toBeDefined();
   });
 });
