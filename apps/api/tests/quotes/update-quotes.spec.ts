@@ -189,6 +189,54 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
     });
 
+    it('deve enviar ao registro os anunciados com data-com (#278)', async () => {
+      const paidEvents = [
+        { paymentDate: '2026-07-14', rate: 0.92, comDate: '2026-06-30' },
+      ];
+      const upcomingEvents = [
+        { paymentDate: '2026-08-14', rate: 0.95, comDate: '2026-07-31' },
+      ];
+      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+        ]),
+      );
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([
+          ['HGLG11', { monthlyDividend: 0.92, paidEvents, upcomingEvents }],
+          // Só anunciado: ainda precisa da foto na data-com.
+          [
+            'MXRF11',
+            {
+              monthlyDividend: 0.07,
+              upcomingEvents: [
+                {
+                  paymentDate: '2026-08-14',
+                  rate: 0.07,
+                  comDate: '2026-07-31',
+                },
+              ],
+            },
+          ],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockRecordPaidDividends).toHaveBeenCalledWith(
+        'HGLG11',
+        [...paidEvents, ...upcomingEvents],
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+      expect(mockRecordPaidDividends).toHaveBeenCalledWith(
+        'MXRF11',
+        [{ paymentDate: '2026-08-14', rate: 0.07, comDate: '2026-07-31' }],
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+    });
+
     it('deve logar e seguir quando o registro de proventos de um ticker falha', async () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
