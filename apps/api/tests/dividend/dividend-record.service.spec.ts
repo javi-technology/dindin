@@ -137,9 +137,24 @@ describe('DividendRecordService', () => {
   it('registra um documento por ticker somando posições e itens da geladeira', async () => {
     const { batchSet, batchCommit, dividendsCollection } = setupUserFirestore({
       quotes: [
-        { id: 'hglg11', ticker: 'HGLG11', monthlyDividend: 0.923 },
-        { id: 'xplg11', ticker: 'XPLG11', monthlyDividend: 0 },
-        { id: 'mxrf11', ticker: 'MXRF11', monthlyDividend: 0.5 },
+        {
+          id: 'hglg11',
+          ticker: 'HGLG11',
+          monthlyDividend: 0.923,
+          dividendPaymentDate: '2026-09-12',
+        },
+        {
+          id: 'xplg11',
+          ticker: 'XPLG11',
+          monthlyDividend: 0,
+          dividendPaymentDate: '2026-09-12',
+        },
+        {
+          id: 'mxrf11',
+          ticker: 'MXRF11',
+          monthlyDividend: 0.5,
+          dividendPaymentDate: '2026-09-12',
+        },
       ],
       positions: [
         { ticker: 'HGLG11', quantity: 100 },
@@ -164,7 +179,7 @@ describe('DividendRecordService', () => {
         amountPerShare: 0.923,
         quantity: 130,
         totalAmount: 119.99,
-        paymentDate: '2026-09-15',
+        paymentDate: '2026-09-12',
         source: 'auto',
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -179,7 +194,7 @@ describe('DividendRecordService', () => {
         amountPerShare: 0.923,
         quantity: 130,
         totalAmount: 119.99,
-        paymentDate: '2026-09-15',
+        paymentDate: '2026-09-12',
         source: 'auto',
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -188,9 +203,128 @@ describe('DividendRecordService', () => {
     expect(batchCommit).toHaveBeenCalledTimes(1);
   });
 
+  it('registra só o provento cujo pagamento cai no mês da competência', async () => {
+    const { batchSet, batchCommit } = setupUserFirestore({
+      quotes: [
+        {
+          ticker: 'HGLG11',
+          monthlyDividend: 0.9,
+          dividendPaymentDate: '2026-09-14',
+        },
+        // Pagador trimestral: o último evento foi em agosto.
+        {
+          ticker: 'PETR4',
+          monthlyDividend: 1.2,
+          dividendPaymentDate: '2026-08-20',
+        },
+        // Evento já anunciado para o mês seguinte.
+        {
+          ticker: 'ITSA4',
+          monthlyDividend: 0.3,
+          dividendPaymentDate: '2026-10-01',
+        },
+        // Sem data não há como saber se o pagamento é deste mês.
+        { ticker: 'MXRF11', monthlyDividend: 0.1 },
+      ],
+      positions: [
+        { ticker: 'HGLG11', quantity: 10 },
+        { ticker: 'PETR4', quantity: 100 },
+        { ticker: 'ITSA4', quantity: 100 },
+        { ticker: 'MXRF11', quantity: 100 },
+      ],
+    });
+
+    const result = await recordMonthlyDividends('user-1', '2026-09-01');
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: '2026-09_HGLG11',
+        ticker: 'HGLG11',
+        totalAmount: 9,
+        paymentDate: '2026-09-14',
+      }),
+    ]);
+    expect(batchSet).toHaveBeenCalledTimes(1);
+    expect(batchCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserva o registro automático do mês quando o último evento já é de outro mês', async () => {
+    const { batchSet, batchDelete } = setupUserFirestore({
+      quotes: [
+        {
+          ticker: 'HGLG11',
+          monthlyDividend: 0.95,
+          dividendPaymentDate: '2026-10-14',
+        },
+      ],
+      positions: [{ ticker: 'HGLG11', quantity: 10 }],
+      existingDividends: [
+        {
+          id: '2026-09_HGLG11',
+          data: {
+            ticker: 'HGLG11',
+            source: 'auto',
+            paymentDate: '2026-09-14',
+          },
+        },
+      ],
+    });
+
+    const result = await recordMonthlyDividends('user-1', '2026-09-30');
+
+    expect(result).toEqual([]);
+    expect(batchSet).not.toHaveBeenCalled();
+    expect(batchDelete).not.toHaveBeenCalled();
+  });
+
+  it('remove o registro automático quando há lançamento manual do ticker no mês', async () => {
+    const { batchSet, batchDelete } = setupUserFirestore({
+      quotes: [
+        {
+          ticker: 'HGLG11',
+          monthlyDividend: 0.9,
+          dividendPaymentDate: '2026-09-14',
+        },
+      ],
+      positions: [{ ticker: 'HGLG11', quantity: 10 }],
+      existingDividends: [
+        {
+          id: '2026-09_HGLG11',
+          data: {
+            ticker: 'HGLG11',
+            source: 'auto',
+            paymentDate: '2026-09-14',
+          },
+        },
+        {
+          id: 'manual-1',
+          data: {
+            ticker: 'HGLG11',
+            source: 'manual',
+            paymentDate: '2026-09-14',
+          },
+        },
+      ],
+    });
+
+    await recordMonthlyDividends('user-1', '2026-09-30');
+
+    expect(batchSet).not.toHaveBeenCalled();
+    expect(batchDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '2026-09_HGLG11' }),
+    );
+  });
+
   it('remove registros automáticos antigos que não fazem mais parte da carteira', async () => {
     const { batchDelete, batchCommit } = setupUserFirestore({
-      quotes: [{ id: 'hglg11', ticker: 'HGLG11', monthlyDividend: 0.9 }],
+      quotes: [
+        {
+          id: 'hglg11',
+          ticker: 'HGLG11',
+          monthlyDividend: 0.9,
+          dividendPaymentDate: '2026-09-14',
+        },
+      ],
       positions: [{ ticker: 'HGLG11', quantity: 100 }],
       existingDividends: [
         {
