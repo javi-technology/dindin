@@ -20,7 +20,7 @@ export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
   weight?: number;
   closePrice?: number;
-  monthlyDividend?: number;
+  averageMonthlyDividend?: number;
   qualifiedInvestor?: boolean;
 }
 
@@ -114,7 +114,7 @@ export function buildSuggestionHistory(
 export function buildSuggestionInput(
   comparison: RecommendedWalletComparison,
   tab: AiSuggestionTab,
-  quotesByTicker: Map<string, number>,
+  averageMonthlyDividendByTicker: Map<string, number>,
   contribution?: number,
   history: AiSuggestionHistoryMonth[] = [],
   projectedDividendsOverride?: number,
@@ -128,7 +128,9 @@ export function buildSuggestionInput(
   );
   const items = comparison.items.map((item) => {
     const asset = assets.get(item.ticker.toUpperCase());
-    const monthlyDividend = quotesByTicker.get(item.ticker.toUpperCase());
+    const averageMonthlyDividend = averageMonthlyDividendByTicker.get(
+      item.ticker.toUpperCase(),
+    );
     const qualifiedInvestor = qualifiedTickers.has(item.ticker.toUpperCase());
     return {
       ...item,
@@ -139,14 +141,17 @@ export function buildSuggestionInput(
             closePrice: asset.closePrice,
           }
         : {}),
-      ...(monthlyDividend === undefined ? {} : { monthlyDividend }),
+      ...(averageMonthlyDividend === undefined
+        ? {}
+        : { averageMonthlyDividend }),
       ...(qualifiedInvestor ? { qualifiedInvestor: true } : {}),
     };
   });
   const projectedDividends =
     projectedDividendsOverride ??
     items.reduce(
-      (total, item) => total + item.quantity * (item.monthlyDividend ?? 0),
+      (total, item) =>
+        total + item.quantity * (item.averageMonthlyDividend ?? 0),
       0,
     );
   return {
@@ -880,7 +885,7 @@ export async function generateSuggestion(
   const input = buildSuggestionInput(
     comparison,
     tab,
-    income.monthlyDividendByTicker,
+    income.averageMonthlyDividendByTicker,
     contribution,
     history,
     income.total,

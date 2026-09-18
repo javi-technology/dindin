@@ -14,6 +14,7 @@ export interface MonthlyIncome {
   total: number;
   totalFromFridge: number;
   monthlyDividendByTicker: Map<string, number>;
+  averageMonthlyDividendByTicker: Map<string, number>;
 }
 
 function positionsCollection(userId: string, walletId: string) {
@@ -78,7 +79,7 @@ export async function computeMonthlyIncome(
     const average =
       typeof data.annualDividend === 'number' &&
       Number.isFinite(data.annualDividend)
-        ? data.annualDividend / 12
+        ? Math.round((data.annualDividend / 12) * 1e6) / 1e6
         : monthlyDividendByTicker.get(ticker);
     if (average !== undefined) {
       averageMonthlyDividendByTicker.set(ticker, average);
@@ -132,5 +133,6 @@ export async function computeMonthlyIncome(
     total,
     totalFromFridge,
     monthlyDividendByTicker,
+    averageMonthlyDividendByTicker,
   };
 }
