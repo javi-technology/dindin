@@ -275,8 +275,15 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
       quantity: 100,
       monthlyDividend: 1.2,
       monthlyIncome: 120,
+      averageMonthlyIncome: 20,
       paymentDate: '2026-08-20',
     });
+    // A soma das médias por ativo das carteiras bate com o total sem geladeira.
+    const averageSum = income.byTicker.reduce(
+      (sum, item) => sum + item.averageMonthlyIncome,
+      0,
+    );
+    expect(averageSum).toBe(income.total - income.totalFromFridge);
   });
 
   it('não deve arredondar a média usada no total do card', async () => {
@@ -372,12 +379,14 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 10,
         monthlyDividend: 0.9,
         monthlyIncome: 9,
+        averageMonthlyIncome: 9,
       },
       {
         ticker: 'MXRF11',
         quantity: 100,
         monthlyDividend: 0.07,
         monthlyIncome: 7,
+        averageMonthlyIncome: 7,
       },
     ]);
     expect(response.body.total).toBe(16);
@@ -439,6 +448,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 10,
         monthlyDividend: 0.9,
         monthlyIncome: 9,
+        averageMonthlyIncome: 9,
         paymentDate: '2026-09-15',
       },
       {
@@ -446,6 +456,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 100,
         monthlyDividend: 0.07,
         monthlyIncome: 7,
+        averageMonthlyIncome: 7,
       },
     ]);
   });
