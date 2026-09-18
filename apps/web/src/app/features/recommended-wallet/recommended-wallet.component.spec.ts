@@ -5,6 +5,8 @@ import { of, Subject, throwError } from 'rxjs';
 import { MeResponse } from 'dindin-shared-types';
 import {
   AiSuggestion,
+  Asset,
+  Position,
   RecommendedWallet,
   RecommendedWalletComparison,
   Wallet,
@@ -14,11 +16,15 @@ import { RecommendedWalletService } from '../../core/services/recommended-wallet
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService } from '../../core/services/billing.service';
+import { PositionService } from '../../core/services/position.service';
+import { AssetService } from '../../core/services/asset.service';
 
 describe('RecommendedWalletComponent', () => {
   let fixture: ComponentFixture<RecommendedWalletComponent>;
   let serviceMock: jasmine.SpyObj<RecommendedWalletService>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
+  let positionServiceMock: jasmine.SpyObj<PositionService>;
+  let assetServiceMock: jasmine.SpyObj<AssetService>;
   let authServiceMock: { isAdmin: jasmine.Spy };
   let billingServiceMock: {
     hasAi: ReturnType<typeof signal<boolean>>;
@@ -94,7 +100,14 @@ describe('RecommendedWalletComponent', () => {
       'import',
       'getSuggestion',
       'generateSuggestion',
+      'applySuggestionItem',
     ]);
+    positionServiceMock = jasmine.createSpyObj('PositionService', [
+      'list',
+      'create',
+      'update',
+    ]);
+    assetServiceMock = jasmine.createSpyObj('AssetService', ['list']);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
     billingServiceMock = {
@@ -171,6 +184,8 @@ describe('RecommendedWalletComponent', () => {
         { provide: WalletService, useValue: walletServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: BillingService, useValue: billingServiceMock },
+        { provide: PositionService, useValue: positionServiceMock },
+        { provide: AssetService, useValue: assetServiceMock },
       ],
     }).compileComponents();
 
@@ -461,5 +476,282 @@ describe('RecommendedWalletComponent', () => {
     fixture.componentInstance.generateSuggestion();
 
     expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Aplicar itens da Sugestão do mês na carteira (issue #276)
+  // -------------------------------------------------------------------------
+  describe('aplicar na carteira', () => {
+    const suggestion: AiSuggestion = {
+      id: 'wallet-1_2026-09_renda',
+      walletId: 'wallet-1',
+      month: '2026-09',
+      tab: 'renda',
+      model: 'modelo',
+      summary: 'Resumo',
+      items: [
+        {
+          ticker: 'HGLG11',
+          action: 'buy',
+          priority: 1,
+          rationale: 'Aumente a posição.',
+          suggestedAmount: 100,
+          suggestedQuantity: 1,
+          referencePrice: 95,
+          fallbackAllocations: [
+            {
+              ticker: 'HGCR11',
+              amount: 100,
+              suggestedQuantity: 1,
+              referencePrice: 96.44,
+            },
+          ],
+        },
+        {
+          ticker: 'MXRF11',
+          action: 'buy',
+          priority: 2,
+          rationale: 'Aguarde acumular.',
+          suggestedAmount: 9,
+          suggestedQuantity: 0,
+          referencePrice: 10,
+        },
+        {
+          ticker: 'VISC11',
+          action: 'hold',
+          priority: 3,
+          rationale: 'Mantenha.',
+        },
+        {
+          ticker: 'XPML11',
+          action: 'reduce',
+          priority: 4,
+          rationale: 'Reduza.',
+        },
+      ],
+      disclaimer: 'Aviso',
+      createdAt: '2026-09-04T12:00:00Z',
+    };
+    const positions: Position[] = [
+      {
+        id: 'pos-1',
+        walletId: 'wallet-1',
+        ticker: 'HGLG11',
+        assetType: 'FII',
+        quantity: 2,
+        averagePrice: 100,
+        inFridge: false,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+    const assets: Asset[] = [
+      {
+        ticker: 'HGCR11',
+        name: 'CSHG Recebíveis',
+        assetType: 'FII',
+        active: true,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+    const button = (testId: string): HTMLButtonElement | null =>
+      el().querySelector(`[data-testid="${testId}"]`);
+    const modal = (): HTMLElement | null =>
+      el().querySelector('[data-testid="apply-modal"]');
+    const input = (testId: string): HTMLInputElement =>
+      modal()!.querySelector(`[data-testid="${testId}"]`) as HTMLInputElement;
+    const type = (testId: string, value: string): void => {
+      const field = input(testId);
+      field.value = value;
+      field.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+    const confirmButton = (): HTMLButtonElement =>
+      modal()!.querySelector(
+        '[data-testid="confirm-dialog-confirm"]',
+      ) as HTMLButtonElement;
+    const open = (testId: string): void => {
+      button(testId)!.click();
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      serviceMock.getSuggestion.and.returnValue(of(suggestion));
+      positionServiceMock.list.and.returnValue(of(positions));
+      assetServiceMock.list.and.returnValue(of(assets));
+      positionServiceMock.update.and.returnValue(of(positions[0]));
+      positionServiceMock.create.and.returnValue(of(positions[0]));
+      serviceMock.applySuggestionItem.and.callFake((_id, body) =>
+        of({
+          ...suggestion,
+          appliedItems: [{ ...body, appliedAt: '2026-09-18T00:00:00Z' }],
+        }),
+      );
+      fixture.detectChanges();
+    });
+
+    it('deve exibir o botão só nas compras e nas alternativas', () => {
+      expect(button('apply-item-HGLG11')).not.toBeNull();
+      expect(button('apply-fallback-HGLG11-HGCR11')).not.toBeNull();
+      // Aguardar, Manter e Reduzir não ganham botão.
+      expect(button('apply-item-MXRF11')).toBeNull();
+      expect(button('apply-item-VISC11')).toBeNull();
+      expect(button('apply-item-XPML11')).toBeNull();
+    });
+
+    it('deve abrir o modal pré-preenchido com a carteira comparada', () => {
+      open('apply-item-HGLG11');
+
+      expect(modal()).not.toBeNull();
+      expect(modal()!.textContent).toContain('Principal');
+      expect(input('apply-quantity').value).toBe('1');
+      expect(input('apply-price').value).toBe('95');
+      expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
+    });
+
+    it('deve mostrar a prévia da quantidade e do preço médio', () => {
+      open('apply-item-HGLG11');
+
+      const preview = modal()!.querySelector(
+        '[data-testid="apply-preview"]',
+      )!.textContent!;
+      // 2 cotas a R$ 100 + 1 a R$ 95 → 3 cotas a R$ 98,33.
+      expect(preview).toContain('2 → 3');
+      expect(preview).toMatch(/R\$\s?100,00 → R\$\s?98,33/);
+    });
+
+    it('deve atualizar a posição existente com o preço pago em vírgula', () => {
+      open('apply-item-HGLG11');
+      type('apply-quantity', '2');
+      type('apply-price', '89,20');
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.update).toHaveBeenCalledWith(
+        'wallet-1',
+        'pos-1',
+        { quantity: 4, averagePrice: 94.6 },
+      );
+      expect(positionServiceMock.create).not.toHaveBeenCalled();
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
+        'wallet-1_2026-09_renda',
+        { ticker: 'HGLG11', quantity: 2, price: 89.2 },
+      );
+      expect(modal()).toBeNull();
+    });
+
+    it('deve criar a posição da alternativa com o tipo do catálogo', () => {
+      open('apply-fallback-HGLG11-HGCR11');
+      expect(input('apply-price').value).toBe('96,44');
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.create).toHaveBeenCalledWith('wallet-1', {
+        ticker: 'HGCR11',
+        assetType: 'FII',
+        quantity: 1,
+        averagePrice: 96.44,
+      });
+      expect(positionServiceMock.update).not.toHaveBeenCalled();
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
+        'wallet-1_2026-09_renda',
+        { ticker: 'HGCR11', fallbackFor: 'HGLG11', quantity: 1, price: 96.44 },
+      );
+    });
+
+    it('deve recarregar a comparação depois de aplicar', () => {
+      const calls = serviceMock.compare.calls.count();
+      open('apply-item-HGLG11');
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(serviceMock.compare.calls.count()).toBe(calls + 1);
+    });
+
+    it('deve bloquear a confirmação com quantidade ou preço inválidos', () => {
+      open('apply-item-HGLG11');
+
+      type('apply-quantity', '0');
+      expect(confirmButton().disabled).toBeTrue();
+
+      type('apply-quantity', '1');
+      type('apply-price', '-1');
+      expect(confirmButton().disabled).toBeTrue();
+
+      type('apply-price', 'abc');
+      expect(confirmButton().disabled).toBeTrue();
+
+      type('apply-price', '95');
+      expect(confirmButton().disabled).toBeFalse();
+    });
+
+    it('deve marcar como aplicado e impedir nova aplicação', () => {
+      fixture.componentInstance.suggestion.set({
+        ...suggestion,
+        appliedItems: [
+          {
+            ticker: 'HGLG11',
+            quantity: 3,
+            price: 94.5,
+            appliedAt: '2026-09-18T00:00:00Z',
+          },
+        ],
+      });
+      fixture.detectChanges();
+
+      const applied = button('apply-item-HGLG11')!;
+      expect(applied.disabled).toBeTrue();
+      expect(applied.closest('li')!.textContent).toContain('Aplicado');
+      expect(applied.closest('li')!.textContent).toMatch(
+        /3 cotas a R\$\s?94,50/,
+      );
+      // A alternativa é outra compra e continua disponível.
+      expect(button('apply-fallback-HGLG11-HGCR11')!.disabled).toBeFalse();
+    });
+
+    it('deve mostrar o erro no modal sem marcar o item', () => {
+      positionServiceMock.update.and.returnValue(
+        throwError(() => ({ status: 500 })),
+      );
+      open('apply-item-HGLG11');
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(
+        modal()!.querySelector('[data-testid="apply-error"]'),
+      ).not.toBeNull();
+      expect(serviceMock.applySuggestionItem).not.toHaveBeenCalled();
+      expect(
+        fixture.componentInstance.suggestion()?.appliedItems,
+      ).toBeUndefined();
+    });
+
+    it('não deve lançar a compra de novo ao repetir só o registro que falhou', () => {
+      serviceMock.applySuggestionItem.and.returnValues(
+        throwError(() => ({ status: 500 })),
+        of({ ...suggestion, appliedItems: [] }),
+      );
+      open('apply-item-HGLG11');
+
+      confirmButton().click();
+      fixture.detectChanges();
+      expect(
+        modal()!.querySelector('[data-testid="apply-error"]'),
+      ).not.toBeNull();
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(positionServiceMock.update).toHaveBeenCalledTimes(1);
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledTimes(2);
+      expect(modal()).toBeNull();
+    });
   });
 });
