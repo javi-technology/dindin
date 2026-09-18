@@ -2,10 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { Router, UrlTree } from '@angular/router';
 import { Auth, User } from '@angular/fire/auth';
 import { authGuard } from './auth.guard';
+import { SetupService } from '../services/setup.service';
 
 describe('authGuard', () => {
   let authMock: { authStateReady: jasmine.Spy; currentUser: User | null };
   let routerMock: jasmine.SpyObj<Router>;
+  let setupServiceMock: jasmine.SpyObj<SetupService>;
 
   beforeEach(() => {
     authMock = {
@@ -16,11 +18,14 @@ describe('authGuard', () => {
     };
     routerMock = jasmine.createSpyObj('Router', ['parseUrl']);
     routerMock.parseUrl.and.returnValue({} as UrlTree);
+    setupServiceMock = jasmine.createSpyObj('SetupService', ['ensureDefaults']);
+    setupServiceMock.ensureDefaults.and.resolveTo();
 
     TestBed.configureTestingModule({
       providers: [
         { provide: Auth, useValue: authMock },
         { provide: Router, useValue: routerMock },
+        { provide: SetupService, useValue: setupServiceMock },
       ],
     });
   });
@@ -45,5 +50,28 @@ describe('authGuard', () => {
 
     expect(routerMock.parseUrl).toHaveBeenCalledWith('/login');
     expect(result).toBe(routerMock.parseUrl('/login'));
+    expect(setupServiceMock.ensureDefaults).not.toHaveBeenCalled();
+  });
+
+  it('deve provisionar carteira e geladeira padrão antes de liberar a tela (#275)', async () => {
+    authMock.currentUser = { uid: 'user-123' } as User;
+    let finishSetup!: () => void;
+    setupServiceMock.ensureDefaults.and.returnValue(
+      new Promise<void>((resolve) => (finishSetup = resolve)),
+    );
+
+    let settled = false;
+    const result = TestBed.runInInjectionContext(() =>
+      authGuard({} as never, {} as never),
+    ) as Promise<boolean | UrlTree>;
+    result.then(() => (settled = true));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(setupServiceMock.ensureDefaults).toHaveBeenCalledWith('user-123');
+    expect(settled).toBeFalse();
+
+    finishSetup();
+    expect(await result).toBeTrue();
   });
 });

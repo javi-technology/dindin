@@ -5,6 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { of, throwError, delay } from 'rxjs';
+import { SetupService } from '../../core/services/setup.service';
 import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
@@ -20,6 +21,7 @@ describe('WalletComponent', () => {
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
   let dividendServiceMock: jasmine.SpyObj<DividendService>;
+  let setupServiceMock: jasmine.SpyObj<SetupService>;
 
   const assets: Asset[] = [
     {
@@ -114,6 +116,7 @@ describe('WalletComponent', () => {
       'getDividendYield',
       'getMonthlyIncome',
     ]);
+    setupServiceMock = jasmine.createSpyObj('SetupService', ['createDefault']);
 
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
@@ -173,6 +176,7 @@ describe('WalletComponent', () => {
         { provide: FridgeService, useValue: fridgeServiceMock },
         { provide: AssetService, useValue: assetServiceMock },
         { provide: DividendService, useValue: dividendServiceMock },
+        { provide: SetupService, useValue: setupServiceMock },
       ],
     }).compileComponents();
 
@@ -202,8 +206,10 @@ describe('WalletComponent', () => {
   });
 
   it('deve criar carteira padrão ao clicar no botão', fakeAsync(() => {
-    walletServiceMock.list.and.returnValue(of([]));
-    walletServiceMock.create.and.returnValue(of(wallets[0]));
+    walletServiceMock.list.and.returnValues(of([]), of(wallets));
+    setupServiceMock.createDefault.and.returnValue(
+      of({ walletCreated: true, fridgeCreated: false }),
+    );
     fixture = TestBed.createComponent(WalletComponent);
     fixture.detectChanges();
     tick();
@@ -217,10 +223,9 @@ describe('WalletComponent', () => {
     tick();
     fixture.detectChanges();
 
-    expect(walletServiceMock.create).toHaveBeenCalledWith({
-      name: 'Carteira Principal',
-      currency: 'BRL',
-    });
+    // O nome padrão mora na API (#275): o front só pede o recurso.
+    expect(setupServiceMock.createDefault).toHaveBeenCalledWith('wallet');
+    expect(walletServiceMock.create).not.toHaveBeenCalled();
     expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
   }));
 
