@@ -434,7 +434,8 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
 
       expect(result).toEqual([]);
       expect(batchSet).not.toHaveBeenCalled();
-      expect(snapshotSet).toHaveBeenCalledOnceWith('2026-09-30', {
+      expect(snapshotSet).toHaveBeenCalledTimes(1);
+      expect(snapshotSet).toHaveBeenCalledWith('2026-09-30', {
         quantities: { u1: 100, u2: 30 },
         takenAt: expect.any(String),
       });
@@ -578,7 +579,8 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
         '2026-10-20',
       );
 
-      expect(snapshotDelete).toHaveBeenCalledOnceWith('2025-08-29');
+      expect(snapshotDelete).toHaveBeenCalledTimes(1);
+      expect(snapshotDelete).toHaveBeenCalledWith('2025-08-29');
       expect(stateSet).toHaveBeenCalledWith({
         recorded: { '2026-10-14': 1.1 },
         snapshots: ['2026-09-30'],
