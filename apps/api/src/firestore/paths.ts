@@ -36,6 +36,10 @@ export function fridgeItemsCollection(userId: string, fridgeId: string) {
   return fridgesCollection(userId).doc(fridgeId).collection('fridgeItems');
 }
 
+export function alertsCollection(userId: string) {
+  return userDocument(userId).collection('alerts');
+}
+
 export function dividendsCollection(userId: string) {
   return userDocument(userId).collection('dividends');
 }

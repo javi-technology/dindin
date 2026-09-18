@@ -235,3 +235,26 @@ export interface AiSuggestion {
   projectedDividends?: number;
   historyMonths?: string[];
 }
+
+/**
+ * Alerta de preço-alvo de um item da geladeira — subcoleção
+ * `users/{uid}/alerts` (issue #118).
+ *
+ * O id é determinístico (`{fridgeId}_{ticker}`) porque só existe um alerta
+ * por item: enquanto ele estiver `open` o job não cria outro, e por isso o
+ * usuário recebe um aviso por vez que o ativo atinge o alvo, não um por dia.
+ * O alerta é rearmado (`cleared`) quando o preço volta abaixo do alvo ou o
+ * item sai da geladeira.
+ */
+export interface Alert {
+  id: string; // `${fridgeId}_${ticker}`
+  fridgeId: string;
+  fridgeName: string;
+  ticker: string;
+  targetPrice: number;
+  currentPrice: number;
+  status: 'open' | 'cleared';
+  createdAt: string; // ISO-8601
+  notifiedAt?: string; // ISO-8601 — preenchido pelo envio do e-mail
+  clearedAt?: string; // ISO-8601 — quando o alerta foi rearmado
+}
