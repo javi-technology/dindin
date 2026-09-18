@@ -5,6 +5,9 @@ import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 export interface DividendInfo {
   monthlyDividend: number;
   paymentDate?: string; // YYYY-MM-DD
+  // Soma dos proventos pagos nos 12 meses até hoje. Ausente quando nenhum
+  // evento tem data: sem ela não há como saber a periodicidade.
+  annualDividend?: number;
 }
 
 interface FiiDividendEvent {
@@ -90,8 +93,50 @@ function dividendInfo(
   return date ? { monthlyDividend, paymentDate: date } : { monthlyDividend };
 }
 
+interface PaidEvent {
+  rate: number;
+  paymentDate: unknown;
+}
+
+/**
+ * Soma os proventos pagos em (hoje − 12 meses, hoje]. Eventos anunciados e
+ * ainda não pagos ficam de fora, senão um pagador mensal somaria 13 meses.
+ */
+function annualDividend(events: PaidEvent[], today: Date): number | undefined {
+  const dates = events.map((event) => toDateOnly(event.paymentDate));
+  if (dates.every((date) => date === undefined)) {
+    return undefined;
+  }
+
+  const end = today.toISOString().slice(0, 10);
+  const start = `${Number(end.slice(0, 4)) - 1}${end.slice(4)}`;
+  const total = events.reduce((sum, event, index) => {
+    const date = dates[index];
+    return date !== undefined && date > start && date <= end
+      ? sum + event.rate
+      : sum;
+  }, 0);
+
+  // Evita resíduos de ponto flutuante (ex.: 1.25 + 1.1 = 2.3499999...).
+  return Math.round(total * 1e6) / 1e6;
+}
+
+function withAnnualDividend(
+  info: DividendInfo,
+  events: PaidEvent[],
+  today: Date,
+): DividendInfo {
+  const annual = annualDividend(events, today);
+  return annual === undefined ? info : { ...info, annualDividend: annual };
+}
+
+function isValidRate(rate: unknown): rate is number {
+  return typeof rate === 'number' && Number.isFinite(rate);
+}
+
 async function fetchFiiDividendBatch(
   tickers: string[],
+  today: Date,
 ): Promise<Map<string, DividendInfo>> {
   const symbols = tickers.join(',');
   const url = `${BRAPI_FII_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
@@ -117,13 +162,14 @@ async function fetchFiiDividendBatch(
 
   const events = (data as FiiDividendsResponse).dividends;
   const byTicker = new Map<string, FiiDividendEvent>();
+  const eventsByTicker = new Map<string, FiiDividendEvent[]>();
 
   for (const event of events) {
     if (event.label !== 'RENDIMENTO') continue;
-    if (typeof event.rate !== 'number' || !Number.isFinite(event.rate))
-      continue;
+    if (!isValidRate(event.rate)) continue;
 
     const symbol = event.symbol.toUpperCase();
+    eventsByTicker.set(symbol, [...(eventsByTicker.get(symbol) ?? []), event]);
     const current = byTicker.get(symbol);
     if (
       !current ||
@@ -136,13 +182,18 @@ async function fetchFiiDividendBatch(
   return new Map(
     [...byTicker.entries()].map(([ticker, event]) => [
       ticker,
-      dividendInfo(event.rate, event.paymentDate),
+      withAnnualDividend(
+        dividendInfo(event.rate, event.paymentDate),
+        eventsByTicker.get(ticker)!,
+        today,
+      ),
     ]),
   );
 }
 
 async function fetchStocksDividendBatch(
   tickers: string[],
+  today: Date,
 ): Promise<Map<string, DividendInfo>> {
   const symbols = tickers.join(',');
   const url = `${BRAPI_STOCKS_DIVIDENDS_URL}?symbols=${encodeURIComponent(symbols)}`;
@@ -177,12 +228,16 @@ async function fetchStocksDividendBatch(
       latestEventDate(a.paymentDate, b.paymentDate),
     );
     const latest = sorted[0];
-    if (typeof latest.rate !== 'number' || !Number.isFinite(latest.rate)) {
+    if (!isValidRate(latest.rate)) {
       continue;
     }
     output.set(
       (item.requestedSymbol ?? item.symbol).toUpperCase(),
-      dividendInfo(latest.rate, latest.paymentDate),
+      withAnnualDividend(
+        dividendInfo(latest.rate, latest.paymentDate),
+        dividends.filter((dividend) => isValidRate(dividend.rate)),
+        today,
+      ),
     );
   }
 
@@ -202,6 +257,7 @@ function isStockLike(assetType: AssetType): boolean {
 
 export async function fetchMonthlyDividends(
   assets: ActiveAsset[],
+  today = new Date(),
 ): Promise<Map<string, DividendInfo>> {
   const fiiTickers = assets
     .filter((a) => isFii(a.assetType))
@@ -214,7 +270,7 @@ export async function fetchMonthlyDividends(
     fetchInBatches(
       fiiTickers,
       FII_BATCH_SIZE,
-      fetchFiiDividendBatch,
+      (batch) => fetchFiiDividendBatch(batch, today),
       BATCH_ERROR_LOG_MESSAGE,
     ).catch((error) => {
       console.error('[fetchMonthlyDividends] Erro ao buscar FIIs:', {
@@ -225,7 +281,7 @@ export async function fetchMonthlyDividends(
     fetchInBatches(
       stockTickers,
       STOCKS_BATCH_SIZE,
-      fetchStocksDividendBatch,
+      (batch) => fetchStocksDividendBatch(batch, today),
       BATCH_ERROR_LOG_MESSAGE,
     ).catch((error) => {
       console.error('[fetchMonthlyDividends] Erro ao buscar stocks:', {
