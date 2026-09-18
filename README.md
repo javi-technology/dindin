@@ -276,6 +276,11 @@ O remetente padrão é `DinDin <alertas@javitech.online>` e pode ser trocado pel
 variável de ambiente `ALERT_MAIL_FROM`. O endereço precisa pertencer ao domínio
 verificado.
 
+O `Reply-To` sai preenchido porque o domínio não tem MX: a caixa do remetente
+não recebe, e sem ele qualquer resposta ao alerta voltaria com erro. O padrão
+pode ser trocado por `ALERT_MAIL_REPLY_TO` — quando houver caixa no próprio
+domínio (ex.: `contato@javitech.online`), é para lá que ele deve apontar.
+
 Comportamento em falha, por decisão de projeto:
 
 - Sem `RESEND_API_KEY` ou sem e-mail no Auth, o alerta é criado e o envio é

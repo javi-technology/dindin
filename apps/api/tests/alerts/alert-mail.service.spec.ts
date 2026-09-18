@@ -152,6 +152,23 @@ describe('AlertMailService', () => {
     expect(requestBody().from).toBe('DinDin <avisos@outro.dominio>');
   });
 
+  it('deve definir Reply-To para a resposta não voltar com erro', async () => {
+    seedFirestore();
+
+    await sendAlertEmails('user-1', [alert()]);
+
+    expect(requestBody().reply_to).toBe('vkremersantos@icloud.com');
+  });
+
+  it('deve permitir sobrescrever o Reply-To por variável de ambiente', async () => {
+    seedFirestore();
+    process.env.ALERT_MAIL_REPLY_TO = 'contato@javitech.online';
+
+    await sendAlertEmails('user-1', [alert()]);
+
+    expect(requestBody().reply_to).toBe('contato@javitech.online');
+  });
+
   it('deve descrever ticker, preço atual, preço-alvo e geladeira no conteúdo', async () => {
     seedFirestore();
 

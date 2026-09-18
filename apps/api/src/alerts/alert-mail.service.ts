@@ -20,6 +20,10 @@ const RESEND_TIMEOUT_MS = 10_000;
 // `send.` que aparece no DNS é o return-path da infra do Resend, não um
 // domínio de envio — usá-lo no FROM faria o envio ser recusado.
 const DEFAULT_FROM = 'DinDin <alertas@javitech.online>';
+// O domínio não tem MX, então a caixa do remetente não recebe: sem Reply-To,
+// responder ao alerta devolveria erro. Trocar por um endereço do próprio
+// domínio quando houver caixa lá.
+const DEFAULT_REPLY_TO = 'vkremersantos@icloud.com';
 const APP_URL = 'https://dindin-4e720.web.app/geladeira';
 
 function formatCurrency(value: number): string {
@@ -62,6 +66,7 @@ function buildEmail(alert: Alert, to: string) {
   return {
     from: process.env.ALERT_MAIL_FROM ?? DEFAULT_FROM,
     to: [to],
+    reply_to: process.env.ALERT_MAIL_REPLY_TO ?? DEFAULT_REPLY_TO,
     subject: `${alert.ticker} atingiu o preço-alvo de ${target}`,
     text,
     html,
