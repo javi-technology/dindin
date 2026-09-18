@@ -76,6 +76,7 @@ import {
 } from './patrimony/patrimony.controller';
 import { saveAllPatrimonySnapshots } from './patrimony/patrimony-snapshot.service';
 import { recordAllMonthlyDividends } from './dividend/dividend-record.service';
+import { checkAllTargetPrices } from './alerts/target-price.service';
 import { onObjectFinalized } from 'firebase-functions/v2/storage';
 import {
   compareRecommended,
@@ -338,6 +339,26 @@ export const savePatrimonySnapshotsScheduled = onSchedule(
   },
   async () => {
     await saveAllPatrimonySnapshots();
+  },
+);
+
+// Verificação diária de preço-alvo da geladeira, 15 min após o snapshot
+// patrimonial, para comparar com as cotações já atualizadas do dia (issue #118).
+// O aviso por e-mail usa a API do Resend (issue #265); configurar o segredo com:
+//   firebase functions:secrets:set RESEND_API_KEY
+export const checkTargetPricesScheduled = onSchedule(
+  {
+    schedule: '15 19 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+    secrets: ['RESEND_API_KEY'],
+    // Varre todos os usuários, com uma leitura por geladeira; os 60s padrão
+    // não bastam conforme a base cresce, e o retry reexecutaria a varredura
+    // inteira três vezes.
+    timeoutSeconds: 300,
+  },
+  async () => {
+    await checkAllTargetPrices();
   },
 );
 

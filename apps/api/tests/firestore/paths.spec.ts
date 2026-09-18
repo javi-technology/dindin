@@ -34,6 +34,7 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import {
+  alertsCollection,
   dividendsCollection,
   fridgeItemsCollection,
   fridgesCollection,
@@ -98,6 +99,16 @@ describe('caminhos do Firestore', () => {
         'collection:fridges',
         'doc:fridge-1',
         'collection:fridgeItems',
+      ]);
+    });
+
+    it('deve montar users/{uid}/alerts', () => {
+      alertsCollection('user-123');
+
+      expect(visited).toEqual([
+        'collection:users',
+        'doc:user-123',
+        'collection:alerts',
       ]);
     });
 

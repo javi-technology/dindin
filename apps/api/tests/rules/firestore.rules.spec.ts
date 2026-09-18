@@ -436,6 +436,39 @@ describe('Firestore rules – patrimonySnapshots', () => {
 });
 
 // ---------------------------------------------------------------------------
+// alerts (issue #118)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – alerts', () => {
+  const alertPath = 'users/alice/alerts/fridge-1_HGLG11';
+
+  it('deve permitir que o proprietário leia seus alertas', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await seed(alertPath, { ticker: 'HGLG11', status: 'open' });
+
+    await assertSucceeds(getDoc(doc(alice.firestore(), alertPath)));
+  });
+
+  it('deve negar que outro usuário leia os alertas', async () => {
+    const bob = testEnv.authenticatedContext('bob');
+    await seed(alertPath, { ticker: 'HGLG11', status: 'open' });
+
+    await assertFails(getDoc(doc(bob.firestore(), alertPath)));
+  });
+
+  it('deve negar que o proprietário escreva alertas', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+
+    await assertFails(
+      setDoc(doc(alice.firestore(), alertPath), {
+        ticker: 'HGLG11',
+        status: 'open',
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 

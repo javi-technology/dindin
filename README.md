@@ -241,6 +241,68 @@ expostos em `GET /api/me`):
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
   `portal-session`.
 
+## Moeda: BRL-only
+
+O app trabalha **apenas com reais** (issue #266, herdada da #105). Projeção de
+proventos, patrimônio e totais consolidados somam valores sem conversão de
+câmbio, então uma carteira em outra moeda seria calculada como se fosse em
+reais. Por isso `POST /api/wallets` e `PUT /api/wallets/:id` rejeitam com 400
+qualquer `currency` diferente de `BRL`. Multimoeda está fora da v1.
+
+## Alertas de preço-alvo da geladeira
+
+Todo dia às 19:15 (após a atualização de cotações das 18:30 e o snapshot
+patrimonial das 19:00), a function `checkTargetPricesScheduled` compara a
+cotação atual de cada item da geladeira com o `targetPrice` definido pelo
+usuário e grava um alerta em `users/{uid}/alerts/{fridgeId}_{ticker}`.
+
+- O alerta nasce `open` e o usuário recebe **um** e-mail. Enquanto o alerta
+  continuar aberto o job não cria outro, então não há aviso diário repetido.
+- Quando o preço volta abaixo do alvo ou o item sai da geladeira, o alerta vira
+  `cleared` e o ativo é rearmado: se voltar ao alvo, um novo aviso é enviado.
+
+### E-mail (API do Resend)
+
+O aviso é enviado pela **API HTTP do Resend** (`POST https://api.resend.com/emails`)
+direto do job. A extensão Trigger Email do Firebase foi descartada porque o
+Firebase Extensions será desligado em 31/03/2027 — adotá-la obrigaria a migrar
+o envio de novo antes dessa data.
+
+Configuração (uma vez):
+
+1. Verificar o domínio `javitech.online` no Resend criando os registros DNS que
+   o painel informar (DKIM em `resend._domainkey`, mais MX e SPF no subdomínio
+   `send.`, que é o return-path da infra do Resend).
+2. Gerar uma API key com permissão de envio e gravá-la como segredo:
+
+   ```bash
+   firebase functions:secrets:set RESEND_API_KEY
+   ```
+
+O segredo está vinculado a `checkTargetPricesScheduled` em `apps/api/src/index.ts`.
+O remetente padrão é `DinDin <alertas@javitech.online>` e pode ser trocado pela
+variável de ambiente `ALERT_MAIL_FROM`. O endereço precisa pertencer ao domínio
+verificado.
+
+O `Reply-To` sai preenchido porque o domínio não tem MX: a caixa do remetente
+não recebe, e sem ele qualquer resposta ao alerta voltaria com erro. O padrão
+pode ser trocado por `ALERT_MAIL_REPLY_TO` — quando houver caixa no próprio
+domínio (ex.: `contato@javitech.online`), é para lá que ele deve apontar.
+
+Comportamento em falha, por decisão de projeto:
+
+- Sem `RESEND_API_KEY` ou sem e-mail no Auth, o alerta é criado e o envio é
+  pulado com log — o job não quebra.
+- Erro do Resend não marca `notifiedAt`: como o alerta segue `open`, a
+  execução do dia seguinte o devolve como pendência e tenta de novo, sem
+  criar alerta duplicado.
+- Os envios são sequenciais e espaçados (`ALERT_MAIL_INTERVAL_MS`, 600ms por
+  padrão) para respeitar o limite de requisições por segundo do Resend.
+- Cada envio leva uma `Idempotency-Key` estável por alerta, então o retry do
+  scheduler não entrega o mesmo e-mail duas vezes.
+
+O destinatário vem do Firebase Auth (`getAuth().getUser(uid).email`).
+
 ## Próximos passos
 
 1. Criar o projeto `dindin-4e720` no Firebase Console (ou ajustar em `.firebaserc`).

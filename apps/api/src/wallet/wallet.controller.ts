@@ -4,24 +4,15 @@ import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { uid, walletsCollection } from '../firestore/paths';
 
-// Códigos de moeda ISO 4217 aceitos pela aplicação.
-// Ampliar conforme necessário.
-const SUPPORTED_CURRENCIES = new Set([
-  'BRL',
-  'USD',
-  'EUR',
-  'GBP',
-  'JPY',
-  'CAD',
-  'AUD',
-  'CHF',
-  'CNY',
-  'ARS',
-]);
+// O DinDin é BRL-only por decisão de produto (issue #266, herdada da #105):
+// projeção de proventos, patrimônio e totais consolidados somam valores sem
+// conversão de câmbio. Aceitar outra moeda gravaria uma carteira que todos os
+// cálculos do app tratariam como se fosse em reais.
+const SUPPORTED_CURRENCY = 'BRL';
 
-/** Mensagem de erro de moeda não suportada, com a lista de aceitas. */
+/** Mensagem de erro de moeda não suportada. */
 function unsupportedCurrencyError(currency: string): string {
-  return `Currency '${currency}' is not supported. Accepted values: ${[...SUPPORTED_CURRENCIES].join(', ')}`;
+  return `Currency '${currency}' is not supported. Accepted value: ${SUPPORTED_CURRENCY}`;
 }
 
 export const listWallets = asyncHandler(
@@ -43,7 +34,7 @@ export const createWallet = asyncHandler(
       return;
     }
 
-    if (!SUPPORTED_CURRENCIES.has(currency)) {
+    if (currency !== SUPPORTED_CURRENCY) {
       res.status(400).json({ error: unsupportedCurrencyError(currency) });
       return;
     }
@@ -93,7 +84,7 @@ export const updateWallet = asyncHandler(
       Pick<Wallet, 'name' | 'description' | 'currency'>
     >;
 
-    if (currency !== undefined && !SUPPORTED_CURRENCIES.has(currency)) {
+    if (currency !== undefined && currency !== SUPPORTED_CURRENCY) {
       res.status(400).json({ error: unsupportedCurrencyError(currency) });
       return;
     }

@@ -11,6 +11,7 @@ type ScheduleOptions = {
   timeZone?: string;
   retryCount?: number;
   secrets?: string[];
+  timeoutSeconds?: number;
 };
 
 function findScheduleBySchedule(schedule: string): ScheduleOptions {
@@ -47,6 +48,26 @@ describe('Cloud Functions agendadas', () => {
 
     it('deve ter retry configurado para falhas', () => {
       expect(options().retryCount).toBe(3);
+    });
+  });
+
+  describe('checkTargetPricesScheduled', () => {
+    const options = () => findScheduleBySchedule('15 19 * * *');
+
+    it('deve rodar 1x ao dia às 19:15 (após cotações e snapshots) no fuso de São Paulo', () => {
+      expect(options().timeZone).toBe('America/Sao_Paulo');
+    });
+
+    it('deve ter timeout maior que o padrão por varrer toda a base', () => {
+      expect(options().timeoutSeconds).toBeGreaterThanOrEqual(180);
+    });
+
+    it('deve ter retry configurado para falhas', () => {
+      expect(options().retryCount).toBe(3);
+    });
+
+    it('deve vincular o segredo RESEND_API_KEY para o envio do aviso', () => {
+      expect(options().secrets).toEqual(['RESEND_API_KEY']);
     });
   });
 

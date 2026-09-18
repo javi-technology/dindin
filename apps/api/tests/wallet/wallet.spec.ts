@@ -321,6 +321,20 @@ describe('Wallet CRUD', () => {
       expect(response.body.error).toMatch(/not supported/);
     });
 
+    it('deve retornar 400 para moeda estrangeira: o app é BRL-only (#266)', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      for (const currency of ['USD', 'EUR', 'ARS']) {
+        const response = await request(app)
+          .post('/api/wallets')
+          .set('Authorization', authHeader)
+          .send({ name: 'Nova Carteira', currency });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/BRL/);
+      }
+    });
+
     it('deve retornar 500 quando o Firestore falha', async () => {
       firestoreMock = createFailingFirestoreMock();
 
@@ -391,6 +405,30 @@ describe('Wallet CRUD', () => {
         .send({ name: 'Carteira Atualizada' });
 
       expect(response.status).toBe(404);
+    });
+
+    it('deve retornar 400 ao trocar a carteira para moeda estrangeira (#266)', async () => {
+      firestoreMock = createFirestoreMock([baseWallet]);
+
+      const response = await request(app)
+        .put('/api/wallets/wallet-1')
+        .set('Authorization', authHeader)
+        .send({ currency: 'USD' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/BRL/);
+    });
+
+    it('deve aceitar a atualização mantendo BRL', async () => {
+      firestoreMock = createFirestoreMock([baseWallet]);
+
+      const response = await request(app)
+        .put('/api/wallets/wallet-1')
+        .set('Authorization', authHeader)
+        .send({ currency: 'BRL' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.currency).toBe('BRL');
     });
 
     it('deve retornar 400 para currency inválida na atualização', async () => {
