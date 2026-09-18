@@ -1,11 +1,12 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { Alert, FridgeItem, Quote } from 'dindin-models';
+import {
+  alertsCollection,
+  fridgeItemsCollection,
+  fridgesCollection,
+} from '../firestore/paths';
 
 const BATCH_SIZE = 10;
-
-function userCollection(userId: string, collection: string) {
-  return getFirestore().collection('users').doc(userId).collection(collection);
-}
 
 /** Preço por ticker (em caixa alta) das cotações atuais. */
 export type QuotePrices = Map<string, number>;
@@ -49,12 +50,15 @@ type FridgeItemWithFridge = {
 async function fetchFridgeItems(
   userId: string,
 ): Promise<FridgeItemWithFridge[]> {
-  const fridgesSnapshot = await userCollection(userId, 'fridges').get();
+  const fridgesSnapshot = await fridgesCollection(userId).get();
   const items: FridgeItemWithFridge[] = [];
 
   for (const fridgeDoc of fridgesSnapshot.docs) {
     const fridgeName = (fridgeDoc.data() as { name?: string }).name ?? '';
-    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
+    const itemsSnapshot = await fridgeItemsCollection(
+      userId,
+      fridgeDoc.id,
+    ).get();
 
     for (const itemDoc of itemsSnapshot.docs) {
       items.push({
@@ -69,8 +73,14 @@ async function fetchFridgeItems(
 }
 
 export interface TargetPriceCheckResult {
-  /** Alertas criados nesta execução — entrada do envio de e-mail. */
+  /** Alertas criados nesta execução. */
   created: Alert[];
+  /**
+   * Alertas que já estavam abertos e continuam sem aviso enviado — o envio
+   * falhou numa execução anterior. Sem isso o alerta ficaria `open` para
+   * sempre (a dedup impede recriá-lo) e o usuário nunca seria avisado.
+   */
+  pendingNotification: Alert[];
   /** Ids dos alertas rearmados nesta execução. */
   cleared: string[];
 }
@@ -88,16 +98,26 @@ export async function checkUserTargetPrices(
   const [prices, fridgeItems, openAlertsSnapshot] = await Promise.all([
     quotePrices ? Promise.resolve(quotePrices) : loadQuotePrices(),
     fetchFridgeItems(userId),
-    userCollection(userId, 'alerts').where('status', '==', 'open').get(),
+    alertsCollection(userId).where('status', '==', 'open').get(),
   ]);
 
-  const alerts = userCollection(userId, 'alerts');
-  const openAlertIds = new Set(openAlertsSnapshot.docs.map((doc) => doc.id));
+  const alerts = alertsCollection(userId);
+  const openAlerts = new Map<string, Alert>(
+    openAlertsSnapshot.docs.map((doc) => [
+      doc.id,
+      { ...doc.data(), id: doc.id } as Alert,
+    ]),
+  );
   const timestamp = now.toISOString();
 
   const created: Alert[] = [];
+  const pendingNotification: Alert[] = [];
   const cleared: string[] = [];
   const stillOnTarget = new Set<string>();
+  // Itens no alvo cuja cotação não pôde ser lida: não dá para afirmar que o
+  // preço caiu, então o alerta aberto não é rearmado (rearmar faria o job
+  // recriá-lo depois e avisar de novo).
+  const undetermined = new Set<string>();
 
   for (const { item, fridgeId, fridgeName } of fridgeItems) {
     const ticker =
@@ -105,15 +125,27 @@ export async function checkUserTargetPrices(
     const targetPrice = validPrice(item.targetPrice);
     const currentPrice = ticker ? prices.get(ticker) : undefined;
 
-    if (!ticker || targetPrice === undefined || currentPrice === undefined) {
+    if (!ticker || targetPrice === undefined) continue;
+
+    if (currentPrice === undefined) {
+      undetermined.add(alertId(fridgeId, ticker));
       continue;
     }
 
     const id = alertId(fridgeId, ticker);
     if (currentPrice < targetPrice) continue;
 
+    // O mesmo ticker pode aparecer duas vezes na mesma geladeira e os dois
+    // itens compartilham o id do alerta; sem isso o segundo sobrescreveria o
+    // alerta e geraria um aviso duplicado.
+    if (stillOnTarget.has(id)) continue;
     stillOnTarget.add(id);
-    if (openAlertIds.has(id)) continue;
+
+    const openAlert = openAlerts.get(id);
+    if (openAlert) {
+      if (!openAlert.notifiedAt) pendingNotification.push(openAlert);
+      continue;
+    }
 
     const alert: Alert = {
       id,
@@ -133,13 +165,13 @@ export async function checkUserTargetPrices(
   // Alerta aberto cujo item não está mais no alvo (preço caiu ou o item saiu
   // da geladeira) é rearmado: se voltar ao alvo, um novo alerta é criado e o
   // usuário é avisado de novo.
-  for (const id of openAlertIds) {
-    if (stillOnTarget.has(id)) continue;
+  for (const id of openAlerts.keys()) {
+    if (stillOnTarget.has(id) || undetermined.has(id)) continue;
     await alerts.doc(id).update({ status: 'cleared', clearedAt: timestamp });
     cleared.push(id);
   }
 
-  return { created, cleared };
+  return { created, pendingNotification, cleared };
 }
 
 /** Roda a verificação para todos os usuários — usado pelo scheduler. */

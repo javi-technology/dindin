@@ -349,6 +349,10 @@ export const checkTargetPricesScheduled = onSchedule(
     schedule: '15 19 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
+    // Varre todos os usuários, com uma leitura por geladeira; os 60s padrão
+    // não bastam conforme a base cresce, e o retry reexecutaria a varredura
+    // inteira três vezes.
+    timeoutSeconds: 300,
   },
   async () => {
     await checkAllTargetPrices();

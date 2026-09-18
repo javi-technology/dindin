@@ -50,23 +50,32 @@ function seedFirestore(options: {
     })),
   };
 
+  // Itens por geladeira: o serviço chega neles por
+  // `fridges/{id}/fridgeItems` (paths.ts), não pela ref do snapshot.
+  const itemsByFridge = new Map(
+    (options.fridges ?? []).map((fridge) => [
+      fridge.id,
+      {
+        get: jest.fn().mockResolvedValue({
+          docs: fridge.items.map((item, index) => ({
+            id: `item-${index}`,
+            data: () => item,
+          })),
+        }),
+      },
+    ]),
+  );
+
   const fridgesCollection = {
     get: jest.fn().mockResolvedValue({
       docs: (options.fridges ?? []).map((fridge) => ({
         id: fridge.id,
         data: () => ({ name: fridge.name }),
-        ref: {
-          collection: jest.fn(() => ({
-            get: jest.fn().mockResolvedValue({
-              docs: fridge.items.map((item, index) => ({
-                id: `item-${index}`,
-                data: () => item,
-              })),
-            }),
-          })),
-        },
       })),
     }),
+    doc: jest.fn((fridgeId: string) => ({
+      collection: jest.fn(() => itemsByFridge.get(fridgeId)),
+    })),
   };
 
   const userDoc = {
@@ -301,6 +310,168 @@ describe('TargetPriceService – detecção do preço-alvo', () => {
       ([name]: [string]) => name === 'quotes',
     );
     expect(quotesCalls).toHaveLength(1);
+  });
+});
+
+describe('TargetPriceService – casos que duplicariam o aviso', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('deve criar um único alerta para o mesmo ticker repetido na geladeira', async () => {
+    // O mesmo ticker pode entrar duas vezes na geladeira (ex.: posições de
+    // duas carteiras): nada impede isso no CRUD, e o id do alerta é por
+    // (geladeira, ticker).
+    const { alertSet } = seedFirestore({
+      quotes: { PETR4: 46 },
+      fridges: [
+        {
+          id: 'fridge-1',
+          name: 'Geladeira FIIs',
+          items: [
+            item({ ticker: 'PETR4', targetPrice: 40 }),
+            item({ ticker: 'PETR4', targetPrice: 45 }),
+          ],
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(alertSet).toHaveBeenCalledTimes(1);
+    expect(result.created).toHaveLength(1);
+  });
+
+  it('não deve rearmar alerta aberto quando a cotação está indisponível', async () => {
+    // Sem cotação não dá para afirmar que o preço caiu; rearmar aqui faria o
+    // job recriar o alerta na execução seguinte e avisar duas vezes.
+    const { alertUpdate } = seedFirestore({
+      quotes: {},
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: { ticker: 'HGLG11', fridgeId: 'fridge-1', status: 'open' },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(alertUpdate).not.toHaveBeenCalled();
+    expect(result.cleared).toHaveLength(0);
+  });
+
+  it('deve rearmar alerta de item que saiu da geladeira mesmo sem cotação', async () => {
+    const { alertUpdate } = seedFirestore({
+      quotes: {},
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: { ticker: 'HGLG11', fridgeId: 'fridge-1', status: 'open' },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(alertUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'cleared' }),
+    );
+    expect(result.cleared).toEqual(['fridge-1_HGLG11']);
+  });
+
+  it('deve rearmar quando o alvo foi removido do item, mesmo sem cotação', async () => {
+    const { alertUpdate } = seedFirestore({
+      quotes: {},
+      fridges: [
+        {
+          id: 'fridge-1',
+          name: 'Geladeira FIIs',
+          items: [item({ targetPrice: 0 })],
+        },
+      ],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: { ticker: 'HGLG11', fridgeId: 'fridge-1', status: 'open' },
+        },
+      ],
+    });
+
+    await checkUserTargetPrices('user-1');
+
+    expect(alertUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'cleared' }),
+    );
+  });
+});
+
+describe('TargetPriceService – avisos pendentes de execuções anteriores', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('deve devolver alerta aberto que ficou sem notifiedAt', async () => {
+    const { alertSet } = seedFirestore({
+      quotes: { HGLG11: 130 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: {
+            fridgeId: 'fridge-1',
+            fridgeName: 'Geladeira FIIs',
+            ticker: 'HGLG11',
+            targetPrice: 120,
+            currentPrice: 130,
+            status: 'open',
+            createdAt: '2026-09-17T22:15:00Z',
+          },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(alertSet).not.toHaveBeenCalled();
+    expect(result.created).toHaveLength(0);
+    expect(result.pendingNotification).toHaveLength(1);
+    expect(result.pendingNotification[0].id).toBe('fridge-1_HGLG11');
+  });
+
+  it('não deve devolver alerta aberto que já foi notificado', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 130 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: {
+            ticker: 'HGLG11',
+            status: 'open',
+            notifiedAt: '2026-09-17T22:16:00Z',
+          },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(result.pendingNotification).toHaveLength(0);
   });
 });
 
