@@ -15,6 +15,10 @@ import {
   generateSuggestion as generateSuggestionForUser,
   getSavedSuggestion,
 } from './ai-suggestion.service';
+import {
+  AppliedItemInput,
+  recordAppliedItem,
+} from './suggestion-applied.service';
 
 // O mapeamento de `error.statusCode` para status HTTP, antes repetido em seis
 // handlers deste arquivo, passou para o asyncHandler (issue #222): basta
@@ -178,5 +182,19 @@ export const generateSuggestion = asyncHandler(
     );
 
     res.status(201).json(suggestion);
+  },
+);
+
+/** Marca uma compra da sugestão como lançada na carteira (#276). */
+export const applySuggestionItem = asyncHandler(
+  'applySuggestionItem',
+  async (req: Request, res: Response) => {
+    res.json(
+      await recordAppliedItem(
+        uid(req),
+        req.params.id,
+        (req.body ?? {}) as AppliedItemInput,
+      ),
+    );
   },
 );

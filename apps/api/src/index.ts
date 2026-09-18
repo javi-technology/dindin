@@ -83,6 +83,7 @@ import {
   getLatestRecommended,
   getSuggestion,
   generateSuggestion,
+  applySuggestionItem,
   importRecommended,
   listRecommended,
 } from './recommended-wallet/recommended-wallet.controller';
@@ -264,6 +265,11 @@ app.post(
   '/api/recommended-wallets/bb-fii/suggestions',
   requireEntitlement('ai'),
   generateSuggestion,
+);
+app.post(
+  '/api/recommended-wallets/bb-fii/suggestions/:id/applied',
+  requireEntitlement('ai'),
+  applySuggestionItem,
 );
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',
