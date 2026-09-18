@@ -31,13 +31,14 @@ function queryResult(docs: unknown[]) {
 }
 
 function setupFirestore(options: {
-  cursor?: string;
+  // Valor por cota já registrado em cada dia de pagamento.
+  recorded?: Record<string, number>;
   positions?: HolderDoc[];
   fridgeItems?: HolderDoc[];
   existingDividends?: ExistingDividend[];
   commitError?: Error;
 }) {
-  const cursorSet = jest.fn().mockResolvedValue(undefined);
+  const stateSet = jest.fn().mockResolvedValue(undefined);
   const batchSet = jest.fn();
   const batchCommit = options.commitError
     ? jest.fn().mockRejectedValue(options.commitError)
@@ -68,14 +69,14 @@ function setupFirestore(options: {
         return {
           doc: jest.fn(() => ({
             get: jest.fn().mockResolvedValue(
-              options.cursor
+              options.recorded
                 ? {
                     exists: true,
-                    data: () => ({ recordedThrough: options.cursor }),
+                    data: () => ({ recorded: options.recorded }),
                   }
                 : { exists: false, data: () => undefined },
             ),
-            set: cursorSet,
+            set: stateSet,
           })),
         };
       }
@@ -99,7 +100,7 @@ function setupFirestore(options: {
     batch: jest.fn(() => ({ set: batchSet, commit: batchCommit })),
   };
 
-  return { cursorSet, batchSet, batchCommit, groups };
+  return { stateSet, batchSet, batchCommit, groups };
 }
 
 const writtenPaths = (batchSet: jest.Mock) =>
@@ -110,9 +111,9 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     jest.clearAllMocks();
   });
 
-  it('registra os eventos pagos depois do cursor para quem tem o ativo', async () => {
-    const { batchSet, cursorSet, groups } = setupFirestore({
-      cursor: '2026-09-10',
+  it('registra os dias de pagamento ainda não registrados para quem tem o ativo', async () => {
+    const { batchSet, stateSet, groups } = setupFirestore({
+      recorded: { '2026-08-14': 0.9 },
       positions: [
         { path: 'users/u1/wallets/w1/positions/p1', quantity: 100 },
         { path: 'users/u1/wallets/w2/positions/p2', quantity: 20 },
@@ -127,7 +128,7 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     const result = await recordPaidDividends(
       'HGLG11',
       [
-        // Já registrado em execução anterior (antes do cursor).
+        // Já registrado em execução anterior.
         { paymentDate: '2026-08-14', rate: 0.9 },
         { paymentDate: '2026-09-14', rate: 0.92 },
       ],
@@ -173,14 +174,16 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
-    expect(cursorSet).toHaveBeenCalledWith({
-      recordedThrough: '2026-09-18',
+    expect(stateSet).toHaveBeenCalledWith({
+      recorded: { '2026-08-14': 0.9, '2026-09-14': 0.92 },
       updatedAt: expect.any(String),
     });
   });
 
   it('não consulta quem tem o ativo quando não há pagamento novo', async () => {
-    const { batchSet, cursorSet } = setupFirestore({ cursor: '2026-09-14' });
+    const { batchSet, stateSet } = setupFirestore({
+      recorded: { '2026-09-14': 0.92 },
+    });
 
     const result = await recordPaidDividends(
       'HGLG11',
@@ -191,11 +194,11 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     expect(result).toEqual([]);
     expect(firestoreMock.collectionGroup).not.toHaveBeenCalled();
     expect(batchSet).not.toHaveBeenCalled();
-    expect(cursorSet).not.toHaveBeenCalled();
+    expect(stateSet).not.toHaveBeenCalled();
   });
 
-  it('sem cursor, registra só os pagamentos de hoje e inicia o cursor', async () => {
-    const { batchSet, cursorSet } = setupFirestore({
+  it('na primeira execução, registra só os pagamentos de hoje', async () => {
+    const { batchSet, stateSet } = setupFirestore({
       positions: [{ path: 'users/u1/wallets/w1/positions/p1', quantity: 10 }],
     });
 
@@ -211,13 +214,16 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     expect(writtenPaths(batchSet)).toEqual([
       'users/u1/dividends/2026-09-18_HGLG11',
     ]);
-    expect(cursorSet).toHaveBeenCalledWith(
-      expect.objectContaining({ recordedThrough: '2026-09-18' }),
+    // Os dias anteriores entram como já registrados, sem gravação retroativa.
+    expect(stateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recorded: { '2026-08-14': 0.9, '2026-09-18': 0.92 },
+      }),
     );
   });
 
-  it('sem cursor e sem pagamento hoje, apenas inicia o cursor', async () => {
-    const { batchSet, cursorSet } = setupFirestore({});
+  it('na primeira execução sem pagamento hoje, apenas guarda o estado', async () => {
+    const { batchSet, stateSet } = setupFirestore({});
 
     await recordPaidDividends(
       'HGLG11',
@@ -227,14 +233,14 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
 
     expect(firestoreMock.collectionGroup).not.toHaveBeenCalled();
     expect(batchSet).not.toHaveBeenCalled();
-    expect(cursorSet).toHaveBeenCalledWith(
-      expect.objectContaining({ recordedThrough: '2026-09-18' }),
+    expect(stateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ recorded: { '2026-08-14': 0.9 } }),
     );
   });
 
   it('junta num único registro os proventos pagos no mesmo dia', async () => {
     const { batchSet } = setupFirestore({
-      cursor: '2026-09-10',
+      recorded: {},
       positions: [{ path: 'users/u1/wallets/w1/positions/p1', quantity: 100 }],
     });
 
@@ -253,9 +259,57 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     );
   });
 
+  it('regrava o dia quando um provento do mesmo dia chega depois', async () => {
+    // Dividendo registrado no dia 15; o JCP do mesmo dia só apareceu na
+    // Brapi no dia 16.
+    const { batchSet, stateSet } = setupFirestore({
+      recorded: { '2026-09-15': 1.25 },
+      positions: [{ path: 'users/u1/wallets/w1/positions/p1', quantity: 100 }],
+    });
+
+    await recordPaidDividends(
+      'PETR4',
+      [
+        { paymentDate: '2026-09-15', rate: 1.25 },
+        { paymentDate: '2026-09-15', rate: 0.5 },
+      ],
+      '2026-09-16',
+    );
+
+    expect(writtenPaths(batchSet)).toEqual([
+      'users/u1/dividends/2026-09-15_PETR4',
+    ]);
+    expect(batchSet.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ amountPerShare: 1.75, totalAmount: 175 }),
+    );
+    expect(stateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ recorded: { '2026-09-15': 1.75 } }),
+    );
+  });
+
+  it('registra um pagamento publicado depois com data anterior à do último registro', async () => {
+    const { batchSet } = setupFirestore({
+      recorded: { '2026-09-15': 0.92 },
+      positions: [{ path: 'users/u1/wallets/w1/positions/p1', quantity: 10 }],
+    });
+
+    await recordPaidDividends(
+      'HGLG11',
+      [
+        { paymentDate: '2026-09-14', rate: 0.3 },
+        { paymentDate: '2026-09-15', rate: 0.92 },
+      ],
+      '2026-09-16',
+    );
+
+    expect(writtenPaths(batchSet)).toEqual([
+      'users/u1/dividends/2026-09-14_HGLG11',
+    ]);
+  });
+
   it('respeita lançamento manual e registro do job antigo no mesmo mês', async () => {
     const { batchSet, groups } = setupFirestore({
-      cursor: '2026-09-10',
+      recorded: {},
       positions: [
         { path: 'users/manual/wallets/w1/positions/p1', quantity: 10 },
         { path: 'users/legado/wallets/w1/positions/p1', quantity: 10 },
@@ -308,9 +362,9 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
     ]);
   });
 
-  it('não avança o cursor quando a gravação falha', async () => {
-    const { cursorSet } = setupFirestore({
-      cursor: '2026-09-10',
+  it('não atualiza o estado quando a gravação falha', async () => {
+    const { stateSet } = setupFirestore({
+      recorded: {},
       positions: [{ path: 'users/u1/wallets/w1/positions/p1', quantity: 10 }],
       commitError: new Error('falha no Firestore'),
     });
@@ -322,6 +376,6 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
         '2026-09-18',
       ),
     ).rejects.toThrow('falha no Firestore');
-    expect(cursorSet).not.toHaveBeenCalled();
+    expect(stateSet).not.toHaveBeenCalled();
   });
 });
