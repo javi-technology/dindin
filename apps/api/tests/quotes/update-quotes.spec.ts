@@ -2,6 +2,7 @@ const mockFetchQuotes = jest.fn();
 const mockSaveQuoteHistory = jest.fn();
 const mockListActiveAssetTickers = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
+const mockRecordPaidDividends = jest.fn();
 
 jest.mock('../../src/quotes/brapi.service', () => ({
   fetchQuotes: mockFetchQuotes,
@@ -15,6 +16,10 @@ jest.mock('../../src/quotes/quote-history.service', () => ({
   saveQuoteHistory: mockSaveQuoteHistory,
 }));
 
+jest.mock('../../src/dividend/dividend-sync-record.service', () => ({
+  recordPaidDividends: mockRecordPaidDividends,
+}));
+
 jest.mock('../../src/assets/asset.service', () => ({
   listActiveAssetTickers: mockListActiveAssetTickers,
 }));
@@ -25,6 +30,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchMonthlyDividends.mockResolvedValue(new Map());
+    mockRecordPaidDividends.mockResolvedValue([]);
   });
 
   describe('sem ativos no catálogo', () => {
@@ -147,6 +153,74 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         '2026-07-14',
         10.8,
       );
+    });
+
+    it('deve registrar os proventos pagos de cada ticker com eventos', async () => {
+      const paidEvents = [{ paymentDate: '2026-07-14', rate: 0.92 }];
+      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+        ]),
+      );
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([
+          [
+            'HGLG11',
+            {
+              monthlyDividend: 0.92,
+              paymentDate: '2026-07-14',
+              annualDividend: 0.92,
+              paidEvents,
+            },
+          ],
+          ['MXRF11', { monthlyDividend: 0.07 }],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockRecordPaidDividends).toHaveBeenCalledTimes(1);
+      expect(mockRecordPaidDividends).toHaveBeenCalledWith(
+        'HGLG11',
+        paidEvents,
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+    });
+
+    it('deve logar e seguir quando o registro de proventos de um ticker falha', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      const paidEvents = [{ paymentDate: '2026-07-14', rate: 0.5 }];
+      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+        ]),
+      );
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([
+          ['HGLG11', { monthlyDividend: 0.92, paidEvents }],
+          ['MXRF11', { monthlyDividend: 0.07, paidEvents }],
+        ]),
+      );
+      mockRecordPaidDividends
+        .mockRejectedValueOnce(new Error('falha no registro'))
+        .mockResolvedValueOnce([]);
+
+      await expect(updateAllQuotes()).resolves.toBeUndefined();
+
+      expect(mockRecordPaidDividends).toHaveBeenCalledTimes(2);
+      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[updateAllQuotes] Erro ao registrar proventos de HGLG11:',
+        { message: 'falha no registro' },
+      );
+      consoleErrorSpy.mockRestore();
     });
 
     it('deve salvar a data de pagamento do provento junto com o histórico', async () => {
