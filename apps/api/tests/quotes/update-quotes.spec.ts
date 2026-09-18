@@ -105,6 +105,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         0.92,
         'brapi',
         undefined,
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -112,6 +113,39 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         0.07,
         'brapi',
         undefined,
+        undefined,
+      );
+    });
+
+    it('deve salvar a soma dos proventos de 12 meses junto com o histórico', async () => {
+      mockListActiveAssetTickers.mockResolvedValue(mockAssets());
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+        ]),
+      );
+      mockFetchMonthlyDividends.mockResolvedValue(
+        new Map([
+          [
+            'HGLG11',
+            {
+              monthlyDividend: 0.92,
+              paymentDate: '2026-07-14',
+              annualDividend: 10.8,
+            },
+          ],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+        'HGLG11',
+        165.5,
+        0.92,
+        'brapi',
+        '2026-07-14',
+        10.8,
       );
     });
 
@@ -138,12 +172,14 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         0.92,
         'brapi',
         '2026-07-14',
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
         10.32,
         0.07,
         'brapi',
+        undefined,
         undefined,
       );
     });
@@ -165,6 +201,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         undefined,
         'brapi',
+        undefined,
         undefined,
       );
     });
@@ -239,6 +276,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         0.92,
         'brapi',
         undefined,
+        undefined,
       );
     });
 
@@ -268,6 +306,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         0.07,
         'brapi',
         undefined,
+        undefined,
       );
     });
 
@@ -296,6 +335,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         165.5,
         undefined,
         'brapi',
+        undefined,
         undefined,
       );
 
@@ -337,6 +377,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           10 + i,
           (10 + i) / 100,
           'brapi',
+          undefined,
           undefined,
         );
       }
