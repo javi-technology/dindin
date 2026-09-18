@@ -6,7 +6,6 @@ import {
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
-import { recordMonthlyDividends } from './dividend-record.service';
 import { computeMonthlyIncome } from './monthly-income.service';
 import {
   appToday,
@@ -275,14 +274,6 @@ export const getMonthlyDividendReport = asyncHandler(
     );
 
     res.json(buildMonthlyDividendReport(dividends, year));
-  },
-);
-
-export const postMonthlyDividendRecord = asyncHandler(
-  'postMonthlyDividendRecord',
-  async (req: Request, res: Response) => {
-    const dividends = await recordMonthlyDividends(uid(req));
-    res.status(201).json(dividends);
   },
 );
 
