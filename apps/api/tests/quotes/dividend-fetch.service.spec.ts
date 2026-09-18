@@ -110,13 +110,19 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         ],
       });
 
-      const result = await fetchMonthlyDividends([
-        { ticker: 'HGLG11', assetType: 'FII' },
-      ]);
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'HGLG11', assetType: 'FII' }],
+        new Date('2026-09-18T12:00:00.000Z'),
+      );
 
       expect(result.get('HGLG11')).toEqual({
         monthlyDividend: 0.92,
         paymentDate: '2026-07-14',
+        annualDividend: 1.82,
+        paidEvents: [
+          { paymentDate: '2026-06-12', rate: 0.9 },
+          { paymentDate: '2026-07-14', rate: 0.92 },
+        ],
       });
     });
 
@@ -208,13 +214,16 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
         ],
       });
 
-      const result = await fetchMonthlyDividends([
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'PETR4', assetType: 'STOCK' }],
+        new Date('2026-09-18T12:00:00.000Z'),
+      );
 
       expect(result.get('PETR4')).toEqual({
         monthlyDividend: 1.25,
         paymentDate: '2026-10-15',
+        annualDividend: 1.1,
+        paidEvents: [{ paymentDate: '2026-06-15', rate: 1.1 }],
       });
     });
 
@@ -554,14 +563,19 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       });
       globalThis.fetch = fetchMock;
 
-      const result = await fetchMonthlyDividends([
-        { ticker: 'HGLG11', assetType: 'FII' },
-        { ticker: 'PETR4', assetType: 'STOCK' },
-      ]);
+      const result = await fetchMonthlyDividends(
+        [
+          { ticker: 'HGLG11', assetType: 'FII' },
+          { ticker: 'PETR4', assetType: 'STOCK' },
+        ],
+        new Date('2026-09-18T12:00:00.000Z'),
+      );
 
       expect(result.get('HGLG11')).toEqual({
         monthlyDividend: 0.9,
         paymentDate: '2026-07-14',
+        annualDividend: 0.9,
+        paidEvents: [{ paymentDate: '2026-07-14', rate: 0.9 }],
       });
       expect(result.has('PETR4')).toBe(false);
     });
@@ -632,6 +646,146 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
 
       expect(result.size).toBe(0);
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('soma dos proventos dos últimos 12 meses', () => {
+    const today = new Date('2026-09-18T12:00:00.000Z');
+
+    it('soma os rendimentos de FII pagos nos 12 meses até hoje', async () => {
+      mockFetch({
+        dividends: [
+          // Anunciado, mas ainda não pago: fica fora da soma.
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 1,
+            paymentDate: '2026-10-14T00:00:00.000Z',
+          },
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.92,
+            paymentDate: '2026-09-14T00:00:00.000Z',
+          },
+          {
+            symbol: 'HGLG11',
+            label: 'AMORTIZACAO',
+            rate: 1.5,
+            paymentDate: '2026-08-14T00:00:00.000Z',
+          },
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.9,
+            paymentDate: '2026-06-12T00:00:00.000Z',
+          },
+          // Exatamente 12 meses atrás: já fora da janela.
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 0.8,
+            paymentDate: '2025-09-18T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'HGLG11', assetType: 'FII' }],
+        today,
+      );
+
+      expect(result.get('HGLG11')).toEqual({
+        monthlyDividend: 1,
+        paymentDate: '2026-10-14',
+        annualDividend: 1.82,
+        paidEvents: [
+          { paymentDate: '2026-06-12', rate: 0.9 },
+          { paymentDate: '2026-09-14', rate: 0.92 },
+        ],
+      });
+    });
+
+    it('lista e soma os dividendos e JCP de ações pagos nos 12 meses até hoje', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'PETR4',
+            data: {
+              cashDividends: [
+                {
+                  rate: 1.25,
+                  paymentDate: '2026-07-15T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+                {
+                  rate: 0.5,
+                  paymentDate: '2026-07-15T03:00:00.000Z',
+                  label: 'JCP',
+                },
+                {
+                  rate: 1.1,
+                  paymentDate: '2026-01-15T03:00:00.000Z',
+                  label: 'JCP',
+                },
+                {
+                  rate: 2,
+                  paymentDate: '2025-08-01T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'PETR4', assetType: 'STOCK' }],
+        today,
+      );
+
+      expect(result.get('PETR4')?.annualDividend).toBe(2.85);
+      // Dividendo e JCP pagos no mesmo dia são eventos distintos.
+      expect(result.get('PETR4')?.paidEvents).toEqual([
+        { paymentDate: '2026-01-15', rate: 1.1 },
+        { paymentDate: '2026-07-15', rate: 1.25 },
+        { paymentDate: '2026-07-15', rate: 0.5 },
+      ]);
+    });
+
+    it('zera a soma quando nenhum provento foi pago nos últimos 12 meses', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'VALE3',
+            data: {
+              cashDividends: [
+                {
+                  rate: 2.1,
+                  paymentDate: '2025-03-10T03:00:00.000Z',
+                  label: 'DIVIDENDO',
+                },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'VALE3', assetType: 'STOCK' }],
+        today,
+      );
+
+      expect(result.get('VALE3')).toEqual({
+        monthlyDividend: 2.1,
+        paymentDate: '2025-03-10',
+        annualDividend: 0,
+        paidEvents: [],
+      });
     });
   });
 });

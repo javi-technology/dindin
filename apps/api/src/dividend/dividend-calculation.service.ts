@@ -5,7 +5,7 @@ import { Dividend, Position } from 'dindin-models';
  *
  * Esta matemática vivia dentro do `dividend.controller`, misturada aos
  * handlers HTTP — inconsistente com o próprio domínio, que já tinha
- * `monthly-income.service` e `dividend-record.service` extraídos. Sendo
+ * `monthly-income.service` e o registro de proventos extraídos. Sendo
  * função pura sobre arrays, aqui ela é testável sem subir o Express.
  */
 

@@ -58,17 +58,30 @@ export async function computeMonthlyIncome(
   ]);
 
   const monthlyDividendByTicker = new Map<string, number>();
+  const averageMonthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
   for (const doc of quotesSnapshot.docs) {
     const data = doc.data() as Quote;
+    const ticker = doc.id.toUpperCase();
     if (typeof data.dividendPaymentDate === 'string') {
-      paymentDateByTicker.set(doc.id.toUpperCase(), data.dividendPaymentDate);
+      paymentDateByTicker.set(ticker, data.dividendPaymentDate);
     }
     if (
       typeof data.monthlyDividend === 'number' &&
       Number.isFinite(data.monthlyDividend)
     ) {
-      monthlyDividendByTicker.set(doc.id.toUpperCase(), data.monthlyDividend);
+      monthlyDividendByTicker.set(ticker, data.monthlyDividend);
+    }
+    // O último provento só vale como renda mensal para quem paga todo mês;
+    // a soma de 12 meses reflete a periodicidade real (#112). Sem ela
+    // (cotação ainda não sincronizada), fica o último provento.
+    const average =
+      typeof data.annualDividend === 'number' &&
+      Number.isFinite(data.annualDividend)
+        ? data.annualDividend / 12
+        : monthlyDividendByTicker.get(ticker);
+    if (average !== undefined) {
+      averageMonthlyDividendByTicker.set(ticker, average);
     }
   }
 
@@ -87,6 +100,9 @@ export async function computeMonthlyIncome(
     const monthlyIncome = roundCurrency(quantity * monthlyDividend);
     const paymentDate = paymentDateByTicker.get(position.ticker.toUpperCase());
 
+    const averageMonthlyDividend =
+      averageMonthlyDividendByTicker.get(position.ticker.toUpperCase()) ?? 0;
+
     byTicker.push({
       ticker: position.ticker,
       quantity,
@@ -94,18 +110,18 @@ export async function computeMonthlyIncome(
       monthlyIncome,
       ...(paymentDate && { paymentDate }),
     });
-    total += monthlyIncome;
+    total += roundCurrency(quantity * averageMonthlyDividend);
   }
 
   let totalFromFridge = 0;
   for (const item of fridgeItems) {
-    const monthlyDividend =
-      monthlyDividendByTicker.get(item.ticker.toUpperCase()) ?? 0;
+    const averageMonthlyDividend =
+      averageMonthlyDividendByTicker.get(item.ticker.toUpperCase()) ?? 0;
     const quantity =
       typeof item.quantity === 'number' && Number.isFinite(item.quantity)
         ? item.quantity
         : 0;
-    totalFromFridge += quantity * monthlyDividend;
+    totalFromFridge += quantity * averageMonthlyDividend;
   }
   totalFromFridge = roundCurrency(totalFromFridge);
   total = roundCurrency(total + totalFromFridge);

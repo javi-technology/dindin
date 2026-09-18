@@ -56,7 +56,6 @@ import {
   getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
-  postMonthlyDividendRecord,
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
@@ -75,7 +74,6 @@ import {
   postPatrimonySnapshot,
 } from './patrimony/patrimony.controller';
 import { saveAllPatrimonySnapshots } from './patrimony/patrimony-snapshot.service';
-import { recordAllMonthlyDividends } from './dividend/dividend-record.service';
 import { checkAllTargetPrices } from './alerts/target-price.service';
 import { onObjectFinalized } from 'firebase-functions/v2/storage';
 import {
@@ -240,7 +238,6 @@ app.post('/api/fridges/:fridgeId/items/:id/unfreeze', unfreezeItem);
 app.get('/api/dividends', listDividends);
 app.get('/api/dividends/projection', getDividendProjection);
 app.get('/api/dividends/monthly-report', getMonthlyDividendReport);
-app.post('/api/dividends/record-monthly', postMonthlyDividendRecord);
 app.post('/api/dividends', createDividend);
 app.get('/api/dividends/:id', getDividend);
 app.put('/api/dividends/:id', updateDividend);
@@ -323,6 +320,10 @@ export const updateQuotesScheduled = onSchedule(
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['BRAPI_API_KEY'],
+    // Além das cotações, registra os proventos pagos para quem tem cada
+    // ativo (#112); em dia de pagamento de muitos FIIs os 60s padrão não
+    // bastam.
+    timeoutSeconds: 300,
   },
   async () => {
     await updateAllQuotes();
@@ -359,18 +360,6 @@ export const checkTargetPricesScheduled = onSchedule(
   },
   async () => {
     await checkAllTargetPrices();
-  },
-);
-
-// Registro mensal de proventos no primeiro dia do mês, após atualizar cotações.
-export const recordMonthlyDividendsScheduled = onSchedule(
-  {
-    schedule: '0 2 1 * *',
-    timeZone: 'America/Sao_Paulo',
-    retryCount: 3,
-  },
-  async () => {
-    await recordAllMonthlyDividends();
   },
 );
 

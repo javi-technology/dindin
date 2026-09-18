@@ -128,6 +128,58 @@ describe('QuoteHistoryService', () => {
         expect.objectContaining({ monthlyDividend: 0.07 }),
       );
     });
+    it('deve salvar a soma dos proventos de 12 meses no documento principal', async () => {
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: jest.fn().mockResolvedValue(undefined) })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('PETR4', 38.5, 1.25, 'brapi', '2026-07-15', 2.35);
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({ annualDividend: 2.35 }),
+      );
+    });
+
+    it('deve preservar a soma de 12 meses existente quando o provento não vier', async () => {
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            ticker: 'PETR4',
+            price: 38.5,
+            monthlyDividend: 1.25,
+            dividendPaymentDate: '2026-07-15',
+            annualDividend: 2.35,
+            updatedAt: '2026-07-15T18:00:00Z',
+            source: 'brapi',
+          }),
+        }),
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: jest.fn().mockResolvedValue(undefined) })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('PETR4', 39, undefined);
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({ annualDividend: 2.35 }),
+      );
+    });
+
     it('deve salvar a data de pagamento do provento no documento principal', async () => {
       const historySet = jest.fn().mockResolvedValue(undefined);
       const quoteSet = jest.fn().mockResolvedValue(undefined);

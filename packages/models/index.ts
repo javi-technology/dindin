@@ -117,6 +117,7 @@ export interface Quote {
   price: number;
   monthlyDividend: number; // último provento/rendimento por cota/ação
   dividendPaymentDate?: string; // YYYY-MM-DD — data de pagamento do provento
+  annualDividend?: number; // soma dos proventos pagos nos últimos 12 meses
   updatedAt: string; // ISO-8601
   source: string; // ex: "brapi"
 }
