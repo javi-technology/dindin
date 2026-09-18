@@ -31,6 +31,7 @@ import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
+import { SetupService } from '../../core/services/setup.service';
 import {
   DividendService,
   DividendYieldResponse,
@@ -97,6 +98,7 @@ export class WalletComponent implements OnInit {
   private readonly fridgeService = inject(FridgeService);
   private readonly assetService = inject(AssetService);
   private readonly dividendService = inject(DividendService);
+  private readonly setupService = inject(SetupService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   /**
@@ -355,15 +357,11 @@ export class WalletComponent implements OnInit {
 
   createDefaultWallet(): void {
     this.loading.set(true);
-    this.walletService
-      .create({ name: 'Carteira Principal', currency: 'BRL' })
+    this.setupService
+      .createDefault('wallet')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (wallet) => {
-          this.wallets.set([wallet]);
-          this.selectWallet(wallet);
-          this.loading.set(false);
-        },
+        next: () => this.loadWallets(),
         error: () => {
           this.error.set('Erro ao criar carteira padrão.');
           this.loading.set(false);
