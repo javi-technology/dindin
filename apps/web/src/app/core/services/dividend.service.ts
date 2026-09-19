@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Dividend } from 'dindin-models';
 
 export interface TickerDividendYield {
   ticker: string;
@@ -23,7 +22,10 @@ export interface MonthlyIncomeItem {
   ticker: string;
   quantity: number;
   monthlyDividend: number;
+  /** Valor do último evento: é o que a agenda de pagamentos mostra. */
   monthlyIncome: number;
+  /** Média mensal dos proventos de 12 meses: a renda do ativo (#280). */
+  averageMonthlyIncome: number;
   paymentDate?: string; // YYYY-MM-DD
 }
 
@@ -130,9 +132,5 @@ export class DividendService {
       '/api/quotes/dividend-history',
       { params: { tickers: tickers.join(','), months } },
     );
-  }
-
-  recordMonthlyDividends(): Observable<Dividend[]> {
-    return this.http.post<Dividend[]>('/api/dividends/record-monthly', {});
   }
 }

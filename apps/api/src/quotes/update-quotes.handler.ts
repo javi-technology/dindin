@@ -2,6 +2,8 @@ import { fetchQuotes, QuoteResult } from './brapi.service';
 import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
+import { recordPaidDividends } from '../dividend/dividend-sync-record.service';
+import { todayDateInBrazil } from '../patrimony/patrimony-snapshot.service';
 
 // Processa os tickers com cotação em lotes, para não disparar centenas de
 // escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
@@ -11,10 +13,35 @@ const BATCH_SIZE = 10;
 // A Brapi é a fonte oficial e única de cotações e proventos (issue #212).
 const QUOTE_SOURCE = 'brapi';
 
+async function recordTickerDividends(
+  ticker: string,
+  dividend: DividendInfo | undefined,
+  today: string,
+): Promise<void> {
+  if (!dividend?.paidEvents && !dividend?.upcomingEvents) {
+    return;
+  }
+  // Os anunciados entram para a foto da data-com (#278); o registro só
+  // considera os pagamentos até hoje.
+  const events = [
+    ...(dividend.paidEvents ?? []),
+    ...(dividend.upcomingEvents ?? []),
+  ];
+  try {
+    await recordPaidDividends(ticker, events, today);
+  } catch (error) {
+    console.error(
+      `[updateAllQuotes] Erro ao registrar proventos de ${ticker}:`,
+      { message: (error as Error).message },
+    );
+  }
+}
+
 async function processTickerQuote(
   ticker: string,
   quote: QuoteResult,
   dividend: DividendInfo | undefined,
+  today: string,
 ): Promise<void> {
   try {
     await saveQuoteHistory(
@@ -23,6 +50,7 @@ async function processTickerQuote(
       dividend?.monthlyDividend,
       QUOTE_SOURCE,
       dividend?.paymentDate,
+      dividend?.annualDividend,
     );
     console.log(
       `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${QUOTE_SOURCE}).`,
@@ -32,6 +60,9 @@ async function processTickerQuote(
       message: (error as Error).message,
     });
   }
+  // Registra os proventos pagos nos usuários (#112). O estado do registro
+  // só é gravado após o commit, então uma falha aqui é refeita no próximo sync.
+  await recordTickerDividends(ticker, dividend, today);
 }
 
 /**
@@ -105,12 +136,13 @@ export async function updateAllQuotes(): Promise<void> {
       dividends = new Map();
     }
 
+    const today = todayDateInBrazil();
     const tickerEntries = [...quotes.entries()];
     for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
       const batch = tickerEntries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map(([ticker, quote]) =>
-          processTickerQuote(ticker, quote, dividends.get(ticker)),
+          processTickerQuote(ticker, quote, dividends.get(ticker), today),
         ),
       );
     }

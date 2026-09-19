@@ -41,7 +41,6 @@ describe('DividendComponent', () => {
       'getMonthlyReport',
       'getDividendYield',
       'getDividendHistoryBatch',
-      'recordMonthlyDividends',
     ]);
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
 
@@ -54,6 +53,7 @@ describe('DividendComponent', () => {
             quantity: 150,
             monthlyDividend: 0.9,
             monthlyIncome: 135,
+            averageMonthlyIncome: 135,
             paymentDate: '2026-09-15',
           },
           {
@@ -61,6 +61,7 @@ describe('DividendComponent', () => {
             quantity: 50,
             monthlyDividend: 0.7,
             monthlyIncome: 35,
+            averageMonthlyIncome: 35,
           },
         ],
         total: 176,
@@ -114,7 +115,6 @@ describe('DividendComponent', () => {
           ),
         }),
     );
-    dividendServiceMock.recordMonthlyDividends.and.returnValue(of([]));
   });
 
   describe('cards por ticker', () => {
@@ -145,6 +145,41 @@ describe('DividendComponent', () => {
       ).toContain('0,90');
       expect(primeiro.textContent).toContain('HGLG11');
       expect(primeiro.textContent).toContain('135,00');
+    });
+
+    it('deve mostrar a média de 12 meses como renda de ativo não mensal', async () => {
+      // Semestral: o último provento (R$ 120,00) não se repete todo mês (#280).
+      dividendServiceMock.getMonthlyIncome.and.returnValue(
+        of({
+          byTicker: [
+            {
+              ticker: 'PETR4',
+              quantity: 100,
+              monthlyDividend: 1.2,
+              monthlyIncome: 120,
+              averageMonthlyIncome: 20,
+              paymentDate: '2026-08-20',
+            },
+          ],
+          total: 20,
+          totalFromFridge: 0,
+        }),
+      );
+      await setup();
+
+      const card = cards()[0];
+      const renda = card.querySelector('[data-testid="card-average-income"]');
+      expect(renda?.textContent).toMatch(/R\$\s?20,00/);
+      expect(card.textContent).toContain('média dos últimos 12 meses');
+      expect(
+        card.querySelector('[data-testid="card-last-income"]')?.textContent,
+      ).toMatch(/R\$\s?120,00/);
+      // A agenda continua mostrando o valor do evento.
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="payment-schedule"]',
+        )?.textContent,
+      ).toMatch(/R\$\s?120,00/);
     });
 
     it('deve exibir o sparkline a partir do histórico carregado', async () => {
@@ -286,34 +321,6 @@ describe('DividendComponent', () => {
       expect(kpi('kpi-yield')).toContain('6,00');
     });
 
-    it('deve recarregar o dividend yield após registrar os proventos do mês', async () => {
-      // O aviso do próprio tile manda usar esse botão para alimentar o
-      // histórico; se o yield não recarrega, a ação não produz o efeito
-      // que a interface promete.
-      dividendServiceMock.getDividendYield.and.returnValues(
-        of({
-          byTicker: [],
-          total: { annualIncome: 0, currentValue: 22000, yield: 0 },
-        }),
-        of({
-          byTicker: [],
-          total: { annualIncome: 2112, currentValue: 22000, yield: 9.6 },
-        }),
-      );
-
-      await setup();
-      expect(kpi('kpi-yield')).toContain('0,00');
-
-      (
-        (fixture.nativeElement as HTMLElement).querySelector(
-          '[data-testid="record-monthly-button"]',
-        ) as HTMLButtonElement
-      ).click();
-      fixture.detectChanges();
-
-      expect(kpi('kpi-yield')).toContain('9,60');
-    });
-
     it('deve carregar a lista de carteiras uma única vez', async () => {
       await setup();
 
@@ -330,7 +337,9 @@ describe('DividendComponent', () => {
 
       await setup();
 
-      expect(kpi('kpi-yield-note')).toContain('Registrar proventos do mês');
+      // Não há mais botão de registro: os pagamentos entram pelo sync (#112).
+      expect(kpi('kpi-yield-note')).toContain('registrados automaticamente');
+      expect(kpi('kpi-yield-note')).not.toContain('Registrar proventos do mês');
     });
 
     it('não deve sinalizar nada quando há yield calculado', async () => {
@@ -409,6 +418,7 @@ describe('DividendComponent', () => {
                   quantity: 10,
                   monthlyDividend: 1,
                   monthlyIncome: 10,
+                  averageMonthlyIncome: 10,
                 },
               ],
               total: 40,
@@ -421,6 +431,7 @@ describe('DividendComponent', () => {
                   quantity: 5,
                   monthlyDividend: 1,
                   monthlyIncome: 5,
+                  averageMonthlyIncome: 5,
                 },
               ],
               total: 35,
@@ -703,55 +714,15 @@ describe('DividendComponent', () => {
     ).not.toBeNull();
   });
 
-  it('deve registrar os proventos e recarregar o relatório', async () => {
+  it('não deve oferecer registro manual dos proventos do mês', async () => {
+    // O registro passou a ser feito pelo sync diário de cotações (#112).
     await setup();
-    const reportCallsBefore =
-      dividendServiceMock.getMonthlyReport.calls.count();
-    const button = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="record-monthly-button"]',
-    ) as HTMLButtonElement;
 
-    button.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(dividendServiceMock.recordMonthlyDividends).toHaveBeenCalledWith();
-    expect(dividendServiceMock.getMonthlyReport.calls.count()).toBeGreaterThan(
-      reportCallsBefore,
-    );
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="record-success"]',
-      )?.textContent,
-    ).toContain('Proventos de');
-  });
-
-  it('deve exibir erro ao registrar os proventos', async () => {
-    dividendServiceMock.recordMonthlyDividends.and.returnValue(
-      throwError(() => new Error('Network error')),
-    );
-
-    await setup();
-    const button = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="record-monthly-button"]',
-    ) as HTMLButtonElement;
-
-    button.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid="record-error"]',
-      )?.textContent,
-    ).toContain('Erro ao registrar proventos do mês');
     expect(
       (fixture.nativeElement as HTMLElement).querySelector(
         '[data-testid="record-monthly-button"]',
       ),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -767,6 +738,7 @@ describe('DividendComponent', () => {
       quantity: 10,
       monthlyDividend: monthlyIncome / 10,
       monthlyIncome,
+      averageMonthlyIncome: monthlyIncome,
       ...(paymentDate ? { paymentDate } : {}),
     });
 

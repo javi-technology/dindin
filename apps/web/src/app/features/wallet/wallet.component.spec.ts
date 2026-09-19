@@ -5,6 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { of, throwError, delay } from 'rxjs';
+import { SetupService } from '../../core/services/setup.service';
 import { WalletComponent } from './wallet.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
@@ -20,6 +21,7 @@ describe('WalletComponent', () => {
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
   let dividendServiceMock: jasmine.SpyObj<DividendService>;
+  let setupServiceMock: jasmine.SpyObj<SetupService>;
 
   const assets: Asset[] = [
     {
@@ -114,6 +116,7 @@ describe('WalletComponent', () => {
       'getDividendYield',
       'getMonthlyIncome',
     ]);
+    setupServiceMock = jasmine.createSpyObj('SetupService', ['createDefault']);
 
     walletServiceMock.list.and.returnValue(of(wallets));
     positionServiceMock.list.and.returnValue(of(positions));
@@ -150,12 +153,14 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
+            averageMonthlyIncome: 9,
           },
           {
             ticker: 'KNRI11',
             quantity: 5,
             monthlyDividend: 0.75,
             monthlyIncome: 3.75,
+            averageMonthlyIncome: 3.75,
           },
         ],
         total: 12.75,
@@ -171,6 +176,7 @@ describe('WalletComponent', () => {
         { provide: FridgeService, useValue: fridgeServiceMock },
         { provide: AssetService, useValue: assetServiceMock },
         { provide: DividendService, useValue: dividendServiceMock },
+        { provide: SetupService, useValue: setupServiceMock },
       ],
     }).compileComponents();
 
@@ -200,8 +206,10 @@ describe('WalletComponent', () => {
   });
 
   it('deve criar carteira padrão ao clicar no botão', fakeAsync(() => {
-    walletServiceMock.list.and.returnValue(of([]));
-    walletServiceMock.create.and.returnValue(of(wallets[0]));
+    walletServiceMock.list.and.returnValues(of([]), of(wallets));
+    setupServiceMock.createDefault.and.returnValue(
+      of({ walletCreated: true, fridgeCreated: false }),
+    );
     fixture = TestBed.createComponent(WalletComponent);
     fixture.detectChanges();
     tick();
@@ -215,10 +223,9 @@ describe('WalletComponent', () => {
     tick();
     fixture.detectChanges();
 
-    expect(walletServiceMock.create).toHaveBeenCalledWith({
-      name: 'Carteira Principal',
-      currency: 'BRL',
-    });
+    // O nome padrão mora na API (#275): o front só pede o recurso.
+    expect(setupServiceMock.createDefault).toHaveBeenCalledWith('wallet');
+    expect(walletServiceMock.create).not.toHaveBeenCalled();
     expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
   }));
 
@@ -260,6 +267,45 @@ describe('WalletComponent', () => {
     expect(secondRow).toMatch(/R\$\s?3,75/);
   });
 
+  it('deve mostrar a média de 12 meses como proventos/mês da posição', () => {
+    // Semestral: o último provento (R$ 120,00) não se repete todo mês (#280).
+    fixture.componentInstance.monthlyIncome.set({
+      byTicker: [
+        {
+          ticker: 'HGLG11',
+          quantity: 10,
+          monthlyDividend: 12,
+          monthlyIncome: 120,
+          averageMonthlyIncome: 20,
+        },
+        {
+          ticker: 'KNRI11',
+          quantity: 5,
+          monthlyDividend: 0.75,
+          monthlyIncome: 3.75,
+          averageMonthlyIncome: 3.75,
+        },
+      ],
+      total: 23.75,
+      totalFromFridge: 0,
+    });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const rows = compiled.querySelectorAll('tbody tr');
+    expect(rows[0].textContent).toMatch(/R\$\s?20,00/);
+    expect(
+      rows[0].querySelector('[data-testid="proventos-ultimo"]')?.textContent,
+    ).toMatch(/R\$\s?120,00/);
+    // Quando o último provento é a própria média, não há o que destacar.
+    expect(
+      rows[1].querySelector('[data-testid="proventos-ultimo"]'),
+    ).toBeNull();
+    expect(compiled.querySelector('thead')?.textContent).toContain(
+      'média dos últimos 12 meses',
+    );
+  });
+
   it('deve marcar como bloqueada a projeção recortada no plano gratuito', () => {
     // A API recorta `byTicker` sem o entitlement `projections` (#262): sem
     // isso a coluna mostraria R$ 0,00, que é número errado, não bloqueio.
@@ -270,6 +316,7 @@ describe('WalletComponent', () => {
           quantity: 10,
           monthlyDividend: 0.9,
           monthlyIncome: 9,
+          averageMonthlyIncome: 9,
         },
       ],
       total: 12.75,
@@ -329,6 +376,7 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
+            averageMonthlyIncome: 9,
           },
         ],
         total: 9,
@@ -1260,5 +1308,196 @@ describe('WalletComponent', () => {
 
       expect(fixture.componentInstance.loading()).toBe(false);
     }));
+  });
+
+  // -------------------------------------------------------------------------
+  // Ordenação por coluna da tabela de posições (issue #274)
+  // -------------------------------------------------------------------------
+  describe('ordenação da tabela', () => {
+    const position = (
+      id: string,
+      ticker: string,
+      quantity: number,
+      currentPrice?: number,
+    ): Position => ({
+      id,
+      walletId: 'wallet-1',
+      ticker,
+      assetType: 'FII',
+      quantity,
+      averagePrice: 10,
+      ...(currentPrice === undefined ? {} : { currentPrice }),
+      inFridge: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    const income = (ticker: string, averageMonthlyIncome: number) => ({
+      ticker,
+      quantity: 1,
+      monthlyDividend: averageMonthlyIncome,
+      monthlyIncome: averageMonthlyIncome,
+      averageMonthlyIncome,
+    });
+    const dy = (ticker: string, value: number) => ({
+      ticker,
+      annualIncome: 0,
+      currentValue: 0,
+      yield: value,
+    });
+
+    const tickers = (): string[] =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+      ).map((row) => row.querySelector('td')?.textContent?.trim() ?? '');
+    const header = (column: string): HTMLElement =>
+      (fixture.nativeElement as HTMLElement).querySelector(
+        `th[data-sort-column="${column}"]`,
+      ) as HTMLElement;
+    const sortBy = (column: string): void => {
+      header(column).querySelector('button')!.click();
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      const component = fixture.componentInstance;
+      // KNRI11 sem cotação: a tabela mostra o preço médio.
+      component.positions.set([
+        position('p1', 'XPML11', 10, 100),
+        position('p2', 'BTLG11', 30, 50),
+        position('p3', 'KNRI11', 5),
+      ]);
+      component.monthlyIncome.set({
+        byTicker: [
+          income('XPML11', 8),
+          income('BTLG11', 8),
+          income('KNRI11', 2),
+        ],
+        total: 18,
+        totalFromFridge: 0,
+      });
+      component.dividendYield.set({
+        byTicker: [dy('XPML11', 9), dy('BTLG11', 7), dy('KNRI11', 11)],
+        total: { annualIncome: 0, currentValue: 0, yield: 8 },
+      });
+      fixture.detectChanges();
+    });
+
+    it('deve ordenar por Ticker crescente ao abrir a tela', () => {
+      expect(tickers()).toEqual(['BTLG11', 'KNRI11', 'XPML11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('ascending');
+      for (const column of [
+        'quantity',
+        'currentPrice',
+        'total',
+        'monthlyIncome',
+        'dividendYield',
+      ]) {
+        expect(header(column).getAttribute('aria-sort')).toBe('none');
+      }
+    });
+
+    it('não deve tornar a coluna Ações ordenável', () => {
+      const headers = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        'thead th',
+      );
+      const acoes = headers[headers.length - 1];
+      expect(acoes.textContent).toContain('Ações');
+      expect(acoes.hasAttribute('aria-sort')).toBeFalse();
+      expect(acoes.querySelector('button')).toBeNull();
+    });
+
+    it('deve alternar entre crescente e decrescente na mesma coluna', () => {
+      sortBy('ticker');
+      expect(tickers()).toEqual(['XPML11', 'KNRI11', 'BTLG11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('descending');
+
+      sortBy('ticker');
+      expect(tickers()).toEqual(['BTLG11', 'KNRI11', 'XPML11']);
+      expect(header('ticker').getAttribute('aria-sort')).toBe('ascending');
+    });
+
+    it('deve passar a ordenar outra coluna em ordem crescente', () => {
+      sortBy('ticker'); // desc
+      sortBy('quantity');
+
+      expect(tickers()).toEqual(['KNRI11', 'XPML11', 'BTLG11']);
+      expect(header('quantity').getAttribute('aria-sort')).toBe('ascending');
+      expect(header('ticker').getAttribute('aria-sort')).toBe('none');
+    });
+
+    it('deve ordenar Preço atual e Total pelo valor exibido', () => {
+      // KNRI11 sem cotação aparece com o preço médio (R$ 10) e total R$ 50:
+      // a ordem tem de seguir o que a tabela mostra.
+      sortBy('total');
+      expect(tickers()).toEqual(['KNRI11', 'XPML11', 'BTLG11']);
+
+      sortBy('total');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+
+      sortBy('currentPrice');
+      expect(tickers()).toEqual(['KNRI11', 'BTLG11', 'XPML11']);
+
+      sortBy('currentPrice');
+      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
+    });
+
+    it('deve desempatar pelo Ticker em ordem alfabética', () => {
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['KNRI11', 'BTLG11', 'XPML11']);
+
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+    });
+
+    it('deve ordenar por DY com o valor exibido', () => {
+      sortBy('dividendYield');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+    });
+
+    it('deve levar ao fim a projeção bloqueada no plano gratuito', () => {
+      fixture.componentInstance.monthlyIncome.set({
+        byTicker: [income('XPML11', 8), income('BTLG11', 3)],
+        total: 18,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: ['KNRI11'],
+        hiddenPaymentDates: [],
+      });
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+
+      sortBy('monthlyIncome');
+      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
+    });
+
+    it('não deve alterar a linha de totais', () => {
+      const tfoot = (): string =>
+        (fixture.nativeElement as HTMLElement).querySelector('tfoot')
+          ?.textContent ?? '';
+      const before = tfoot();
+
+      sortBy('total');
+      sortBy('total');
+
+      expect(tfoot()).toBe(before);
+    });
+
+    it('deve manter a ordenação escolhida ao trocar de carteira', () => {
+      sortBy('total');
+      sortBy('total');
+
+      fixture.componentInstance.selectWallet({
+        ...wallets[0],
+        id: 'wallet-2',
+        name: 'Outra',
+      });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.sort()).toEqual({
+        column: 'total',
+        direction: 'desc',
+      });
+      expect(header('total').getAttribute('aria-sort')).toBe('descending');
+    });
   });
 });

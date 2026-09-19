@@ -104,6 +104,7 @@ describe('ai-suggestion.service', () => {
       total: 2.5,
       totalFromFridge: 0,
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+      averageMonthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
     consoleErrorSpy = jest
       .spyOn(console, 'error')
@@ -139,7 +140,7 @@ describe('ai-suggestion.service', () => {
         segment: 'Logísticos',
         weight: 0.2,
         closePrice: 160,
-        monthlyDividend: 1.25,
+        averageMonthlyDividend: 1.25,
       }),
       expect.objectContaining({ ticker: 'XPML11', status: 'extra' }),
     ]);
@@ -150,7 +151,12 @@ describe('ai-suggestion.service', () => {
 
     const extra = input.items.find((item) => item.ticker === 'XPML11');
     expect(extra).toBeDefined();
-    for (const key of ['segment', 'weight', 'closePrice', 'monthlyDividend']) {
+    for (const key of [
+      'segment',
+      'weight',
+      'closePrice',
+      'averageMonthlyDividend',
+    ]) {
       expect(extra).not.toHaveProperty(key);
     }
   });
@@ -592,6 +598,16 @@ describe('ai-suggestion.service', () => {
       'Proventos mensais projetados da carteira: R$ 2.5',
     );
     expect(prompt).toContain('Total disponível para investir: R$ 502.5');
+  });
+
+  it('deve informar no prompt a média mensal de 12 meses por ativo', () => {
+    const prompt = buildUserPrompt(
+      buildSuggestionInput(comparison, 'renda', new Map([['HGLG11', 0.2]])),
+    );
+
+    expect(prompt).toContain('averageMonthlyDividend12m=0.2');
+    expect(prompt).toContain('averageMonthlyDividend12m=indisponível');
+    expect(prompt).not.toContain('monthlyDividend=');
   });
 
   it('deve incluir o status de investidor qualificado no prompt', () => {
@@ -1781,7 +1797,9 @@ describe('ai-suggestion.service', () => {
       byTicker: [],
       total: 15.5,
       totalFromFridge: 13,
-      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+      // Semestral: o último provento (1.5) não se repete todo mês.
+      monthlyDividendByTicker: new Map([['HGLG11', 1.5]]),
+      averageMonthlyDividendByTicker: new Map([['HGLG11', 0.25]]),
     });
     listQualifiedInvestorTickersMock.mockResolvedValue(new Set(['HGLG11']));
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -1862,6 +1880,24 @@ describe('ai-suggestion.service', () => {
       summary: 'Resumo',
       projectedDividends: 15.5,
     });
+    expect(doc.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          projectedDividends: 15.5,
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              ticker: 'HGLG11',
+              averageMonthlyDividend: 0.25,
+            }),
+          ]),
+        }),
+      }),
+    );
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(JSON.stringify(body.messages)).toContain('ticker=HGLG11');
+    expect(JSON.stringify(body.messages)).toContain(
+      'averageMonthlyDividend12m=0.25',
+    );
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         qualifiedInvestor: true,
@@ -2124,6 +2160,14 @@ describe('ai-suggestion.service', () => {
           month: '2026-09',
           tab: 'renda',
           contribution: 500,
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
         }),
       }),
       set: jest.fn(),
@@ -2173,6 +2217,113 @@ describe('ai-suggestion.service', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(savedDoc.set).toHaveBeenCalled();
+    // Compras já lançadas na carteira continuam marcadas (#276).
+    const applied = [
+      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
+    ];
+    expect(result.appliedItems).toEqual(applied);
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
+  });
+
+  it('deve manter os itens aplicados ao gerar de novo com force', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Aporte maior.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+      set: jest.fn(),
+    };
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return {
+            get: jest.fn().mockResolvedValue({
+              docs: [
+                {
+                  id: 'HGLG11',
+                  data: () => ({ monthlyDividend: 1.25 }),
+                },
+              ],
+            }),
+          };
+        }
+        return {
+          doc: jest.fn(() => ({
+            collection: jest.fn(() => ({
+              ...query,
+              doc: jest.fn(() => savedDoc),
+            })),
+          })),
+        };
+      }),
+    };
+
+    const result = await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      true,
+      600,
+    );
+
+    expect(result).toMatchObject({
+      summary: 'Novo resumo',
+      contribution: 600,
+      projectedDividends: 2.5,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    expect(savedDoc.set).toHaveBeenCalled();
+    // Compras já lançadas na carteira continuam marcadas (#276).
+    const applied = [
+      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
+    ];
+    expect(result.appliedItems).toEqual(applied);
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
   });
 
   it('deve gerar ids determinísticos', () => {

@@ -96,8 +96,8 @@
                 class="text-sm mt-2 text-amber-700"
                 data-testid="kpi-yield-note"
               >
-                Calculado sobre os proventos já registrados. Use "Registrar
-                proventos do mês" para alimentar o histórico.
+                Calculado sobre os proventos já registrados. Os pagamentos são
+                registrados automaticamente na data em que caem.
               </p>
             } @else {
               <p class="text-sm mt-2 text-gray-500">Projeção anual</p>
@@ -341,8 +341,22 @@
                       <dd class="text-gray-900">{{ card.item.quantity }}</dd>
                     </div>
                     <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Proventos/mês</dt>
-                      <dd class="font-medium text-gray-900">
+                      <dt class="text-gray-500">
+                        Proventos/mês
+                        <span class="block text-xs">
+                          média dos últimos 12 meses
+                        </span>
+                      </dt>
+                      <dd
+                        class="font-medium text-gray-900"
+                        data-testid="card-average-income"
+                      >
+                        {{ formatCurrency(card.item.averageMonthlyIncome) }}
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Último provento</dt>
+                      <dd class="text-gray-900" data-testid="card-last-income">
                         {{ formatCurrency(card.item.monthlyIncome) }}
                       </dd>
                     </div>
@@ -417,30 +431,7 @@
                 }
               </select>
             </label>
-            <button
-              type="button"
-              class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              data-testid="record-monthly-button"
-              [disabled]="recording()"
-              (click)="recordMonthly()"
-            >
-              {{
-                recording() ? 'Registrando...' : 'Registrar proventos do mês'
-              }}
-            </button>
           </div>
-
-          @if (recordError()) {
-            <p class="mb-5 text-sm text-red-700" data-testid="record-error">
-              {{ recordError() }}
-            </p>
-          }
-
-          @if (recordSuccess()) {
-            <p class="mb-5 text-sm text-green-700" data-testid="record-success">
-              {{ recordSuccess() }}
-            </p>
-          }
 
           @if (monthlyReport.months.length === 0) {
             <p class="text-gray-600" data-testid="report-empty">

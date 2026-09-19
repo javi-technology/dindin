@@ -5,6 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
+import { SetupService } from '../../core/services/setup.service';
 import { FridgeComponent } from './fridge.component';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
@@ -15,6 +16,7 @@ describe('FridgeComponent', () => {
   let fixture: ComponentFixture<FridgeComponent>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
+  let setupServiceMock: jasmine.SpyObj<SetupService>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
 
   const assets: Asset[] = [
@@ -99,6 +101,7 @@ describe('FridgeComponent', () => {
     assetServiceMock.list.and.returnValue(of(assets));
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
     walletServiceMock.list.and.returnValue(of(wallets));
+    setupServiceMock = jasmine.createSpyObj('SetupService', ['createDefault']);
 
     await TestBed.configureTestingModule({
       imports: [FridgeComponent],
@@ -106,6 +109,7 @@ describe('FridgeComponent', () => {
         { provide: FridgeService, useValue: fridgeServiceMock },
         { provide: AssetService, useValue: assetServiceMock },
         { provide: WalletService, useValue: walletServiceMock },
+        { provide: SetupService, useValue: setupServiceMock },
       ],
     }).compileComponents();
 
@@ -133,8 +137,10 @@ describe('FridgeComponent', () => {
   });
 
   it('deve criar geladeira padrão ao clicar no botão', fakeAsync(() => {
-    fridgeServiceMock.listFridges.and.returnValue(of([]));
-    fridgeServiceMock.createFridge.and.returnValue(of(fridges[0]));
+    fridgeServiceMock.listFridges.and.returnValues(of([]), of(fridges));
+    setupServiceMock.createDefault.and.returnValue(
+      of({ walletCreated: false, fridgeCreated: true }),
+    );
     fixture = TestBed.createComponent(FridgeComponent);
     fixture.detectChanges();
     tick();
@@ -148,9 +154,9 @@ describe('FridgeComponent', () => {
     tick();
     fixture.detectChanges();
 
-    expect(fridgeServiceMock.createFridge).toHaveBeenCalledWith({
-      name: 'Geladeira Principal',
-    });
+    // O nome padrão mora na API (#275): o front só pede o recurso.
+    expect(setupServiceMock.createDefault).toHaveBeenCalledWith('fridge');
+    expect(fridgeServiceMock.createFridge).not.toHaveBeenCalled();
     expect(fridgeServiceMock.listItems).toHaveBeenCalledWith('fridge-1');
   }));
 

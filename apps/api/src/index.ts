@@ -56,10 +56,10 @@ import {
   getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
-  postMonthlyDividendRecord,
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
+import { setupDefaults } from './me/setup.controller';
 import {
   getDividendHistory,
   getDividendHistoryBatch,
@@ -75,7 +75,6 @@ import {
   postPatrimonySnapshot,
 } from './patrimony/patrimony.controller';
 import { saveAllPatrimonySnapshots } from './patrimony/patrimony-snapshot.service';
-import { recordAllMonthlyDividends } from './dividend/dividend-record.service';
 import { checkAllTargetPrices } from './alerts/target-price.service';
 import { onObjectFinalized } from 'firebase-functions/v2/storage';
 import {
@@ -84,6 +83,7 @@ import {
   getLatestRecommended,
   getSuggestion,
   generateSuggestion,
+  applySuggestionItem,
   importRecommended,
   listRecommended,
 } from './recommended-wallet/recommended-wallet.controller';
@@ -167,6 +167,8 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
   }
 });
 
+app.post('/api/me/setup', setupDefaults);
+
 app.post('/api/billing/checkout-session', createCheckoutSession);
 app.post('/api/billing/portal-session', createPortalSession);
 
@@ -240,7 +242,6 @@ app.post('/api/fridges/:fridgeId/items/:id/unfreeze', unfreezeItem);
 app.get('/api/dividends', listDividends);
 app.get('/api/dividends/projection', getDividendProjection);
 app.get('/api/dividends/monthly-report', getMonthlyDividendReport);
-app.post('/api/dividends/record-monthly', postMonthlyDividendRecord);
 app.post('/api/dividends', createDividend);
 app.get('/api/dividends/:id', getDividend);
 app.put('/api/dividends/:id', updateDividend);
@@ -264,6 +265,11 @@ app.post(
   '/api/recommended-wallets/bb-fii/suggestions',
   requireEntitlement('ai'),
   generateSuggestion,
+);
+app.post(
+  '/api/recommended-wallets/bb-fii/suggestions/:id/applied',
+  requireEntitlement('ai'),
+  applySuggestionItem,
 );
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',
@@ -323,6 +329,10 @@ export const updateQuotesScheduled = onSchedule(
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['BRAPI_API_KEY'],
+    // Além das cotações, registra os proventos pagos para quem tem cada
+    // ativo (#112); em dia de pagamento de muitos FIIs os 60s padrão não
+    // bastam.
+    timeoutSeconds: 300,
   },
   async () => {
     await updateAllQuotes();
@@ -359,18 +369,6 @@ export const checkTargetPricesScheduled = onSchedule(
   },
   async () => {
     await checkAllTargetPrices();
-  },
-);
-
-// Registro mensal de proventos no primeiro dia do mês, após atualizar cotações.
-export const recordMonthlyDividendsScheduled = onSchedule(
-  {
-    schedule: '0 2 1 * *',
-    timeZone: 'America/Sao_Paulo',
-    retryCount: 3,
-  },
-  async () => {
-    await recordAllMonthlyDividends();
   },
 );
 

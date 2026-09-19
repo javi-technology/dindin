@@ -77,6 +77,20 @@ export type PublicSubscription = Pick<
   'status' | 'plan' | 'interval' | 'currentPeriodEnd' | 'cancelAtPeriodEnd'
 >;
 
+/** Recurso padrão que `POST /api/me/setup` pode criar (#275). */
+export type DefaultResource = 'wallet' | 'fridge';
+
+/** Corpo opcional de `POST /api/me/setup`: pedido explícito pelo fallback. */
+export interface SetupRequest {
+  resource?: DefaultResource;
+}
+
+/** Resposta de `POST /api/me/setup`: o que foi criado nesta chamada. */
+export interface SetupResponse {
+  walletCreated: boolean;
+  fridgeCreated: boolean;
+}
+
 export interface MeResponse {
   uid: string;
   admin: boolean;
