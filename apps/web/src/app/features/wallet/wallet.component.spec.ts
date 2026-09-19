@@ -1355,7 +1355,7 @@ describe('WalletComponent', () => {
 
     beforeEach(() => {
       const component = fixture.componentInstance;
-      // KNRI11 sem cotação: sem preço atual nem total.
+      // KNRI11 sem cotação: a tabela mostra o preço médio.
       component.positions.set([
         position('p1', 'XPML11', 10, 100),
         position('p2', 'BTLG11', 30, 50),
@@ -1420,15 +1420,20 @@ describe('WalletComponent', () => {
       expect(header('ticker').getAttribute('aria-sort')).toBe('none');
     });
 
-    it('deve manter posições sem valor no fim nas duas direções', () => {
+    it('deve ordenar Preço atual e Total pelo valor exibido', () => {
+      // KNRI11 sem cotação aparece com o preço médio (R$ 10) e total R$ 50:
+      // a ordem tem de seguir o que a tabela mostra.
       sortBy('total');
-      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
+      expect(tickers()).toEqual(['KNRI11', 'XPML11', 'BTLG11']);
 
       sortBy('total');
       expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
 
       sortBy('currentPrice');
-      expect(tickers()).toEqual(['BTLG11', 'XPML11', 'KNRI11']);
+      expect(tickers()).toEqual(['KNRI11', 'BTLG11', 'XPML11']);
+
+      sortBy('currentPrice');
+      expect(tickers()).toEqual(['XPML11', 'BTLG11', 'KNRI11']);
     });
 
     it('deve desempatar pelo Ticker em ordem alfabética', () => {
