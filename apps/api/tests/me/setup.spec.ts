@@ -312,6 +312,23 @@ describe('POST /api/me/setup (#275)', () => {
       expect(wallets().length).toBe(1);
     });
 
+    it('não deve gravar o marcador em pedido explícito de quem não foi provisionado', async () => {
+      // O provisionamento automático falhou e o usuário usou o fallback da
+      // carteira: a geladeira ainda precisa vir no próximo login.
+      firestoreMock.docs.delete(`users/${UID}`);
+
+      await setup({ resource: 'wallet' });
+      expect(firestoreMock.docs.get(`users/${UID}`)).toBeUndefined();
+
+      const response = await setup();
+      expect(response.body).toEqual({
+        walletCreated: false,
+        fridgeCreated: true,
+      });
+      expect(wallets().length).toBe(1);
+      expect(fridges().length).toBe(1);
+    });
+
     it('deve recusar recurso desconhecido', async () => {
       const response = await setup({ resource: 'position' });
 
