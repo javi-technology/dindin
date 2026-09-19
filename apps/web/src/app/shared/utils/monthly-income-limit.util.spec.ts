@@ -11,18 +11,12 @@ import {
 
 const TODAY = new Date('2026-09-17T12:00:00Z');
 
-function item(
-  ticker: string,
-  monthlyIncome: number,
-  paymentDate?: string,
-  averageMonthlyIncome = monthlyIncome,
-) {
+function item(ticker: string, monthlyIncome: number, paymentDate?: string) {
   return {
     ticker,
     quantity: 10,
     monthlyDividend: monthlyIncome / 10,
     monthlyIncome,
-    averageMonthlyIncome,
     ...(paymentDate ? { paymentDate } : {}),
   };
 }
@@ -93,16 +87,15 @@ describe('buildFreeView', () => {
     expect(view.hiddenCount).toBe(2);
   });
 
-  it('deve escolher os 3 maiores ativos pela média mensal', () => {
+  it('deve escolher os 3 maiores ativos pelo último provento (#290)', () => {
     const responses: MonthlyIncomeResponse[] = [
       {
         byTicker: [
-          // Semestral: último provento alto, média mensal baixa (#280).
-          item('AAAA11', 120, '2026-09-11', 20),
+          item('AAAA11', 120, '2026-09-11'),
           item('BBBB11', 39.1, '2026-09-15'),
           item('CCCC11', 26.1, '2026-09-15'),
         ],
-        total: 85.2,
+        total: 185.2,
         totalFromFridge: 0,
         limited: true,
         hiddenTickers: [],
@@ -121,8 +114,8 @@ describe('buildFreeView', () => {
     const view = buildFreeView(responses, TODAY);
 
     expect(view.byTicker.map((i) => i.ticker)).toEqual([
+      'AAAA11',
       'BBBB11',
-      'CCCC11',
       'DDDD11',
     ]);
   });
@@ -157,7 +150,6 @@ describe('buildFreeView', () => {
         quantity: 20,
         monthlyDividend: 1,
         monthlyIncome: 15,
-        averageMonthlyIncome: 15,
         paymentDate: '2026-09-16',
       },
     ]);

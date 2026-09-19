@@ -20,7 +20,7 @@ export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
   weight?: number;
   closePrice?: number;
-  averageMonthlyDividend?: number;
+  monthlyDividend?: number; // último provento pago informado pela Brapi (#290)
   qualifiedInvestor?: boolean;
 }
 
@@ -114,7 +114,7 @@ export function buildSuggestionHistory(
 export function buildSuggestionInput(
   comparison: RecommendedWalletComparison,
   tab: AiSuggestionTab,
-  averageMonthlyDividendByTicker: Map<string, number>,
+  monthlyDividendByTicker: Map<string, number>,
   contribution?: number,
   history: AiSuggestionHistoryMonth[] = [],
   projectedDividendsOverride?: number,
@@ -128,7 +128,7 @@ export function buildSuggestionInput(
   );
   const items = comparison.items.map((item) => {
     const asset = assets.get(item.ticker.toUpperCase());
-    const averageMonthlyDividend = averageMonthlyDividendByTicker.get(
+    const monthlyDividend = monthlyDividendByTicker.get(
       item.ticker.toUpperCase(),
     );
     const qualifiedInvestor = qualifiedTickers.has(item.ticker.toUpperCase());
@@ -141,17 +141,14 @@ export function buildSuggestionInput(
             closePrice: asset.closePrice,
           }
         : {}),
-      ...(averageMonthlyDividend === undefined
-        ? {}
-        : { averageMonthlyDividend }),
+      ...(monthlyDividend === undefined ? {} : { monthlyDividend }),
       ...(qualifiedInvestor ? { qualifiedInvestor: true } : {}),
     };
   });
   const projectedDividends =
     projectedDividendsOverride ??
     items.reduce(
-      (total, item) =>
-        total + item.quantity * (item.averageMonthlyDividend ?? 0),
+      (total, item) => total + item.quantity * (item.monthlyDividend ?? 0),
       0,
     );
   return {
@@ -886,7 +883,7 @@ export async function generateSuggestion(
   const input = buildSuggestionInput(
     comparison,
     tab,
-    income.averageMonthlyDividendByTicker,
+    income.monthlyDividendByTicker,
     contribution,
     history,
     income.total,

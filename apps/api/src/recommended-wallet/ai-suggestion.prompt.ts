@@ -27,7 +27,7 @@ export function buildUserPrompt(input: AiSuggestionInput): string {
       `segment=${item.segment ?? 'indisponível'}`,
       `weight=${item.weight ?? 'indisponível'}`,
       `closePrice=${item.closePrice ?? 'indisponível'}`,
-      `averageMonthlyDividend12m=${item.averageMonthlyDividend ?? 'indisponível'}`,
+      `monthlyDividend=${item.monthlyDividend ?? 'indisponível'}`,
       `qualifiedInvestor=${item.qualifiedInvestor ? 'sim' : 'não'}`,
     ];
     return `- ${fields.join(', ')}`;
