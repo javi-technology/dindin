@@ -65,7 +65,9 @@ export async function provisionDefaults(
       };
       tx.create(fridgesCollection(userId).doc(), fridge);
     }
-    if (!provisioned) {
+    // Só o provisionamento automático marca o usuário: um pedido explícito
+    // de um recurso não pode impedir que o outro venha no próximo login.
+    if (!provisioned && resource === undefined) {
       tx.set(userRef, { defaultsProvisionedAt: now }, { merge: true });
     }
 
