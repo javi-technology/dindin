@@ -33,8 +33,26 @@ export interface Wallet {
   updatedAt: string;
 }
 
+/**
+ * Tipos de ativo suportados, em um lugar só (issue #303).
+ *
+ * A lista vinha repetida em sete arquivos entre api e web — validação de
+ * posição, de provento, do catálogo, da sugestão aplicada e o seletor da
+ * tela de admin. Incluir um tipo novo exigia lembrar de todos, e o arquivo
+ * esquecido passava a recusar o tipo sem erro de compilação.
+ */
+export const ASSET_TYPES = ['FII', 'STOCK', 'ETF', 'REIT', 'OTHER'] as const;
+
 /** Tipos de ativo suportados em uma posição */
-export type AssetType = 'FII' | 'STOCK' | 'ETF' | 'REIT' | 'OTHER';
+export type AssetType = (typeof ASSET_TYPES)[number];
+
+/** Se o valor é um tipo de ativo suportado. */
+export function isAssetType(value: unknown): value is AssetType {
+  return (
+    typeof value === 'string' &&
+    (ASSET_TYPES as readonly string[]).includes(value)
+  );
+}
 
 /**
  * Ativo do catálogo suportado pelo app — coleção `assets`.

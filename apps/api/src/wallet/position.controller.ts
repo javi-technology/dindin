@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { Position, AssetType, FridgeItem } from 'dindin-models';
+import { ASSET_TYPES, FridgeItem, isAssetType, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { asyncHandler, notFound } from '../middleware/async-handler';
@@ -11,18 +11,6 @@ import {
   fridgesCollection,
   walletsCollection,
 } from '../firestore/paths';
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
 
 /**
  * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
@@ -87,10 +75,10 @@ function validatePositionBody(
   }
 
   if (!allowPartial || assetType !== undefined) {
-    if (!isValidAssetType(assetType)) {
+    if (!isAssetType(assetType)) {
       return {
         valid: false,
-        error: `Asset type is required and must be one of: ${[...ASSET_TYPES].join(', ')}`,
+        error: `Asset type is required and must be one of: ${ASSET_TYPES.join(', ')}`,
       };
     }
   }

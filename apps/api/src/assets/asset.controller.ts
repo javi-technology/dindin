@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
-import { Asset, AssetType } from 'dindin-models';
+import { Asset, ASSET_TYPES, AssetType, isAssetType } from 'dindin-models';
 import { asyncHandler } from '../middleware/async-handler';
-
-const VALID_ASSET_TYPES: AssetType[] = ['FII', 'STOCK', 'ETF', 'REIT', 'OTHER'];
 
 function assetsCollection() {
   return getFirestore().collection('assets');
@@ -72,11 +70,8 @@ function validateAssetBody(
   ) {
     errors.push('name is required');
   }
-  if (
-    (requireIdentity || assetType !== undefined) &&
-    (!assetType || !VALID_ASSET_TYPES.includes(assetType as AssetType))
-  ) {
-    errors.push(`assetType must be one of: ${VALID_ASSET_TYPES.join(', ')}`);
+  if ((requireIdentity || assetType !== undefined) && !isAssetType(assetType)) {
+    errors.push(`assetType must be one of: ${ASSET_TYPES.join(', ')}`);
   }
   if (active !== undefined && typeof active !== 'boolean') {
     errors.push('active must be a boolean');

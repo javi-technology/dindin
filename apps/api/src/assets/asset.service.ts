@@ -1,22 +1,12 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { Asset, AssetType } from 'dindin-models';
+import { Asset, AssetType, isAssetType } from 'dindin-models';
 
 function assetsCollection() {
   return getFirestore().collection('assets');
 }
 
-const VALID_ASSET_TYPES: Set<AssetType> = new Set([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
 function normalizeAssetType(value: unknown): AssetType {
-  return typeof value === 'string' && VALID_ASSET_TYPES.has(value as AssetType)
-    ? (value as AssetType)
-    : 'OTHER';
+  return isAssetType(value) ? value : 'OTHER';
 }
 
 /**

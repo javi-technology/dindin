@@ -9,7 +9,7 @@ import {
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AssetService } from '../../core/services/asset.service';
-import { Asset } from 'dindin-models';
+import { ASSET_TYPES, Asset, AssetType } from 'dindin-models';
 import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
 
 @Component({
@@ -45,13 +45,23 @@ export class AdminAssetsComponent implements OnInit {
     qualifiedInvestor: [false],
   });
 
-  assetTypes = [
-    { value: 'FII', label: 'FII' },
-    { value: 'STOCK', label: 'Ação' },
-    { value: 'ETF', label: 'ETF' },
-    { value: 'REIT', label: 'REIT' },
-    { value: 'OTHER', label: 'Outro' },
-  ];
+  /**
+   * Rótulos das opções do seletor. Os valores vêm de `ASSET_TYPES`
+   * (`dindin-models`), então um tipo novo aparece aqui sozinho — antes a
+   * lista era mantida à mão e podia divergir da API (issue #303).
+   */
+  private readonly assetTypeLabels: Record<AssetType, string> = {
+    FII: 'FII',
+    STOCK: 'Ação',
+    ETF: 'ETF',
+    REIT: 'REIT',
+    OTHER: 'Outro',
+  };
+
+  assetTypes = ASSET_TYPES.map((value) => ({
+    value,
+    label: this.assetTypeLabels[value],
+  }));
 
   ngOnInit(): void {
     this.loadAssets();

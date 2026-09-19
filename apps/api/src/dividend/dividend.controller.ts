@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Dividend, AssetType } from 'dindin-models';
+import { ASSET_TYPES, Dividend, isAssetType } from 'dindin-models';
 import {
   buildMonthlyDividendReport,
   isValidPaymentDate,
@@ -21,18 +21,6 @@ import {
 import { uid, dividendsCollection } from '../firestore/paths';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { currentYear, todayAsUtcDate } from '../shared/date';
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
 
 function validateDividendBody(
   body: Partial<Dividend>,
@@ -88,10 +76,10 @@ function validateDividendBody(
     }
   }
 
-  if (assetType !== undefined && !isValidAssetType(assetType)) {
+  if (assetType !== undefined && !isAssetType(assetType)) {
     return {
       valid: false,
-      error: `Asset type must be one of: ${[...ASSET_TYPES].join(', ')}`,
+      error: `Asset type must be one of: ${ASSET_TYPES.join(', ')}`,
     };
   }
 
