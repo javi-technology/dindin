@@ -15,7 +15,6 @@ export interface MonthlyIncome {
   total: number;
   totalFromFridge: number;
   monthlyDividendByTicker: Map<string, number>;
-  averageMonthlyDividendByTicker: Map<string, number>;
 }
 
 function positionsCollection(userId: string, walletId: string) {
@@ -60,7 +59,6 @@ export async function computeMonthlyIncome(
   ]);
 
   const monthlyDividendByTicker = new Map<string, number>();
-  const averageMonthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
   for (const doc of quotesSnapshot.docs) {
     const data = doc.data() as Quote;
@@ -73,17 +71,6 @@ export async function computeMonthlyIncome(
       Number.isFinite(data.monthlyDividend)
     ) {
       monthlyDividendByTicker.set(ticker, data.monthlyDividend);
-    }
-    // A média de 12 meses é só dado de entrada da sugestão por IA (#279): o
-    // que o usuário vê é sempre o último provento real da Brapi (#290). Sem
-    // a soma anual (cotação ainda não sincronizada), fica o último provento.
-    const average =
-      typeof data.annualDividend === 'number' &&
-      Number.isFinite(data.annualDividend)
-        ? data.annualDividend / 12
-        : monthlyDividendByTicker.get(ticker);
-    if (average !== undefined) {
-      averageMonthlyDividendByTicker.set(ticker, average);
     }
   }
 
@@ -131,12 +118,5 @@ export async function computeMonthlyIncome(
     total,
     totalFromFridge,
     monthlyDividendByTicker,
-    // Arredondado para o prompt da IA (#279).
-    averageMonthlyDividendByTicker: new Map(
-      [...averageMonthlyDividendByTicker].map(([ticker, average]) => [
-        ticker,
-        Math.round(average * 1e6) / 1e6,
-      ]),
-    ),
   };
 }

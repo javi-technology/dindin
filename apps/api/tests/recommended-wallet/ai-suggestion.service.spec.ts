@@ -150,12 +150,7 @@ describe('ai-suggestion.service', () => {
 
     const extra = input.items.find((item) => item.ticker === 'XPML11');
     expect(extra).toBeDefined();
-    for (const key of [
-      'segment',
-      'weight',
-      'closePrice',
-      'monthlyDividend',
-    ]) {
+    for (const key of ['segment', 'weight', 'closePrice', 'monthlyDividend']) {
       expect(extra).not.toHaveProperty(key);
     }
   });
@@ -606,7 +601,9 @@ describe('ai-suggestion.service', () => {
 
     expect(prompt).toContain('ticker=HGLG11');
     expect(prompt).toMatch(/ticker=HGLG11,[^\n]*, monthlyDividend=0\.93/);
-    expect(prompt).toMatch(/ticker=XPML11,[^\n]*, monthlyDividend=indisponível/);
+    expect(prompt).toMatch(
+      /ticker=XPML11,[^\n]*, monthlyDividend=indisponível/,
+    );
     expect(prompt).not.toContain('averageMonthlyDividend12m');
   });
 
@@ -1893,9 +1890,7 @@ describe('ai-suggestion.service', () => {
     );
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
     expect(JSON.stringify(body.messages)).toContain('ticker=HGLG11');
-    expect(JSON.stringify(body.messages)).toContain(
-      'monthlyDividend=1.5',
-    );
+    expect(JSON.stringify(body.messages)).toContain('monthlyDividend=1.5');
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         qualifiedInvestor: true,
