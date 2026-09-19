@@ -463,6 +463,31 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
       expect(stateSet).not.toHaveBeenCalled();
     });
 
+    it('não sobrescreve a foto gravada quando o estado não chegou a ser salvo', async () => {
+      // Execução anterior gravou a foto e falhou antes de salvar o estado.
+      const { snapshotSet, stateSet } = setupFirestore({
+        recorded: {},
+        snapshots: { '2026-09-30': { u1: 100 } },
+        positions: [
+          // Depois da data-com u1 vendeu e u2 comprou.
+          { path: 'users/u2/wallets/w1/positions/p1', quantity: 50 },
+        ],
+      });
+
+      await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-01',
+      );
+
+      expect(snapshotSet).not.toHaveBeenCalled();
+      expect(stateSet).toHaveBeenCalledWith({
+        recorded: {},
+        snapshots: ['2026-09-30'],
+        updatedAt: expect.any(String),
+      });
+    });
+
     it('não tira foto antes da data-com', async () => {
       const { snapshotSet } = setupFirestore({ recorded: {} });
 
