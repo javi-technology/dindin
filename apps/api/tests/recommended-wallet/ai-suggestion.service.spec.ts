@@ -2160,6 +2160,14 @@ describe('ai-suggestion.service', () => {
           month: '2026-09',
           tab: 'renda',
           contribution: 500,
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
         }),
       }),
       set: jest.fn(),
@@ -2209,6 +2217,113 @@ describe('ai-suggestion.service', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(savedDoc.set).toHaveBeenCalled();
+    // Compras já lançadas na carteira continuam marcadas (#276).
+    const applied = [
+      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
+    ];
+    expect(result.appliedItems).toEqual(applied);
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
+  });
+
+  it('deve manter os itens aplicados ao gerar de novo com force', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Aporte maior.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+      set: jest.fn(),
+    };
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
+    };
+    firestoreMock = {
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return {
+            get: jest.fn().mockResolvedValue({
+              docs: [
+                {
+                  id: 'HGLG11',
+                  data: () => ({ monthlyDividend: 1.25 }),
+                },
+              ],
+            }),
+          };
+        }
+        return {
+          doc: jest.fn(() => ({
+            collection: jest.fn(() => ({
+              ...query,
+              doc: jest.fn(() => savedDoc),
+            })),
+          })),
+        };
+      }),
+    };
+
+    const result = await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      true,
+      600,
+    );
+
+    expect(result).toMatchObject({
+      summary: 'Novo resumo',
+      contribution: 600,
+      projectedDividends: 2.5,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    expect(savedDoc.set).toHaveBeenCalled();
+    // Compras já lançadas na carteira continuam marcadas (#276).
+    const applied = [
+      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
+    ];
+    expect(result.appliedItems).toEqual(applied);
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
   });
 
   it('deve gerar ids determinísticos', () => {
