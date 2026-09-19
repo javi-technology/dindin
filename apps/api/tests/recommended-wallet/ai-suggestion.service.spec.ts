@@ -104,7 +104,6 @@ describe('ai-suggestion.service', () => {
       total: 2.5,
       totalFromFridge: 0,
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
-      averageMonthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
     consoleErrorSpy = jest
       .spyOn(console, 'error')
@@ -140,7 +139,7 @@ describe('ai-suggestion.service', () => {
         segment: 'Logísticos',
         weight: 0.2,
         closePrice: 160,
-        averageMonthlyDividend: 1.25,
+        monthlyDividend: 1.25,
       }),
       expect.objectContaining({ ticker: 'XPML11', status: 'extra' }),
     ]);
@@ -155,7 +154,7 @@ describe('ai-suggestion.service', () => {
       'segment',
       'weight',
       'closePrice',
-      'averageMonthlyDividend',
+      'monthlyDividend',
     ]) {
       expect(extra).not.toHaveProperty(key);
     }
@@ -600,14 +599,15 @@ describe('ai-suggestion.service', () => {
     expect(prompt).toContain('Total disponível para investir: R$ 502.5');
   });
 
-  it('deve informar no prompt a média mensal de 12 meses por ativo', () => {
+  it('deve informar no prompt o último provento da Brapi por ativo (#290)', () => {
     const prompt = buildUserPrompt(
-      buildSuggestionInput(comparison, 'renda', new Map([['HGLG11', 0.2]])),
+      buildSuggestionInput(comparison, 'renda', new Map([['HGLG11', 0.93]])),
     );
 
-    expect(prompt).toContain('averageMonthlyDividend12m=0.2');
-    expect(prompt).toContain('averageMonthlyDividend12m=indisponível');
-    expect(prompt).not.toContain('monthlyDividend=');
+    expect(prompt).toContain('ticker=HGLG11');
+    expect(prompt).toMatch(/ticker=HGLG11,[^\n]*, monthlyDividend=0\.93/);
+    expect(prompt).toMatch(/ticker=XPML11,[^\n]*, monthlyDividend=indisponível/);
+    expect(prompt).not.toContain('averageMonthlyDividend12m');
   });
 
   it('deve incluir o status de investidor qualificado no prompt', () => {
@@ -1797,9 +1797,7 @@ describe('ai-suggestion.service', () => {
       byTicker: [],
       total: 15.5,
       totalFromFridge: 13,
-      // Semestral: o último provento (1.5) não se repete todo mês.
       monthlyDividendByTicker: new Map([['HGLG11', 1.5]]),
-      averageMonthlyDividendByTicker: new Map([['HGLG11', 0.25]]),
     });
     listQualifiedInvestorTickersMock.mockResolvedValue(new Set(['HGLG11']));
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -1887,7 +1885,7 @@ describe('ai-suggestion.service', () => {
           items: expect.arrayContaining([
             expect.objectContaining({
               ticker: 'HGLG11',
-              averageMonthlyDividend: 0.25,
+              monthlyDividend: 1.5,
             }),
           ]),
         }),
@@ -1896,7 +1894,7 @@ describe('ai-suggestion.service', () => {
     const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
     expect(JSON.stringify(body.messages)).toContain('ticker=HGLG11');
     expect(JSON.stringify(body.messages)).toContain(
-      'averageMonthlyDividend12m=0.25',
+      'monthlyDividend=1.5',
     );
     expect(result.items[0]).toEqual(
       expect.objectContaining({

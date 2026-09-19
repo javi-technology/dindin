@@ -267,13 +267,14 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
       monthlyIncome: 120,
       paymentDate: '2026-08-20',
     });
-    // A média de 12 meses fica só como dado de entrada da sugestão por IA
-    // (#279), inclusive de quem só está na geladeira.
-    expect(income.averageMonthlyDividendByTicker).toEqual(
+    // Nem a sugestão por IA recebe a média de 12 meses: vale o último
+    // provento, inclusive de quem só está na geladeira.
+    expect(income).not.toHaveProperty('averageMonthlyDividendByTicker');
+    expect(income.monthlyDividendByTicker).toEqual(
       new Map([
-        ['PETR4', 0.2],
+        ['PETR4', 1.2],
         ['HGLG11', 0.9],
-        ['TRXF11', 0.983333],
+        ['TRXF11', 0.93],
       ]),
     );
   });
