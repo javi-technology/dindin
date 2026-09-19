@@ -9,6 +9,7 @@ import {
   uid,
   positionsCollection,
   fridgesCollection,
+  walletsCollection,
 } from '../firestore/paths';
 
 const ASSET_TYPES = new Set<AssetType>([
@@ -137,12 +138,24 @@ export const listPositions = asyncHandler(
 export const createPosition = asyncHandler(
   'createPosition',
   async (req: Request, res: Response) => {
+    const userId = uid(req);
     const walletId = req.params.walletId;
     const body = req.body as Partial<Position>;
 
     const validation = validatePositionBody(body);
     if (!validation.valid) {
       res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    // Sem esta checagem a posição nasce órfã sob uma carteira inexistente:
+    // a API não a alcança, porque navega a partir das carteiras, mas o
+    // registro automático de proventos a encontra pelo collection group e
+    // lança provento de um ativo que o usuário não vê (issue #296). É a
+    // mesma verificação que `createItem` já faz com a geladeira.
+    const walletDoc = await walletsCollection(userId).doc(walletId).get();
+    if (!walletDoc.exists) {
+      res.status(404).json({ error: 'Wallet not found' });
       return;
     }
 
@@ -172,7 +185,7 @@ export const createPosition = asyncHandler(
       positionData.targetPrice = body.targetPrice;
     }
 
-    const docRef = await positionsCollection(uid(req), walletId).add(
+    const docRef = await positionsCollection(userId, walletId).add(
       positionData,
     );
     res.status(201).json({ id: docRef.id, ...positionData });
