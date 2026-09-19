@@ -98,6 +98,10 @@ function createFirestoreMock(
   const itemMap = new Map<string, any>();
   const walletMap = new Map<string, any>();
   const batchOperations: unknown[][] = [];
+  // Documentos já removidos por uma transação: a leitura seguinte precisa
+  // enxergar a remoção, senão duas chamadas concorrentes leriam o mesmo
+  // item vivo (issue #295).
+  const deletedIds = new Set<string>();
 
   wallets.forEach((wallet) => {
     walletMap.set(wallet.id, {
@@ -144,7 +148,11 @@ function createFirestoreMock(
       get: jest
         .fn()
         .mockImplementation(() =>
-          Promise.resolve(createFridgeItemSnapshot(data)),
+          Promise.resolve(
+            deletedIds.has(item.id)
+              ? { id: item.id, exists: false, data: () => null }
+              : createFridgeItemSnapshot(data),
+          ),
         ),
       set: jest.fn().mockImplementation((value: any) => {
         data = { ...data, ...value };
@@ -239,6 +247,28 @@ function createFirestoreMock(
     operations: batchOperations,
   };
 
+  const transactionOperations: unknown[][] = [];
+  const transaction = {
+    get: jest.fn((ref: any) => ref.get()),
+    delete: jest.fn((ref: any) => {
+      transactionOperations.push(['delete', ref]);
+      deletedIds.add(ref.id);
+    }),
+    set: jest.fn((ref: any, value: unknown) => {
+      transactionOperations.push(['set', ref, value]);
+    }),
+  };
+
+  // As transações do Firestore são serializadas em caso de conflito: a
+  // segunda só enxerga o estado depois que a primeira commitou. A fila
+  // reproduz isso para que o teste de concorrência seja determinístico.
+  let queue: Promise<unknown> = Promise.resolve();
+  const runTransaction = jest.fn((handler: any) => {
+    const result = queue.then(() => handler(transaction));
+    queue = result.catch(() => undefined);
+    return result;
+  });
+
   return {
     collection: jest.fn((path: string) => {
       if (path === 'users') {
@@ -317,6 +347,8 @@ function createFirestoreMock(
     getAll: catalog.getAll,
     batch: jest.fn(() => batchMock),
     batchMock,
+    runTransaction,
+    transactionMock: { ...transaction, operations: transactionOperations },
   };
 }
 
@@ -1126,13 +1158,13 @@ describe('FridgeItem CRUD', () => {
         }),
       );
 
-      const batch = firestoreMock.batchMock;
-      expect(batch.operations[0][0]).toBe('delete');
-      expect(batch.operations[1][0]).toBe('set');
-      expect(batch.delete).toHaveBeenCalledWith(
+      const { transactionMock } = firestoreMock;
+      expect(transactionMock.operations[0][0]).toBe('delete');
+      expect(transactionMock.operations[1][0]).toBe('set');
+      expect(transactionMock.delete).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'item-1' }),
       );
-      expect(batch.set).toHaveBeenCalledWith(
+      expect(transactionMock.set).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'new-position-id' }),
         expect.objectContaining({
           walletId: 'wallet-1',
@@ -1140,6 +1172,34 @@ describe('FridgeItem CRUD', () => {
           inFridge: false,
         }),
       );
+    });
+
+    // Antes, o item era lido fora da transação e o batch fazia delete + set.
+    // Como `delete` de documento inexistente não falha, duas chamadas
+    // simultâneas criavam duas posições com a mesma quantidade (issue #295).
+    it('deve criar uma única posição quando duas chamadas concorrem pelo mesmo item', async () => {
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [{ ...baseItem, assetType: 'FII' as const }],
+        createCatalogStubs(),
+        [baseWallet],
+      );
+
+      const unfreeze = () =>
+        request(app)
+          .post('/api/fridges/fridge-1/items/item-1/unfreeze')
+          .set('Authorization', authHeader)
+          .send({ walletId: 'wallet-1' });
+
+      const [first, second] = await Promise.all([unfreeze(), unfreeze()]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([201, 404]);
+
+      const created = firestoreMock.transactionMock.operations.filter(
+        (operation: unknown[]) => operation[0] === 'set',
+      );
+      expect(created.length).toBe(1);
     });
 
     it('deve retornar 400 quando walletId não é informado', async () => {
