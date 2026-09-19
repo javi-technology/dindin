@@ -281,6 +281,12 @@ function createFirestoreMock(
                     if (walletMap.has(walletId)) return walletMap.get(walletId);
                     return {
                       id: walletId,
+                      // A referência da posição é montada antes da leitura,
+                      // porque a transação precisa dela para escrever
+                      // (issue #295) — mesmo para carteira inexistente.
+                      collection: jest.fn(() => ({
+                        doc: jest.fn(() => ({ id: 'new-position-id' })),
+                      })),
                       get: jest.fn().mockResolvedValue({
                         id: walletId,
                         exists: false,
