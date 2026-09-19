@@ -121,11 +121,6 @@
                           }
                         }
                       </button>
-                      @if (header.hint) {
-                        <span class="block text-xs font-normal text-gray-500">
-                          {{ header.hint }}
-                        </span>
-                      }
                     </th>
                   }
                   <th
@@ -179,14 +174,6 @@
                     <td class="py-3 px-4 text-gray-700">
                       @if (totalProventosFor(position); as proventos) {
                         {{ formatCurrency(proventos) }}
-                        @if (lastProventoFor(position); as ultimo) {
-                          <span
-                            class="block text-xs text-gray-500"
-                            data-testid="proventos-ultimo"
-                          >
-                            último: {{ formatCurrency(ultimo) }}
-                          </span>
-                        }
                       } @else if (totalProventosFor(position) === null) {
                         <span
                           class="text-gray-400"

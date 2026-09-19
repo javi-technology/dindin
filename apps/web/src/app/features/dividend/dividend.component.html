@@ -341,22 +341,8 @@
                       <dd class="text-gray-900">{{ card.item.quantity }}</dd>
                     </div>
                     <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">
-                        Proventos/mês
-                        <span class="block text-xs">
-                          média dos últimos 12 meses
-                        </span>
-                      </dt>
-                      <dd
-                        class="font-medium text-gray-900"
-                        data-testid="card-average-income"
-                      >
-                        {{ formatCurrency(card.item.averageMonthlyIncome) }}
-                      </dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Último provento</dt>
-                      <dd class="text-gray-900" data-testid="card-last-income">
+                      <dt class="text-gray-500">Proventos/mês</dt>
+                      <dd class="font-medium text-gray-900">
                         {{ formatCurrency(card.item.monthlyIncome) }}
                       </dd>
                     </div>

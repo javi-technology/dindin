@@ -25,9 +25,6 @@ export function mergeMonthlyIncomeItems(
               item.paymentDate && { paymentDate: item.paymentDate }),
             quantity: current.quantity + item.quantity,
             monthlyIncome: round(current.monthlyIncome + item.monthlyIncome),
-            averageMonthlyIncome: round(
-              current.averageMonthlyIncome + item.averageMonthlyIncome,
-            ),
           }
         : { ...item },
     );
