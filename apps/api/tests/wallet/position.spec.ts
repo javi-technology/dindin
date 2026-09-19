@@ -159,6 +159,16 @@ function createFirestoreMock(
               if (subPath === 'wallets' && uid === 'user-123') {
                 return {
                   doc: jest.fn((walletId: string) => ({
+                    // Só `wallet-1` existe: o cadastro de posição confere a
+                    // carteira antes de gravar (issue #296).
+                    get: jest.fn().mockResolvedValue({
+                      id: walletId,
+                      exists: walletId === 'wallet-1',
+                      data: () =>
+                        walletId === 'wallet-1'
+                          ? { name: 'Carteira Principal' }
+                          : undefined,
+                    }),
                     collection: jest.fn((positionPath: string) => {
                       if (
                         positionPath === 'positions' &&
@@ -499,6 +509,26 @@ describe('Position CRUD', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.currentPrice).toBeUndefined();
+    });
+
+    // Sem essa checagem a posição fica órfã sob uma carteira inexistente:
+    // invisível na API, que navega a partir das carteiras, mas visível para o
+    // registro automático de proventos, que usa collection group (issue #296).
+    it('deve retornar 404 quando a carteira não existe', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-inexistente/positions')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: 'FII',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Wallet not found' });
     });
 
     it('deve retornar 400 quando ticker não é informado', async () => {
