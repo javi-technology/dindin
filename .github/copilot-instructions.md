@@ -23,13 +23,33 @@ template sozinha. Uma issue fora do template não está pronta para ser trabalha
 | Defeito (bug, regressão, teste intermitente)       | `bug_report.md`      | `[Bug] - ...`     | `bug`         |
 | Demais (funcionalidade, melhoria, refactor, docs…) | `feature_request.md` | `[Feature] - ...` | `enhancement` |
 
-- O corpo tem as seções **Contexto**, **DOR** e **DOD**, nessa ordem e com esses
-  títulos em negrito, como no template:
-  - **Contexto:** o problema e por que ele importa;
-  - **DOR** (Definition of Ready): o que se quer e o que precisa estar claro para começar;
-  - **DOD** (Definition of Done): critérios de aceite em checklist (`- [ ]`).
-- Detalhes extras (escopo, fora de escopo, exemplos) entram dentro dessas seções,
-  sem criar outras.
+- O corpo segue **exatamente** o formato do template, sem acrescentar nem trocar
+  estrutura:
+
+  ```markdown
+  **Contexto:**
+
+  - ...
+
+  **DOR:**
+
+  - ...
+
+  **DOD:**
+
+  - ...
+  ```
+
+  - As seções são **Contexto**, **DOR** e **DOD**, nessa ordem, com o título em
+    negrito terminado em dois-pontos.
+  - Cada seção contém só bullet points simples (`- `). **Não usar** checkbox
+    (`- [ ]`), sub-bullets, tabelas, títulos (`##`) nem seções extras.
+  - **Contexto:** o problema e por que ele importa. **DOR** (Definition of Ready):
+    o que se quer e o que precisa estar claro para começar. **DOD** (Definition of
+    Done): os critérios de aceite, um por bullet.
+  - Detalhes extras (escopo, fora de escopo, exemplos) viram bullets dentro dessas
+    seções.
+
 - Labels complementares (`fase-N`, `test`, `debito-tecnico`, `documentation`…) são
   somadas à label do template, nunca a substituem.
 - `custom.md` está vazio e não deve ser usado.
