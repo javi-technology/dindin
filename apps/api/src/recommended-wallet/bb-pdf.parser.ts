@@ -1,5 +1,5 @@
 import pdfParse from 'pdf-parse';
-import { todayDateInBrazil } from '../patrimony/patrimony-snapshot.service';
+import { today } from '../shared/date';
 
 export interface ParsedRow {
   ticker: string;
@@ -153,7 +153,7 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
   }
 
   return {
-    publishedAt: publishedDateFromText(parsed.text) ?? todayDateInBrazil(),
+    publishedAt: publishedDateFromText(parsed.text) ?? today(),
     renda: parseWalletTable(rendaPage),
     ganho: ganhoPage ? parseWalletTable(ganhoPage) : [],
   };

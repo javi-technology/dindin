@@ -1,3 +1,4 @@
+import { currentMonth } from '../shared/date';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
   RecommendedWallet,
@@ -264,12 +265,7 @@ export async function compareWithWallet(
 }
 
 export async function syncBbWallet(): Promise<void> {
-  const currentMonth = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-  }).format(new Date());
-  const found = await fetchLatestBbPdf(currentMonth);
+  const found = await fetchLatestBbPdf(currentMonth());
   if (!found) {
     console.log('[syncBbWallet] Nenhum PDF disponível');
     return;

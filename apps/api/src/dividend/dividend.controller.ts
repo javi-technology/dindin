@@ -8,7 +8,6 @@ import {
 } from './monthly-report.service';
 import { computeMonthlyIncome } from './monthly-income.service';
 import {
-  appToday,
   computeScheduleTotals,
   limitMonthlyIncome,
 } from './monthly-income-limit.service';
@@ -21,6 +20,7 @@ import {
 } from './dividend-calculation.service';
 import { uid, dividendsCollection } from '../firestore/paths';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { currentYear, todayAsUtcDate } from '../shared/date';
 
 const ASSET_TYPES = new Set<AssetType>([
   'FII',
@@ -250,7 +250,7 @@ export const getMonthlyDividendReport = asyncHandler(
   'getMonthlyDividendReport',
   async (req: Request, res: Response) => {
     const queryYear = req.query.year;
-    let year = new Date().getFullYear();
+    let year = currentYear();
 
     if (queryYear !== undefined) {
       const parsedYear =
@@ -310,7 +310,7 @@ export const getMonthlyIncome = asyncHandler(
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
-    const today = appToday();
+    const today = todayAsUtcDate();
     const scheduleTotals = computeScheduleTotals(byTicker, today);
 
     if (entitled) {

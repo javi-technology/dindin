@@ -1,19 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { FridgeItem, PatrimonySnapshot, Position, Quote } from 'dindin-models';
+import { today } from '../shared/date';
 
 const BATCH_SIZE = 10;
 
 function userCollection(userId: string, collection: string) {
   return getFirestore().collection('users').doc(userId).collection(collection);
-}
-
-export function todayDateInBrazil(now = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
 }
 
 function validQuantity(quantity: unknown): number {
@@ -117,7 +109,7 @@ export async function computeUserPatrimony(
 
 export async function savePatrimonySnapshot(
   userId: string,
-  date = todayDateInBrazil(),
+  date = today(),
 ): Promise<PatrimonySnapshot> {
   const totals = await computeUserPatrimony(userId);
   const snapshot: PatrimonySnapshot = {

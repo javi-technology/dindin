@@ -3,7 +3,7 @@ import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 import { recordPaidDividends } from '../dividend/dividend-sync-record.service';
-import { todayDateInBrazil } from '../patrimony/patrimony-snapshot.service';
+import { today } from '../shared/date';
 
 // Processa os tickers com cotação em lotes, para não disparar centenas de
 // escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
@@ -136,13 +136,13 @@ export async function updateAllQuotes(): Promise<void> {
       dividends = new Map();
     }
 
-    const today = todayDateInBrazil();
+    const date = today();
     const tickerEntries = [...quotes.entries()];
     for (let i = 0; i < tickerEntries.length; i += BATCH_SIZE) {
       const batch = tickerEntries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(
         batch.map(([ticker, quote]) =>
-          processTickerQuote(ticker, quote, dividends.get(ticker), today),
+          processTickerQuote(ticker, quote, dividends.get(ticker), date),
         ),
       );
     }
