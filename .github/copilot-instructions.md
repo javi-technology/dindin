@@ -12,6 +12,48 @@ Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 4 (frontend
 - Antes de iniciar qualquer trabalho, verificar se existe issue aberta. Se não existir, criar.
 - Nenhum commit sem o número da issue correspondente.
 
+#### Template obrigatório
+
+**Toda issue DEVE seguir, de forma obrigatória, um template de `.github/ISSUE_TEMPLATE/`.**
+Isso vale também para issues criadas pela CLI (`gh issue create`), que não aplica o
+template sozinha. Uma issue fora do template não está pronta para ser trabalhada.
+
+| Tipo de issue                                      | Template             | Título            | Label         |
+| -------------------------------------------------- | -------------------- | ----------------- | ------------- |
+| Defeito (bug, regressão, teste intermitente)       | `bug_report.md`      | `[Bug] - ...`     | `bug`         |
+| Demais (funcionalidade, melhoria, refactor, docs…) | `feature_request.md` | `[Feature] - ...` | `enhancement` |
+
+- O corpo segue **exatamente** o formato do template, sem acrescentar nem trocar
+  estrutura:
+
+  ```markdown
+  **Contexto:**
+
+  - ...
+
+  **DOR:**
+
+  - ...
+
+  **DOD:**
+
+  - ...
+  ```
+
+  - As seções são **Contexto**, **DOR** e **DOD**, nessa ordem, com o título em
+    negrito terminado em dois-pontos.
+  - Cada seção contém só bullet points simples (`- `). **Não usar** checkbox
+    (`- [ ]`), sub-bullets, tabelas, títulos (`##`) nem seções extras.
+  - **Contexto:** o problema e por que ele importa. **DOR** (Definition of Ready):
+    o que se quer e o que precisa estar claro para começar. **DOD** (Definition of
+    Done): os critérios de aceite, um por bullet.
+  - Detalhes extras (escopo, fora de escopo, exemplos) viram bullets dentro dessas
+    seções.
+
+- Labels complementares (`fase-N`, `test`, `debito-tecnico`, `documentation`…) são
+  somadas à label do template, nunca a substituem.
+- `custom.md` está vazio e não deve ser usado.
+
 #### Campos obrigatórios no GitHub Projects
 
 Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
@@ -23,7 +65,7 @@ Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchi
 | `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
 ```bash
-gh issue create --title "..." --label "..." --body-file issue.md
+gh issue create --title "[Feature] - ..." --label "enhancement" --body-file issue.md  # corpo no formato do template
 gh project item-add 4 --owner javi-technology --url <url_da_issue>
 gh project field-list 4 --owner javi-technology           # ids dos campos e opções
 gh project item-edit --project-id <project_id> --id <item_id> --field-id <estimate_id> --number <pontos>
