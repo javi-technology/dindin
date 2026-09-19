@@ -114,11 +114,10 @@ export function limitMonthlyIncome(
   items: MonthlyIncomeItem[],
   today: Date = appToday(),
 ): LimitedMonthlyIncome {
-  // Mesma renda que a tela mostra por ativo: a média de 12 meses (#280).
+  // Mesma renda que a tela mostra por ativo: o último provento (#290).
   const byIncome = [...items].sort(
     (a, b) =>
-      b.averageMonthlyIncome - a.averageMonthlyIncome ||
-      a.ticker.localeCompare(b.ticker),
+      b.monthlyIncome - a.monthlyIncome || a.ticker.localeCompare(b.ticker),
   );
   const visible = byIncome.slice(0, FREE_TICKER_LIMIT);
   const hiddenTickers = byIncome
