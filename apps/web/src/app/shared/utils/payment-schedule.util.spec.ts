@@ -10,7 +10,6 @@ const item = (
   quantity: 100,
   monthlyDividend: monthlyIncome / 100,
   monthlyIncome,
-  averageMonthlyIncome: monthlyIncome,
   ...(paymentDate && { paymentDate }),
 });
 

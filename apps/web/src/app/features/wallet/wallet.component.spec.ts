@@ -153,14 +153,12 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
-            averageMonthlyIncome: 9,
           },
           {
             ticker: 'KNRI11',
             quantity: 5,
             monthlyDividend: 0.75,
             monthlyIncome: 3.75,
-            averageMonthlyIncome: 3.75,
           },
         ],
         total: 12.75,
@@ -267,8 +265,7 @@ describe('WalletComponent', () => {
     expect(secondRow).toMatch(/R\$\s?3,75/);
   });
 
-  it('deve mostrar a média de 12 meses como proventos/mês da posição', () => {
-    // Semestral: o último provento (R$ 120,00) não se repete todo mês (#280).
+  it('deve mostrar o último provento da Brapi como proventos/mês (#290)', () => {
     fixture.componentInstance.monthlyIncome.set({
       byTicker: [
         {
@@ -276,32 +273,18 @@ describe('WalletComponent', () => {
           quantity: 10,
           monthlyDividend: 12,
           monthlyIncome: 120,
-          averageMonthlyIncome: 20,
-        },
-        {
-          ticker: 'KNRI11',
-          quantity: 5,
-          monthlyDividend: 0.75,
-          monthlyIncome: 3.75,
-          averageMonthlyIncome: 3.75,
         },
       ],
-      total: 23.75,
+      total: 120,
       totalFromFridge: 0,
     });
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    const rows = compiled.querySelectorAll('tbody tr');
-    expect(rows[0].textContent).toMatch(/R\$\s?20,00/);
-    expect(
-      rows[0].querySelector('[data-testid="proventos-ultimo"]')?.textContent,
-    ).toMatch(/R\$\s?120,00/);
-    // Quando o último provento é a própria média, não há o que destacar.
-    expect(
-      rows[1].querySelector('[data-testid="proventos-ultimo"]'),
-    ).toBeNull();
-    expect(compiled.querySelector('thead')?.textContent).toContain(
+    const row = compiled.querySelector('tbody tr');
+    expect(row?.textContent).toMatch(/R\$\s?120,00/);
+    expect(row?.querySelector('[data-testid="proventos-ultimo"]')).toBeNull();
+    expect(compiled.querySelector('thead')?.textContent).not.toContain(
       'média dos últimos 12 meses',
     );
   });
@@ -316,7 +299,6 @@ describe('WalletComponent', () => {
           quantity: 10,
           monthlyDividend: 0.9,
           monthlyIncome: 9,
-          averageMonthlyIncome: 9,
         },
       ],
       total: 12.75,
@@ -376,7 +358,6 @@ describe('WalletComponent', () => {
             quantity: 10,
             monthlyDividend: 0.9,
             monthlyIncome: 9,
-            averageMonthlyIncome: 9,
           },
         ],
         total: 9,
@@ -1331,12 +1312,11 @@ describe('WalletComponent', () => {
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     });
-    const income = (ticker: string, averageMonthlyIncome: number) => ({
+    const income = (ticker: string, monthlyIncome: number) => ({
       ticker,
       quantity: 1,
-      monthlyDividend: averageMonthlyIncome,
-      monthlyIncome: averageMonthlyIncome,
-      averageMonthlyIncome,
+      monthlyDividend: monthlyIncome,
+      monthlyIncome,
     });
     const dy = (ticker: string, value: number) => ({
       ticker,
