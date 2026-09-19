@@ -219,9 +219,9 @@ export class WalletComponent implements OnInit {
   ];
 
   /**
-   * Posições na ordem escolhida. Quem não tem valor na coluna (sem cotação,
-   * projeção bloqueada) vai para o fim nas duas direções, e empates seguem o
-   * Ticker A→Z para a ordem não oscilar.
+   * Posições na ordem escolhida. Quem não tem valor na coluna (projeção
+   * bloqueada no plano gratuito) vai para o fim nas duas direções, e empates
+   * seguem o Ticker A→Z para a ordem não oscilar.
    */
   sortedPositions = computed(() => {
     const { column, direction } = this.sort();
@@ -268,12 +268,11 @@ export class WalletComponent implements OnInit {
     switch (column) {
       case 'quantity':
         return position.quantity;
+      // Os mesmos valores da tabela: sem cotação, vale o preço médio.
       case 'currentPrice':
-        return position.currentPrice ?? null;
+        return this.unitPrice(position);
       case 'total':
-        return position.currentPrice == null
-          ? null
-          : position.quantity * position.currentPrice;
+        return this.totalPosition(position);
       case 'monthlyIncome':
         return this.totalProventosFor(position);
       case 'dividendYield':
