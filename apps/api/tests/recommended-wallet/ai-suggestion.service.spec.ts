@@ -9,9 +9,40 @@ jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
 }));
 
+/**
+ * Garante `runTransaction` em qualquer mock de Firestore: a cota diária passou
+ * a ser reservada dentro de uma transação (issue #297), e os mocks dos testes
+ * de geração só descrevem as collections que lhes interessam. As transações
+ * são serializadas, como o Firestore faz ao detectar conflito.
+ */
+function mockQuotaTransaction(firestore: any) {
+  if (!firestore || firestore.runTransaction) return firestore;
+
+  const counts = new Map<string, any>();
+  const transaction = {
+    get: jest.fn(async (ref: { id: string }) => ({
+      exists: counts.has(ref.id),
+      data: () => counts.get(ref.id),
+    })),
+    set: jest.fn((ref: { id: string }, data: any) => {
+      counts.set(ref.id, data);
+    }),
+  };
+
+  let queue: Promise<unknown> = Promise.resolve();
+  firestore.runTransaction = jest.fn((handler: any) => {
+    const result = queue.then(() => handler(transaction));
+    queue = result.catch(() => undefined);
+    return result;
+  });
+  firestore.quotaCounts = counts;
+
+  return firestore;
+}
+
 jest.mock('firebase-admin/firestore', () => ({
   ...jest.requireActual('firebase-admin/firestore'),
-  getFirestore: jest.fn(() => firestoreMock),
+  getFirestore: jest.fn(() => mockQuotaTransaction(firestoreMock)),
 }));
 
 jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
