@@ -207,13 +207,21 @@ export async function recordPaidDividends(
     .filter((date) => !stored.has(date))
     .sort();
   if (toSnapshot.length > 0) {
-    const snapshot: QuantitySnapshot = {
-      quantities: Object.fromEntries(await currentQuantities()),
-      takenAt: new Date().toISOString(),
-    };
-    await Promise.all(
-      toSnapshot.map((date) => snapshotsRef.doc(date).set(snapshot)),
+    // A foto é gravada antes do estado: se uma execução anterior falhou
+    // depois dela, a foto certa já existe e não pode virar a de hoje.
+    const existing = await Promise.all(
+      toSnapshot.map((date) => snapshotsRef.doc(date).get()),
     );
+    const missing = toSnapshot.filter((_, index) => !existing[index].exists);
+    if (missing.length > 0) {
+      const snapshot: QuantitySnapshot = {
+        quantities: Object.fromEntries(await currentQuantities()),
+        takenAt: new Date().toISOString(),
+      };
+      await Promise.all(
+        missing.map((date) => snapshotsRef.doc(date).set(snapshot)),
+      );
+    }
     toSnapshot.forEach((date) => stored.add(date));
   }
 
