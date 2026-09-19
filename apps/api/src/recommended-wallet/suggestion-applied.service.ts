@@ -1,5 +1,12 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { AiSuggestion, AiSuggestionAppliedItem } from 'dindin-models';
+import {
+  AiSuggestion,
+  AiSuggestionAppliedItem,
+  Asset,
+  AssetType,
+  Position,
+} from 'dindin-models';
+import { positionsCollection, walletsCollection } from '../firestore/paths';
 
 export interface AppliedItemInput {
   ticker?: unknown;
@@ -15,6 +22,27 @@ function createError(message: string, statusCode: number): StatusError {
   error.statusCode = statusCode;
   error.expose = true;
   return error;
+}
+
+const ASSET_TYPES = new Set<AssetType>([
+  'FII',
+  'STOCK',
+  'ETF',
+  'REIT',
+  'OTHER',
+]);
+
+/** Preço médio após a compra, arredondado a 2 casas, como na tela. */
+function weightedAveragePrice(
+  currentQuantity: number,
+  currentPrice: number,
+  addedQuantity: number,
+  purchasePrice: number,
+): number {
+  const average =
+    (currentQuantity * currentPrice + addedQuantity * purchasePrice) /
+    (currentQuantity + addedQuantity);
+  return Math.round(average * 100) / 100;
 }
 
 function isPositiveNumber(value: unknown): value is number {
@@ -52,9 +80,14 @@ function isApplicable(
 }
 
 /**
- * Marca uma compra da Sugestão do mês como lançada na carteira (#276). A
- * leitura e a gravação ficam na mesma transação, para que dois cliques
- * simultâneos não marquem a mesma compra duas vezes.
+ * Lança uma compra da Sugestão do mês na carteira e a marca como aplicada
+ * (#276). Posição e marca ficam na mesma transação: um item já aplicado (409)
+ * não chega a mexer na carteira, dois cliques ou duas abas não lançam a mesma
+ * compra duas vezes, e uma falha não deixa a compra lançada sem a marca.
+ *
+ * A carteira é a da sugestão. Com posição do ticker, soma a quantidade e
+ * recalcula o preço médio ponderado; sem posição, cria uma com o tipo do
+ * catálogo de ativos.
  */
 export async function recordAppliedItem(
   uid: string,
@@ -106,12 +139,62 @@ export async function recordAppliedItem(
       throw createError('Item já aplicado na carteira', 409);
     }
 
+    const walletRef = walletsCollection(uid).doc(suggestion.walletId);
+    const walletPositions = positionsCollection(uid, suggestion.walletId);
+    const [walletSnapshot, positionSnapshot, assetSnapshot] = await Promise.all(
+      [
+        tx.get(walletRef),
+        tx.get(walletPositions.where('ticker', '==', ticker).limit(1)),
+        tx.get(getFirestore().collection('assets').doc(ticker)),
+      ],
+    );
+    if (!walletSnapshot.exists) {
+      throw createError('Carteira não encontrada', 404);
+    }
+
+    const now = new Date().toISOString();
+    if (!positionSnapshot.empty) {
+      const positionDoc = positionSnapshot.docs[0];
+      const current = positionDoc.data() as Position;
+      tx.update(positionDoc.ref, {
+        quantity: current.quantity + quantity,
+        averagePrice: weightedAveragePrice(
+          current.quantity,
+          current.averagePrice,
+          quantity,
+          price,
+        ),
+        updatedAt: now,
+      });
+    } else {
+      const asset = assetSnapshot.data() as Partial<Asset> | undefined;
+      if (!assetSnapshot.exists || asset?.active !== true) {
+        throw createError(
+          'Ticker não encontrado no catálogo de ativos suportados',
+          400,
+        );
+      }
+      const position: Omit<Position, 'id'> = {
+        walletId: suggestion.walletId,
+        ticker,
+        assetType: ASSET_TYPES.has(asset.assetType as AssetType)
+          ? (asset.assetType as AssetType)
+          : 'OTHER',
+        quantity,
+        averagePrice: price,
+        inFridge: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      tx.create(walletPositions.doc(), position);
+    }
+
     const applied: AiSuggestionAppliedItem = {
       ticker,
       ...(fallbackFor === undefined ? {} : { fallbackFor }),
       quantity,
       price,
-      appliedAt: new Date().toISOString(),
+      appliedAt: now,
     };
     const updated = [...appliedItems, applied];
     tx.update(ref, { appliedItems: updated });

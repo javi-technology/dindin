@@ -865,16 +865,17 @@ export async function generateSuggestion(
   const availableHistoryMonths = sortedHistoryWallets.map(
     (wallet) => `${wallet.month}:${wallet.revision}`,
   );
-  if (!force) {
-    const saved = await getSavedSuggestion(uid, walletId, month, tab);
-    if (
-      saved &&
-      saved.contribution === contribution &&
-      JSON.stringify(saved.historyMonths ?? []) ===
-        JSON.stringify(availableHistoryMonths)
-    ) {
-      return saved;
-    }
+  // Lida também com `force`: as compras já lançadas na carteira (#276)
+  // continuam marcadas na sugestão gerada de novo.
+  const saved = await getSavedSuggestion(uid, walletId, month, tab);
+  if (
+    !force &&
+    saved &&
+    saved.contribution === contribution &&
+    JSON.stringify(saved.historyMonths ?? []) ===
+      JSON.stringify(availableHistoryMonths)
+  ) {
+    return saved;
   }
   await checkDailyLimit(uid);
   const [income, quotePrices, qualifiedTickers] = await Promise.all([
@@ -945,6 +946,9 @@ export async function generateSuggestion(
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,
     historyMonths: availableHistoryMonths,
+    ...(saved?.appliedItems?.length
+      ? { appliedItems: saved.appliedItems }
+      : {}),
   };
   await suggestionsCollection(uid)
     .doc(id)
