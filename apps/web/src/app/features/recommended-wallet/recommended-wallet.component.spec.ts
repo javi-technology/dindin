@@ -623,7 +623,7 @@ describe('RecommendedWalletComponent', () => {
       expect(preview).toMatch(/R\$\s?100,00 → R\$\s?98,33/);
     });
 
-    it('deve atualizar a posição existente com o preço pago em vírgula', () => {
+    it('deve aplicar a compra com o preço pago em vírgula numa única chamada', () => {
       open('apply-item-HGLG11');
       type('apply-quantity', '2');
       type('apply-price', '89,20');
@@ -631,33 +631,24 @@ describe('RecommendedWalletComponent', () => {
       confirmButton().click();
       fixture.detectChanges();
 
-      expect(positionServiceMock.update).toHaveBeenCalledWith(
-        'wallet-1',
-        'pos-1',
-        { quantity: 4, averagePrice: 94.6 },
-      );
+      // A API lança a posição e marca o item na mesma transação.
+      expect(positionServiceMock.update).not.toHaveBeenCalled();
       expect(positionServiceMock.create).not.toHaveBeenCalled();
-      expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledOnceWith(
         'wallet-1_2026-09_renda',
         { ticker: 'HGLG11', quantity: 2, price: 89.2 },
       );
       expect(modal()).toBeNull();
     });
 
-    it('deve criar a posição da alternativa com o tipo do catálogo', () => {
+    it('deve aplicar a alternativa com o FII de origem', () => {
       open('apply-fallback-HGLG11-HGCR11');
       expect(input('apply-price').value).toBe('96,44');
 
       confirmButton().click();
       fixture.detectChanges();
 
-      expect(positionServiceMock.create).toHaveBeenCalledWith('wallet-1', {
-        ticker: 'HGCR11',
-        assetType: 'FII',
-        quantity: 1,
-        averagePrice: 96.44,
-      });
-      expect(positionServiceMock.update).not.toHaveBeenCalled();
+      expect(positionServiceMock.create).not.toHaveBeenCalled();
       expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
         'wallet-1_2026-09_renda',
         { ticker: 'HGCR11', fallbackFor: 'HGLG11', quantity: 1, price: 96.44 },
@@ -715,9 +706,12 @@ describe('RecommendedWalletComponent', () => {
       expect(button('apply-fallback-HGLG11-HGCR11')!.disabled).toBeFalse();
     });
 
-    it('deve mostrar o erro no modal sem marcar o item', () => {
-      positionServiceMock.update.and.returnValue(
-        throwError(() => ({ status: 500 })),
+    it('deve mostrar o erro da API no modal sem marcar o item', () => {
+      serviceMock.applySuggestionItem.and.returnValue(
+        throwError(() => ({
+          status: 409,
+          error: { error: 'Item já aplicado na carteira' },
+        })),
       );
       open('apply-item-HGLG11');
 
@@ -725,32 +719,49 @@ describe('RecommendedWalletComponent', () => {
       fixture.detectChanges();
 
       expect(
-        modal()!.querySelector('[data-testid="apply-error"]'),
-      ).not.toBeNull();
-      expect(serviceMock.applySuggestionItem).not.toHaveBeenCalled();
+        modal()!.querySelector('[data-testid="apply-error"]')?.textContent,
+      ).toContain('Item já aplicado na carteira');
       expect(
         fixture.componentInstance.suggestion()?.appliedItems,
       ).toBeUndefined();
     });
 
-    it('não deve lançar a compra de novo ao repetir só o registro que falhou', () => {
-      serviceMock.applySuggestionItem.and.returnValues(
+    it('deve mostrar erro genérico quando a API não explica a falha', () => {
+      serviceMock.applySuggestionItem.and.returnValue(
         throwError(() => ({ status: 500 })),
-        of({ ...suggestion, appliedItems: [] }),
       );
       open('apply-item-HGLG11');
 
       confirmButton().click();
       fixture.detectChanges();
+
       expect(
-        modal()!.querySelector('[data-testid="apply-error"]'),
-      ).not.toBeNull();
+        modal()!.querySelector('[data-testid="apply-error"]')?.textContent,
+      ).toContain('Não foi possível aplicar');
+    });
+
+    it('não deve fechar o modal enquanto a compra é aplicada', () => {
+      const pending = new Subject<AiSuggestion>();
+      serviceMock.applySuggestionItem.and.returnValue(pending);
+      open('apply-item-HGLG11');
 
       confirmButton().click();
       fixture.detectChanges();
+      (
+        modal()!.querySelector(
+          '[data-testid="confirm-dialog-cancel"]',
+        ) as HTMLButtonElement
+      ).click();
+      fixture.componentInstance.closeApply();
+      fixture.detectChanges();
 
-      expect(positionServiceMock.update).toHaveBeenCalledTimes(1);
-      expect(serviceMock.applySuggestionItem).toHaveBeenCalledTimes(2);
+      expect(modal()).not.toBeNull();
+      expect(confirmButton().disabled).toBeTrue();
+
+      pending.next({ ...suggestion, appliedItems: [] });
+      pending.complete();
+      fixture.detectChanges();
+
       expect(modal()).toBeNull();
     });
   });
