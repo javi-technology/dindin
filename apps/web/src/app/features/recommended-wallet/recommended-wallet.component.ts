@@ -10,8 +10,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { RouterLink } from '@angular/router';
-import { EMPTY, Observable, Subject, forkJoin, of } from 'rxjs';
-import { catchError, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, Subject, forkJoin, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { RecommendedWalletService } from '../../core/services/recommended-wallet.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -128,11 +128,6 @@ export class RecommendedWalletComponent implements OnInit {
   applyAssets = signal<Asset[]>([]);
   applyError = signal<string | null>(null);
   applySaving = signal(false);
-  /**
-   * A posição já foi gravada nesta tentativa e só o registro na sugestão
-   * falhou: repetir não pode lançar a compra de novo na carteira.
-   */
-  private applyPositionDone = false;
 
   months = computed(() =>
     this.recommendedWallets().map((wallet) => wallet.month),
@@ -395,7 +390,6 @@ export class RecommendedWalletComponent implements OnInit {
     );
     this.applyError.set(null);
     this.applyPositions.set(null);
-    this.applyPositionDone = false;
 
     forkJoin([
       this.positionService.list(walletId),
@@ -419,6 +413,9 @@ export class RecommendedWalletComponent implements OnInit {
   }
 
   closeApply(): void {
+    // Enquanto a compra é lançada o modal fica aberto: fechar e abrir outro
+    // item deixaria a resposta desta chegar no modal errado.
+    if (this.applySaving()) return;
     this.applyTarget.set(null);
     this.applyError.set(null);
   }
@@ -426,50 +423,20 @@ export class RecommendedWalletComponent implements OnInit {
   confirmApply(): void {
     const target = this.applyTarget();
     const preview = this.applyPreview();
-    const assetType = this.applyAssetType();
-    const walletId = this.selectedWalletId();
     const suggestion = this.suggestion();
-    if (
-      !target ||
-      !preview ||
-      !assetType ||
-      !walletId ||
-      !suggestion ||
-      !this.canConfirmApply()
-    ) {
-      return;
-    }
+    if (!target || !preview || !suggestion || !this.canConfirmApply()) return;
 
-    const existing = this.applyExisting();
-    const savePosition$: Observable<unknown> = this.applyPositionDone
-      ? of(null)
-      : existing
-        ? this.positionService.update(walletId, existing.id, {
-            quantity: preview.newQuantity,
-            averagePrice: preview.newAverage,
-          })
-        : this.positionService.create(walletId, {
-            ticker: target.ticker,
-            assetType,
-            quantity: preview.quantity,
-            averagePrice: preview.price,
-          });
-
+    // A API lança a posição e marca o item na mesma transação (#276).
     this.applySaving.set(true);
     this.applyError.set(null);
-    savePosition$
-      .pipe(
-        tap(() => (this.applyPositionDone = true)),
-        switchMap(() =>
-          this.recommendedWalletService.applySuggestionItem(suggestion.id, {
-            ticker: target.ticker,
-            ...(target.fallbackFor ? { fallbackFor: target.fallbackFor } : {}),
-            quantity: preview.quantity,
-            price: preview.price,
-          }),
-        ),
-        takeUntilDestroyed(this.destroyRef),
-      )
+    this.recommendedWalletService
+      .applySuggestionItem(suggestion.id, {
+        ticker: target.ticker,
+        ...(target.fallbackFor ? { fallbackFor: target.fallbackFor } : {}),
+        quantity: preview.quantity,
+        price: preview.price,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
           this.applySaving.set(false);
@@ -477,12 +444,11 @@ export class RecommendedWalletComponent implements OnInit {
           this.closeApply();
           this.refreshComparison();
         },
-        error: () => {
+        error: (error: { error?: { error?: string } }) => {
           this.applySaving.set(false);
           this.applyError.set(
-            this.applyPositionDone
-              ? 'A compra foi lançada na carteira, mas não foi possível marcar o item como aplicado. Confirme de novo para tentar só a marcação.'
-              : 'Não foi possível atualizar a carteira. Tente novamente.',
+            error?.error?.error ??
+              'Não foi possível aplicar a compra. Tente novamente.',
           );
         },
       });
