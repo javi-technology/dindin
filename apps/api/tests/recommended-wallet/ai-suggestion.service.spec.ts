@@ -34,7 +34,8 @@ jest.mock('../../src/dividend/monthly-income.service', () => ({
 import {
   buildSuggestionInput,
   callOpenRouter,
-  checkDailyLimit,
+  releaseDailySuggestion,
+  reserveDailySuggestion,
   generateSuggestion,
   buildSuggestionHistory,
   previousMonths,
@@ -50,6 +51,7 @@ import {
   buildUserPrompt,
   SYSTEM_PROMPT,
 } from '../../src/recommended-wallet/ai-suggestion.prompt';
+import { today } from '../../src/shared/date';
 import {
   RecommendedWallet,
   RecommendedWalletComparison,
@@ -57,6 +59,73 @@ import {
 } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
+  /**
+   * Firestore mínimo com transação para a cota diária (issue #297): o
+   * contador vive num documento por dia e é reservado dentro da transação.
+   * As transações são serializadas, como o Firestore faz ao detectar
+   * conflito, para que o teste de concorrência seja determinístico.
+   */
+  function createUsageFirestore(
+    options: {
+      counts?: Record<string, { count: number }>;
+      suggestionDoc?: { get: jest.Mock; set: jest.Mock };
+      quotes?: { docs: unknown[] };
+    } = {},
+  ) {
+    const counts = new Map<string, { count: number; expiresAt?: unknown }>(
+      Object.entries(options.counts ?? {}),
+    );
+    const suggestionDoc = options.suggestionDoc ?? {
+      get: jest.fn().mockResolvedValue({ exists: false }),
+      set: jest.fn(),
+    };
+    const usageCollection = {
+      doc: jest.fn((day: string) => ({ id: day })),
+    };
+    const userDoc = {
+      collection: jest.fn((name: string) =>
+        name === 'aiSuggestionUsage'
+          ? usageCollection
+          : { doc: jest.fn(() => suggestionDoc) },
+      ),
+    };
+
+    const transaction = {
+      get: jest.fn(async (ref: { id: string }) => ({
+        exists: counts.has(ref.id),
+        data: () => counts.get(ref.id),
+      })),
+      set: jest.fn((ref: { id: string }, data: any) => {
+        counts.set(ref.id, data);
+      }),
+    };
+
+    let queue: Promise<unknown> = Promise.resolve();
+    const runTransaction = jest.fn((handler: any) => {
+      const result = queue.then(() => handler(transaction));
+      queue = result.catch(() => undefined);
+      return result;
+    });
+
+    return {
+      firestore: {
+        collection: jest.fn((name: string) =>
+          name === 'quotes'
+            ? {
+                get: jest
+                  .fn()
+                  .mockResolvedValue(options.quotes ?? { docs: [] }),
+              }
+            : { doc: jest.fn(() => userDoc) },
+        ),
+        runTransaction,
+      },
+      counts,
+      suggestionDoc,
+      usageCollection,
+    };
+  }
+
   let consoleErrorSpy: jest.SpyInstance;
   let consoleWarnSpy: jest.SpyInstance;
   const comparison = {
@@ -1640,18 +1709,101 @@ describe('ai-suggestion.service', () => {
     });
   });
 
-  it('deve limitar cinco gerações no mesmo dia', async () => {
-    const query = { where: jest.fn().mockReturnThis(), get: jest.fn() };
-    query.get.mockResolvedValue({ size: 5 });
-    firestoreMock = {
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({ collection: jest.fn(() => query) })),
-      })),
-    };
+  describe('cota diária (issue #297)', () => {
+    // 17/09 às 22h em Brasília ainda é 17/09; em UTC já é 18/09, e o limite
+    // reiniciava às 21h para o usuário.
+    const lateNight = new Date('2026-09-18T01:00:00Z');
 
-    await expect(checkDailyLimit('user-1')).rejects.toMatchObject({
-      statusCode: 429,
-      message: 'Limite diário de sugestões atingido',
+    it('deve reservar a cota no contador do dia em Brasília', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      const day = await reserveDailySuggestion('user-1', lateNight);
+
+      expect(day).toBe('2026-09-17');
+      expect(store.counts.get('2026-09-17')?.count).toBe(1);
+    });
+
+    it('deve gravar expiresAt para o TTL limpar o contador', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await reserveDailySuggestion('user-1', lateNight);
+
+      expect(store.counts.get('2026-09-17')).toEqual(
+        expect.objectContaining({ expiresAt: expect.any(Date) }),
+      );
+    });
+
+    it('deve recusar a reserva quando o dia já atingiu o limite', async () => {
+      const store = createUsageFirestore({
+        counts: { '2026-09-17': { count: 5 } },
+      });
+      firestoreMock = store.firestore;
+
+      await expect(
+        reserveDailySuggestion('user-1', lateNight),
+      ).rejects.toMatchObject({
+        statusCode: 429,
+        message: 'Limite diário de sugestões atingido',
+      });
+      expect(store.counts.get('2026-09-17')?.count).toBe(5);
+    });
+
+    // A checagem antiga lia o uso, chamava o provedor (até 120 s) e só então
+    // gravava: seis requisições paralelas passavam todas pela checagem.
+    it('deve respeitar o limite com reservas concorrentes', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, () =>
+          reserveDailySuggestion('user-1', lateNight),
+        ),
+      );
+
+      const granted = results.filter(
+        (result) => result.status === 'fulfilled',
+      ).length;
+      expect(granted).toBe(5);
+      expect(store.counts.get('2026-09-17')?.count).toBe(5);
+      expect(
+        results.filter((result) => result.status === 'rejected'),
+      ).toHaveLength(1);
+    });
+
+    it('deve devolver a cota reservada', async () => {
+      const store = createUsageFirestore({
+        counts: { '2026-09-17': { count: 3 } },
+      });
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.get('2026-09-17')?.count).toBe(2);
+    });
+
+    it('não deve deixar o contador negativo ao devolver cota inexistente', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.get('2026-09-17')?.count ?? 0).toBe(0);
+    });
+
+    it('deve devolver a cota quando o provedor de IA falha', async () => {
+      process.env.OPENROUTER_API_KEY = 'secret';
+      compareWithWalletMock.mockResolvedValue(comparison);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await expect(
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+      ).rejects.toMatchObject({ statusCode: 502 });
+
+      expect(store.counts.get(today())?.count ?? 0).toBe(0);
     });
   });
 
@@ -1681,45 +1833,17 @@ describe('ai-suggestion.service', () => {
         ],
       }),
     });
-    let usageCount = 0;
-    const usageDoc = {
-      set: jest.fn().mockImplementation(async () => {
-        usageCount += 1;
-      }),
-    };
-    const usageQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockImplementation(async () => ({ size: usageCount })),
-      doc: jest.fn(() => usageDoc),
-    };
-    const suggestionDoc = {
-      get: jest.fn().mockResolvedValue({ exists: false }),
-      set: jest.fn(),
-    };
-    const userDoc = {
-      collection: jest.fn((name: string) =>
-        name === 'aiSuggestionUsage'
-          ? usageQuery
-          : { doc: jest.fn(() => suggestionDoc) },
-      ),
-    };
-    firestoreMock = {
-      collection: jest.fn((name: string) => {
-        if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
-        }
-        return { doc: jest.fn(() => userDoc) };
-      }),
-    };
+    const store = createUsageFirestore({
+      quotes: {
+        docs: [
+          {
+            id: 'HGLG11',
+            data: () => ({ monthlyDividend: 1.25 }),
+          },
+        ],
+      },
+    });
+    firestoreMock = store.firestore;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
@@ -1731,14 +1855,7 @@ describe('ai-suggestion.service', () => {
       statusCode: 429,
       message: 'Limite diário de sugestões atingido',
     });
-    expect(usageQuery.get).toHaveBeenCalledTimes(6);
-    expect(usageDoc.set).toHaveBeenCalledTimes(5);
-    expect(usageDoc.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        suggestionId: 'wallet-1_2026-09_renda',
-        createdAt: expect.any(String),
-      }),
-    );
+    expect(store.counts.get(today())?.count).toBe(5);
   });
 
   it('deve retornar a sugestão salva sem consultar a IA', async () => {
@@ -2080,30 +2197,9 @@ describe('ai-suggestion.service', () => {
         ],
       }),
     });
-    const suggestionDoc = {
-      get: jest.fn().mockResolvedValue({ exists: false }),
-      set: jest.fn(),
-    };
-    const usageDoc = { set: jest.fn() };
-    const usageQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ size: 0 }),
-      doc: jest.fn(() => usageDoc),
-    };
-    const userDoc = {
-      collection: jest.fn((name: string) =>
-        name === 'aiSuggestionUsage'
-          ? usageQuery
-          : { doc: jest.fn(() => suggestionDoc) },
-      ),
-    };
-    firestoreMock = {
-      collection: jest.fn((name: string) =>
-        name === 'quotes'
-          ? { get: jest.fn().mockResolvedValue({ docs: [] }) }
-          : { doc: jest.fn(() => userDoc) },
-      ),
-    };
+    const store = createUsageFirestore();
+    const { suggestionDoc } = store;
+    firestoreMock = store.firestore;
 
     await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
 
