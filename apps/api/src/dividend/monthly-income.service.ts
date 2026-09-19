@@ -79,7 +79,7 @@ export async function computeMonthlyIncome(
     const average =
       typeof data.annualDividend === 'number' &&
       Number.isFinite(data.annualDividend)
-        ? Math.round((data.annualDividend / 12) * 1e6) / 1e6
+        ? data.annualDividend / 12
         : monthlyDividendByTicker.get(ticker);
     if (average !== undefined) {
       averageMonthlyDividendByTicker.set(ticker, average);
@@ -133,6 +133,13 @@ export async function computeMonthlyIncome(
     total,
     totalFromFridge,
     monthlyDividendByTicker,
-    averageMonthlyDividendByTicker,
+    // Arredondado só para o prompt da IA: os totais acima usam a média
+    // exata, senão um centavo poderia mudar no card (#279).
+    averageMonthlyDividendByTicker: new Map(
+      [...averageMonthlyDividendByTicker].map(([ticker, average]) => [
+        ticker,
+        Math.round(average * 1e6) / 1e6,
+      ]),
+    ),
   };
 }
