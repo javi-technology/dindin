@@ -59,6 +59,7 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
+import { setupDefaults } from './me/setup.controller';
 import {
   getDividendHistory,
   getDividendHistoryBatch,
@@ -82,6 +83,7 @@ import {
   getLatestRecommended,
   getSuggestion,
   generateSuggestion,
+  applySuggestionItem,
   importRecommended,
   listRecommended,
 } from './recommended-wallet/recommended-wallet.controller';
@@ -164,6 +166,8 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.post('/api/me/setup', setupDefaults);
 
 app.post('/api/billing/checkout-session', createCheckoutSession);
 app.post('/api/billing/portal-session', createPortalSession);
@@ -261,6 +265,11 @@ app.post(
   '/api/recommended-wallets/bb-fii/suggestions',
   requireEntitlement('ai'),
   generateSuggestion,
+);
+app.post(
+  '/api/recommended-wallets/bb-fii/suggestions/:id/applied',
+  requireEntitlement('ai'),
+  applySuggestionItem,
 );
 app.post(
   '/api/admin/recommended-wallets/bb-fii/import',

@@ -11,12 +11,18 @@ import {
 
 const TODAY = new Date('2026-09-17T12:00:00Z');
 
-function item(ticker: string, monthlyIncome: number, paymentDate?: string) {
+function item(
+  ticker: string,
+  monthlyIncome: number,
+  paymentDate?: string,
+  averageMonthlyIncome = monthlyIncome,
+) {
   return {
     ticker,
     quantity: 10,
     monthlyDividend: monthlyIncome / 10,
     monthlyIncome,
+    averageMonthlyIncome,
     ...(paymentDate ? { paymentDate } : {}),
   };
 }
@@ -87,6 +93,40 @@ describe('buildFreeView', () => {
     expect(view.hiddenCount).toBe(2);
   });
 
+  it('deve escolher os 3 maiores ativos pela média mensal', () => {
+    const responses: MonthlyIncomeResponse[] = [
+      {
+        byTicker: [
+          // Semestral: último provento alto, média mensal baixa (#280).
+          item('AAAA11', 120, '2026-09-11', 20),
+          item('BBBB11', 39.1, '2026-09-15'),
+          item('CCCC11', 26.1, '2026-09-15'),
+        ],
+        total: 85.2,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+      },
+      {
+        byTicker: [item('DDDD11', 30, '2026-09-16')],
+        total: 30,
+        totalFromFridge: 0,
+        limited: true,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+      },
+    ];
+
+    const view = buildFreeView(responses, TODAY);
+
+    expect(view.byTicker.map((i) => i.ticker)).toEqual([
+      'BBBB11',
+      'CCCC11',
+      'DDDD11',
+    ]);
+  });
+
   it('deve somar o mesmo ticker vindo de carteiras diferentes', () => {
     const responses: MonthlyIncomeResponse[] = [
       {
@@ -117,6 +157,7 @@ describe('buildFreeView', () => {
         quantity: 20,
         monthlyDividend: 1,
         monthlyIncome: 15,
+        averageMonthlyIncome: 15,
         paymentDate: '2026-09-16',
       },
     ]);

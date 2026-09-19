@@ -788,4 +788,113 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       });
     });
   });
+
+  describe('data-com (#278)', () => {
+    const today = new Date('2026-09-18T12:00:00Z');
+
+    it('deve expor a data-com dos rendimentos de FII e os anunciados', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'MXRF11',
+            label: 'RENDIMENTO',
+            rate: 0.1,
+            lastDatePrior: '2026-09-30T00:00:00.000Z',
+            exDate: null,
+            paymentDate: '2026-10-15T00:00:00.000Z',
+          },
+          {
+            symbol: 'MXRF11',
+            label: 'RENDIMENTO',
+            rate: 0.1,
+            lastDatePrior: '2026-08-31T00:00:00.000Z',
+            exDate: null,
+            paymentDate: '2026-09-15T00:00:00.000Z',
+          },
+          {
+            symbol: 'MXRF11',
+            label: 'RENDIMENTO',
+            rate: 0.09,
+            lastDatePrior: null,
+            paymentDate: '2026-08-14T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'MXRF11', assetType: 'FII' }],
+        today,
+      );
+
+      expect(result.get('MXRF11')?.paidEvents).toEqual([
+        { paymentDate: '2026-08-14', rate: 0.09 },
+        { paymentDate: '2026-09-15', rate: 0.1, comDate: '2026-08-31' },
+      ]);
+      expect(result.get('MXRF11')?.upcomingEvents).toEqual([
+        { paymentDate: '2026-10-15', rate: 0.1, comDate: '2026-09-30' },
+      ]);
+      // O anunciado não entra na soma de 12 meses.
+      expect(result.get('MXRF11')?.annualDividend).toBe(0.19);
+    });
+
+    it('deve expor a data-com dos proventos de ações no fuso de Brasília', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'ITSA4',
+            data: {
+              cashDividends: [
+                {
+                  rate: 0.0242425,
+                  label: 'JCP',
+                  lastDatePrior: '2026-11-30T03:00:00.000Z',
+                  exDate: '2026-12-01T03:00:00.000Z',
+                  paymentDate: '2027-01-04T03:00:00.000Z',
+                },
+                {
+                  rate: 0.0242425,
+                  label: 'JCP',
+                  lastDatePrior: '2026-08-31T03:00:00.000Z',
+                  exDate: '2026-09-01T03:00:00.000Z',
+                  paymentDate: '2026-10-01T03:00:00.000Z',
+                },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'ITSA4', assetType: 'STOCK' }],
+        today,
+      );
+
+      expect(result.get('ITSA4')?.upcomingEvents).toEqual([
+        { paymentDate: '2026-10-01', rate: 0.0242425, comDate: '2026-08-31' },
+        { paymentDate: '2027-01-04', rate: 0.0242425, comDate: '2026-11-30' },
+      ]);
+    });
+
+    it('não deve expor anunciados sem data-com', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 1.1,
+            paymentDate: '2026-10-15T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'HGLG11', assetType: 'FII' }],
+        today,
+      );
+
+      expect(result.get('HGLG11')).not.toHaveProperty('upcomingEvents');
+    });
+  });
 });

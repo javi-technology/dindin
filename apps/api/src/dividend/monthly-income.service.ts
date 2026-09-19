@@ -5,7 +5,10 @@ export interface MonthlyIncomeItem {
   ticker: string;
   quantity: number;
   monthlyDividend: number;
+  /** Valor do último evento: é o que a agenda de pagamentos mostra. */
   monthlyIncome: number;
+  /** Média mensal dos proventos de 12 meses: a renda do ativo (#280). */
+  averageMonthlyIncome: number;
   paymentDate?: string; // YYYY-MM-DD
 }
 
@@ -14,6 +17,7 @@ export interface MonthlyIncome {
   total: number;
   totalFromFridge: number;
   monthlyDividendByTicker: Map<string, number>;
+  averageMonthlyDividendByTicker: Map<string, number>;
 }
 
 function positionsCollection(userId: string, walletId: string) {
@@ -103,14 +107,19 @@ export async function computeMonthlyIncome(
     const averageMonthlyDividend =
       averageMonthlyDividendByTicker.get(position.ticker.toUpperCase()) ?? 0;
 
+    const averageMonthlyIncome = roundCurrency(
+      quantity * averageMonthlyDividend,
+    );
+
     byTicker.push({
       ticker: position.ticker,
       quantity,
       monthlyDividend,
       monthlyIncome,
+      averageMonthlyIncome,
       ...(paymentDate && { paymentDate }),
     });
-    total += roundCurrency(quantity * averageMonthlyDividend);
+    total += averageMonthlyIncome;
   }
 
   let totalFromFridge = 0;
@@ -132,5 +141,13 @@ export async function computeMonthlyIncome(
     total,
     totalFromFridge,
     monthlyDividendByTicker,
+    // Arredondado só para o prompt da IA: os totais acima usam a média
+    // exata, senão um centavo poderia mudar no card (#279).
+    averageMonthlyDividendByTicker: new Map(
+      [...averageMonthlyDividendByTicker].map(([ticker, average]) => [
+        ticker,
+        Math.round(average * 1e6) / 1e6,
+      ]),
+    ),
   };
 }

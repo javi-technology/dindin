@@ -31,6 +31,7 @@ import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
+import { SetupService } from '../../core/services/setup.service';
 import {
   DividendService,
   DividendYieldResponse,
@@ -53,7 +54,25 @@ import {
   LucidePencil,
   LucideTrash2,
   LucideRefrigerator,
+  LucideArrowUp,
+  LucideArrowDown,
+  LucideArrowUpDown,
 } from '@lucide/angular';
+
+export type PositionSortColumn =
+  | 'ticker'
+  | 'quantity'
+  | 'currentPrice'
+  | 'total'
+  | 'monthlyIncome'
+  | 'dividendYield';
+
+export interface PositionSort {
+  column: PositionSortColumn;
+  direction: 'asc' | 'desc';
+}
+
+const tickerCollator = new Intl.Collator('pt-BR');
 
 @Component({
   selector: 'app-wallet',
@@ -66,6 +85,9 @@ import {
     LucidePencil,
     LucideTrash2,
     LucideRefrigerator,
+    LucideArrowUp,
+    LucideArrowDown,
+    LucideArrowUpDown,
     ConfirmDialogComponent,
   ],
   templateUrl: './wallet.component.html',
@@ -76,6 +98,7 @@ export class WalletComponent implements OnInit {
   private readonly fridgeService = inject(FridgeService);
   private readonly assetService = inject(AssetService);
   private readonly dividendService = inject(DividendService);
+  private readonly setupService = inject(SetupService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   /**
@@ -92,6 +115,8 @@ export class WalletComponent implements OnInit {
   assetsError = signal<string | null>(null);
   dividendYield = signal<DividendYieldResponse | null>(null);
   monthlyIncome = signal<MonthlyIncomeResponse | null>(null);
+  /** Coluna e direção da tabela de posições (#274). */
+  sort = signal<PositionSort>({ column: 'ticker', direction: 'asc' });
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -160,9 +185,104 @@ export class WalletComponent implements OnInit {
     const found = income?.byTicker.find(
       (item) => item.ticker === position.ticker,
     );
-    if (found) return found.monthlyIncome;
+    if (found) return found.averageMonthlyIncome;
     return income?.limited ? null : 0;
   };
+
+  /**
+   * Valor do último provento, exibido como informação secundária só quando
+   * difere da média de 12 meses (ativo que não paga todo mês, #280).
+   */
+  lastProventoFor = (position: Position): number | null => {
+    const found = this.monthlyIncome()?.byTicker.find(
+      (item) => item.ticker === position.ticker,
+    );
+    if (!found || found.monthlyIncome === found.averageMonthlyIncome) {
+      return null;
+    }
+    return found.monthlyIncome;
+  };
+
+  readonly sortableColumns: {
+    column: PositionSortColumn;
+    label: string;
+    hint?: string;
+  }[] = [
+    { column: 'ticker', label: 'Ticker' },
+    { column: 'quantity', label: 'Quantidade' },
+    { column: 'currentPrice', label: 'Preço atual' },
+    { column: 'total', label: 'Total' },
+    {
+      column: 'monthlyIncome',
+      label: 'Proventos/mês',
+      hint: 'média dos últimos 12 meses',
+    },
+    { column: 'dividendYield', label: 'DY' },
+  ];
+
+  /**
+   * Posições na ordem escolhida. Quem não tem valor na coluna (projeção
+   * bloqueada no plano gratuito) vai para o fim nas duas direções, e empates
+   * seguem o Ticker A→Z para a ordem não oscilar.
+   */
+  sortedPositions = computed(() => {
+    const { column, direction } = this.sort();
+    const factor = direction === 'asc' ? 1 : -1;
+    const byTicker = (a: Position, b: Position) =>
+      tickerCollator.compare(a.ticker, b.ticker);
+
+    return this.positions()
+      .map((position) => ({
+        position,
+        value: this.sortValue(position, column),
+      }))
+      .sort((a, b) => {
+        if (column === 'ticker') {
+          return factor * byTicker(a.position, b.position);
+        }
+        if (a.value === null || b.value === null) {
+          if (a.value !== b.value) return a.value === null ? 1 : -1;
+          return byTicker(a.position, b.position);
+        }
+        return factor * (a.value - b.value) || byTicker(a.position, b.position);
+      })
+      .map(({ position }) => position);
+  });
+
+  toggleSort(column: PositionSortColumn): void {
+    this.sort.update((current) =>
+      current.column === column
+        ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' },
+    );
+  }
+
+  ariaSort(column: PositionSortColumn): 'ascending' | 'descending' | 'none' {
+    const { column: active, direction } = this.sort();
+    if (active !== column) return 'none';
+    return direction === 'asc' ? 'ascending' : 'descending';
+  }
+
+  private sortValue(
+    position: Position,
+    column: PositionSortColumn,
+  ): number | null {
+    switch (column) {
+      case 'quantity':
+        return position.quantity;
+      // Os mesmos valores da tabela: sem cotação, vale o preço médio.
+      case 'currentPrice':
+        return this.unitPrice(position);
+      case 'total':
+        return this.totalPosition(position);
+      case 'monthlyIncome':
+        return this.totalProventosFor(position);
+      case 'dividendYield':
+        return this.dividendYieldFor(position);
+      default:
+        return null;
+    }
+  }
 
   constructor() {
     this.walletToLoad$
@@ -237,15 +357,11 @@ export class WalletComponent implements OnInit {
 
   createDefaultWallet(): void {
     this.loading.set(true);
-    this.walletService
-      .create({ name: 'Carteira Principal', currency: 'BRL' })
+    this.setupService
+      .createDefault('wallet')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (wallet) => {
-          this.wallets.set([wallet]);
-          this.selectWallet(wallet);
-          this.loading.set(false);
-        },
+        next: () => this.loadWallets(),
         error: () => {
           this.error.set('Erro ao criar carteira padrão.');
           this.loading.set(false);

@@ -37,8 +37,21 @@ function setupFirestore(options: {
   fridgeItems?: HolderDoc[];
   existingDividends?: ExistingDividend[];
   commitError?: Error;
+  // Datas-com com foto guardada e as fotos em si (#278).
+  snapshotDates?: string[];
+  snapshots?: Record<string, Record<string, number>>;
 }) {
   const stateSet = jest.fn().mockResolvedValue(undefined);
+  const snapshotSet = jest.fn().mockResolvedValue(undefined);
+  const snapshotDelete = jest.fn().mockResolvedValue(undefined);
+  const snapshotGet = jest.fn((comDate: string) => {
+    const quantities = options.snapshots?.[comDate];
+    return Promise.resolve(
+      quantities
+        ? { exists: true, data: () => ({ quantities, takenAt: 'x' }) }
+        : { exists: false, data: () => undefined },
+    );
+  });
   const batchSet = jest.fn();
   const batchCommit = options.commitError
     ? jest.fn().mockRejectedValue(options.commitError)
@@ -67,16 +80,29 @@ function setupFirestore(options: {
     collection: jest.fn((name: string) => {
       if (name === 'dividendSync') {
         return {
-          doc: jest.fn(() => ({
+          doc: jest.fn((ticker: string) => ({
             get: jest.fn().mockResolvedValue(
               options.recorded
                 ? {
                     exists: true,
-                    data: () => ({ recorded: options.recorded }),
+                    data: () => ({
+                      recorded: options.recorded,
+                      ...(options.snapshotDates
+                        ? { snapshots: options.snapshotDates }
+                        : {}),
+                    }),
                   }
                 : { exists: false, data: () => undefined },
             ),
             set: stateSet,
+            collection: jest.fn((sub: string) => ({
+              doc: jest.fn((comDate: string) => ({
+                path: `dividendSync/${ticker}/${sub}/${comDate}`,
+                get: () => snapshotGet(comDate),
+                set: (data: unknown) => snapshotSet(comDate, data),
+                delete: () => snapshotDelete(comDate),
+              })),
+            })),
           })),
         };
       }
@@ -100,7 +126,15 @@ function setupFirestore(options: {
     batch: jest.fn(() => ({ set: batchSet, commit: batchCommit })),
   };
 
-  return { stateSet, batchSet, batchCommit, groups };
+  return {
+    stateSet,
+    batchSet,
+    batchCommit,
+    groups,
+    snapshotSet,
+    snapshotDelete,
+    snapshotGet,
+  };
 }
 
 const writtenPaths = (batchSet: jest.Mock) =>
@@ -377,5 +411,206 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
       ),
     ).rejects.toThrow('falha no Firestore');
     expect(stateSet).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Quantidade da data-com (#278)
+  // -------------------------------------------------------------------------
+  describe('quantidade da data-com', () => {
+    it('guarda a foto das quantidades quando a data-com chega', async () => {
+      const { snapshotSet, stateSet, batchSet } = setupFirestore({
+        recorded: {},
+        positions: [
+          { path: 'users/u1/wallets/w1/positions/p1', quantity: 100 },
+          { path: 'users/u2/wallets/w1/positions/p1', quantity: 30 },
+        ],
+      });
+
+      const result = await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-09-30',
+      );
+
+      expect(result).toEqual([]);
+      expect(batchSet).not.toHaveBeenCalled();
+      expect(snapshotSet).toHaveBeenCalledTimes(1);
+      expect(snapshotSet).toHaveBeenCalledWith('2026-09-30', {
+        quantities: { u1: 100, u2: 30 },
+        takenAt: expect.any(String),
+      });
+      expect(stateSet).toHaveBeenCalledWith({
+        recorded: {},
+        snapshots: ['2026-09-30'],
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('não refaz a foto de uma data-com já guardada', async () => {
+      const { snapshotSet, stateSet } = setupFirestore({
+        recorded: {},
+        snapshotDates: ['2026-09-30'],
+      });
+
+      await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-01',
+      );
+
+      expect(snapshotSet).not.toHaveBeenCalled();
+      expect(firestoreMock.collectionGroup).not.toHaveBeenCalled();
+      expect(stateSet).not.toHaveBeenCalled();
+    });
+
+    it('não sobrescreve a foto gravada quando o estado não chegou a ser salvo', async () => {
+      // Execução anterior gravou a foto e falhou antes de salvar o estado.
+      const { snapshotSet, stateSet } = setupFirestore({
+        recorded: {},
+        snapshots: { '2026-09-30': { u1: 100 } },
+        positions: [
+          // Depois da data-com u1 vendeu e u2 comprou.
+          { path: 'users/u2/wallets/w1/positions/p1', quantity: 50 },
+        ],
+      });
+
+      await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-01',
+      );
+
+      expect(snapshotSet).not.toHaveBeenCalled();
+      expect(stateSet).toHaveBeenCalledWith({
+        recorded: {},
+        snapshots: ['2026-09-30'],
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('não tira foto antes da data-com', async () => {
+      const { snapshotSet } = setupFirestore({ recorded: {} });
+
+      await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-09-29',
+      );
+
+      expect(snapshotSet).not.toHaveBeenCalled();
+    });
+
+    it('registra com a quantidade da data-com quem vendeu antes do pagamento', async () => {
+      const { batchSet } = setupFirestore({
+        recorded: {},
+        snapshotDates: ['2026-09-30'],
+        snapshots: { '2026-09-30': { u1: 100 } },
+        // u1 vendeu tudo depois da data-com.
+        positions: [],
+      });
+
+      const result = await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-14',
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: '2026-10-14_HGLG11',
+          userId: 'u1',
+          quantity: 100,
+          totalAmount: 110,
+        }),
+      ]);
+      expect(writtenPaths(batchSet)).toEqual([
+        'users/u1/dividends/2026-10-14_HGLG11',
+      ]);
+    });
+
+    it('não registra para quem comprou depois da data-com', async () => {
+      setupFirestore({
+        recorded: {},
+        snapshotDates: ['2026-09-30'],
+        snapshots: { '2026-09-30': { u1: 100 } },
+        positions: [
+          // u1 comprou mais depois da data-com: vale a quantidade da foto.
+          { path: 'users/u1/wallets/w1/positions/p1', quantity: 150 },
+          { path: 'users/u2/wallets/w1/positions/p1', quantity: 50 },
+        ],
+      });
+
+      const result = await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-14',
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({ userId: 'u1', quantity: 100 }),
+      ]);
+    });
+
+    it('usa a quantidade do dia do pagamento em evento sem data-com', async () => {
+      setupFirestore({
+        recorded: {},
+        snapshotDates: ['2026-09-30'],
+        snapshots: { '2026-09-30': { u1: 100 } },
+        positions: [
+          { path: 'users/u1/wallets/w1/positions/p1', quantity: 150 },
+          { path: 'users/u2/wallets/w1/positions/p1', quantity: 50 },
+        ],
+      });
+
+      const result = await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1 }],
+        '2026-10-14',
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({ userId: 'u1', quantity: 150 }),
+        expect.objectContaining({ userId: 'u2', quantity: 50 }),
+      ]);
+    });
+
+    it('usa a quantidade do dia do pagamento quando a foto não existe', async () => {
+      // Data-com anterior ao deploy ou sync que não rodou no dia.
+      setupFirestore({
+        recorded: {},
+        positions: [{ path: 'users/u2/wallets/w1/positions/p1', quantity: 50 }],
+      });
+
+      const result = await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-14',
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({ userId: 'u2', quantity: 50 }),
+      ]);
+    });
+
+    it('apaga a foto que saiu da janela de eventos', async () => {
+      const { snapshotDelete, stateSet } = setupFirestore({
+        recorded: { '2026-10-14': 1.1 },
+        snapshotDates: ['2025-08-29', '2026-09-30'],
+      });
+
+      await recordPaidDividends(
+        'HGLG11',
+        [{ paymentDate: '2026-10-14', rate: 1.1, comDate: '2026-09-30' }],
+        '2026-10-20',
+      );
+
+      expect(snapshotDelete).toHaveBeenCalledTimes(1);
+      expect(snapshotDelete).toHaveBeenCalledWith('2025-08-29');
+      expect(stateSet).toHaveBeenCalledWith({
+        recorded: { '2026-10-14': 1.1 },
+        snapshots: ['2026-09-30'],
+        updatedAt: expect.any(String),
+      });
+    });
   });
 });

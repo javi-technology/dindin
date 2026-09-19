@@ -10,6 +10,7 @@ import {
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
 import { WalletService } from '../../core/services/wallet.service';
+import { SetupService } from '../../core/services/setup.service';
 import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
 import {
   decimalValidator,
@@ -43,6 +44,7 @@ export class FridgeComponent implements OnInit {
   private readonly fridgeService = inject(FridgeService);
   private readonly assetService = inject(AssetService);
   private readonly walletService = inject(WalletService);
+  private readonly setupService = inject(SetupService);
   private readonly fb = inject(FormBuilder);
 
   fridges = signal<Fridge[]>([]);
@@ -120,12 +122,8 @@ export class FridgeComponent implements OnInit {
 
   createDefaultFridge(): void {
     this.loading.set(true);
-    this.fridgeService.createFridge({ name: 'Geladeira Principal' }).subscribe({
-      next: (fridge) => {
-        this.fridges.set([fridge]);
-        this.selectFridge(fridge);
-        this.loading.set(false);
-      },
+    this.setupService.createDefault('fridge').subscribe({
+      next: () => this.loadFridges(),
       error: () => {
         this.error.set('Erro ao criar geladeira padrão.');
         this.loading.set(false);

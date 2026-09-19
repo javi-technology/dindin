@@ -5,6 +5,9 @@ import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 export interface PaidDividendEvent {
   paymentDate: string; // YYYY-MM-DD
   rate: number;
+  // Data-com (`lastDatePrior` da Brapi): quem tinha o ativo no fim desse dia
+  // tem direito ao provento (#278). Ausente quando a Brapi não informa.
+  comDate?: string; // YYYY-MM-DD
 }
 
 export interface DividendInfo {
@@ -16,6 +19,9 @@ export interface DividendInfo {
   // Eventos pagos nos 12 meses até hoje, do mais antigo para o mais recente.
   // É daqui que o sync registra os proventos dos usuários (#112).
   paidEvents?: PaidDividendEvent[];
+  // Anunciados e ainda não pagos que têm data-com, em ordem de pagamento. O
+  // sync guarda a quantidade de cada usuário quando a data-com chega (#278).
+  upcomingEvents?: PaidDividendEvent[];
 }
 
 interface FiiDividendEvent {
@@ -23,6 +29,7 @@ interface FiiDividendEvent {
   label: string;
   rate: number;
   paymentDate: string;
+  lastDatePrior?: string | null;
 }
 
 interface FiiDividendsResponse {
@@ -33,6 +40,7 @@ interface StockCashDividend {
   rate: number;
   paymentDate: string;
   label?: string;
+  lastDatePrior?: string | null;
 }
 
 interface StockDividendsData {
@@ -104,19 +112,28 @@ function dividendInfo(
 interface RawDividendEvent {
   rate: number;
   paymentDate: unknown;
+  lastDatePrior?: unknown;
+}
+
+function byPaymentDate(a: PaidDividendEvent, b: PaidDividendEvent): number {
+  return a.paymentDate.localeCompare(b.paymentDate);
 }
 
 /**
- * Eventos pagos em (hoje − 12 meses, hoje]. Os anunciados e ainda não pagos
- * ficam de fora, senão um pagador mensal somaria 13 meses.
+ * Separa os eventos datados em pagos em (hoje − 12 meses, hoje] e anunciados
+ * com data-com. Os anunciados ficam fora dos pagos, senão um pagador mensal
+ * somaria 13 meses.
  */
-function paidEventsInLastYear(
+function splitEvents(
   events: RawDividendEvent[],
   today: Date,
-): PaidDividendEvent[] | undefined {
-  const dated = events.flatMap((event) => {
+): { paid: PaidDividendEvent[]; upcoming: PaidDividendEvent[] } | undefined {
+  const dated = events.flatMap((event): PaidDividendEvent[] => {
     const paymentDate = toDateOnly(event.paymentDate);
-    return paymentDate ? [{ paymentDate, rate: event.rate }] : [];
+    const comDate = toDateOnly(event.lastDatePrior);
+    return paymentDate
+      ? [{ paymentDate, rate: event.rate, ...(comDate ? { comDate } : {}) }]
+      : [];
   });
   if (dated.length === 0) {
     return undefined;
@@ -124,9 +141,14 @@ function paidEventsInLastYear(
 
   const end = today.toISOString().slice(0, 10);
   const start = `${Number(end.slice(0, 4)) - 1}${end.slice(4)}`;
-  return dated
-    .filter(({ paymentDate }) => paymentDate > start && paymentDate <= end)
-    .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
+  return {
+    paid: dated
+      .filter(({ paymentDate }) => paymentDate > start && paymentDate <= end)
+      .sort(byPaymentDate),
+    upcoming: dated
+      .filter(({ paymentDate, comDate }) => paymentDate > end && comDate)
+      .sort(byPaymentDate),
+  };
 }
 
 function withPaidEvents(
@@ -134,17 +156,19 @@ function withPaidEvents(
   events: RawDividendEvent[],
   today: Date,
 ): DividendInfo {
-  const paidEvents = paidEventsInLastYear(events, today);
-  if (paidEvents === undefined) {
+  const split = splitEvents(events, today);
+  if (split === undefined) {
     return info;
   }
 
-  const total = paidEvents.reduce((sum, event) => sum + event.rate, 0);
+  const { paid, upcoming } = split;
+  const total = paid.reduce((sum, event) => sum + event.rate, 0);
   return {
     ...info,
     // Evita resíduos de ponto flutuante (ex.: 1.25 + 1.1 = 2.3499999...).
     annualDividend: Math.round(total * 1e6) / 1e6,
-    paidEvents,
+    paidEvents: paid,
+    ...(upcoming.length > 0 ? { upcomingEvents: upcoming } : {}),
   };
 }
 

@@ -18,11 +18,17 @@ async function recordTickerDividends(
   dividend: DividendInfo | undefined,
   today: string,
 ): Promise<void> {
-  if (!dividend?.paidEvents) {
+  if (!dividend?.paidEvents && !dividend?.upcomingEvents) {
     return;
   }
+  // Os anunciados entram para a foto da data-com (#278); o registro só
+  // considera os pagamentos até hoje.
+  const events = [
+    ...(dividend.paidEvents ?? []),
+    ...(dividend.upcomingEvents ?? []),
+  ];
   try {
-    await recordPaidDividends(ticker, dividend.paidEvents, today);
+    await recordPaidDividends(ticker, events, today);
   } catch (error) {
     console.error(
       `[updateAllQuotes] Erro ao registrar proventos de ${ticker}:`,

@@ -221,6 +221,19 @@ export interface AiSuggestionItem {
   fallbackAllocations?: AiSuggestionFallbackAllocation[];
 }
 
+/**
+ * Compra da sugestão já lançada na carteira pelo usuário (#276). A alternativa
+ * de redistribuição guarda o FII de origem em `fallbackFor`, porque o mesmo
+ * ticker pode ser item próprio e alternativa de outro FII.
+ */
+export interface AiSuggestionAppliedItem {
+  ticker: string;
+  fallbackFor?: string;
+  quantity: number;
+  price: number;
+  appliedAt: string;
+}
+
 /** Sugestão gerada por IA — subcoleção users/{uid}/aiSuggestions. */
 export interface AiSuggestion {
   id: string;
@@ -235,6 +248,7 @@ export interface AiSuggestion {
   contribution?: number;
   projectedDividends?: number;
   historyMonths?: string[];
+  appliedItems?: AiSuggestionAppliedItem[];
 }
 
 /**

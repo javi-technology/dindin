@@ -261,14 +261,66 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
     // PETR4 2.4/12 × 100 = 20; HGLG11 0.9 × 10 = 9; ITSA4 1.2/12 × 50 = 5.
     expect(income.total).toBe(34);
     expect(income.totalFromFridge).toBe(5);
+    // Média por ticker, inclusive de quem só está na geladeira (#279).
+    expect(income.averageMonthlyDividendByTicker).toEqual(
+      new Map([
+        ['PETR4', 0.2],
+        ['HGLG11', 0.9],
+        ['ITSA4', 0.1],
+      ]),
+    );
     // A agenda mostra o evento anunciado, não a média.
     expect(income.byTicker).toContainEqual({
       ticker: 'PETR4',
       quantity: 100,
       monthlyDividend: 1.2,
       monthlyIncome: 120,
+      averageMonthlyIncome: 20,
       paymentDate: '2026-08-20',
     });
+    // A soma das médias por ativo das carteiras bate com o total sem geladeira.
+    const averageSum = income.byTicker.reduce(
+      (sum, item) => sum + item.averageMonthlyIncome,
+      0,
+    );
+    expect(averageSum).toBe(income.total - income.totalFromFridge);
+  });
+
+  it('não deve arredondar a média usada no total do card', async () => {
+    firestoreMock = createFirestoreMock(
+      [
+        {
+          id: 'position-1',
+          walletId: 'wallet-1',
+          ticker: 'ITSA4',
+          assetType: 'STOCK',
+          quantity: 3,
+          averagePrice: 10,
+          inFridge: false,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+      [
+        {
+          ticker: 'ITSA4',
+          price: 10,
+          monthlyDividend: 0.6,
+          annualDividend: 2.3,
+          updatedAt: '2026-09-18T00:00:00Z',
+          source: 'brapi',
+        },
+      ],
+      [],
+    );
+
+    const income = await computeMonthlyIncome('user-123', 'wallet-1');
+
+    // 3 × 2.3 / 12 = 0,575 → R$ 0,57. Com a média arredondada a 6 casas
+    // (0,191667) o total viraria R$ 0,58.
+    expect(income.total).toBe(0.57);
+    // O mapa exposto à sugestão por IA segue arredondado para o prompt.
+    expect(income.averageMonthlyDividendByTicker.get('ITSA4')).toBe(0.191667);
   });
 
   it('deve calcular renda mensal por ticker com base nas quotes', async () => {
@@ -327,12 +379,14 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 10,
         monthlyDividend: 0.9,
         monthlyIncome: 9,
+        averageMonthlyIncome: 9,
       },
       {
         ticker: 'MXRF11',
         quantity: 100,
         monthlyDividend: 0.07,
         monthlyIncome: 7,
+        averageMonthlyIncome: 7,
       },
     ]);
     expect(response.body.total).toBe(16);
@@ -394,6 +448,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 10,
         monthlyDividend: 0.9,
         monthlyIncome: 9,
+        averageMonthlyIncome: 9,
         paymentDate: '2026-09-15',
       },
       {
@@ -401,6 +456,7 @@ describe('GET /api/wallets/:walletId/monthly-income', () => {
         quantity: 100,
         monthlyDividend: 0.07,
         monthlyIncome: 7,
+        averageMonthlyIncome: 7,
       },
     ]);
   });

@@ -167,4 +167,27 @@ describe('RecommendedWalletService', () => {
     });
     request.flush(wallet);
   });
+
+  it('deve registrar um item aplicado da sugestão (#276)', () => {
+    service
+      .applySuggestionItem('wallet-1_2026-09_renda', {
+        ticker: 'HGCR11',
+        fallbackFor: 'HGLG11',
+        quantity: 1,
+        price: 96.44,
+      })
+      .subscribe();
+
+    const request = httpMock.expectOne(
+      '/api/recommended-wallets/bb-fii/suggestions/wallet-1_2026-09_renda/applied',
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      ticker: 'HGCR11',
+      fallbackFor: 'HGLG11',
+      quantity: 1,
+      price: 96.44,
+    });
+    request.flush({});
+  });
 });

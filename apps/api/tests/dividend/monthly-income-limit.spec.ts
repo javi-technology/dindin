@@ -17,12 +17,14 @@ function item(
   ticker: string,
   monthlyIncome: number,
   paymentDate?: string,
+  averageMonthlyIncome = monthlyIncome,
 ): MonthlyIncomeItem {
   return {
     ticker,
     quantity: 10,
     monthlyDividend: monthlyIncome / 10,
     monthlyIncome,
+    averageMonthlyIncome,
     ...(paymentDate ? { paymentDate } : {}),
   };
 }
@@ -38,6 +40,25 @@ describe('monthly-income-limit – limitMonthlyIncome', () => {
   it('deve manter os 3 ativos de maior renda mensal, em ordem alfabética', () => {
     const items = [
       item('AAAA11', 5, '2026-09-15'),
+      item('BBBB11', 45, '2026-09-11'),
+      item('CCCC11', 39.1, '2026-09-08'),
+      item('DDDD11', 26.1, '2026-09-15'),
+    ];
+
+    const { byTicker, hiddenTickers } = limitMonthlyIncome(items, TODAY);
+
+    expect(byTicker.map((i) => i.ticker)).toEqual([
+      'BBBB11',
+      'CCCC11',
+      'DDDD11',
+    ]);
+    expect(hiddenTickers).toEqual(['AAAA11']);
+  });
+
+  it('deve escolher os ativos pela média mensal, não pelo último provento', () => {
+    const items = [
+      // Semestral: último provento alto, média mensal baixa (#280).
+      item('AAAA11', 120, '2026-09-15', 20),
       item('BBBB11', 45, '2026-09-11'),
       item('CCCC11', 39.1, '2026-09-08'),
       item('DDDD11', 26.1, '2026-09-15'),
