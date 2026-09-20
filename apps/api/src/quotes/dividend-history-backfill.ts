@@ -1,7 +1,6 @@
 import {
   quoteDividendHistoryCollection,
   quoteHistoryCollection,
-  quotesCollection,
 } from '../firestore/paths';
 import { MonthlyDividendHistory, QuoteHistory } from 'dindin-models';
 
@@ -62,7 +61,6 @@ export function buildMonthlyEntries(
 export async function backfillTickerDividendHistory(
   ticker: string,
 ): Promise<number> {
-  const quoteRef = quotesCollection().doc(ticker);
   const snapshot = await quoteHistoryCollection(ticker).get();
 
   const entries = buildMonthlyEntries(

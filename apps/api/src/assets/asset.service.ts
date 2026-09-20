@@ -1,4 +1,3 @@
-import { getFirestore } from 'firebase-admin/firestore';
 import type { Asset, AssetType } from 'dindin-models';
 import { isAssetType } from './asset-type';
 import { assetsCollection } from '../firestore/paths';

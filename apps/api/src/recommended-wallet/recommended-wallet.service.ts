@@ -1,3 +1,4 @@
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   positionsCollection,
   recommendedWalletsCollection,
@@ -5,13 +6,11 @@ import {
 import { loadAllQuotePrices } from '../quotes/quote-prices';
 import { currentMonth } from '../shared/date';
 import { HttpError } from '../shared/http-error';
-import { getFirestore } from 'firebase-admin/firestore';
 import {
   RecommendedWallet,
   RecommendedWalletAsset,
   RecommendedWalletComparison,
   RecommendedWalletComparisonItem,
-  Quote,
 } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';

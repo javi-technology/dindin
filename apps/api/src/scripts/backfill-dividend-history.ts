@@ -23,7 +23,6 @@
  */
 import { initializeApp } from 'firebase-admin/app';
 import { quotesCollection } from '../firestore/paths';
-import { getFirestore } from 'firebase-admin/firestore';
 import {
   backfillTickerDividendHistory,
   resolveTickers,

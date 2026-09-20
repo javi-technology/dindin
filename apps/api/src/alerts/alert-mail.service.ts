@@ -1,5 +1,4 @@
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 import { Alert } from 'dindin-models';
 import { alertsCollection } from '../firestore/paths';
 

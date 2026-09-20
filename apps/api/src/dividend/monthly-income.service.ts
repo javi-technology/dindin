@@ -1,4 +1,4 @@
-import { FridgeItem, Position, Quote } from 'dindin-models';
+import { Position, Quote } from 'dindin-models';
 import { positionsCollection, quotesCollection } from '../firestore/paths';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
