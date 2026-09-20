@@ -1,4 +1,4 @@
-import { Position, Quote } from 'dindin-models';
+import { Position } from 'dindin-models';
 import { positionsCollection } from '../firestore/paths';
 import { getQuotesByTicker } from '../quotes/quote-prices';
 import { roundCurrency, validQuantity } from '../shared/numbers';
