@@ -15,6 +15,7 @@ import {
 import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
+import { today } from '../shared/date';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -807,15 +808,77 @@ export async function callOpenRouter(
   }
 }
 
-export async function checkDailyLimit(uid: string): Promise<void> {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const snapshot = await usageCollection(uid)
-    .where('createdAt', '>=', startOfToday.toISOString())
-    .get();
-  if (snapshot.size >= DAILY_SUGGESTION_LIMIT) {
-    throw createError('Limite diário de sugestões atingido', 429);
-  }
+/**
+ * Dias que o contador de uso sobrevive antes do TTL do Firestore apagá-lo.
+ * Só o dia corrente importa para o limite; a margem existe para inspecionar
+ * consumo recente. A política de TTL é configurada no campo `expiresAt` da
+ * collection `aiSuggestionUsage` (ver README).
+ */
+const USAGE_RETENTION_DAYS = 30;
+
+/**
+ * Reserva uma geração do dia e devolve o dia reservado (issue #297).
+ *
+ * A reserva acontece **antes** da chamada ao provedor, numa transação. Antes,
+ * o uso era contado no início e gravado só depois da resposta da OpenRouter,
+ * que leva até 120 s: requisições paralelas liam todas o mesmo total e
+ * passavam juntas pelo limite, sem teto real de custo.
+ *
+ * O contador vive num documento por dia, no fuso do produto. Com o dia do
+ * servidor (UTC), o limite reiniciava às 21h em Brasília.
+ */
+export async function reserveDailySuggestion(
+  uid: string,
+  now: Date = new Date(),
+): Promise<string> {
+  const day = today(now);
+  const reference = usageCollection(uid).doc(day);
+
+  await getFirestore().runTransaction(async (transaction) => {
+    const document = await transaction.get(reference);
+    const count = (document.data()?.count as number | undefined) ?? 0;
+
+    if (count >= DAILY_SUGGESTION_LIMIT) {
+      throw createError('Limite diário de sugestões atingido', 429);
+    }
+
+    transaction.set(reference, {
+      count: count + 1,
+      updatedAt: now.toISOString(),
+      expiresAt: new Date(
+        now.getTime() + USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+      ),
+    });
+  });
+
+  return day;
+}
+
+/**
+ * Devolve uma cota reservada que não virou sugestão — falha do provedor, por
+ * exemplo. Sem isso, um 502 consumiria a cota do usuário.
+ */
+export async function releaseDailySuggestion(
+  uid: string,
+  day: string,
+): Promise<void> {
+  const reference = usageCollection(uid).doc(day);
+
+  await getFirestore().runTransaction(async (transaction) => {
+    const document = await transaction.get(reference);
+
+    // Sem contador não há o que devolver. Criar o documento aqui gravaria um
+    // `{ count: 0 }` sem `expiresAt`, que o TTL nunca apagaria.
+    if (!document.exists) return;
+
+    const count = (document.data()?.count as number | undefined) ?? 0;
+
+    transaction.set(
+      reference,
+      { ...document.data(), count: Math.max(0, count - 1) },
+      { merge: true },
+    );
+  });
 }
 
 export function suggestionId(
@@ -874,7 +937,60 @@ export async function generateSuggestion(
   ) {
     return saved;
   }
-  await checkDailyLimit(uid);
+  // A cota é reservada antes de qualquer chamada ao provedor e devolvida se
+  // a geração não chegar ao fim (issue #297).
+  const reservedDay = await reserveDailySuggestion(uid);
+  try {
+    return await buildAndSaveSuggestion({
+      uid,
+      walletId,
+      month,
+      tab,
+      comparison,
+      availableHistoryMonths,
+      history,
+      contribution,
+      saved,
+    });
+  } catch (error) {
+    // A devolução é uma segunda transação no mesmo documento disputado. Se
+    // ela falhar, quem precisa chegar ao cliente é o erro original — uma
+    // falha aqui vira log, não um 500 genérico por cima do 502 do provedor.
+    await releaseDailySuggestion(uid, reservedDay).catch((releaseError) =>
+      console.error('[generateSuggestion] falha ao devolver a cota', {
+        uid,
+        day: reservedDay,
+        message: (releaseError as Error).message,
+      }),
+    );
+    throw error;
+  }
+}
+
+interface BuildSuggestionArgs {
+  uid: string;
+  walletId: string;
+  month: string;
+  tab: AiSuggestionTab;
+  comparison: RecommendedWalletComparison;
+  availableHistoryMonths: string[];
+  history: AiSuggestionHistoryMonth[];
+  contribution?: number;
+  saved: AiSuggestion | null;
+}
+
+/** Monta, consulta a IA e persiste a sugestão, com a cota já reservada. */
+async function buildAndSaveSuggestion({
+  uid,
+  walletId,
+  month,
+  tab,
+  comparison,
+  availableHistoryMonths,
+  history,
+  contribution,
+  saved,
+}: BuildSuggestionArgs): Promise<AiSuggestion> {
   const [income, quotePrices, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
     getQuotePrices(),
@@ -950,6 +1066,5 @@ export async function generateSuggestion(
   await suggestionsCollection(uid)
     .doc(id)
     .set({ ...suggestion, input });
-  await usageCollection(uid).doc().set({ createdAt, suggestionId: id });
   return suggestion;
 }

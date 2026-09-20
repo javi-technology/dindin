@@ -1,4 +1,5 @@
 import { AssetType } from 'dindin-models';
+import { today as appToday } from '../shared/date';
 import { ActiveAsset } from '../assets/asset.service';
 import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 
@@ -139,7 +140,9 @@ function splitEvents(
     return undefined;
   }
 
-  const end = today.toISOString().slice(0, 10);
+  // O dia vem do fuso do produto: em UTC, uma execução depois das 21h em
+  // Brasília abriria a janela no dia seguinte (issue #305).
+  const end = appToday(today);
   const start = `${Number(end.slice(0, 4)) - 1}${end.slice(4)}`;
   return {
     paid: dated

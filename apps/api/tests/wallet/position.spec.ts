@@ -159,6 +159,16 @@ function createFirestoreMock(
               if (subPath === 'wallets' && uid === 'user-123') {
                 return {
                   doc: jest.fn((walletId: string) => ({
+                    // Só `wallet-1` existe: o cadastro de posição confere a
+                    // carteira antes de gravar (issue #296).
+                    get: jest.fn().mockResolvedValue({
+                      id: walletId,
+                      exists: walletId === 'wallet-1',
+                      data: () =>
+                        walletId === 'wallet-1'
+                          ? { name: 'Carteira Principal' }
+                          : undefined,
+                    }),
                     collection: jest.fn((positionPath: string) => {
                       if (
                         positionPath === 'positions' &&
@@ -229,6 +239,10 @@ function createFirestoreMockWithFridge(
 ) {
   const positionMap = new Map<string, any>();
   const fridgeMap = new Map<string, any>();
+  // Documentos já removidos por uma transação: a leitura seguinte precisa
+  // enxergar a remoção, senão duas chamadas concorrentes leriam a mesma
+  // posição viva (issue #295).
+  const deletedIds = new Set<string>();
 
   positions.forEach((position) => {
     let data = { ...position };
@@ -238,7 +252,11 @@ function createFirestoreMockWithFridge(
       get: jest
         .fn()
         .mockImplementation(() =>
-          Promise.resolve(createPositionSnapshot(data)),
+          Promise.resolve(
+            deletedIds.has(position.id)
+              ? { id: position.id, exists: false, data: () => null }
+              : createPositionSnapshot(data),
+          ),
         ),
       set: jest.fn().mockImplementation((value: any) => {
         data = { ...data, ...value };
@@ -306,28 +324,31 @@ function createFirestoreMockWithFridge(
     })),
   };
 
-  const batchOperations: Array<{
+  const transactionOperations: Array<{
     type: 'delete' | 'set';
     ref: any;
     data?: any;
   }> = [];
-  const batchMock: {
-    delete: jest.Mock;
-    set: jest.Mock;
-    commit: jest.Mock;
-    _operations: typeof batchOperations;
-  } = {
+  const transaction = {
+    get: jest.fn((ref: any) => ref.get()),
     delete: jest.fn((ref: any) => {
-      batchOperations.push({ type: 'delete', ref });
-      return batchMock;
+      transactionOperations.push({ type: 'delete', ref });
+      deletedIds.add(ref.id);
     }),
     set: jest.fn((ref: any, data: any) => {
-      batchOperations.push({ type: 'set', ref, data });
-      return batchMock;
+      transactionOperations.push({ type: 'set', ref, data });
     }),
-    commit: jest.fn().mockResolvedValue(undefined),
-    _operations: batchOperations,
   };
+
+  // As transações do Firestore são serializadas em caso de conflito: a
+  // segunda só enxerga o estado depois que a primeira commitou. A fila
+  // reproduz isso para que o teste de concorrência seja determinístico.
+  let queue: Promise<unknown> = Promise.resolve();
+  const runTransaction = jest.fn((handler: any) => {
+    const result = queue.then(() => handler(transaction));
+    queue = result.catch(() => undefined);
+    return result;
+  });
 
   return {
     collection: jest.fn((path: string) => {
@@ -386,8 +407,8 @@ function createFirestoreMockWithFridge(
       throw new Error(`Unexpected collection: ${path}`);
     }),
     getAll: catalog.getAll,
-    batch: jest.fn(() => batchMock),
-    _batch: batchMock,
+    runTransaction,
+    _transaction: { ...transaction, operations: transactionOperations },
   };
 }
 
@@ -499,6 +520,26 @@ describe('Position CRUD', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.currentPrice).toBeUndefined();
+    });
+
+    // Sem essa checagem a posição fica órfã sob uma carteira inexistente:
+    // invisível na API, que navega a partir das carteiras, mas visível para o
+    // registro automático de proventos, que usa collection group (issue #296).
+    it('deve retornar 404 quando a carteira não existe', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-inexistente/positions')
+        .set('Authorization', authHeader)
+        .send({
+          ticker: 'HGLG11',
+          quantity: 10,
+          averagePrice: 110.5,
+          assetType: 'FII',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Wallet not found' });
     });
 
     it('deve retornar 400 quando ticker não é informado', async () => {
@@ -764,14 +805,38 @@ describe('Position CRUD', () => {
       expect(response.body.fridgeId).toBe('fridge-1');
       expect(response.body.assetType).toBe('FII');
 
-      // Verifica que o batch foi usado
-      const batchOps = firestoreMock._batch._operations;
-      expect(batchOps.length).toBe(2);
-      expect(batchOps[0].type).toBe('delete');
-      expect(batchOps[1].type).toBe('set');
-      expect(batchOps[1].data.ticker).toBe('HGLG11');
-      expect(batchOps[1].data.transferredPrice).toBe(110.5);
-      expect(batchOps[1].data.targetPrice).toBe(120);
+      // A remoção da posição e a criação do item acontecem na mesma transação
+      const operations = firestoreMock._transaction.operations;
+      expect(operations.length).toBe(2);
+      expect(operations[0].type).toBe('delete');
+      expect(operations[1].type).toBe('set');
+      expect(operations[1].data.ticker).toBe('HGLG11');
+      expect(operations[1].data.transferredPrice).toBe(110.5);
+      expect(operations[1].data.targetPrice).toBe(120);
+    });
+
+    // Antes, a posição era lida fora da transação e o batch fazia
+    // delete + set. Como `delete` de documento inexistente não falha, duas
+    // chamadas simultâneas criavam dois itens com a mesma quantidade
+    // (issue #295).
+    it('deve criar um único item quando duas chamadas concorrem pela mesma posição', async () => {
+      firestoreMock = createFirestoreMockWithFridge([basePosition], [fridge]);
+
+      const move = () =>
+        request(app)
+          .post('/api/wallets/wallet-1/positions/position-1/move-to-fridge')
+          .set('Authorization', authHeader)
+          .send({ fridgeId: 'fridge-1', targetPrice: 120 });
+
+      const [first, second] = await Promise.all([move(), move()]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([201, 404]);
+
+      const created = firestoreMock._transaction.operations.filter(
+        (operation: { type: string }) => operation.type === 'set',
+      );
+      expect(created.length).toBe(1);
     });
 
     it('deve retornar 404 se posição não existe', async () => {

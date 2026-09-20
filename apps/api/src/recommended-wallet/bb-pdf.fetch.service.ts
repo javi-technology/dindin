@@ -1,8 +1,8 @@
 import { bbFileName } from './bb-pdf.parser';
-import { todayDateInBrazil } from '../patrimony/patrimony-snapshot.service';
+import { currentMonth } from '../shared/date';
 
 export async function fetchLatestBbPdf(
-  month = todayDateInBrazil().slice(0, 7),
+  month = currentMonth(),
 ): Promise<{ fileName: string; buffer: Buffer; revision: number } | null> {
   let latest:
     { fileName: string; buffer: Buffer; revision: number } | undefined;

@@ -154,6 +154,24 @@ sugestões.
 `GET /api/me` devolve
 `{ uid, admin, subscription: { status, plan, interval, currentPeriodEnd, cancelAtPeriodEnd }, entitlements: ['ai'] }`.
 
+### Limite diário de sugestões de IA
+
+São 5 gerações por dia por usuário. O contador fica em
+`users/{uid}/aiSuggestionUsage/{YYYY-MM-DD}`, com o dia no fuso
+`America/Sao_Paulo` — em UTC o limite reiniciaria às 21h de Brasília.
+
+A cota é **reservada numa transação antes** da chamada ao provedor de IA, que
+pode levar até 120 s, e devolvida se a geração falhar. Contar o uso só depois
+da resposta deixava requisições paralelas passarem todas pelo limite.
+
+Cada documento grava `expiresAt` (30 dias). Para o Firestore apagá-los
+sozinho, habilite a política de TTL uma vez por projeto:
+
+```bash
+gcloud firestore fields ttls update expiresAt \
+  --collection-group=aiSuggestionUsage --enable-ttl --project=dindin-4e720
+```
+
 ### Stripe
 
 O provedor de pagamento é a Stripe (Checkout + Customer Portal + webhooks).

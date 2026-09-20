@@ -1,4 +1,5 @@
 import { MonthlyIncomeItem } from './monthly-income.service';
+import { todayAsUtcDate } from '../shared/date';
 
 /**
  * Recorte gratuito da projeção por ativo e da agenda de pagamentos (#262).
@@ -33,9 +34,6 @@ export interface LimitedMonthlyIncome {
    */
   hiddenScheduleTickers: string[];
 }
-
-/** Fuso do produto: os usuários são brasileiros, as Functions rodam em UTC. */
-const APP_TIMEZONE = 'America/Sao_Paulo';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 86400000;
@@ -74,28 +72,12 @@ function daysUntil(date: string, today: Date): number | null {
 }
 
 /**
- * Meia-noite UTC do dia corrente **no fuso do produto**. Em UTC puro, das 21h
- * à meia-noite de Brasília o servidor viraria o dia antes da tela do usuário e
- * um pagamento de hoje cairia em "já pagos" enquanto a tela o lista em "a
- * receber".
- */
-export function appToday(now: Date = new Date()): Date {
-  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
-    timeZone: APP_TIMEZONE,
-  })
-    .format(now)
-    .split('-')
-    .map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-/**
  * Totais da agenda sobre **todos** os ativos. O não assinante vê a agenda
  * recortada, mas "Já pagos" e "A receber" continuam valores reais.
  */
 export function computeScheduleTotals(
   items: MonthlyIncomeItem[],
-  today: Date = appToday(),
+  today: Date = todayAsUtcDate(),
 ): ScheduleTotals {
   let upcomingTotal = 0;
   let paidTotal = 0;
@@ -112,7 +94,7 @@ export function computeScheduleTotals(
 
 export function limitMonthlyIncome(
   items: MonthlyIncomeItem[],
-  today: Date = appToday(),
+  today: Date = todayAsUtcDate(),
 ): LimitedMonthlyIncome {
   // Mesma renda que a tela mostra por ativo: o último provento (#290).
   const byIncome = [...items].sort(

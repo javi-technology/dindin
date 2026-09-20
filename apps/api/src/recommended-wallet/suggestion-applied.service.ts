@@ -1,11 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import {
+import type {
   AiSuggestion,
   AiSuggestionAppliedItem,
   Asset,
-  AssetType,
   Position,
 } from 'dindin-models';
+import { isAssetType } from '../assets/asset-type';
 import { positionsCollection, walletsCollection } from '../firestore/paths';
 
 export interface AppliedItemInput {
@@ -23,14 +23,6 @@ function createError(message: string, statusCode: number): StatusError {
   error.expose = true;
   return error;
 }
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
 
 /** Preço médio após a compra, arredondado a 2 casas, como na tela. */
 function weightedAveragePrice(
@@ -177,9 +169,7 @@ export async function recordAppliedItem(
       const position: Omit<Position, 'id'> = {
         walletId: suggestion.walletId,
         ticker,
-        assetType: ASSET_TYPES.has(asset.assetType as AssetType)
-          ? (asset.assetType as AssetType)
-          : 'OTHER',
+        assetType: isAssetType(asset.assetType) ? asset.assetType : 'OTHER',
         quantity,
         averagePrice: price,
         inFridge: false,

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { Dividend, AssetType } from 'dindin-models';
+import type { Dividend } from 'dindin-models';
+import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import {
   buildMonthlyDividendReport,
   isValidPaymentDate,
@@ -8,7 +9,6 @@ import {
 } from './monthly-report.service';
 import { computeMonthlyIncome } from './monthly-income.service';
 import {
-  appToday,
   computeScheduleTotals,
   limitMonthlyIncome,
 } from './monthly-income-limit.service';
@@ -21,18 +21,7 @@ import {
 } from './dividend-calculation.service';
 import { uid, dividendsCollection } from '../firestore/paths';
 import { AuthRequest } from '../middleware/auth.middleware';
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
+import { currentYear, todayAsUtcDate } from '../shared/date';
 
 function validateDividendBody(
   body: Partial<Dividend>,
@@ -88,10 +77,10 @@ function validateDividendBody(
     }
   }
 
-  if (assetType !== undefined && !isValidAssetType(assetType)) {
+  if (assetType !== undefined && !isAssetType(assetType)) {
     return {
       valid: false,
-      error: `Asset type must be one of: ${[...ASSET_TYPES].join(', ')}`,
+      error: `Asset type must be one of: ${ASSET_TYPES.join(', ')}`,
     };
   }
 
@@ -250,7 +239,7 @@ export const getMonthlyDividendReport = asyncHandler(
   'getMonthlyDividendReport',
   async (req: Request, res: Response) => {
     const queryYear = req.query.year;
-    let year = new Date().getFullYear();
+    let year = currentYear();
 
     if (queryYear !== undefined) {
       const parsedYear =
@@ -310,7 +299,7 @@ export const getMonthlyIncome = asyncHandler(
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
-    const today = appToday();
+    const today = todayAsUtcDate();
     const scheduleTotals = computeScheduleTotals(byTicker, today);
 
     if (entitled) {

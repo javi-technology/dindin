@@ -4,7 +4,7 @@ import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
-import { asyncHandler } from '../middleware/async-handler';
+import { asyncHandler, notFound } from '../middleware/async-handler';
 import {
   uid,
   fridgesCollection,
@@ -384,36 +384,42 @@ export const unfreezeItem = asyncHandler(
     }
 
     const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
-    const itemDoc = await itemRef.get();
-    if (!itemDoc.exists) {
-      res.status(404).json({ error: 'Fridge item not found' });
-      return;
-    }
-
     const walletRef = walletsCollection(userId).doc(walletId);
-    const walletDoc = await walletRef.get();
-    if (!walletDoc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
-      return;
-    }
-
-    const item = itemDoc.data() as FridgeItem;
-    const now = new Date().toISOString();
-    const positionData: Omit<Position, 'id'> = {
-      walletId,
-      ticker: item.ticker,
-      assetType: item.assetType ?? 'FII',
-      quantity: item.quantity,
-      averagePrice: item.transferredPrice,
-      inFridge: false,
-      createdAt: now,
-      updatedAt: now,
-    };
     const positionRef = positionsCollection(userId, walletId).doc();
-    const batch = getFirestore().batch();
-    batch.delete(itemRef);
-    batch.set(positionRef, positionData);
-    await batch.commit();
+
+    // O item é lido dentro da transação, não antes dela: `delete` de um
+    // documento que já sumiu não falha, então com a leitura fora duas
+    // chamadas simultâneas passavam pela checagem de existência e cada uma
+    // criava uma posição, duplicando a quantidade na carteira (issue #295).
+    const positionData = await getFirestore().runTransaction(
+      async (transaction) => {
+        const [itemDoc, walletDoc] = await Promise.all([
+          transaction.get(itemRef),
+          transaction.get(walletRef),
+        ]);
+
+        if (!itemDoc.exists) throw notFound('Fridge item not found');
+        if (!walletDoc.exists) throw notFound('Wallet not found');
+
+        const item = itemDoc.data() as FridgeItem;
+        const now = new Date().toISOString();
+        const data: Omit<Position, 'id'> = {
+          walletId,
+          ticker: item.ticker,
+          assetType: item.assetType ?? 'FII',
+          quantity: item.quantity,
+          averagePrice: item.transferredPrice,
+          inFridge: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        transaction.delete(itemRef);
+        transaction.set(positionRef, data);
+
+        return data;
+      },
+    );
 
     res.status(201).json({ id: positionRef.id, ...positionData });
   },

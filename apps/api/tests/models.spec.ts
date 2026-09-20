@@ -4,7 +4,9 @@ import {
   Position,
   Fridge,
   FridgeItem,
+  ASSET_TYPES,
   AssetType,
+  isAssetType,
   Asset,
   Dividend,
   PatrimonySnapshot,
@@ -119,6 +121,35 @@ describe('models – Position', () => {
     ];
 
     expect(types).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tipos de ativo em um lugar só (issue #303)
+// A lista estava repetida em sete arquivos entre api e web: incluir um tipo
+// novo exigia lembrar de todos, e o esquecido passava a recusar o tipo.
+// ---------------------------------------------------------------------------
+
+describe('models – ASSET_TYPES', () => {
+  it('deve listar os tipos suportados', () => {
+    expect([...ASSET_TYPES]).toEqual(['FII', 'STOCK', 'ETF', 'REIT', 'OTHER']);
+  });
+
+  it('deve derivar AssetType da lista', () => {
+    const types: AssetType[] = [...ASSET_TYPES];
+
+    expect(types).toHaveLength(ASSET_TYPES.length);
+  });
+
+  it('deve reconhecer os tipos válidos', () => {
+    expect(ASSET_TYPES.every((type) => isAssetType(type))).toBe(true);
+  });
+
+  it('deve recusar valores fora da lista', () => {
+    expect(isAssetType('BDR')).toBe(false);
+    expect(isAssetType('fii')).toBe(false);
+    expect(isAssetType(undefined)).toBe(false);
+    expect(isAssetType(7)).toBe(false);
   });
 });
 

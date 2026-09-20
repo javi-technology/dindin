@@ -1,27 +1,17 @@
 import { Request, Response } from 'express';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { Position, AssetType, FridgeItem } from 'dindin-models';
+import type { FridgeItem, Position } from 'dindin-models';
+import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
-import { asyncHandler } from '../middleware/async-handler';
+import { asyncHandler, notFound } from '../middleware/async-handler';
 import {
   uid,
   positionsCollection,
   fridgesCollection,
+  walletsCollection,
 } from '../firestore/paths';
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
 
 /**
  * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
@@ -86,10 +76,10 @@ function validatePositionBody(
   }
 
   if (!allowPartial || assetType !== undefined) {
-    if (!isValidAssetType(assetType)) {
+    if (!isAssetType(assetType)) {
       return {
         valid: false,
-        error: `Asset type is required and must be one of: ${[...ASSET_TYPES].join(', ')}`,
+        error: `Asset type is required and must be one of: ${ASSET_TYPES.join(', ')}`,
       };
     }
   }
@@ -137,12 +127,24 @@ export const listPositions = asyncHandler(
 export const createPosition = asyncHandler(
   'createPosition',
   async (req: Request, res: Response) => {
+    const userId = uid(req);
     const walletId = req.params.walletId;
     const body = req.body as Partial<Position>;
 
     const validation = validatePositionBody(body);
     if (!validation.valid) {
       res.status(400).json({ error: validation.error });
+      return;
+    }
+
+    // Sem esta checagem a posição nasce órfã sob uma carteira inexistente:
+    // a API não a alcança, porque navega a partir das carteiras, mas o
+    // registro automático de proventos a encontra pelo collection group e
+    // lança provento de um ativo que o usuário não vê (issue #296). É a
+    // mesma verificação que `createItem` já faz com a geladeira.
+    const walletDoc = await walletsCollection(userId).doc(walletId).get();
+    if (!walletDoc.exists) {
+      res.status(404).json({ error: 'Wallet not found' });
       return;
     }
 
@@ -172,7 +174,7 @@ export const createPosition = asyncHandler(
       positionData.targetPrice = body.targetPrice;
     }
 
-    const docRef = await positionsCollection(uid(req), walletId).add(
+    const docRef = await positionsCollection(userId, walletId).add(
       positionData,
     );
     res.status(201).json({ id: docRef.id, ...positionData });
@@ -300,48 +302,46 @@ export const moveToFridge = asyncHandler(
       return;
     }
 
-    // Verifica se a posição existe
     const positionRef = positionsCollection(userId, walletId).doc(positionId);
-    const positionDoc = await positionRef.get();
-
-    if (!positionDoc.exists) {
-      res.status(404).json({ error: 'Position not found' });
-      return;
-    }
-
-    const positionData = positionDoc.data() as Position;
-
-    // Verifica se a geladeira existe
     const fridgeRef = fridgesCollection(userId).doc(fridgeId);
-    const fridgeDoc = await fridgeRef.get();
-
-    if (!fridgeDoc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
-      return;
-    }
-
-    const now = new Date().toISOString();
     const fridgeItemRef = fridgeRef.collection('fridgeItems').doc();
 
-    const fridgeItemData: Omit<FridgeItem, 'id'> = {
-      fridgeId,
-      ticker: positionData.ticker,
-      quantity: positionData.quantity,
-      transferredPrice: positionData.averagePrice,
-      targetPrice,
-      assetType: positionData.assetType,
-      createdAt: now,
-      updatedAt: now,
-    };
+    // A posição é lida dentro da transação, não antes dela: `delete` de um
+    // documento que já sumiu não falha, então com a leitura fora duas
+    // chamadas simultâneas passavam pela checagem de existência e cada uma
+    // criava um item, duplicando a quantidade na geladeira (issue #295).
+    const fridgeItemData = await getFirestore().runTransaction(
+      async (transaction) => {
+        const [positionDoc, fridgeDoc] = await Promise.all([
+          transaction.get(positionRef),
+          transaction.get(fridgeRef),
+        ]);
 
-    // currentPrice não é mais carregado da posição: passa a ser resolvido
-    // a partir da collection `quotes` no momento da leitura (issue #86).
+        if (!positionDoc.exists) throw notFound('Position not found');
+        if (!fridgeDoc.exists) throw notFound('Fridge not found');
 
-    // Operação atômica: remove posição e cria item na geladeira
-    const batch = getFirestore().batch();
-    batch.delete(positionRef);
-    batch.set(fridgeItemRef, fridgeItemData);
-    await batch.commit();
+        const positionData = positionDoc.data() as Position;
+        const now = new Date().toISOString();
+
+        // currentPrice não é mais carregado da posição: passa a ser
+        // resolvido a partir da collection `quotes` na leitura (issue #86).
+        const data: Omit<FridgeItem, 'id'> = {
+          fridgeId,
+          ticker: positionData.ticker,
+          quantity: positionData.quantity,
+          transferredPrice: positionData.averagePrice,
+          targetPrice,
+          assetType: positionData.assetType,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        transaction.delete(positionRef);
+        transaction.set(fridgeItemRef, data);
+
+        return data;
+      },
+    );
 
     res.status(201).json({ id: fridgeItemRef.id, ...fridgeItemData });
   },

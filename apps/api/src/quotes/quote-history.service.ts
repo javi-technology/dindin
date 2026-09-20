@@ -1,5 +1,6 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { MonthlyDividendHistory, Quote, QuoteHistory } from 'dindin-models';
+import { today } from '../shared/date';
 
 function quotesCollection() {
   return getFirestore().collection('quotes');
@@ -11,10 +12,6 @@ function historyCollection(ticker: string) {
 
 function dividendHistoryCollection(ticker: string) {
   return quotesCollection().doc(ticker).collection('dividendHistory');
-}
-
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function historyDocId(): string {
@@ -31,7 +28,7 @@ export async function saveQuoteHistory(
   annualDividend?: number,
 ): Promise<void> {
   const now = new Date().toISOString();
-  const date = todayDate();
+  const date = today();
   const docId = historyDocId();
 
   const quoteRef = quotesCollection().doc(ticker);

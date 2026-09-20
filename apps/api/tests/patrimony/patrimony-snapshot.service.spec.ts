@@ -14,7 +14,6 @@ import {
   listPatrimonySnapshots,
   saveAllPatrimonySnapshots,
   savePatrimonySnapshot,
-  todayDateInBrazil,
 } from '../../src/patrimony/patrimony-snapshot.service';
 
 function firestoreDocument(
@@ -103,15 +102,6 @@ function userDataFirestore(options: {
 describe('PatrimonySnapshotService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('deve calcular a data no fuso horário de São Paulo', () => {
-    expect(todayDateInBrazil(new Date('2026-09-02T23:30:00Z'))).toBe(
-      '2026-09-02',
-    );
-    expect(todayDateInBrazil(new Date('2026-09-02T02:30:00Z'))).toBe(
-      '2026-09-01',
-    );
   });
 
   it('deve usar cotação atual e fallback de preço médio ou transferido', async () => {

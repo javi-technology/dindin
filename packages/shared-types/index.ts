@@ -1,3 +1,5 @@
+import type { AssetType } from 'dindin-models';
+
 // Tipos compartilhados entre web e api serão adicionados aqui.
 
 export interface HealthResponse {
@@ -5,13 +7,10 @@ export interface HealthResponse {
   project: string;
 }
 
-/** Tipos de ativo suportados em um provento */
-export type DividendAssetType = 'FII' | 'STOCK' | 'ETF' | 'REIT' | 'OTHER';
-
 /** Payload para criação/edição de um provento */
 export interface DividendCreateRequest {
   ticker: string;
-  assetType?: DividendAssetType;
+  assetType?: AssetType;
   amountPerShare: number;
   quantity: number;
   paymentDate: string; // YYYY-MM-DD
