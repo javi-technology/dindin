@@ -122,7 +122,22 @@ app.post(
   handleWebhook,
 );
 
-app.use(express.json({ limit: '10mb' }));
+// O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
+// de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais,
+// e recebe o limite maior na própria rota (issue #298).
+export const DEFAULT_BODY_LIMIT = '100kb';
+export const PDF_IMPORT_BODY_LIMIT = '10mb';
+
+// O parser da rota de import vem antes do global: quem chega primeiro lê o
+// corpo, e o `express.json` seguinte ignora requisição já parseada. Deixar o
+// limite maior só na definição da rota não adiantaria — o global já teria
+// recusado o corpo com 413 antes de o roteador chegar lá.
+app.use(
+  '/api/admin/recommended-wallets/bb-fii/import',
+  express.json({ limit: PDF_IMPORT_BODY_LIMIT }),
+);
+
+app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 
 // Middleware de log de requisições para diagnóstico em produção
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -296,6 +311,15 @@ app.use(
       message: err.message,
       stack: err.stack,
     });
+
+    // Corpo acima do limite é erro do cliente: responder 500 esconderia a
+    // causa de quem está integrando (issue #298).
+    const status = (err as { status?: number; statusCode?: number }).status;
+    if (status === 413) {
+      res.status(413).json({ error: 'Corpo da requisição muito grande' });
+      return;
+    }
+
     res.status(500).json({ error: 'Erro interno do servidor' });
   },
 );
