@@ -1,10 +1,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import type { Asset, AssetType } from 'dindin-models';
 import { isAssetType } from './asset-type';
-
-function assetsCollection() {
-  return getFirestore().collection('assets');
-}
+import { assetsCollection } from '../firestore/paths';
 
 function normalizeAssetType(value: unknown): AssetType {
   return isAssetType(value) ? value : 'OTHER';

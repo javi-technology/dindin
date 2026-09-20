@@ -1,5 +1,7 @@
-import { getFirestore } from 'firebase-admin/firestore';
 import { FridgeItem, Position, Quote } from 'dindin-models';
+import { positionsCollection, quotesCollection } from '../firestore/paths';
+import { roundCurrency, validQuantity } from '../shared/numbers';
+import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 
 export interface MonthlyIncomeItem {
   ticker: string;
@@ -17,36 +19,7 @@ export interface MonthlyIncome {
   monthlyDividendByTicker: Map<string, number>;
 }
 
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
-
-function fridgesCollection(userId: string) {
-  return getFirestore().collection('users').doc(userId).collection('fridges');
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-export async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
-  const items: FridgeItem[] = [];
-  const fridgesSnapshot = await fridgesCollection(userId).get();
-
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({ id: itemDoc.id, ...itemDoc.data() } as FridgeItem);
-    }
-  }
-
-  return items;
-}
+export const fetchFridgeItems = getAllUserFridgeItems;
 
 export async function computeMonthlyIncome(
   userId: string,
@@ -54,7 +27,7 @@ export async function computeMonthlyIncome(
 ): Promise<MonthlyIncome> {
   const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    getFirestore().collection('quotes').get(),
+    quotesCollection().get(),
     fetchFridgeItems(userId),
   ]);
 
@@ -81,11 +54,7 @@ export async function computeMonthlyIncome(
     const position = { id: doc.id, ...doc.data() } as Position;
     const monthlyDividend =
       monthlyDividendByTicker.get(position.ticker.toUpperCase()) ?? 0;
-    const quantity =
-      typeof position.quantity === 'number' &&
-      Number.isFinite(position.quantity)
-        ? position.quantity
-        : 0;
+    const quantity = validQuantity(position.quantity);
     const monthlyIncome = roundCurrency(quantity * monthlyDividend);
     const paymentDate = paymentDateByTicker.get(position.ticker.toUpperCase());
 
@@ -103,10 +72,7 @@ export async function computeMonthlyIncome(
   for (const item of fridgeItems) {
     const monthlyDividend =
       monthlyDividendByTicker.get(item.ticker.toUpperCase()) ?? 0;
-    const quantity =
-      typeof item.quantity === 'number' && Number.isFinite(item.quantity)
-        ? item.quantity
-        : 0;
+    const quantity = validQuantity(item.quantity);
     totalFromFridge += quantity * monthlyDividend;
   }
   totalFromFridge = roundCurrency(totalFromFridge);

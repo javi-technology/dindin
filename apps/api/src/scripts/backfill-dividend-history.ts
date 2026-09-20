@@ -22,6 +22,7 @@
  * Requer credenciais com permissão de escrita no Firestore do projeto.
  */
 import { initializeApp } from 'firebase-admin/app';
+import { quotesCollection } from '../firestore/paths';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
   backfillTickerDividendHistory,
@@ -31,9 +32,7 @@ import {
 async function main(): Promise<void> {
   initializeApp();
 
-  const allTickers = (await getFirestore().collection('quotes').get()).docs.map(
-    (doc) => doc.id,
-  );
+  const allTickers = (await quotesCollection().get()).docs.map((doc) => doc.id);
 
   if (allTickers.length === 0) {
     console.log('[backfill-dividend-history] nenhum ticker em `quotes`.');

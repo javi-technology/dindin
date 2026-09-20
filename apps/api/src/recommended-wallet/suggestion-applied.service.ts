@@ -7,7 +7,12 @@ import type {
 } from 'dindin-models';
 import { isAssetType } from '../assets/asset-type';
 import { HttpError } from '../shared/http-error';
-import { positionsCollection, walletsCollection } from '../firestore/paths';
+import {
+  aiSuggestionsCollection,
+  assetsCollection,
+  positionsCollection,
+  walletsCollection,
+} from '../firestore/paths';
 
 export interface AppliedItemInput {
   ticker?: unknown;
@@ -93,11 +98,7 @@ export async function recordAppliedItem(
   }
   const { quantity, price } = input;
 
-  const ref = getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestions')
-    .doc(suggestionId);
+  const ref = aiSuggestionsCollection(uid).doc(suggestionId);
 
   return getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
@@ -131,7 +132,7 @@ export async function recordAppliedItem(
       [
         tx.get(walletRef),
         tx.get(walletPositions.where('ticker', '==', ticker).limit(1)),
-        tx.get(getFirestore().collection('assets').doc(ticker)),
+        tx.get(assetsCollection().doc(ticker)),
       ],
     );
     if (!walletSnapshot.exists) {

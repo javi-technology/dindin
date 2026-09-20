@@ -73,27 +73,34 @@ function createFirestoreMock(
                 };
               }
               if (subPath === 'fridges' && uid === 'user-123') {
+                // A leitura passou a sair de `fridgeItemsCollection(uid,
+                // fridgeId)` em vez de `fridgeDoc.ref.collection(...)` —
+                // mesmo caminho, montado pelo módulo de paths (issue #302).
+                const itemsOf = (fridgeId: string) => ({
+                  get: jest.fn().mockResolvedValue({
+                    docs: (
+                      fridges.find((fridge) => fridge.id === fridgeId)?.items ??
+                      []
+                    ).map((item) => ({
+                      id: item.id,
+                      data: () => ({ ...item }),
+                    })),
+                  }),
+                });
+
                 return {
+                  doc: jest.fn((fridgeId: string) => ({
+                    collection: jest.fn((innerPath: string) => {
+                      if (innerPath === 'fridgeItems') return itemsOf(fridgeId);
+                      throw new Error(
+                        `Unexpected inner collection: ${innerPath}`,
+                      );
+                    }),
+                  })),
                   get: jest.fn().mockResolvedValue({
                     docs: fridges.map((fridge) => ({
                       id: fridge.id,
-                      ref: {
-                        collection: jest.fn((innerPath: string) => {
-                          if (innerPath === 'fridgeItems') {
-                            return {
-                              get: jest.fn().mockResolvedValue({
-                                docs: fridge.items.map((item) => ({
-                                  id: item.id,
-                                  data: () => ({ ...item }),
-                                })),
-                              }),
-                            };
-                          }
-                          throw new Error(
-                            `Unexpected inner collection: ${innerPath}`,
-                          );
-                        }),
-                      },
+                      data: () => ({ name: fridge.id }),
                     })),
                   }),
                 };

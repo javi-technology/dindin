@@ -50,6 +50,18 @@ describe('quotes/quote-prices', () => {
 
       expect(prices.get('AAAA11')).toBe(0);
     });
+
+    // O job de preço-alvo descarta preço zero: com ele, qualquer alvo seria
+    // considerado atingido e o usuário receberia e-mail de alerta indevido.
+    it('deve descartar preço zero quando só positivos são aceitos', () => {
+      const prices = quotePricesFromDocs(
+        [quoteDoc('AAAA11', { price: 0 }), quoteDoc('BBBB11', { price: 12 })],
+        { positiveOnly: true },
+      );
+
+      expect(prices.has('AAAA11')).toBe(false);
+      expect(prices.get('BBBB11')).toBe(12);
+    });
   });
 
   describe('loadAllQuotePrices', () => {
@@ -68,6 +80,19 @@ describe('quotes/quote-prices', () => {
 
       expect(prices.get('HGLG11')).toBe(112.5);
       expect(get).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve repassar a opção de só positivos', async () => {
+      const get = jest.fn().mockResolvedValue({
+        docs: [quoteDoc('AAAA11', { price: 0 })],
+      });
+      getFirestoreMock.mockReturnValue({
+        collection: jest.fn(() => ({ get })),
+      });
+
+      const prices = await loadAllQuotePrices({ positiveOnly: true });
+
+      expect(prices.size).toBe(0);
     });
   });
 });

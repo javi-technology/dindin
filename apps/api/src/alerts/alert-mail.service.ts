@@ -1,6 +1,7 @@
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Alert } from 'dindin-models';
+import { alertsCollection } from '../firestore/paths';
 
 /**
  * Envio de e-mail dos alertas de preço-alvo (issue #265).
@@ -171,10 +172,7 @@ export async function sendAlertEmails(
     return 0;
   }
 
-  const userAlerts = getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('alerts');
+  const userAlerts = alertsCollection(userId);
   const notifiedAt = now.toISOString();
   let sent = 0;
 

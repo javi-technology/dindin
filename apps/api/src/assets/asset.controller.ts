@@ -3,10 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import type { Asset, AssetType } from 'dindin-models';
 import { ASSET_TYPES, isAssetType } from './asset-type';
 import { asyncHandler } from '../middleware/async-handler';
-
-function assetsCollection() {
-  return getFirestore().collection('assets');
-}
+import { assetsCollection } from '../firestore/paths';
 
 /**
  * Lista os ativos disponíveis no catálogo para seleção em posições/itens

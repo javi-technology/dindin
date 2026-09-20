@@ -1,5 +1,6 @@
 import {
   roundCurrency,
+  validPositivePrice,
   validPrice,
   validQuantity,
 } from '../../src/shared/numbers';
@@ -17,9 +18,16 @@ import {
 describe('shared/numbers', () => {
   describe('roundCurrency', () => {
     it('deve arredondar a duas casas', () => {
-      expect(roundCurrency(1.005)).toBe(1.01);
+      expect(roundCurrency(2.345)).toBe(2.35);
       expect(roundCurrency(2.344)).toBe(2.34);
       expect(roundCurrency(10)).toBe(10);
+    });
+
+    // Comportamento herdado das três cópias que este módulo substitui: 1.005
+    // é 1.00499… em binário, então arredonda para baixo. Fica registrado
+    // para que a diferença de um centavo não vire caça ao fantasma depois.
+    it('arredonda para baixo quando o valor binário fica abaixo da metade', () => {
+      expect(roundCurrency(1.005)).toBe(1);
     });
 
     it('deve eliminar resíduo de ponto flutuante', () => {
@@ -63,6 +71,19 @@ describe('shared/numbers', () => {
       expect(validPrice('112.5')).toBeUndefined();
       expect(validPrice(null)).toBeUndefined();
       expect(validPrice(undefined)).toBeUndefined();
+    });
+  });
+
+  // O job de preço-alvo usa esta variante: preço ou alvo zero faria qualquer
+  // comparação parecer atingida e dispararia e-mail de alerta indevido.
+  describe('validPositivePrice', () => {
+    it('deve aceitar apenas número positivo', () => {
+      expect(validPositivePrice(112.5)).toBe(112.5);
+      expect(validPositivePrice(0)).toBeUndefined();
+      expect(validPositivePrice(-3)).toBeUndefined();
+      expect(validPositivePrice(Number.NaN)).toBeUndefined();
+      expect(validPositivePrice('112.5')).toBeUndefined();
+      expect(validPositivePrice(null)).toBeUndefined();
     });
   });
 });

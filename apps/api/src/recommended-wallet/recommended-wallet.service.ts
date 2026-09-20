@@ -1,3 +1,8 @@
+import {
+  positionsCollection,
+  recommendedWalletsCollection,
+} from '../firestore/paths';
+import { loadAllQuotePrices } from '../quotes/quote-prices';
 import { currentMonth } from '../shared/date';
 import { HttpError } from '../shared/http-error';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -12,10 +17,6 @@ import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
-
-function recommendedWalletsCollection() {
-  return getFirestore().collection('recommendedWallets');
-}
 
 export function recommendedWalletId(month: string): string {
   return `bb-fii_${month}`.toLowerCase();
@@ -158,31 +159,8 @@ export async function confirmRecommendedWallet(
   } as RecommendedWallet;
 }
 
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
-
-export function quotePriceByTicker(snapshot: {
-  docs: Array<{ id: string; data: () => unknown }>;
-}): Map<string, number> {
-  return new Map(
-    snapshot.docs.flatMap((doc) => {
-      const quote = doc.data() as Partial<Quote>;
-      return typeof quote.price === 'number' && Number.isFinite(quote.price)
-        ? [[doc.id.toUpperCase(), quote.price] as [string, number]]
-        : [];
-    }),
-  );
-}
-
 export async function getQuotePrices(): Promise<Map<string, number>> {
-  const snapshot = await getFirestore().collection('quotes').get();
-  return quotePriceByTicker(snapshot);
+  return loadAllQuotePrices();
 }
 
 export async function compareWithWallet(
@@ -196,11 +174,10 @@ export async function compareWithWallet(
     throw HttpError.notFound('Carteira recomendada não encontrada');
   }
 
-  const [positionsSnapshot, quotesSnapshot] = await Promise.all([
+  const [positionsSnapshot, quotesByTicker] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    getFirestore().collection('quotes').get(),
+    loadAllQuotePrices(),
   ]);
-  const quotesByTicker = quotePriceByTicker(quotesSnapshot);
   const positionsByTicker = new Map<
     string,
     { quantity: number; currentValue: number }

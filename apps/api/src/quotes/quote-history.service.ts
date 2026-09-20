@@ -1,18 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { MonthlyDividendHistory, Quote, QuoteHistory } from 'dindin-models';
+import {
+  quoteDividendHistoryCollection as dividendHistoryCollection,
+  quoteHistoryCollection as historyCollection,
+  quotesCollection,
+} from '../firestore/paths';
 import { today } from '../shared/date';
-
-function quotesCollection() {
-  return getFirestore().collection('quotes');
-}
-
-function historyCollection(ticker: string) {
-  return quotesCollection().doc(ticker).collection('history');
-}
-
-function dividendHistoryCollection(ticker: string) {
-  return quotesCollection().doc(ticker).collection('dividendHistory');
-}
 
 function historyDocId(): string {
   // Usa timestamp ISO com segundos para evitar sobrescrita no mesmo dia

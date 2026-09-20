@@ -15,6 +15,10 @@ import {
 import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
+import {
+  aiSuggestionUsageCollection,
+  aiSuggestionsCollection,
+} from '../firestore/paths';
 import { today } from '../shared/date';
 import { HttpError } from '../shared/http-error';
 
@@ -50,20 +54,6 @@ export interface AiSuggestionInput {
 const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
 export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
-
-function suggestionsCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestions');
-}
-
-function usageCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestionUsage');
-}
 
 function isTab(value: unknown): value is AiSuggestionTab {
   return value === 'renda' || value === 'ganho';
@@ -808,7 +798,7 @@ export async function reserveDailySuggestion(
   now: Date = new Date(),
 ): Promise<string> {
   const day = today(now);
-  const reference = usageCollection(uid).doc(day);
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
 
   await getFirestore().runTransaction(async (transaction) => {
     const document = await transaction.get(reference);
@@ -838,7 +828,7 @@ export async function releaseDailySuggestion(
   uid: string,
   day: string,
 ): Promise<void> {
-  const reference = usageCollection(uid).doc(day);
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
 
   await getFirestore().runTransaction(async (transaction) => {
     const document = await transaction.get(reference);
@@ -872,7 +862,7 @@ export async function getSavedSuggestion(
   tab: AiSuggestionTab,
 ): Promise<AiSuggestion | null> {
   const id = suggestionId(walletId, month, tab);
-  const doc = await suggestionsCollection(uid).doc(id).get();
+  const doc = await aiSuggestionsCollection(uid).doc(id).get();
   if (!doc.exists) return null;
   const { input: _input, ...data } = doc.data() as AiSuggestion & {
     input?: AiSuggestionInput;
@@ -1039,7 +1029,7 @@ async function buildAndSaveSuggestion({
       ? { appliedItems: saved.appliedItems }
       : {}),
   };
-  await suggestionsCollection(uid)
+  await aiSuggestionsCollection(uid)
     .doc(id)
     .set({ ...suggestion, input });
   return suggestion;

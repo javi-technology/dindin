@@ -9,6 +9,7 @@ import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
 import {
   uid,
+  fridgeItemsCollection,
   positionsCollection,
   fridgesCollection,
   walletsCollection,
@@ -305,7 +306,7 @@ export const moveToFridge = asyncHandler(
 
     const positionRef = positionsCollection(userId, walletId).doc(positionId);
     const fridgeRef = fridgesCollection(userId).doc(fridgeId);
-    const fridgeItemRef = fridgeRef.collection('fridgeItems').doc();
+    const fridgeItemRef = fridgeItemsCollection(userId, fridgeId).doc();
 
     // A posição é lida dentro da transação, não antes dela: `delete` de um
     // documento que já sumiu não falha, então com a leitura fora duas

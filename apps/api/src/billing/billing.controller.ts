@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import { billingEventsCollection } from '../firestore/paths';
 import { getAuth } from 'firebase-admin/auth';
 import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -115,7 +115,7 @@ export async function handleWebhook(
     return;
   }
 
-  const eventDoc = getFirestore().collection('billingEvents').doc(event.id);
+  const eventDoc = billingEventsCollection().doc(event.id);
 
   try {
     const snapshot = await eventDoc.get();
