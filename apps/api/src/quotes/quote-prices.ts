@@ -1,6 +1,10 @@
+import { getFirestore } from 'firebase-admin/firestore';
 import { Quote } from 'dindin-models';
 import { quotesCollection } from '../firestore/paths';
 import { validPrice } from '../shared/numbers';
+
+/** Máximo de documentos por `getAll` (limite do Firestore). */
+const GET_ALL_LIMIT = 500;
 
 /**
  * Mapa `ticker → preço`, num lugar só (issue #302).
@@ -49,4 +53,62 @@ export async function loadAllQuotePrices(
 ): Promise<Map<string, number>> {
   const snapshot = await quotesCollection().get();
   return quotePricesFromDocs(snapshot.docs, options);
+}
+
+/**
+ * Cotações dos tickers informados, indexadas em caixa alta (issue #299).
+ *
+ * Nas rotas HTTP o custo precisa acompanhar a carteira do usuário, não o
+ * tamanho do catálogo: varrer `quotes` cobrava uma leitura por ativo
+ * cadastrado a cada requisição, e a rota de renda mensal é chamada uma vez
+ * por carteira. Os jobs continuam com `loadAllQuotePrices`, porque
+ * processam todos os usuários.
+ */
+export async function getQuotesByTicker(
+  tickers: string[],
+): Promise<Map<string, Quote>> {
+  const unique = [
+    ...new Set(
+      tickers
+        .filter((ticker): ticker is string => typeof ticker === 'string')
+        .map((ticker) => ticker.trim().toUpperCase())
+        .filter((ticker) => ticker.length > 0),
+    ),
+  ];
+
+  const quotes = new Map<string, Quote>();
+
+  // `getAll` rejeita chamada sem nenhum documento.
+  if (unique.length === 0) return quotes;
+
+  const firestore = getFirestore();
+
+  for (let index = 0; index < unique.length; index += GET_ALL_LIMIT) {
+    const batch = unique.slice(index, index + GET_ALL_LIMIT);
+    const snapshots = await firestore.getAll(
+      ...batch.map((ticker) => quotesCollection().doc(ticker)),
+    );
+
+    for (const snapshot of snapshots) {
+      if (!snapshot.exists) continue;
+      quotes.set(snapshot.id.toUpperCase(), snapshot.data() as Quote);
+    }
+  }
+
+  return quotes;
+}
+
+/** Mapa `ticker → preço` apenas dos tickers informados. */
+export async function getQuotePricesByTickers(
+  tickers: string[],
+): Promise<Map<string, number>> {
+  const quotes = await getQuotesByTicker(tickers);
+  const prices = new Map<string, number>();
+
+  for (const [ticker, quote] of quotes) {
+    const price = validPrice(quote.price);
+    if (price !== undefined) prices.set(ticker, price);
+  }
+
+  return prices;
 }

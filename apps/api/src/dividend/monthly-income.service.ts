@@ -1,5 +1,6 @@
 import { Position, Quote } from 'dindin-models';
-import { positionsCollection, quotesCollection } from '../firestore/paths';
+import { positionsCollection } from '../firestore/paths';
+import { getQuotesByTicker } from '../quotes/quote-prices';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 
@@ -25,17 +26,25 @@ export async function computeMonthlyIncome(
   userId: string,
   walletId: string,
 ): Promise<MonthlyIncome> {
-  const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
+  const [positionsSnapshot, fridgeItems] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    quotesCollection().get(),
     fetchFridgeItems(userId),
+  ]);
+
+  // Só as cotações dos ativos do usuário: varrer `quotes` cobrava uma leitura
+  // por ativo do catálogo a cada requisição, e esta rota é chamada uma vez
+  // por carteira (issue #299).
+  const positions = positionsSnapshot.docs.map(
+    (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+  );
+  const quotes = await getQuotesByTicker([
+    ...positions.map((position) => position.ticker),
+    ...fridgeItems.map((item) => item.ticker),
   ]);
 
   const monthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
-  for (const doc of quotesSnapshot.docs) {
-    const data = doc.data() as Quote;
-    const ticker = doc.id.toUpperCase();
+  for (const [ticker, data] of quotes) {
     if (typeof data.dividendPaymentDate === 'string') {
       paymentDateByTicker.set(ticker, data.dividendPaymentDate);
     }
@@ -50,8 +59,7 @@ export async function computeMonthlyIncome(
   const byTicker: MonthlyIncomeItem[] = [];
   let total = 0;
 
-  for (const doc of positionsSnapshot.docs) {
-    const position = { id: doc.id, ...doc.data() } as Position;
+  for (const position of positions) {
     const monthlyDividend =
       monthlyDividendByTicker.get(position.ticker.toUpperCase()) ?? 0;
     const quantity = validQuantity(position.quantity);

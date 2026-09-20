@@ -35,17 +35,23 @@ function createFirestoreMock(
   fridges: TestFridge[] = [],
   subscription: Partial<UserSubscription> | null = null,
 ) {
+  const quoteByTicker = new Map(
+    quotes.map((quote) => [quote.ticker.toUpperCase(), quote]),
+  );
+
   return {
+    // As cotações passaram a ser buscadas por ticker, com getAll, em vez de
+    // varrer a coleção inteira (issue #299).
+    getAll: jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({
+        id: ref.id,
+        exists: quoteByTicker.has(ref.id),
+        data: () => quoteByTicker.get(ref.id),
+      })),
+    ),
     collection: jest.fn((path: string) => {
       if (path === 'quotes') {
-        return {
-          get: jest.fn().mockResolvedValue({
-            docs: quotes.map((quote) => ({
-              id: quote.ticker,
-              data: () => ({ ...quote }),
-            })),
-          }),
-        };
+        return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
       }
       if (path === 'users') {
         return {

@@ -3,7 +3,7 @@ import {
   positionsCollection,
   recommendedWalletsCollection,
 } from '../firestore/paths';
-import { loadAllQuotePrices } from '../quotes/quote-prices';
+import { getQuotePricesByTickers } from '../quotes/quote-prices';
 import { currentMonth } from '../shared/date';
 import { HttpError } from '../shared/http-error';
 import {
@@ -158,8 +158,14 @@ export async function confirmRecommendedWallet(
   } as RecommendedWallet;
 }
 
-export async function getQuotePrices(): Promise<Map<string, number>> {
-  return loadAllQuotePrices();
+/**
+ * Preços dos tickers informados. Recebia a coleção inteira; nas rotas o custo
+ * precisa acompanhar a carteira do usuário, não o catálogo (issue #299).
+ */
+export async function getQuotePrices(
+  tickers: string[],
+): Promise<Map<string, number>> {
+  return getQuotePricesByTickers(tickers);
 }
 
 export async function compareWithWallet(
@@ -173,9 +179,15 @@ export async function compareWithWallet(
     throw HttpError.notFound('Carteira recomendada não encontrada');
   }
 
-  const [positionsSnapshot, quotesByTicker] = await Promise.all([
-    positionsCollection(userId, walletId).get(),
-    loadAllQuotePrices(),
+  const positionsSnapshot = await positionsCollection(userId, walletId).get();
+  const positionTickers = positionsSnapshot.docs.map(
+    (doc) => (doc.data() as { ticker?: string }).ticker ?? '',
+  );
+  // Os recomendados entram na busca porque a comparação mostra também o que
+  // o usuário ainda não tem na carteira.
+  const quotesByTicker = await getQuotePricesByTickers([
+    ...positionTickers,
+    ...recommended[wallet].map((asset) => asset.ticker),
   ]);
   const positionsByTicker = new Map<
     string,

@@ -957,9 +957,14 @@ async function buildAndSaveSuggestion({
   contribution,
   saved,
 }: BuildSuggestionArgs): Promise<AiSuggestion> {
+  // Só os tickers em jogo: os da comparação (posições do usuário) e os da
+  // carteira recomendada do mês (issue #299).
   const [income, quotePrices, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
-    getQuotePrices(),
+    getQuotePrices([
+      ...comparison.items.map((item) => item.ticker),
+      ...comparison.recommended[tab].map((asset) => asset.ticker),
+    ]),
     listQualifiedInvestorTickers(),
   ]);
   const input = buildSuggestionInput(
