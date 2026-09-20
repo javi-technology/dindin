@@ -163,7 +163,7 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     res.json(body);
   } catch (error) {
     console.error('[GET /api/me] erro ao carregar assinatura', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -296,7 +296,7 @@ app.use(
       message: err.message,
       stack: err.stack,
     });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
   },
 );
 

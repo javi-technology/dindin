@@ -25,7 +25,7 @@ export async function authMiddleware(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'Não autorizado' });
     return;
   }
 
@@ -36,7 +36,7 @@ export async function authMiddleware(
     req.user = { uid: decoded.uid, admin: decoded.admin === true };
     next();
   } catch {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'Não autorizado' });
     return;
   }
 }
@@ -48,7 +48,7 @@ export function adminAuthMiddleware(
   next: NextFunction,
 ): void {
   if (!req.user?.admin) {
-    res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: 'Acesso negado' });
     return;
   }
   next();

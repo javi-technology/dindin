@@ -736,7 +736,7 @@ describe('FridgeItem CRUD', () => {
         .set('Authorization', authHeader);
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Fridge not found');
+      expect(response.body).toHaveProperty('error', 'Geladeira não encontrada');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -903,7 +903,7 @@ describe('FridgeItem CRUD', () => {
         });
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Fridge not found');
+      expect(response.body).toHaveProperty('error', 'Geladeira não encontrada');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -954,7 +954,7 @@ describe('FridgeItem CRUD', () => {
         .set('Authorization', authHeader);
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Fridge not found');
+      expect(response.body).toHaveProperty('error', 'Geladeira não encontrada');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -1054,7 +1054,7 @@ describe('FridgeItem CRUD', () => {
         .send({ quantity: 10 });
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Fridge not found');
+      expect(response.body).toHaveProperty('error', 'Geladeira não encontrada');
     });
 
     it('deve retornar 400 para quantity inválida na atualização', async () => {
@@ -1121,7 +1121,7 @@ describe('FridgeItem CRUD', () => {
         .set('Authorization', authHeader);
 
       expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Fridge not found');
+      expect(response.body).toHaveProperty('error', 'Geladeira não encontrada');
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {
@@ -1217,7 +1217,7 @@ describe('FridgeItem CRUD', () => {
         .send({});
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'walletId is required' });
+      expect(response.body).toEqual({ error: 'walletId é obrigatório' });
     });
 
     it('deve retornar 404 quando o item não existe', async () => {
@@ -1229,7 +1229,9 @@ describe('FridgeItem CRUD', () => {
         .send({ walletId: 'wallet-1' });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Fridge item not found' });
+      expect(response.body).toEqual({
+        error: 'Item da geladeira não encontrado',
+      });
     });
 
     it('deve retornar 404 quando a carteira não existe', async () => {
@@ -1246,7 +1248,7 @@ describe('FridgeItem CRUD', () => {
         .send({ walletId: 'wallet-inexistente' });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Wallet not found' });
+      expect(response.body).toEqual({ error: 'Carteira não encontrada' });
     });
   });
 });

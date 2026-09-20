@@ -16,6 +16,7 @@ import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
 import { today } from '../shared/date';
+import { HttpError } from '../shared/http-error';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -49,25 +50,6 @@ export interface AiSuggestionInput {
 const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
 export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
-
-type StatusError = Error & { statusCode?: number; expose?: boolean };
-
-/**
- * `expose: true` libera a mensagem para o cliente mesmo em 5xx. Só vale para
- * texto escrito para a tela; detalhe interno ("OPENROUTER_API_KEY não
- * configurada") não recebe a marca e sai como mensagem genérica.
- */
-function createError(
-  message: string,
-  statusCode: number,
-  { expose }: { expose?: boolean } = {},
-): StatusError {
-  return Object.assign(
-    new Error(message),
-    { statusCode },
-    expose === undefined ? {} : { expose },
-  );
-}
 
 function suggestionsCollection(uid: string) {
   return getFirestore()
@@ -723,7 +705,7 @@ export async function callOpenRouter(
   user: string,
 ): Promise<{ content: string; model: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw createError('OPENROUTER_API_KEY não configurada', 500);
+  if (!apiKey) throw HttpError.internal('OPENROUTER_API_KEY não configurada');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
   const requestBody = {
@@ -763,9 +745,7 @@ export async function callOpenRouter(
       response = await request(retryBody);
       if (!response.ok) {
         await logResponseError(response);
-        throw createError('Falha ao consultar o provedor de IA', 502, {
-          expose: true,
-        });
+        throw HttpError.badGateway('Falha ao consultar o provedor de IA');
       }
     }
     const data: unknown = await response.json();
@@ -782,9 +762,7 @@ export async function callOpenRouter(
         '[callOpenRouter] resposta inesperada',
         serialized.slice(0, 500),
       );
-      throw createError('Falha ao consultar o provedor de IA', 502, {
-        expose: true,
-      });
+      throw HttpError.badGateway('Falha ao consultar o provedor de IA');
     }
     const result = data as {
       model: string;
@@ -795,14 +773,12 @@ export async function callOpenRouter(
     if (
       typeof error === 'object' &&
       error !== null &&
-      (error as StatusError).statusCode === 502
+      (error as HttpError).statusCode === 502
     ) {
       throw error;
     }
     console.error('[callOpenRouter] falha', error);
-    throw createError('Falha ao consultar o provedor de IA', 502, {
-      expose: true,
-    });
+    throw HttpError.badGateway('Falha ao consultar o provedor de IA');
   } finally {
     clearTimeout(timeout);
   }
@@ -839,7 +815,7 @@ export async function reserveDailySuggestion(
     const count = (document.data()?.count as number | undefined) ?? 0;
 
     if (count >= DAILY_SUGGESTION_LIMIT) {
-      throw createError('Limite diário de sugestões atingido', 429);
+      throw HttpError.tooManyRequests('Limite diário de sugestões atingido');
     }
 
     transaction.set(reference, {
@@ -912,7 +888,7 @@ export async function generateSuggestion(
   force: boolean,
   contribution?: number,
 ): Promise<AiSuggestion> {
-  if (!isTab(tab)) throw createError('Aba inválida', 400);
+  if (!isTab(tab)) throw HttpError.badRequest('Aba inválida');
   const comparison = await compareWithWallet(uid, walletId, month, tab);
   const historyMonths = previousMonths(comparison.recommended.month);
   const historyWallets = (

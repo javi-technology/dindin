@@ -35,6 +35,16 @@ trigger: always_on
   preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
   markup do modal na feature.
 
+## Erros da API
+
+- Falha de negócio é sinalizada com **`HttpError`** (`apps/api/src/shared/http-error.ts`),
+  nunca com `Object.assign(new Error(...), { statusCode })` à mão: use as
+  fábricas `badRequest`, `notFound`, `conflict`, `tooManyRequests`,
+  `badGateway` e `internal`.
+- `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não.
+- **Mensagens de erro sempre em português (pt-BR)**. Ficam em inglês apenas o
+  `statusText` do HTTP e códigos de contrato, como `code: 'SUBSCRIPTION_REQUIRED'`.
+
 ## Logs
 
 - Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).

@@ -4,7 +4,8 @@ import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
-import { asyncHandler, notFound } from '../middleware/async-handler';
+import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
 import {
   uid,
   fridgesCollection,
@@ -53,7 +54,7 @@ export const createFridge = asyncHandler(
     const { name, description } = req.body as Partial<Fridge>;
 
     if (!name) {
-      res.status(400).json({ error: 'Name is required' });
+      res.status(400).json({ error: 'Nome é obrigatório' });
       return;
     }
 
@@ -78,7 +79,7 @@ export const getFridge = asyncHandler(
     const doc = await fridgesCollection(uid(req)).doc(fridgeId).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
@@ -94,7 +95,7 @@ export const updateFridge = asyncHandler(
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
@@ -123,7 +124,7 @@ export const deleteFridge = asyncHandler(
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
@@ -148,7 +149,7 @@ async function validateFridgeExists(
 ): Promise<boolean> {
   const fridgeDoc = await fridgesCollection(userId).doc(fridgeId).get();
   if (!fridgeDoc.exists) {
-    res.status(404).json({ error: 'Fridge not found' });
+    res.status(404).json({ error: 'Geladeira não encontrada' });
     return false;
   }
   return true;
@@ -164,7 +165,7 @@ function validateItemBody(
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
       return {
         valid: false,
-        error: 'Ticker is required and must be a non-empty string',
+        error: 'Ticker é obrigatório e deve ser um texto não vazio',
       };
     }
   }
@@ -177,7 +178,7 @@ function validateItemBody(
     ) {
       return {
         valid: false,
-        error: 'Quantity is required and must be a positive number',
+        error: 'Quantidade é obrigatória e deve ser um número positivo',
       };
     }
   }
@@ -204,7 +205,7 @@ function validateItemBody(
     ) {
       return {
         valid: false,
-        error: 'Target price is required and must be a non-negative number',
+        error: 'Preço-alvo é obrigatório e deve ser um número não negativo',
       };
     }
   }
@@ -285,7 +286,7 @@ export const getItem = asyncHandler(
     const doc = await fridgeItemsCollection(userId, fridgeId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
@@ -307,7 +308,7 @@ export const updateItem = asyncHandler(
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
@@ -362,7 +363,7 @@ export const deleteItem = asyncHandler(
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
@@ -379,7 +380,7 @@ export const unfreezeItem = asyncHandler(
     const { walletId } = req.body as { walletId?: unknown };
 
     if (!walletId || typeof walletId !== 'string') {
-      res.status(400).json({ error: 'walletId is required' });
+      res.status(400).json({ error: 'walletId é obrigatório' });
       return;
     }
 
@@ -398,8 +399,10 @@ export const unfreezeItem = asyncHandler(
           transaction.get(walletRef),
         ]);
 
-        if (!itemDoc.exists) throw notFound('Fridge item not found');
-        if (!walletDoc.exists) throw notFound('Wallet not found');
+        if (!itemDoc.exists)
+          throw HttpError.notFound('Item da geladeira não encontrado');
+        if (!walletDoc.exists)
+          throw HttpError.notFound('Carteira não encontrada');
 
         const item = itemDoc.data() as FridgeItem;
         const now = new Date().toISOString();

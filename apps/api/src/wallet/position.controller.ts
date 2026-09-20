@@ -5,7 +5,8 @@ import type { FridgeItem, Position } from 'dindin-models';
 import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
-import { asyncHandler, notFound } from '../middleware/async-handler';
+import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
 import {
   uid,
   positionsCollection,
@@ -44,7 +45,7 @@ function validatePositionBody(
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
       return {
         valid: false,
-        error: 'Ticker is required and must be a non-empty string',
+        error: 'Ticker é obrigatório e deve ser um texto não vazio',
       };
     }
   }
@@ -57,7 +58,7 @@ function validatePositionBody(
     ) {
       return {
         valid: false,
-        error: 'Quantity is required and must be a positive number',
+        error: 'Quantidade é obrigatória e deve ser um número positivo',
       };
     }
   }
@@ -70,7 +71,7 @@ function validatePositionBody(
     ) {
       return {
         valid: false,
-        error: 'Average price is required and must be a non-negative number',
+        error: 'Preço médio é obrigatório e deve ser um número não negativo',
       };
     }
   }
@@ -79,7 +80,7 @@ function validatePositionBody(
     if (!isAssetType(assetType)) {
       return {
         valid: false,
-        error: `Asset type is required and must be one of: ${ASSET_TYPES.join(', ')}`,
+        error: `Tipo de ativo é obrigatório e deve ser um de: ${ASSET_TYPES.join(', ')}`,
       };
     }
   }
@@ -92,7 +93,7 @@ function validatePositionBody(
   if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
     return {
       valid: false,
-      error: 'inFridge must be a boolean',
+      error: 'inFridge deve ser booleano',
     };
   }
 
@@ -105,7 +106,7 @@ function validatePositionBody(
   ) {
     return {
       valid: false,
-      error: 'Target price must be a non-negative number',
+      error: 'Preço-alvo deve ser um número não negativo',
     };
   }
 
@@ -144,7 +145,7 @@ export const createPosition = asyncHandler(
     // mesma verificação que `createItem` já faz com a geladeira.
     const walletDoc = await walletsCollection(userId).doc(walletId).get();
     if (!walletDoc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
@@ -188,7 +189,7 @@ export const getPosition = asyncHandler(
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -206,7 +207,7 @@ export const updatePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -264,7 +265,7 @@ export const deletePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -285,7 +286,7 @@ export const moveToFridge = asyncHandler(
 
     // Validação dos campos obrigatórios
     if (!fridgeId || typeof fridgeId !== 'string') {
-      res.status(400).json({ error: 'fridgeId is required' });
+      res.status(400).json({ error: 'fridgeId é obrigatório' });
       return;
     }
 
@@ -297,7 +298,7 @@ export const moveToFridge = asyncHandler(
       !Number.isFinite(targetPrice)
     ) {
       res.status(400).json({
-        error: 'targetPrice is required and must be a non-negative number',
+        error: 'targetPrice é obrigatório e deve ser um número não negativo',
       });
       return;
     }
@@ -317,8 +318,10 @@ export const moveToFridge = asyncHandler(
           transaction.get(fridgeRef),
         ]);
 
-        if (!positionDoc.exists) throw notFound('Position not found');
-        if (!fridgeDoc.exists) throw notFound('Fridge not found');
+        if (!positionDoc.exists)
+          throw HttpError.notFound('Posição não encontrada');
+        if (!fridgeDoc.exists)
+          throw HttpError.notFound('Geladeira não encontrada');
 
         const positionData = positionDoc.data() as Position;
         const now = new Date().toISOString();

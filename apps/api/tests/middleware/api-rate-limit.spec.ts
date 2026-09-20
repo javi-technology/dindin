@@ -58,7 +58,7 @@ describe('rate limiting global da API', () => {
     const blocked = await getMe(ip);
 
     expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: 'Too many requests' });
+    expect(blocked.body).toEqual({ error: 'Muitas requisições' });
     expect(verifyIdTokenMock).toHaveBeenCalledTimes(callsBeforeBlock);
   });
 

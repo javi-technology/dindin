@@ -36,15 +36,6 @@ function exposeOf(error: unknown, statusCode: number): boolean {
 }
 
 /**
- * Erro 404 lançado de dentro de uma transação, onde não dá para responder
- * direto: o `asyncHandler` lê o `statusCode` e devolve a mensagem, que por
- * ser 4xx já é exposta ao cliente (issue #295).
- */
-export function notFound(message: string): Error & { statusCode: number } {
-  return Object.assign(new Error(message), { statusCode: 404 });
-}
-
-/**
  * Envolve um handler de rota, capturando qualquer erro não tratado (issue #222).
  *
  * Antes, cada um dos ~55 handlers repetia `try` → `console.error` → 500. Além
@@ -83,7 +74,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       res.status(code).json({
         error: exposeOf(error, code)
           ? (error as Error).message
-          : 'Internal server error',
+          : 'Erro interno do servidor',
       });
     }
   };

@@ -318,7 +318,7 @@ describe('Wallet CRUD', () => {
         .send({ name: 'Nova Carteira', currency: 'REAL' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/not supported/);
+      expect(response.body.error).toMatch(/não é suportada/);
     });
 
     it('deve retornar 400 para moeda estrangeira: o app é BRL-only (#266)', async () => {
@@ -440,7 +440,7 @@ describe('Wallet CRUD', () => {
         .send({ currency: 'INVALID' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/not supported/);
+      expect(response.body.error).toMatch(/não é suportada/);
     });
 
     it('deve retornar 500 quando o Firestore falha', async () => {

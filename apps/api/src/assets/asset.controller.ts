@@ -61,27 +61,27 @@ function validateAssetBody(
     (requireIdentity || ticker !== undefined) &&
     (!ticker || typeof ticker !== 'string' || !ticker.trim())
   ) {
-    errors.push('ticker is required');
+    errors.push('ticker é obrigatório');
   } else if (ticker !== undefined && !/^[A-Za-z0-9]+$/.test(ticker.trim())) {
-    errors.push('ticker must contain only letters and numbers');
+    errors.push('ticker deve conter apenas letras e números');
   }
   if (
     (requireIdentity || name !== undefined) &&
     (!name || typeof name !== 'string' || !name.trim())
   ) {
-    errors.push('name is required');
+    errors.push('name é obrigatório');
   }
   if ((requireIdentity || assetType !== undefined) && !isAssetType(assetType)) {
-    errors.push(`assetType must be one of: ${ASSET_TYPES.join(', ')}`);
+    errors.push(`assetType deve ser um de: ${ASSET_TYPES.join(', ')}`);
   }
   if (active !== undefined && typeof active !== 'boolean') {
-    errors.push('active must be a boolean');
+    errors.push('active deve ser booleano');
   }
   if (
     qualifiedInvestor !== undefined &&
     typeof qualifiedInvestor !== 'boolean'
   ) {
-    errors.push('qualifiedInvestor must be a boolean');
+    errors.push('qualifiedInvestor deve ser booleano');
   }
 
   if (errors.length > 0) {
@@ -122,7 +122,7 @@ export const createAsset = asyncHandler(
     const existing = await docRef.get();
 
     if (existing.exists) {
-      res.status(409).json({ error: 'Asset already exists' });
+      res.status(409).json({ error: 'Ativo já cadastrado' });
       return;
     }
 
@@ -151,7 +151,7 @@ export const updateAsset = asyncHandler(
     const existing = await docRef.get();
 
     if (!existing.exists) {
-      res.status(404).json({ error: 'Asset not found' });
+      res.status(404).json({ error: 'Ativo não encontrado' });
       return;
     }
 

@@ -1,4 +1,5 @@
 import { currentMonth } from '../shared/date';
+import { HttpError } from '../shared/http-error';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
   RecommendedWallet,
@@ -140,11 +141,7 @@ export async function confirmRecommendedWallet(
   const docRef = recommendedWalletsCollection().doc(id);
   const doc = await docRef.get();
   if (!doc.exists) {
-    const error = new Error('Carteira recomendada não encontrada') as Error & {
-      statusCode?: number;
-    };
-    error.statusCode = 404;
-    throw error;
+    throw HttpError.notFound('Carteira recomendada não encontrada');
   }
   const confirmedAt = new Date().toISOString();
   await docRef.update({
@@ -196,11 +193,7 @@ export async function compareWithWallet(
 ): Promise<RecommendedWalletComparison> {
   const recommended = await getRecommendedWallet(month);
   if (!recommended) {
-    const error = new Error('Carteira recomendada não encontrada') as Error & {
-      statusCode?: number;
-    };
-    error.statusCode = 404;
-    throw error;
+    throw HttpError.notFound('Carteira recomendada não encontrada');
   }
 
   const [positionsSnapshot, quotesSnapshot] = await Promise.all([

@@ -12,7 +12,7 @@ const SUPPORTED_CURRENCY = 'BRL';
 
 /** Mensagem de erro de moeda não suportada. */
 function unsupportedCurrencyError(currency: string): string {
-  return `Currency '${currency}' is not supported. Accepted value: ${SUPPORTED_CURRENCY}`;
+  return `Moeda '${currency}' não é suportada. Valor aceito: ${SUPPORTED_CURRENCY}`;
 }
 
 export const listWallets = asyncHandler(
@@ -30,7 +30,7 @@ export const createWallet = asyncHandler(
     const { name, description, currency } = req.body as Partial<Wallet>;
 
     if (!name || !currency) {
-      res.status(400).json({ error: 'Name and currency are required' });
+      res.status(400).json({ error: 'Nome e moeda são obrigatórios' });
       return;
     }
 
@@ -60,7 +60,7 @@ export const getWallet = asyncHandler(
     const doc = await walletsCollection(uid(req)).doc(req.params.id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
@@ -76,7 +76,7 @@ export const updateWallet = asyncHandler(
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
@@ -111,7 +111,7 @@ export const deleteWallet = asyncHandler(
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 

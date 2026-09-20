@@ -6,6 +6,7 @@ import type {
   Position,
 } from 'dindin-models';
 import { isAssetType } from '../assets/asset-type';
+import { HttpError } from '../shared/http-error';
 import { positionsCollection, walletsCollection } from '../firestore/paths';
 
 export interface AppliedItemInput {
@@ -13,15 +14,6 @@ export interface AppliedItemInput {
   fallbackFor?: unknown;
   quantity?: unknown;
   price?: unknown;
-}
-
-type StatusError = Error & { statusCode?: number; expose?: boolean };
-
-function createError(message: string, statusCode: number): StatusError {
-  const error = new Error(message) as StatusError;
-  error.statusCode = statusCode;
-  error.expose = true;
-  return error;
 }
 
 /** Preço médio após a compra, arredondado a 2 casas, como na tela. */
@@ -97,7 +89,7 @@ export async function recordAppliedItem(
     !isPositiveNumber(input.quantity) ||
     !isPositiveNumber(input.price)
   ) {
-    throw createError('Ticker, quantidade e preço são obrigatórios', 400);
+    throw HttpError.badRequest('Ticker, quantidade e preço são obrigatórios');
   }
   const { quantity, price } = input;
 
@@ -109,7 +101,7 @@ export async function recordAppliedItem(
 
   return getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
-    if (!snapshot.exists) throw createError('Sugestão não encontrada', 404);
+    if (!snapshot.exists) throw HttpError.notFound('Sugestão não encontrada');
 
     const { input: _input, ...data } = snapshot.data() as AiSuggestion & {
       input?: unknown;
@@ -117,7 +109,9 @@ export async function recordAppliedItem(
     const suggestion: AiSuggestion = { ...data, id: snapshot.id };
 
     if (!isApplicable(suggestion, ticker, fallbackFor)) {
-      throw createError('Ticker não faz parte das compras da sugestão', 400);
+      throw HttpError.badRequest(
+        'Ticker não faz parte das compras da sugestão',
+      );
     }
 
     const appliedItems = suggestion.appliedItems ?? [];
@@ -128,7 +122,7 @@ export async function recordAppliedItem(
           item.fallbackFor?.toUpperCase() === fallbackFor,
       )
     ) {
-      throw createError('Item já aplicado na carteira', 409);
+      throw HttpError.conflict('Item já aplicado na carteira');
     }
 
     const walletRef = walletsCollection(uid).doc(suggestion.walletId);
@@ -141,7 +135,7 @@ export async function recordAppliedItem(
       ],
     );
     if (!walletSnapshot.exists) {
-      throw createError('Carteira não encontrada', 404);
+      throw HttpError.notFound('Carteira não encontrada');
     }
 
     const now = new Date().toISOString();
@@ -161,9 +155,8 @@ export async function recordAppliedItem(
     } else {
       const asset = assetSnapshot.data() as Partial<Asset> | undefined;
       if (!assetSnapshot.exists || asset?.active !== true) {
-        throw createError(
+        throw HttpError.badRequest(
           'Ticker não encontrado no catálogo de ativos suportados',
-          400,
         );
       }
       const position: Omit<Position, 'id'> = {

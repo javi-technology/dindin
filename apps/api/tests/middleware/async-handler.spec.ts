@@ -77,7 +77,9 @@ describe('asyncHandler', () => {
     );
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Erro interno do servidor',
+    });
   });
 
   it('deve capturar também erro lançado de forma síncrona', async () => {
@@ -200,7 +202,7 @@ describe('asyncHandler', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Internal server error',
+        error: 'Erro interno do servidor',
       });
     });
 
@@ -244,7 +246,7 @@ describe('asyncHandler', () => {
 
       expect(res.status).toHaveBeenCalledWith(503);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Internal server error',
+        error: 'Erro interno do servidor',
       });
     });
 
@@ -263,7 +265,7 @@ describe('asyncHandler', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Internal server error',
+        error: 'Erro interno do servidor',
       });
     });
 
@@ -295,6 +297,8 @@ describe('asyncHandler', () => {
       res as unknown as Response,
     );
 
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Erro interno do servidor',
+    });
   });
 });

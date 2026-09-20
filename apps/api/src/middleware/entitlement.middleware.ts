@@ -11,7 +11,7 @@ export function requireEntitlement(entitlement: Entitlement) {
     next: NextFunction,
   ): Promise<void> => {
     if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Não autorizado' });
       return;
     }
 
@@ -24,7 +24,7 @@ export function requireEntitlement(entitlement: Entitlement) {
       if (!allowed) {
         res
           .status(403)
-          .json({ error: 'Forbidden', code: 'SUBSCRIPTION_REQUIRED' });
+          .json({ error: 'Acesso negado', code: 'SUBSCRIPTION_REQUIRED' });
         return;
       }
       next();
@@ -34,7 +34,7 @@ export function requireEntitlement(entitlement: Entitlement) {
         entitlement,
         error,
       });
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Erro interno do servidor' });
     }
   };
 }

@@ -169,7 +169,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      error: 'Ticker is required and must be a non-empty string',
+      error: 'Ticker é obrigatório e deve ser um texto não vazio',
     });
   });
 
@@ -228,7 +228,8 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
-        error: 'Tickers is required and must be a comma-separated list',
+        error:
+          'Tickers é obrigatório e deve ser uma lista separada por vírgula',
       });
     });
 
@@ -241,7 +242,7 @@ describe('GET /api/quotes/:ticker/dividend-history', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
-        error: 'Tickers must contain between 1 and 60 items',
+        error: 'Tickers deve conter entre 1 e 60 itens',
       });
     });
 

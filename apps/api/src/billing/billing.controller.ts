@@ -125,7 +125,7 @@ export async function handleWebhook(
     }
   } catch (error) {
     console.error('[billing.webhook] erro ao consultar billingEvents', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
 
@@ -133,7 +133,7 @@ export async function handleWebhook(
     await processStripeEvent(event);
   } catch (error) {
     console.error('[billing.webhook]', event.type, (error as Error).message);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
 

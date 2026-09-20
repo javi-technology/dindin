@@ -391,7 +391,7 @@ describe('BrapiService — fetchQuotes', () => {
     });
 
     it('deve lançar erro para resposta HTTP 4xx', async () => {
-      mockFetch({ error: 'Unauthorized' }, 401);
+      mockFetch({ error: 'Não autorizado' }, 401);
 
       await expect(fetchQuotes(['HGLG11'])).rejects.toThrow(
         'Brapi API returned status 401',

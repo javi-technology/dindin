@@ -539,7 +539,7 @@ describe('Position CRUD', () => {
         });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Wallet not found' });
+      expect(response.body).toEqual({ error: 'Carteira não encontrada' });
     });
 
     it('deve retornar 400 quando ticker não é informado', async () => {
@@ -848,7 +848,7 @@ describe('Position CRUD', () => {
         .send({ fridgeId: 'fridge-1', targetPrice: 120 });
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Position not found');
+      expect(response.body.error).toContain('Posição não encontrada');
     });
 
     it('deve retornar 404 se geladeira não existe', async () => {
@@ -860,7 +860,7 @@ describe('Position CRUD', () => {
         .send({ fridgeId: 'fridge-inexistente', targetPrice: 120 });
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Fridge not found');
+      expect(response.body.error).toContain('Geladeira não encontrada');
     });
 
     it('deve retornar 400 se fridgeId não informado', async () => {

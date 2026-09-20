@@ -33,7 +33,7 @@ function validateDividendBody(
     if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
       return {
         valid: false,
-        error: 'Ticker is required and must be a non-empty string',
+        error: 'Ticker é obrigatório e deve ser um texto não vazio',
       };
     }
   }
@@ -46,7 +46,7 @@ function validateDividendBody(
     ) {
       return {
         valid: false,
-        error: 'Amount per share is required and must be a non-negative number',
+        error: 'Valor por cota é obrigatório e deve ser um número não negativo',
       };
     }
   }
@@ -59,7 +59,7 @@ function validateDividendBody(
     ) {
       return {
         valid: false,
-        error: 'Quantity is required and must be a positive number',
+        error: 'Quantidade é obrigatória e deve ser um número positivo',
       };
     }
   }
@@ -72,7 +72,8 @@ function validateDividendBody(
     ) {
       return {
         valid: false,
-        error: 'Payment date is required and must be in YYYY-MM-DD format',
+        error:
+          'Data de pagamento é obrigatória e deve estar no formato YYYY-MM-DD',
       };
     }
   }
@@ -80,7 +81,7 @@ function validateDividendBody(
   if (assetType !== undefined && !isAssetType(assetType)) {
     return {
       valid: false,
-      error: `Asset type must be one of: ${ASSET_TYPES.join(', ')}`,
+      error: `Tipo de ativo deve ser um de: ${ASSET_TYPES.join(', ')}`,
     };
   }
 
@@ -138,7 +139,7 @@ export const getDividend = asyncHandler(
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 
@@ -154,7 +155,7 @@ export const updateDividend = asyncHandler(
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 
@@ -194,7 +195,7 @@ export const updateDividend = asyncHandler(
           dividendId: id,
           current,
         });
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Erro interno do servidor' });
         return;
       }
 
@@ -251,7 +252,7 @@ export const getMonthlyDividendReport = asyncHandler(
       ) {
         res
           .status(400)
-          .json({ error: 'Year must be an integer between 1900 and 2100' });
+          .json({ error: 'Ano deve ser um inteiro entre 1900 e 2100' });
         return;
       }
       year = parsedYear;
@@ -339,7 +340,7 @@ export const deleteDividend = asyncHandler(
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 

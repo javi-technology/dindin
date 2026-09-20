@@ -85,13 +85,13 @@ describe('Rotas de patrimônio', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: 'Internal server error' });
+    expect(response.body).toEqual({ error: 'Erro interno do servidor' });
   });
 
   it('deve retornar 401 sem token', async () => {
     const response = await request(app).get('/api/patrimony/history');
 
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: 'Unauthorized' });
+    expect(response.body).toEqual({ error: 'Não autorizado' });
   });
 });

@@ -477,7 +477,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      mockFetch({ error: 'Unauthorized' }, 401);
+      mockFetch({ error: 'Não autorizado' }, 401);
 
       const result = await fetchMonthlyDividends([
         { ticker: 'HGLG11', assetType: 'FII' },
@@ -524,7 +524,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      mockFetch({ error: 'Unauthorized' }, 401);
+      mockFetch({ error: 'Não autorizado' }, 401);
 
       const result = await fetchMonthlyDividends([
         { ticker: 'HGLG11', assetType: 'FII' },
