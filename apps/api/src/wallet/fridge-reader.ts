@@ -21,25 +21,28 @@ export async function getAllUserFridgeItemsWithFridge(
   userId: string,
 ): Promise<FridgeItemWithFridge[]> {
   const fridgesSnapshot = await fridgesCollection(userId).get();
-  const items: FridgeItemWithFridge[] = [];
 
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const fridgeName = (fridgeDoc.data() as { name?: string }).name ?? '';
-    const itemsSnapshot = await fridgeItemsCollection(
-      userId,
-      fridgeDoc.id,
-    ).get();
+  // Uma leitura por geladeira, em paralelo (issue #301). Em série a latência
+  // crescia com o número de geladeiras, e o job de preço-alvo paga esse custo
+  // uma vez por usuário, dentro do timeout da Function. As posições já eram
+  // lidas assim em `position-reader`.
+  const itemsByFridge = await Promise.all(
+    fridgesSnapshot.docs.map(async (fridgeDoc) => {
+      const fridgeName = (fridgeDoc.data() as { name?: string }).name ?? '';
+      const itemsSnapshot = await fridgeItemsCollection(
+        userId,
+        fridgeDoc.id,
+      ).get();
 
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({
+      return itemsSnapshot.docs.map((itemDoc) => ({
         item: { id: itemDoc.id, ...itemDoc.data() } as FridgeItem,
         fridgeId: fridgeDoc.id,
         fridgeName,
-      });
-    }
-  }
+      }));
+    }),
+  );
 
-  return items;
+  return itemsByFridge.flat();
 }
 
 export async function getAllUserFridgeItems(
