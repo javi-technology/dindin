@@ -84,6 +84,41 @@ describe('wallet/fridge-reader', () => {
     ]);
   });
 
+  // Com uma leitura por geladeira em série, a latência cresce linearmente
+  // com o número de geladeiras do usuário — e o job de preço-alvo paga isso
+  // por usuário, dentro do timeout da Function (issue #301).
+  it('deve ler os itens de todas as geladeiras em paralelo', async () => {
+    const order: string[] = [];
+    fridgesCollectionMock.mockReturnValue({
+      get: jest.fn().mockResolvedValue(
+        snapshot([
+          { id: 'fridge-1', data: {} },
+          { id: 'fridge-2', data: {} },
+        ]),
+      ),
+    });
+    fridgeItemsCollectionMock.mockImplementation(
+      (_userId: string, fridgeId: string) => ({
+        get: jest.fn(async () => {
+          order.push(`início:${fridgeId}`);
+          await new Promise((resolve) => setImmediate(resolve));
+          order.push(`fim:${fridgeId}`);
+          return snapshot([]);
+        }),
+      }),
+    );
+
+    await getAllUserFridgeItems('user-123');
+
+    // Em série a ordem seria início:1, fim:1, início:2, fim:2.
+    expect(order).toEqual([
+      'início:fridge-1',
+      'início:fridge-2',
+      'fim:fridge-1',
+      'fim:fridge-2',
+    ]);
+  });
+
   // O e-mail de alerta usa o nome; geladeira antiga pode não ter o campo.
   it('deve usar nome vazio quando a geladeira não tem nome', async () => {
     setupFridges([{ id: 'fridge-1' }], {
