@@ -5,6 +5,7 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import {
+  getQuotesByTicker,
   loadAllQuotePrices,
   quotePricesFromDocs,
 } from '../../src/quotes/quote-prices';
@@ -93,6 +94,68 @@ describe('quotes/quote-prices', () => {
       const prices = await loadAllQuotePrices({ positiveOnly: true });
 
       expect(prices.size).toBe(0);
+    });
+  });
+
+  // Nas rotas HTTP o custo precisa acompanhar a carteira do usuário, não o
+  // tamanho do catálogo: varrer `quotes` cobrava N leituras por requisição,
+  // com N = total de ativos (issue #299).
+  describe('getQuotesByTicker', () => {
+    function firestoreWithGetAll(quotes: Record<string, unknown>) {
+      const getAll = jest.fn(async (...refs: { id: string }[]) =>
+        refs.map((ref) => ({
+          id: ref.id,
+          exists: quotes[ref.id] !== undefined,
+          data: () => quotes[ref.id],
+        })),
+      );
+      getFirestoreMock.mockReturnValue({
+        collection: jest.fn(() => ({ doc: (id: string) => ({ id }) })),
+        getAll,
+      });
+      return getAll;
+    }
+
+    it('deve buscar só os tickers pedidos', async () => {
+      const getAll = firestoreWithGetAll({
+        HGLG11: { price: 112.5, monthlyDividend: 1.1 },
+      });
+
+      const quotes = await getQuotesByTicker(['HGLG11']);
+
+      expect(getAll).toHaveBeenCalledTimes(1);
+      expect(quotes.get('HGLG11')).toEqual({
+        price: 112.5,
+        monthlyDividend: 1.1,
+      });
+    });
+
+    it('deve normalizar e deduplicar os tickers', async () => {
+      const getAll = firestoreWithGetAll({ HGLG11: { price: 10 } });
+
+      const quotes = await getQuotesByTicker(['hglg11', 'HGLG11', ' hglg11 ']);
+
+      expect(getAll).toHaveBeenCalledTimes(1);
+      expect(getAll.mock.calls[0]).toHaveLength(1);
+      expect(quotes.get('HGLG11')).toEqual({ price: 10 });
+    });
+
+    it('deve ignorar ticker sem cotação', async () => {
+      firestoreWithGetAll({});
+
+      const quotes = await getQuotesByTicker(['HGLG11']);
+
+      expect(quotes.size).toBe(0);
+    });
+
+    // `getAll` rejeita chamada sem nenhum documento.
+    it('não deve consultar o Firestore sem tickers', async () => {
+      const getAll = firestoreWithGetAll({});
+
+      const quotes = await getQuotesByTicker([]);
+
+      expect(getAll).not.toHaveBeenCalled();
+      expect(quotes.size).toBe(0);
     });
   });
 });
