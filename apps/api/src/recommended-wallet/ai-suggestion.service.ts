@@ -866,6 +866,11 @@ export async function releaseDailySuggestion(
 
   await getFirestore().runTransaction(async (transaction) => {
     const document = await transaction.get(reference);
+
+    // Sem contador não há o que devolver. Criar o documento aqui gravaria um
+    // `{ count: 0 }` sem `expiresAt`, que o TTL nunca apagaria.
+    if (!document.exists) return;
+
     const count = (document.data()?.count as number | undefined) ?? 0;
 
     transaction.set(
@@ -948,7 +953,16 @@ export async function generateSuggestion(
       saved,
     });
   } catch (error) {
-    await releaseDailySuggestion(uid, reservedDay);
+    // A devolução é uma segunda transação no mesmo documento disputado. Se
+    // ela falhar, quem precisa chegar ao cliente é o erro original — uma
+    // falha aqui vira log, não um 500 genérico por cima do 502 do provedor.
+    await releaseDailySuggestion(uid, reservedDay).catch((releaseError) =>
+      console.error('[generateSuggestion] falha ao devolver a cota', {
+        uid,
+        day: reservedDay,
+        message: (releaseError as Error).message,
+      }),
+    );
     throw error;
   }
 }

@@ -1823,6 +1823,44 @@ describe('ai-suggestion.service', () => {
       expect(store.counts.get('2026-09-17')?.count ?? 0).toBe(0);
     });
 
+    // Um contador criado pela devolução ficaria sem `expiresAt` e o TTL nunca
+    // o apagaria — um documento permanente por usuário e dia.
+    it('não deve criar contador ao devolver cota de um dia sem uso', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.has('2026-09-17')).toBe(false);
+    });
+
+    // A devolução é uma segunda transação no mesmo documento disputado; se
+    // ela falhar, quem precisa chegar ao cliente é a falha do provedor, com
+    // o 502 e a mensagem de tela — não um 500 genérico.
+    it('deve preservar o erro do provedor quando a devolução da cota falha', async () => {
+      process.env.OPENROUTER_API_KEY = 'secret';
+      compareWithWalletMock.mockResolvedValue(comparison);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
+      const store = createUsageFirestore();
+      let calls = 0;
+      store.firestore.runTransaction = jest.fn(async (handler: any) => {
+        calls += 1;
+        if (calls > 1) throw new Error('Firestore unavailable');
+        return handler({
+          get: async () => ({ exists: false, data: () => undefined }),
+          set: jest.fn(),
+        });
+      });
+      firestoreMock = store.firestore;
+
+      await expect(
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        message: 'Falha ao consultar o provedor de IA',
+      });
+    });
+
     it('deve devolver a cota quando o provedor de IA falha', async () => {
       process.env.OPENROUTER_API_KEY = 'secret';
       compareWithWalletMock.mockResolvedValue(comparison);
