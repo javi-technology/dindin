@@ -1,5 +1,6 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import { Asset, AssetType, isAssetType } from 'dindin-models';
+import type { Asset, AssetType } from 'dindin-models';
+import { isAssetType } from './asset-type';
 
 function assetsCollection() {
   return getFirestore().collection('assets');

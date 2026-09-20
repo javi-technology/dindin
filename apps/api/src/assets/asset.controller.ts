@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
-import { Asset, ASSET_TYPES, AssetType, isAssetType } from 'dindin-models';
+import type { Asset, AssetType } from 'dindin-models';
+import { ASSET_TYPES, isAssetType } from './asset-type';
 import { asyncHandler } from '../middleware/async-handler';
 
 function assetsCollection() {

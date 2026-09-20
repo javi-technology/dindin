@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { ASSET_TYPES, FridgeItem, isAssetType, Position } from 'dindin-models';
+import type { FridgeItem, Position } from 'dindin-models';
+import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-history.service';
 import { asyncHandler, notFound } from '../middleware/async-handler';

@@ -1,11 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import {
+import type {
   AiSuggestion,
   AiSuggestionAppliedItem,
   Asset,
-  isAssetType,
   Position,
 } from 'dindin-models';
+import { isAssetType } from '../assets/asset-type';
 import { positionsCollection, walletsCollection } from '../firestore/paths';
 
 export interface AppliedItemInput {

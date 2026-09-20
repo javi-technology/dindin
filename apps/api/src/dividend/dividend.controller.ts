@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { ASSET_TYPES, Dividend, isAssetType } from 'dindin-models';
+import type { Dividend } from 'dindin-models';
+import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import {
   buildMonthlyDividendReport,
   isValidPaymentDate,
