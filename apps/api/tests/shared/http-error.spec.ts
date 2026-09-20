@@ -59,6 +59,18 @@ describe('shared/http-error', () => {
     });
   });
 
+  // Sem `cause`, converter um erro capturado num HttpError joga fora o stack
+  // de quem falhou de verdade — o log do asyncHandler passaria a apontar para
+  // a linha da conversão, não para a validação que disparou (issue #304).
+  it('deve preservar o erro de origem em cause', () => {
+    const origem = new Error('Mês inválido no PDF');
+    const error = HttpError.badRequest(origem.message, { cause: origem });
+
+    expect(error.cause).toBe(origem);
+    expect(error.statusCode).toBe(400);
+    expect(error.message).toBe('Mês inválido no PDF');
+  });
+
   it('deve preservar o stack trace da origem', () => {
     const error = HttpError.notFound('Sugestão não encontrada');
 

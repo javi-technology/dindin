@@ -97,7 +97,7 @@ export const importRecommended = asyncHandler(
       );
     } catch (error) {
       // Falha ao interpretar o PDF enviado é erro do cliente, não interno.
-      throw HttpError.badRequest((error as Error).message);
+      throw HttpError.badRequest((error as Error).message, { cause: error });
     }
 
     const sourceFile = await saveBbPdf(fileName, buffer);

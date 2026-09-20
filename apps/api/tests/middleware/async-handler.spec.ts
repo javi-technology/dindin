@@ -115,6 +115,42 @@ describe('asyncHandler', () => {
     });
   });
 
+  // Um erro convertido em HttpError guarda o original em `cause`. Sem logar
+  // esse stack, o log aponta para a linha da conversão e não para a validação
+  // que falhou de verdade (issue #304).
+  it('deve logar o stack do erro de origem quando há cause', async () => {
+    const origem = new Error('Mês inválido no PDF');
+    const error = Object.assign(new Error('Mês inválido no PDF'), {
+      statusCode: 400,
+      cause: origem,
+    });
+    const handler = jest.fn().mockRejectedValue(error);
+
+    await asyncHandler('importRecommended', handler)(
+      createRequest({ method: 'POST' } as Partial<Request>),
+      createResponse() as unknown as Response,
+    );
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[importRecommended] error:',
+      expect.objectContaining({ causeStack: origem.stack }),
+    );
+  });
+
+  it('não deve incluir causeStack quando o erro não tem cause', async () => {
+    const handler = jest.fn().mockRejectedValue(new Error('Firestore caiu'));
+
+    await asyncHandler('deleteWallet', handler)(
+      createRequest({ method: 'DELETE' } as Partial<Request>),
+      createResponse() as unknown as Response,
+    );
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[deleteWallet] error:',
+      expect.not.objectContaining({ causeStack: expect.anything() }),
+    );
+  });
+
   it('deve logar uid indefinido em rota sem autenticação', async () => {
     const handler = jest.fn().mockRejectedValue(new Error('boom'));
 

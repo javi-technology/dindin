@@ -56,6 +56,11 @@ export function asyncHandler(name: string, handler: RouteHandler) {
     try {
       await handler(req, res);
     } catch (error) {
+      // O `cause` guarda o erro que originou este (ex.: a validação do
+      // parser do PDF convertida em 400). Sem o stack dele, o log aponta
+      // para a linha da conversão, não para a falha real (issue #304).
+      const cause = (error as { cause?: unknown }).cause;
+
       console.error(`[${name}] error:`, {
         method: req.method,
         path: req.path,
@@ -63,6 +68,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
         params: req.params,
         message: (error as Error).message,
         stack: (error as Error).stack,
+        ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
       });
 
       // Um handler pode falhar depois de já ter respondido; um segundo status

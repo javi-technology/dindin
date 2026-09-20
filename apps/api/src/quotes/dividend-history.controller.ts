@@ -85,7 +85,7 @@ export const getDividendHistoryBatch = asyncHandler(
     const months = parseMonths(req.query.months);
     if (months === null) {
       res.status(400).json({
-        error: `Months deve ser um inteiro entre ${MIN_MONTHS} and ${MAX_MONTHS}`,
+        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
       });
       return;
     }
@@ -125,7 +125,7 @@ export const getDividendHistory = asyncHandler(
     const months = parseMonths(req.query.months);
     if (months === null) {
       res.status(400).json({
-        error: `Months deve ser um inteiro entre ${MIN_MONTHS} and ${MAX_MONTHS}`,
+        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
       });
       return;
     }
