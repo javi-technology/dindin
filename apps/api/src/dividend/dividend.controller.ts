@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import type { Dividend } from 'dindin-models';
-import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import {
   buildMonthlyDividendReport,
-  isValidPaymentDate,
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
@@ -22,71 +21,24 @@ import {
 import { uid, dividendsCollection } from '../firestore/paths';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { currentYear, todayAsUtcDate } from '../shared/date';
+import {
+  assetTypeField,
+  nonNegativeNumberField,
+  parseBody,
+  paymentDateField,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 
-function validateDividendBody(
-  body: Partial<Dividend>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, amountPerShare, quantity, paymentDate, assetType } = body;
+const dividendSchema = z.object({
+  ticker: tickerField(),
+  amountPerShare: nonNegativeNumberField('Valor por cota'),
+  quantity: positiveNumberField('Quantidade'),
+  paymentDate: paymentDateField(),
+  assetType: assetTypeField(false).optional(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker é obrigatório e deve ser um texto não vazio',
-      };
-    }
-  }
-
-  if (!allowPartial || amountPerShare !== undefined) {
-    if (
-      typeof amountPerShare !== 'number' ||
-      amountPerShare < 0 ||
-      !Number.isFinite(amountPerShare)
-    ) {
-      return {
-        valid: false,
-        error: 'Valor por cota é obrigatório e deve ser um número não negativo',
-      };
-    }
-  }
-
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantidade é obrigatória e deve ser um número positivo',
-      };
-    }
-  }
-
-  if (!allowPartial || paymentDate !== undefined) {
-    if (
-      !isValidPaymentDate(
-        typeof paymentDate === 'string' ? paymentDate.trim() : paymentDate,
-      )
-    ) {
-      return {
-        valid: false,
-        error:
-          'Data de pagamento é obrigatória e deve estar no formato YYYY-MM-DD',
-      };
-    }
-  }
-
-  if (assetType !== undefined && !isAssetType(assetType)) {
-    return {
-      valid: false,
-      error: `Tipo de ativo deve ser um de: ${ASSET_TYPES.join(', ')}`,
-    };
-  }
-
-  return { valid: true };
-}
+const updateDividendSchema = dividendSchema.partial();
 
 export const listDividends = asyncHandler(
   'listDividends',
@@ -103,22 +55,21 @@ export const listDividends = asyncHandler(
 export const createDividend = asyncHandler(
   'createDividend',
   async (req: Request, res: Response) => {
-    const body = req.body as Partial<Dividend>;
-
-    const validation = validateDividendBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(dividendSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const body = parsed.data;
     const now = new Date().toISOString();
     const dividendData: Omit<Dividend, 'id'> = {
       userId: uid(req),
-      ticker: body.ticker!.trim().toUpperCase(),
-      amountPerShare: body.amountPerShare!,
-      quantity: body.quantity!,
-      totalAmount: body.amountPerShare! * body.quantity!,
-      paymentDate: body.paymentDate!.trim(),
+      ticker: body.ticker,
+      amountPerShare: body.amountPerShare,
+      quantity: body.quantity,
+      totalAmount: body.amountPerShare * body.quantity,
+      paymentDate: body.paymentDate,
       createdAt: now,
       updatedAt: now,
     };
@@ -159,26 +110,25 @@ export const updateDividend = asyncHandler(
       return;
     }
 
-    const body = req.body as Partial<Dividend>;
-    const validation = validateDividendBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updateDividendSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+
+    const body = parsed.data;
 
     const current = doc.data() as Dividend;
     const updates: Partial<Dividend> & { updatedAt: string } = {
       updatedAt: new Date().toISOString(),
     };
 
-    if (body.ticker !== undefined)
-      updates.ticker = body.ticker.trim().toUpperCase();
+    if (body.ticker !== undefined) updates.ticker = body.ticker;
     if (body.assetType !== undefined) updates.assetType = body.assetType;
     if (body.amountPerShare !== undefined)
       updates.amountPerShare = body.amountPerShare;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
-    if (body.paymentDate !== undefined)
-      updates.paymentDate = body.paymentDate.trim();
+    if (body.paymentDate !== undefined) updates.paymentDate = body.paymentDate;
 
     if (body.amountPerShare !== undefined || body.quantity !== undefined) {
       const amountPerShare = body.amountPerShare ?? current.amountPerShare;

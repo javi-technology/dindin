@@ -604,7 +604,7 @@ describe('Position CRUD', () => {
         .post('/api/wallets/wallet-1/positions')
         .set('Authorization', authHeader)
         .send({
-          ticker: 'INEXISTENTE11',
+          ticker: 'ZZZZ11',
           quantity: 10,
           averagePrice: 110.5,
           assetType: 'FII',
@@ -728,7 +728,7 @@ describe('Position CRUD', () => {
       const response = await request(app)
         .put('/api/wallets/wallet-1/positions/position-1')
         .set('Authorization', authHeader)
-        .send({ ticker: 'INEXISTENTE11' });
+        .send({ ticker: 'ZZZZ11' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('catálogo');

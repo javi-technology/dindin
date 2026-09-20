@@ -1,5 +1,12 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { Wallet } from 'dindin-models';
+import {
+  currencyField,
+  descriptionField,
+  nameField,
+  parseBody,
+} from '../shared/validation';
 import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { uid, walletsCollection } from '../firestore/paths';
@@ -8,12 +15,13 @@ import { uid, walletsCollection } from '../firestore/paths';
 // projeção de proventos, patrimônio e totais consolidados somam valores sem
 // conversão de câmbio. Aceitar outra moeda gravaria uma carteira que todos os
 // cálculos do app tratariam como se fosse em reais.
-const SUPPORTED_CURRENCY = 'BRL';
+const createWalletSchema = z.object({
+  name: nameField('Nome'),
+  description: descriptionField(),
+  currency: currencyField(),
+});
 
-/** Mensagem de erro de moeda não suportada. */
-function unsupportedCurrencyError(currency: string): string {
-  return `Moeda '${currency}' não é suportada. Valor aceito: ${SUPPORTED_CURRENCY}`;
-}
+const updateWalletSchema = createWalletSchema.partial();
 
 export const listWallets = asyncHandler(
   'listWallets',
@@ -27,18 +35,13 @@ export const listWallets = asyncHandler(
 export const createWallet = asyncHandler(
   'createWallet',
   async (req: Request, res: Response) => {
-    const { name, description, currency } = req.body as Partial<Wallet>;
-
-    if (!name || !currency) {
-      res.status(400).json({ error: 'Nome e moeda são obrigatórios' });
+    const parsed = parseBody(createWalletSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    if (currency !== SUPPORTED_CURRENCY) {
-      res.status(400).json({ error: unsupportedCurrencyError(currency) });
-      return;
-    }
-
+    const { name, description, currency } = parsed.data;
     const now = new Date().toISOString();
     const walletData: Omit<Wallet, 'id'> = {
       ownerId: uid(req),
@@ -80,15 +83,13 @@ export const updateWallet = asyncHandler(
       return;
     }
 
-    const { name, description, currency } = req.body as Partial<
-      Pick<Wallet, 'name' | 'description' | 'currency'>
-    >;
-
-    if (currency !== undefined && currency !== SUPPORTED_CURRENCY) {
-      res.status(400).json({ error: unsupportedCurrencyError(currency) });
+    const parsed = parseBody(updateWalletSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const { name, description, currency } = parsed.data;
     const updates: Partial<Wallet> & { updatedAt: string } = {
       updatedAt: new Date().toISOString(),
     };

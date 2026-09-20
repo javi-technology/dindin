@@ -1,7 +1,13 @@
 import { Request, Response } from 'express';
-import type { Asset, AssetType } from 'dindin-models';
-import { ASSET_TYPES, isAssetType } from './asset-type';
+import type { Asset } from 'dindin-models';
+import { z } from 'zod';
 import { asyncHandler } from '../middleware/async-handler';
+import {
+  MAX_TICKER_LENGTH,
+  assetTypeField,
+  nameField,
+  parseBodyAll,
+} from '../shared/validation';
 import { assetsCollection } from '../firestore/paths';
 
 /**
@@ -28,73 +34,26 @@ export const listAllAssets = asyncHandler(
   },
 );
 
-interface AssetBodyValid {
-  valid: true;
-  data: {
-    ticker?: string;
-    name?: string;
-    assetType?: AssetType;
-    active?: boolean;
-    qualifiedInvestor?: boolean;
-  };
-}
+const assetSchema = z.object({
+  ticker: z
+    .string({ error: 'ticker é obrigatório' })
+    .trim()
+    .min(1, { error: 'ticker é obrigatório' })
+    .max(MAX_TICKER_LENGTH, {
+      error: `ticker deve ter no máximo ${MAX_TICKER_LENGTH} caracteres`,
+    })
+    .regex(/^[A-Za-z0-9]+$/, {
+      error: 'ticker deve conter apenas letras e números',
+    }),
+  name: nameField('name'),
+  assetType: assetTypeField(),
+  active: z.boolean({ error: 'active deve ser booleano' }).optional(),
+  qualifiedInvestor: z
+    .boolean({ error: 'qualifiedInvestor deve ser booleano' })
+    .optional(),
+});
 
-interface AssetBodyInvalid {
-  valid: false;
-  errors: string[];
-}
-
-type AssetBodyValidation = AssetBodyValid | AssetBodyInvalid;
-
-function validateAssetBody(
-  body: Record<string, unknown>,
-  requireIdentity = true,
-): AssetBodyValidation {
-  const errors: string[] = [];
-  const { ticker, name, assetType, active, qualifiedInvestor } = body ?? {};
-
-  if (
-    (requireIdentity || ticker !== undefined) &&
-    (!ticker || typeof ticker !== 'string' || !ticker.trim())
-  ) {
-    errors.push('ticker é obrigatório');
-  } else if (ticker !== undefined && !/^[A-Za-z0-9]+$/.test(ticker.trim())) {
-    errors.push('ticker deve conter apenas letras e números');
-  }
-  if (
-    (requireIdentity || name !== undefined) &&
-    (!name || typeof name !== 'string' || !name.trim())
-  ) {
-    errors.push('name é obrigatório');
-  }
-  if ((requireIdentity || assetType !== undefined) && !isAssetType(assetType)) {
-    errors.push(`assetType deve ser um de: ${ASSET_TYPES.join(', ')}`);
-  }
-  if (active !== undefined && typeof active !== 'boolean') {
-    errors.push('active deve ser booleano');
-  }
-  if (
-    qualifiedInvestor !== undefined &&
-    typeof qualifiedInvestor !== 'boolean'
-  ) {
-    errors.push('qualifiedInvestor deve ser booleano');
-  }
-
-  if (errors.length > 0) {
-    return { valid: false, errors };
-  }
-
-  return {
-    valid: true,
-    data: {
-      ...(ticker === undefined ? {} : { ticker: ticker as string }),
-      ...(name === undefined ? {} : { name: name as string }),
-      ...(assetType === undefined ? {} : { assetType: assetType as AssetType }),
-      active: active as boolean | undefined,
-      qualifiedInvestor: qualifiedInvestor as boolean | undefined,
-    },
-  };
-}
+const updateAssetSchema = assetSchema.partial();
 
 /**
  * Cria um novo ativo no catálogo. Requer usuário autenticado com
@@ -104,16 +63,15 @@ function validateAssetBody(
 export const createAsset = asyncHandler(
   'createAsset',
   async (req: Request, res: Response) => {
-    const validation = validateAssetBody(req.body ?? {});
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.errors.join('; ') });
+    const parsed = parseBodyAll(assetSchema, req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.errors.join('; ') });
       return;
     }
 
-    const { ticker, name, assetType, active, qualifiedInvestor } =
-      validation.data;
+    const { ticker, name, assetType, active, qualifiedInvestor } = parsed.data;
 
-    const normalizedTicker = ticker!.trim().toUpperCase();
+    const normalizedTicker = ticker.toUpperCase();
     const docRef = assetsCollection().doc(normalizedTicker);
     const existing = await docRef.get();
 
@@ -125,8 +83,8 @@ export const createAsset = asyncHandler(
     const now = new Date().toISOString();
     const asset: Asset = {
       ticker: normalizedTicker,
-      name: name!.trim(),
-      assetType: assetType!,
+      name,
+      assetType,
       active: active !== false,
       createdAt: now,
       updatedAt: now,
@@ -151,9 +109,9 @@ export const updateAsset = asyncHandler(
       return;
     }
 
-    const validation = validateAssetBody(req.body ?? {}, false);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.errors.join('; ') });
+    const parsed = parseBodyAll(updateAssetSchema, req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.errors.join('; ') });
       return;
     }
 
@@ -161,17 +119,17 @@ export const updateAsset = asyncHandler(
     const patch: Partial<Asset> = {
       updatedAt: now,
     };
-    if (validation.data.name !== undefined) {
-      patch.name = validation.data.name.trim();
+    if (parsed.data.name !== undefined) {
+      patch.name = parsed.data.name;
     }
-    if (validation.data.assetType !== undefined) {
-      patch.assetType = validation.data.assetType;
+    if (parsed.data.assetType !== undefined) {
+      patch.assetType = parsed.data.assetType;
     }
-    if (validation.data.active !== undefined) {
-      patch.active = validation.data.active;
+    if (parsed.data.active !== undefined) {
+      patch.active = parsed.data.active;
     }
-    if (validation.data.qualifiedInvestor !== undefined) {
-      patch.qualifiedInvestor = validation.data.qualifiedInvestor;
+    if (parsed.data.qualifiedInvestor !== undefined) {
+      patch.qualifiedInvestor = parsed.data.qualifiedInvestor;
     }
 
     await docRef.update(patch);

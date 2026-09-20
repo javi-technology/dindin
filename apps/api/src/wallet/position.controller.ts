@@ -1,12 +1,19 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import type { FridgeItem, Position } from 'dindin-models';
-import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
 import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
+import {
+  assetTypeField,
+  nonNegativeNumberField,
+  parseBody,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 import {
   uid,
   fridgeItemsCollection,
@@ -36,83 +43,19 @@ async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
   }));
 }
 
-function validatePositionBody(
-  body: Partial<Position>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, averagePrice, assetType } = body;
+const positionSchema = z.object({
+  ticker: tickerField(),
+  quantity: positiveNumberField('Quantidade'),
+  averagePrice: nonNegativeNumberField('Preço médio'),
+  assetType: assetTypeField(),
+  inFridge: z.boolean({ error: 'inFridge deve ser booleano' }).optional(),
+  // `null` remove o preço-alvo gravado.
+  targetPrice: nonNegativeNumberField('Preço-alvo').nullish(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker é obrigatório e deve ser um texto não vazio',
-      };
-    }
-  }
-
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantidade é obrigatória e deve ser um número positivo',
-      };
-    }
-  }
-
-  if (!allowPartial || averagePrice !== undefined) {
-    if (
-      typeof averagePrice !== 'number' ||
-      averagePrice < 0 ||
-      !Number.isFinite(averagePrice)
-    ) {
-      return {
-        valid: false,
-        error: 'Preço médio é obrigatório e deve ser um número não negativo',
-      };
-    }
-  }
-
-  if (!allowPartial || assetType !== undefined) {
-    if (!isAssetType(assetType)) {
-      return {
-        valid: false,
-        error: `Tipo de ativo é obrigatório e deve ser um de: ${ASSET_TYPES.join(', ')}`,
-      };
-    }
-  }
-
-  // currentPrice não é mais aceito no cadastro/atualização de posições:
-  // é resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
-  // valor enviado pelo cliente é silenciosamente ignorado por
-  // createPosition/updatePosition, então não é validado aqui.
-
-  if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
-    return {
-      valid: false,
-      error: 'inFridge deve ser booleano',
-    };
-  }
-
-  if (
-    body.targetPrice !== undefined &&
-    body.targetPrice !== null &&
-    (typeof body.targetPrice !== 'number' ||
-      body.targetPrice < 0 ||
-      !Number.isFinite(body.targetPrice))
-  ) {
-    return {
-      valid: false,
-      error: 'Preço-alvo deve ser um número não negativo',
-    };
-  }
-
-  return { valid: true };
-}
+// currentPrice não é aceito no cadastro/atualização: é resolvido a partir de
+// `quotes/{ticker}` na leitura (issue #86). Um valor enviado é ignorado.
+const updatePositionSchema = positionSchema.partial();
 
 export const listPositions = asyncHandler(
   'listPositions',
@@ -131,13 +74,13 @@ export const createPosition = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
     const walletId = req.params.walletId;
-    const body = req.body as Partial<Position>;
-
-    const validation = validatePositionBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(positionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+
+    const body = parsed.data;
 
     // Sem esta checagem a posição nasce órfã sob uma carteira inexistente:
     // a API não a alcança, porque navega a partir das carteiras, mas o
@@ -150,7 +93,7 @@ export const createPosition = asyncHandler(
       return;
     }
 
-    const ticker = body.ticker!.trim().toUpperCase();
+    const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
       res.status(400).json({
         error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -164,15 +107,15 @@ export const createPosition = asyncHandler(
     const positionData: Omit<Position, 'id'> = {
       walletId,
       ticker,
-      assetType: body.assetType!,
-      quantity: body.quantity!,
-      averagePrice: body.averagePrice!,
+      assetType: body.assetType,
+      quantity: body.quantity,
+      averagePrice: body.averagePrice,
       inFridge: body.inFridge ?? false,
       createdAt: now,
       updatedAt: now,
     };
 
-    if (body.targetPrice !== undefined) {
+    if (body.targetPrice !== undefined && body.targetPrice !== null) {
       positionData.targetPrice = body.targetPrice;
     }
 
@@ -212,16 +155,15 @@ export const updatePosition = asyncHandler(
       return;
     }
 
-    const body = req.body as Partial<Position>;
-    const validation = validatePositionBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updatePositionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    let ticker: string | undefined;
-    if (body.ticker !== undefined) {
-      ticker = body.ticker.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
+    if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
         res.status(400).json({
           error: 'Ticker não encontrado no catálogo de ativos suportados',

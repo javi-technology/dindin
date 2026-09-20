@@ -819,7 +819,7 @@ describe('FridgeItem CRUD', () => {
         .post('/api/fridges/fridge-1/items')
         .set('Authorization', authHeader)
         .send({
-          ticker: 'INEXISTENTE11',
+          ticker: 'ZZZZ11',
           quantity: 5,
           transferredPrice: 95.0,
           targetPrice: 110.0,
@@ -1028,7 +1028,7 @@ describe('FridgeItem CRUD', () => {
       const response = await request(app)
         .put('/api/fridges/fridge-1/items/item-1')
         .set('Authorization', authHeader)
-        .send({ ticker: 'INEXISTENTE11' });
+        .send({ ticker: 'ZZZZ11' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('catálogo');

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
@@ -6,6 +7,14 @@ import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
+import {
+  descriptionField,
+  nameField,
+  nonNegativeNumberField,
+  parseBody,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 import {
   uid,
   fridgesCollection,
@@ -51,13 +60,13 @@ export const listFridges = asyncHandler(
 export const createFridge = asyncHandler(
   'createFridge',
   async (req: Request, res: Response) => {
-    const { name, description } = req.body as Partial<Fridge>;
-
-    if (!name) {
-      res.status(400).json({ error: 'Nome é obrigatório' });
+    const parsed = parseBody(fridgeSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const { name, description } = parsed.data;
     const now = new Date().toISOString();
     const fridgeData: Omit<Fridge, 'id'> = {
       ownerId: uid(req),
@@ -99,10 +108,13 @@ export const updateFridge = asyncHandler(
       return;
     }
 
-    const { name, description } = req.body as Partial<
-      Pick<Fridge, 'name' | 'description'>
-    >;
+    const parsed = parseBody(updateFridgeSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
 
+    const { name, description } = parsed.data;
     const updatedAt = new Date().toISOString();
     const updates: Partial<Fridge> & { updatedAt: string } = { updatedAt };
 
@@ -155,68 +167,24 @@ async function validateFridgeExists(
   return true;
 }
 
-function validateItemBody(
-  body: Partial<FridgeItem>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, transferredPrice, targetPrice } = body;
+const fridgeSchema = z.object({
+  name: nameField('Nome'),
+  description: descriptionField(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker é obrigatório e deve ser um texto não vazio',
-      };
-    }
-  }
+const updateFridgeSchema = fridgeSchema.partial();
 
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantidade é obrigatória e deve ser um número positivo',
-      };
-    }
-  }
+const itemSchema = z.object({
+  ticker: tickerField(),
+  quantity: positiveNumberField('Quantidade'),
+  transferredPrice: nonNegativeNumberField('Preço de transferência'),
+  targetPrice: nonNegativeNumberField('Preço-alvo'),
+});
 
-  if (!allowPartial || transferredPrice !== undefined) {
-    if (
-      typeof transferredPrice !== 'number' ||
-      transferredPrice < 0 ||
-      !Number.isFinite(transferredPrice)
-    ) {
-      return {
-        valid: false,
-        error:
-          'Transferred price is required and must be a non-negative number',
-      };
-    }
-  }
-
-  if (!allowPartial || targetPrice !== undefined) {
-    if (
-      typeof targetPrice !== 'number' ||
-      targetPrice < 0 ||
-      !Number.isFinite(targetPrice)
-    ) {
-      return {
-        valid: false,
-        error: 'Preço-alvo é obrigatório e deve ser um número não negativo',
-      };
-    }
-  }
-
-  // currentPrice não é mais aceito no cadastro/atualização de itens: é
-  // resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
-  // valor enviado pelo cliente é silenciosamente ignorado por
-  // createItem/updateItem, então não é validado aqui.
-
-  return { valid: true };
-}
+// currentPrice não é aceito no cadastro/atualização de itens: é resolvido a
+// partir de `quotes/{ticker}` na leitura (issue #86). Um valor enviado pelo
+// cliente é ignorado.
+const updateItemSchema = itemSchema.partial();
 
 export const listItems = asyncHandler(
   'listItems',
@@ -239,17 +207,16 @@ export const createItem = asyncHandler(
   async (req: Request, res: Response) => {
     const { fridgeId } = req.params;
     const userId = uid(req);
-    const body = req.body as Partial<FridgeItem>;
-
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const validation = validateItemBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(itemSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    const ticker = body.ticker!.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
       res.status(400).json({
         error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -263,9 +230,9 @@ export const createItem = asyncHandler(
     const itemData: Omit<FridgeItem, 'id'> = {
       fridgeId,
       ticker,
-      quantity: body.quantity!,
-      transferredPrice: body.transferredPrice!,
-      targetPrice: body.targetPrice!,
+      quantity: body.quantity,
+      transferredPrice: body.transferredPrice,
+      targetPrice: body.targetPrice,
       createdAt: now,
       updatedAt: now,
     };
@@ -312,17 +279,15 @@ export const updateItem = asyncHandler(
       return;
     }
 
-    const body = req.body as Partial<FridgeItem>;
-
-    const validation = validateItemBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updateItemSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    let ticker: string | undefined;
-    if (body.ticker !== undefined) {
-      ticker = body.ticker.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
+    if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
         res.status(400).json({
           error: 'Ticker não encontrado no catálogo de ativos suportados',
