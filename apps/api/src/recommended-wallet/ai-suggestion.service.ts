@@ -9,7 +9,6 @@ import {
 } from 'dindin-models';
 import {
   compareWithWallet,
-  getQuotePrices,
   getRecommendedWallet,
 } from './recommended-wallet.service';
 import { listQualifiedInvestorTickers } from '../assets/asset.service';

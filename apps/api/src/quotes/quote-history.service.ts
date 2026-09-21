@@ -1,4 +1,3 @@
-import { getFirestore } from 'firebase-admin/firestore';
 import { MonthlyDividendHistory, Quote, QuoteHistory } from 'dindin-models';
 import {
   quoteDividendHistoryCollection as dividendHistoryCollection,
