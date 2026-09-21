@@ -199,3 +199,34 @@ describe('unhandledErrorHandler', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Corpo ausente depois do Express 5 (issue #317)
+//
+// O body-parser 2 deixou de fazer `req.body = req.body || {}`. Handlers que
+// desestruturam `req.body` direto passam a lançar TypeError em requisição sem
+// corpo (ou com Content-Type que não seja JSON) e respondem 500, no lugar do
+// 400 que a validação logo abaixo produziria.
+// ---------------------------------------------------------------------------
+
+describe('requisição sem corpo', () => {
+  const authHeader = 'Bearer valid-token';
+
+  beforeEach(() => {
+    verifyIdTokenMock.mockReset();
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123', admin: true });
+  });
+
+  it.each([
+    ['/api/wallets/wallet-1/positions/position-1/move-to-fridge'],
+    ['/api/fridges/fridge-1/items/item-1/unfreeze'],
+    ['/api/admin/recommended-wallets/bb-fii/import'],
+    ['/api/recommended-wallets/bb-fii/suggestions'],
+  ])('deve responder 400 em POST %s sem corpo', async (path) => {
+    const response = await request(app)
+      .post(path)
+      .set('Authorization', authHeader);
+
+    expect(response.status).toBe(400);
+  });
+});

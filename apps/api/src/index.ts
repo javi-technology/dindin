@@ -183,6 +183,21 @@ app.use(
 
 app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 
+/**
+ * Corpo ausente vira objeto vazio (issue #317).
+ *
+ * O body-parser 2, que vem com o Express 5, deixou de fazer
+ * `req.body = req.body || {}`. Sem isso, requisição sem corpo — ou com
+ * Content-Type que não seja JSON — chega aos handlers com `req.body`
+ * indefinido, e quem desestrutura direto lança TypeError: o cliente recebe
+ * 500 no lugar do 400 da validação. Normalizar aqui vale para toda rota, em
+ * vez de espalhar `?? {}` por cada handler.
+ */
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
+
 app.get('/api/me', async (req: AuthRequest, res: Response) => {
   const user = req.user!;
   const isAdmin = user.admin === true;
