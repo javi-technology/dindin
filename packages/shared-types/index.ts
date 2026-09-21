@@ -268,3 +268,24 @@ export interface DividendHistoryResponse {
 export interface DividendHistoryBatchResponse {
   byTicker: Record<string, DividendHistoryEntry[]>;
 }
+
+/** Valor consolidado de um ticker, para a composição da carteira. */
+export interface TickerValue {
+  ticker: string;
+  value: number;
+}
+
+/**
+ * Resumo do dashboard (issue #300). Antes a tela montava esses números com
+ * uma requisição por carteira e uma por geladeira, e ainda reaplicava regra
+ * de negócio no cliente.
+ */
+export interface DashboardSummaryResponse {
+  totalWallet: number;
+  totalFridge: number;
+  total: number;
+  /** Renda mensal projetada, já com a geladeira contada uma única vez. */
+  monthlyIncomeTotal: number;
+  /** Composição consolidada por ticker, em ordem decrescente de valor. */
+  composition: TickerValue[];
+}
