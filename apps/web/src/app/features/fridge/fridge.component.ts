@@ -1,15 +1,9 @@
-import {
-  Component,
-  DestroyRef,
-  HostListener,
-  OnInit,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, Subject, catchError, switchMap, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ModalComponent } from '../../shared/components/modal/modal.component';
 import {
   FormBuilder,
   FormGroup,
@@ -46,6 +40,7 @@ import {
     LucideTrash2,
     LucideFlame,
     ConfirmDialogComponent,
+    ModalComponent,
   ],
   templateUrl: './fridge.component.html',
 })
@@ -404,17 +399,6 @@ export class FridgeComponent implements OnInit {
       maximumFractionDigits: 2,
     });
     return `${formatted}%`;
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscapeKey(): void {
-    if (this.deleteConfirmItem()) {
-      this.cancelDelete();
-    } else if (this.formVisible()) {
-      this.closeForm();
-    } else if (this.unfreezeItemTarget()) {
-      this.cancelUnfreeze();
-    }
   }
 
   formatCurrency = formatCurrency;

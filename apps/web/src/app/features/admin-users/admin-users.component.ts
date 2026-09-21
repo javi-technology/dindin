@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ModalComponent } from '../../shared/components/modal/modal.component';
 import { FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -58,6 +59,7 @@ const GRANT_ERROR_MESSAGES: Record<number, string> = {
     LucideShieldCheck,
     LucideShieldOff,
     ConfirmDialogComponent,
+    ModalComponent,
   ],
   templateUrl: './admin-users.component.html',
 })

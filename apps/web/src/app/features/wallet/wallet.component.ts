@@ -1,7 +1,6 @@
 import {
   Component,
   DestroyRef,
-  HostListener,
   OnInit,
   inject,
   signal,
@@ -20,6 +19,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ModalComponent } from '../../shared/components/modal/modal.component';
 import {
   FormBuilder,
   FormGroup,
@@ -89,6 +89,7 @@ const tickerCollator = new Intl.Collator('pt-BR');
     LucideArrowDown,
     LucideArrowUpDown,
     ConfirmDialogComponent,
+    ModalComponent,
   ],
   templateUrl: './wallet.component.html',
 })
@@ -643,17 +644,6 @@ export class WalletComponent implements OnInit {
           );
         },
       });
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscapeKey(): void {
-    if (this.moveToFridgePosition()) {
-      this.closeMoveToFridge();
-    } else if (this.deleteConfirmPosition()) {
-      this.cancelDelete();
-    } else if (this.formVisible()) {
-      this.closeForm();
-    }
   }
 
   formatCurrency = formatCurrency;

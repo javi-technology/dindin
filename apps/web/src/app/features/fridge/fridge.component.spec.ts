@@ -561,7 +561,9 @@ describe('FridgeComponent', () => {
     fixture.componentInstance.openForm();
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.formVisible()).toBeFalse();
@@ -571,7 +573,9 @@ describe('FridgeComponent', () => {
     fixture.componentInstance.deleteItem(items[0]);
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.deleteConfirmItem()).toBeNull();

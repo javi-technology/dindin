@@ -273,188 +273,177 @@
   </div>
 
   @if (formVisible()) {
-    <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    <app-modal
+      [title]="editingPosition() ? 'Editar posição' : 'Adicionar posição'"
+      testId="position-form"
+      (closed)="closeForm()"
     >
-      <div
-        class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
-        data-testid="position-form"
-      >
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
-          {{ editingPosition() ? 'Editar posição' : 'Adicionar posição' }}
-        </h2>
+      @if (formError()) {
+        <div
+          class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
+          data-testid="form-error"
+        >
+          {{ formError() }}
+        </div>
+      }
 
-        @if (formError()) {
-          <div
-            class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
-            data-testid="form-error"
+      <form [formGroup]="form" (ngSubmit)="savePosition()" class="space-y-4">
+        <div>
+          <label
+            for="ticker"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Ticker</label
           >
-            {{ formError() }}
+          <select
+            id="ticker"
+            formControlName="ticker"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            [class.border-red-500]="
+              form.get('ticker')?.invalid && form.get('ticker')?.touched
+            "
+          >
+            <option value="" disabled>Selecione um ativo</option>
+            @for (asset of assets(); track asset.ticker) {
+              <option [value]="asset.ticker">
+                {{ asset.ticker }} — {{ asset.name }}
+              </option>
+            }
+          </select>
+          @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
+            <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
+          }
+          @if (assetsError()) {
+            <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
+              {{ assetsError() }}
+            </p>
+          }
+        </div>
+
+        <div>
+          <label
+            for="assetType"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Tipo</label
+          >
+          <select
+            id="assetType"
+            formControlName="assetType"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="FII">FII</option>
+            <option value="STOCK">Ação</option>
+            <option value="ETF">ETF</option>
+            <option value="REIT">REIT</option>
+            <option value="OTHER">Outro</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="quantity"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Quantidade</label
+          >
+          <input
+            id="quantity"
+            type="text"
+            inputmode="decimal"
+            placeholder="Ex: 59, +27 ou -10"
+            formControlName="quantity"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            [class.border-red-500]="
+              form.get('quantity')?.invalid && form.get('quantity')?.touched
+            "
+          />
+          @if (form.get('quantity')?.invalid && form.get('quantity')?.touched) {
+            <p class="text-red-600 text-xs mt-1">
+              Informe uma quantidade maior que zero (ex: 59, +27 ou -10).
+            </p>
+          } @else if (quantityPreview(); as preview) {
+            <p
+              class="text-gray-500 text-xs mt-1"
+              data-testid="quantity-preview"
+            >
+              {{ preview }}
+            </p>
+          }
+        </div>
+
+        @if (isAddingQuantity()) {
+          <div>
+            <label
+              for="purchasePrice"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Preço da compra</label
+            >
+            <input
+              id="purchasePrice"
+              type="text"
+              inputmode="decimal"
+              placeholder="Opcional — recalcula o preço médio"
+              formControlName="purchasePrice"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              [class.border-red-500]="form.get('purchasePrice')?.invalid"
+            />
+            @if (form.get('purchasePrice')?.invalid) {
+              <p class="text-red-600 text-xs mt-1">
+                Informe um número válido (ex: 9,45).
+              </p>
+            }
           </div>
         }
 
-        <form [formGroup]="form" (ngSubmit)="savePosition()" class="space-y-4">
-          <div>
-            <label
-              for="ticker"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Ticker</label
-            >
-            <select
-              id="ticker"
-              formControlName="ticker"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
-                form.get('ticker')?.invalid && form.get('ticker')?.touched
-              "
-            >
-              <option value="" disabled>Selecione um ativo</option>
-              @for (asset of assets(); track asset.ticker) {
-                <option [value]="asset.ticker">
-                  {{ asset.ticker }} — {{ asset.name }}
-                </option>
-              }
-            </select>
-            @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
-              <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
-            }
-            @if (assetsError()) {
-              <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
-                {{ assetsError() }}
-              </p>
-            }
-          </div>
-
-          <div>
-            <label
-              for="assetType"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Tipo</label
-            >
-            <select
-              id="assetType"
-              formControlName="assetType"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="FII">FII</option>
-              <option value="STOCK">Ação</option>
-              <option value="ETF">ETF</option>
-              <option value="REIT">REIT</option>
-              <option value="OTHER">Outro</option>
-            </select>
-          </div>
-
-          <div>
-            <label
-              for="quantity"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Quantidade</label
-            >
-            <input
-              id="quantity"
-              type="text"
-              inputmode="decimal"
-              placeholder="Ex: 59, +27 ou -10"
-              formControlName="quantity"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
-                form.get('quantity')?.invalid && form.get('quantity')?.touched
-              "
-            />
-            @if (
-              form.get('quantity')?.invalid && form.get('quantity')?.touched
-            ) {
-              <p class="text-red-600 text-xs mt-1">
-                Informe uma quantidade maior que zero (ex: 59, +27 ou -10).
-              </p>
-            } @else if (quantityPreview(); as preview) {
-              <p
-                class="text-gray-500 text-xs mt-1"
-                data-testid="quantity-preview"
-              >
-                {{ preview }}
-              </p>
-            }
-          </div>
-
-          @if (isAddingQuantity()) {
-            <div>
-              <label
-                for="purchasePrice"
-                class="block text-sm font-medium text-gray-700 mb-1"
-                >Preço da compra</label
-              >
-              <input
-                id="purchasePrice"
-                type="text"
-                inputmode="decimal"
-                placeholder="Opcional — recalcula o preço médio"
-                formControlName="purchasePrice"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                [class.border-red-500]="form.get('purchasePrice')?.invalid"
-              />
-              @if (form.get('purchasePrice')?.invalid) {
-                <p class="text-red-600 text-xs mt-1">
-                  Informe um número válido (ex: 9,45).
-                </p>
-              }
-            </div>
-          }
-
-          <div>
-            <label
-              for="averagePrice"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Preço médio</label
-            >
-            <input
-              id="averagePrice"
-              type="text"
-              inputmode="decimal"
-              formControlName="averagePrice"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
-                form.get('averagePrice')?.invalid &&
-                form.get('averagePrice')?.touched
-              "
-            />
-            @if (
+        <div>
+          <label
+            for="averagePrice"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Preço médio</label
+          >
+          <input
+            id="averagePrice"
+            type="text"
+            inputmode="decimal"
+            formControlName="averagePrice"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            [class.border-red-500]="
               form.get('averagePrice')?.invalid &&
               form.get('averagePrice')?.touched
-            ) {
-              @if (form.get('averagePrice')?.hasError('required')) {
-                <p class="text-red-600 text-xs mt-1">
-                  Preço médio é obrigatório.
-                </p>
-              } @else if (
-                form.get('averagePrice')?.hasError('invalidDecimal')
-              ) {
-                <p class="text-red-600 text-xs mt-1">
-                  Informe um número válido (ex: 110,50).
-                </p>
-              }
+            "
+          />
+          @if (
+            form.get('averagePrice')?.invalid &&
+            form.get('averagePrice')?.touched
+          ) {
+            @if (form.get('averagePrice')?.hasError('required')) {
+              <p class="text-red-600 text-xs mt-1">
+                Preço médio é obrigatório.
+              </p>
+            } @else if (form.get('averagePrice')?.hasError('invalidDecimal')) {
+              <p class="text-red-600 text-xs mt-1">
+                Informe um número válido (ex: 110,50).
+              </p>
             }
-          </div>
+          }
+        </div>
 
-          <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
-              (click)="closeForm()"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-              [disabled]="form.invalid"
-            >
-              Salvar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+            (click)="closeForm()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            [disabled]="form.invalid"
+          >
+            Salvar
+          </button>
+        </div>
+      </form>
+    </app-modal>
   }
 
   @if (deleteConfirmPosition()) {
@@ -472,97 +461,93 @@
   }
 
   @if (moveToFridgePosition()) {
-    <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-      data-testid="mover-confirm-modal"
+    <app-modal
+      title="Mover para geladeira"
+      testId="mover-confirm-modal"
+      (closed)="closeMoveToFridge()"
     >
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-2">
-          Mover para geladeira
-        </h2>
-        <p class="text-gray-600 mb-4">
-          Transferir <strong>{{ moveToFridgePosition()?.ticker }}</strong> da
-          carteira para a geladeira.
-        </p>
+      <p class="text-gray-600 mb-4">
+        Transferir <strong>{{ moveToFridgePosition()?.ticker }}</strong> da
+        carteira para a geladeira.
+      </p>
 
-        @if (moveToFridgeError()) {
-          <div
-            class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
-            data-testid="mover-error"
-          >
-            {{ moveToFridgeError() }}
-          </div>
-        }
-
-        <form
-          [formGroup]="moveToFridgeForm"
-          (ngSubmit)="confirmMoveToFridge()"
-          class="space-y-4"
+      @if (moveToFridgeError()) {
+        <div
+          class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
+          data-testid="mover-error"
         >
-          <div>
-            <label
-              for="mover-fridge-select"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Geladeira de destino</label
-            >
-            <select
-              id="mover-fridge-select"
-              formControlName="fridgeId"
-              data-testid="mover-fridge-select"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-            >
-              @for (fridge of fridges(); track fridge.id) {
-                <option [value]="fridge.id">{{ fridge.name }}</option>
-              }
-            </select>
-          </div>
+          {{ moveToFridgeError() }}
+        </div>
+      }
 
-          <div>
-            <label
-              for="mover-target-price"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Preço-alvo</label
-            >
-            <input
-              id="mover-target-price"
-              type="text"
-              inputmode="decimal"
-              formControlName="targetPrice"
-              data-testid="mover-target-price"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-              [class.border-red-500]="
-                moveToFridgeForm.get('targetPrice')?.invalid &&
-                moveToFridgeForm.get('targetPrice')?.touched
-              "
-            />
-            @if (
+      <form
+        [formGroup]="moveToFridgeForm"
+        (ngSubmit)="confirmMoveToFridge()"
+        class="space-y-4"
+      >
+        <div>
+          <label
+            for="mover-fridge-select"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Geladeira de destino</label
+          >
+          <select
+            id="mover-fridge-select"
+            formControlName="fridgeId"
+            data-testid="mover-fridge-select"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+          >
+            @for (fridge of fridges(); track fridge.id) {
+              <option [value]="fridge.id">{{ fridge.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="mover-target-price"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Preço-alvo</label
+          >
+          <input
+            id="mover-target-price"
+            type="text"
+            inputmode="decimal"
+            formControlName="targetPrice"
+            data-testid="mover-target-price"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+            [class.border-red-500]="
               moveToFridgeForm.get('targetPrice')?.invalid &&
               moveToFridgeForm.get('targetPrice')?.touched
-            ) {
-              <p class="text-red-600 text-xs mt-1">
-                Informe um preço-alvo válido.
-              </p>
-            }
-          </div>
+            "
+          />
+          @if (
+            moveToFridgeForm.get('targetPrice')?.invalid &&
+            moveToFridgeForm.get('targetPrice')?.touched
+          ) {
+            <p class="text-red-600 text-xs mt-1">
+              Informe um preço-alvo válido.
+            </p>
+          }
+        </div>
 
-          <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
-              (click)="closeMoveToFridge()"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50"
-              [disabled]="moveToFridgeForm.invalid"
-            >
-              Mover
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+            (click)="closeMoveToFridge()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50"
+            [disabled]="moveToFridgeForm.invalid"
+          >
+            Mover
+          </button>
+        </div>
+      </form>
+    </app-modal>
   }
 </main>

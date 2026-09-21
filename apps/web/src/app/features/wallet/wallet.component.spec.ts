@@ -828,7 +828,9 @@ describe('WalletComponent', () => {
     fixture.componentInstance.openForm();
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.formVisible()).toBeFalse();
@@ -838,7 +840,9 @@ describe('WalletComponent', () => {
     fixture.componentInstance.deletePosition(positions[0]);
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.deleteConfirmPosition()).toBeNull();
@@ -995,7 +999,9 @@ describe('WalletComponent', () => {
       fixture.componentInstance.openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
-      fixture.componentInstance.onEscapeKey();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
       fixture.detectChanges();
 
       expect(fixture.componentInstance.moveToFridgePosition()).toBeNull();

@@ -81,7 +81,7 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
 
   readonly title = input.required<string>();
   /** Largura máxima da caixa, no vocabulário do Tailwind. */
-  readonly maxWidth = input<'md' | 'lg' | '2xl'>('md');
+  readonly maxWidth = input<'sm' | 'md' | 'lg' | '2xl'>('md');
   /**
    * `data-testid` da caixa. Cada feature mantém o seu, herdado do modal que
    * este componente substituiu, para que os testes de feature continuem
@@ -103,6 +103,8 @@ export class ModalComponent implements AfterViewInit, OnDestroy {
    */
   protected widthClass(): string {
     switch (this.maxWidth()) {
+      case 'sm':
+        return 'max-w-sm';
       case 'lg':
         return 'max-w-lg';
       case '2xl':
