@@ -117,14 +117,6 @@ const app = express();
 // req.ip seria o do proxy e o rate limit trataria todos como um único cliente.
 app.set('trust proxy', true);
 
-// Webhook da Stripe precisa do body cru (Buffer) para validar a assinatura
-// e não passa pelo authMiddleware — registrar antes do express.json.
-app.post(
-  '/api/billing/webhook',
-  express.raw({ type: 'application/json' }),
-  handleWebhook,
-);
-
 /**
  * Log de requisições para diagnóstico em produção.
  *
@@ -132,6 +124,10 @@ app.post(
  * também as respostas sem corpo — os 204 de toda exclusão e os 401 do
  * authMiddleware —, que são justamente as procuradas ao investigar "sumiu a
  * posição" ou "não consigo entrar".
+ *
+ * Fica acima de tudo, inclusive do webhook da Stripe: registrado depois, o
+ * webhook casava primeiro e suas respostas ficavam fora do log — e é nele que
+ * assinatura inválida e evento antigo são descartados.
  */
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
@@ -151,6 +147,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   next();
 });
+
+// Webhook da Stripe precisa do body cru (Buffer) para validar a assinatura
+// e não passa pelo authMiddleware — registrar antes do express.json.
+app.post(
+  '/api/billing/webhook',
+  express.raw({ type: 'application/json' }),
+  handleWebhook,
+);
 
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', project: 'dindin' });

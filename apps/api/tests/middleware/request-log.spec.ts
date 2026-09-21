@@ -114,4 +114,18 @@ describe('log de requisições', () => {
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
+
+  // O webhook é registrado antes do logger para receber o corpo cru; com isso
+  // ficava fora do log — justo a rota onde assinatura inválida e evento
+  // antigo são descartados com 400/500.
+  it('deve registrar a resposta do webhook da Stripe', async () => {
+    await request(app)
+      .post('/api/billing/webhook')
+      .set('Content-Type', 'application/json')
+      .send('{}');
+
+    expect(requestLogs()[0]?.[1]).toEqual(
+      expect.objectContaining({ path: '/api/billing/webhook' }),
+    );
+  });
 });
