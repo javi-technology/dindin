@@ -51,8 +51,9 @@ export function parseBody<T extends z.ZodType>(
 
 /**
  * Como `parseBody`, mas devolve **todas** as mensagens. O catálogo de ativos
- * responde `{ errors: [...] }` e a tela de admin lista os problemas de uma
- * vez, em vez de corrigir um por requisição.
+ * junta as suas num único `{ error: 'a; b' }`, para a tela de admin mostrar
+ * os problemas de uma vez em vez de um por requisição — formato preservado
+ * da validação manual que existia antes.
  */
 export function parseBodyAll<T extends z.ZodType>(
   schema: T,

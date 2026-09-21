@@ -122,23 +122,6 @@ app.post(
   handleWebhook,
 );
 
-// O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
-// de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais,
-// e recebe o limite maior na própria rota (issue #298).
-export const DEFAULT_BODY_LIMIT = '100kb';
-export const PDF_IMPORT_BODY_LIMIT = '10mb';
-
-// O parser da rota de import vem antes do global: quem chega primeiro lê o
-// corpo, e o `express.json` seguinte ignora requisição já parseada. Deixar o
-// limite maior só na definição da rota não adiantaria — o global já teria
-// recusado o corpo com 413 antes de o roteador chegar lá.
-app.use(
-  '/api/admin/recommended-wallets/bb-fii/import',
-  express.json({ limit: PDF_IMPORT_BODY_LIMIT }),
-);
-
-app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
-
 // Middleware de log de requisições para diagnóstico em produção
 app.use((req: Request, _res: Response, next: NextFunction) => {
   const start = Date.now();
@@ -159,7 +142,26 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', project: 'dindin' });
 });
 
+// Autenticação e rate limit **antes** dos parsers: ler o corpo é o passo caro
+// (até 10 MB na rota de import), e quem não está autenticado não deve chegar
+// a pagá-lo (issue #298). O `/api/health` fica acima, aberto.
 app.use('/api/*', apiRateLimiter, authMiddleware);
+
+// O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
+// de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais.
+export const DEFAULT_BODY_LIMIT = '100kb';
+export const PDF_IMPORT_BODY_LIMIT = '10mb';
+
+// O parser do import vem antes do global: quem chega primeiro lê o corpo, e o
+// `express.json` seguinte ignora requisição já parseada. Deixar o limite maior
+// só na definição da rota não adiantaria — o global já teria recusado o corpo
+// com 413 antes de o roteador chegar lá.
+app.use(
+  '/api/admin/recommended-wallets/bb-fii/import',
+  express.json({ limit: PDF_IMPORT_BODY_LIMIT }),
+);
+
+app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 
 app.get('/api/me', async (req: AuthRequest, res: Response) => {
   const user = req.user!;
@@ -303,26 +305,35 @@ app.put(
 // por isso não passam pelo asyncHandler (issue #222): body malformado no
 // express.json/raw, falha do rate limiter e do middleware de log. Os handlers
 // de rota tratam o próprio erro no wrapper e não chegam aqui.
-app.use(
-  (err: Error, req: Request, res: Response, _next: NextFunction): void => {
-    console.error('[unhandledError]', {
-      method: req.method,
-      path: req.path,
-      message: err.message,
-      stack: err.stack,
-    });
+export function unhandledErrorHandler(
+  err: Error,
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): void {
+  console.error('[unhandledError]', {
+    method: req.method,
+    path: req.path,
+    message: err.message,
+    stack: err.stack,
+  });
 
-    // Corpo acima do limite é erro do cliente: responder 500 esconderia a
-    // causa de quem está integrando (issue #298).
-    const status = (err as { status?: number; statusCode?: number }).status;
-    if (status === 413) {
-      res.status(413).json({ error: 'Corpo da requisição muito grande' });
-      return;
-    }
+  // Corpo acima do limite é erro do cliente: responder 500 esconderia a causa
+  // de quem está integrando (issue #298). O body-parser preenche `status`; o
+  // `HttpError` do projeto usa `statusCode`, então os dois são aceitos.
+  const { status, statusCode } = err as {
+    status?: number;
+    statusCode?: number;
+  };
+  if ((status ?? statusCode) === 413) {
+    res.status(413).json({ error: 'Corpo da requisição muito grande' });
+    return;
+  }
 
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  },
-);
+  res.status(500).json({ error: 'Erro interno do servidor' });
+}
+
+app.use(unhandledErrorHandler);
 
 // Os segredos são configurados com:
 //   firebase functions:secrets:set OPENROUTER_API_KEY
