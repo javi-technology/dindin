@@ -1,9 +1,20 @@
 import { Request, Response } from 'express';
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { asyncHandler } from '../../src/middleware/async-handler';
 
 // ---------------------------------------------------------------------------
 // Testes do asyncHandler (issue #222)
-// Substitui o try/catch → console.error → 500 repetido em 55 pontos dos
+// Substitui o try/catch → functionsLogger.error → 500 repetido em 55 pontos dos
 // controllers, unificando o formato do log de erro.
 // ---------------------------------------------------------------------------
 
@@ -48,7 +59,9 @@ describe('asyncHandler', () => {
   let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    errorSpy = jest
+      .spyOn(functionsLogger, 'error')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -105,7 +118,7 @@ describe('asyncHandler', () => {
       createResponse() as unknown as Response,
     );
 
-    expect(errorSpy).toHaveBeenCalledWith('[deleteWallet] error:', {
+    expect(errorSpy).toHaveBeenCalledWith('deleteWallet', {
       method: 'DELETE',
       path: '/api/wallets/wallet-1',
       uid: 'user-123',
@@ -132,7 +145,7 @@ describe('asyncHandler', () => {
     );
 
     expect(errorSpy).toHaveBeenCalledWith(
-      '[importRecommended] error:',
+      'importRecommended',
       expect.objectContaining({ causeStack: origem.stack }),
     );
   });
@@ -146,7 +159,7 @@ describe('asyncHandler', () => {
     );
 
     expect(errorSpy).toHaveBeenCalledWith(
-      '[deleteWallet] error:',
+      'deleteWallet',
       expect.not.objectContaining({ causeStack: expect.anything() }),
     );
   });

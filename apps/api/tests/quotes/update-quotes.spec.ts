@@ -24,6 +24,17 @@ jest.mock('../../src/assets/asset.service', () => ({
   listActiveAssetTickers: mockListActiveAssetTickers,
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { updateAllQuotes } from '../../src/quotes/update-quotes.handler';
 
 describe('UpdateQuotesHandler — updateAllQuotes', () => {
@@ -239,9 +250,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
     it('deve logar e seguir quando o registro de proventos de um ticker falha', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      jest.spyOn(functionsLogger, 'log').mockImplementation(() => {});
       const paidEvents = [{ paymentDate: '2026-07-14', rate: 0.5 }];
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
@@ -265,8 +276,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockRecordPaidDividends).toHaveBeenCalledTimes(2);
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(2);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[updateAllQuotes] Erro ao registrar proventos de HGLG11:',
-        { message: 'falha no registro' },
+        'updateAllQuotes.dividendFailed',
+        { ticker: 'HGLG11', message: 'falha no registro' },
       );
       consoleErrorSpy.mockRestore();
     });
@@ -356,7 +367,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
     it('deve logar os tickers que ficaram sem cotação na Brapi', async () => {
       const consoleWarnSpy = jest
-        .spyOn(console, 'warn')
+        .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
@@ -368,7 +379,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       await updateAllQuotes();
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[updateAllQuotes] Tickers sem cotação na Brapi:',
+        'updateAllQuotes.tickersWithoutQuote',
         { tickers: ['MXRF11'] },
       );
 
@@ -434,7 +445,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
     it('deve logar erro e continuar quando a busca de dividendos falha', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
@@ -449,7 +460,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       await updateAllQuotes();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[updateAllQuotes] error ao buscar dividendos:',
+        'updateAllQuotes.dividendsFailed',
         expect.objectContaining({ message: 'Dividends API error' }),
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
@@ -509,7 +520,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
   describe('erro na Brapi', () => {
     it('deve lançar erro quando a Brapi falha totalmente, para acionar o retry do scheduler', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockListActiveAssetTickers.mockResolvedValue([
         { ticker: 'HGLG11', assetType: 'FII' },
@@ -520,7 +531,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'Nenhuma cotação obtida na Brapi: Brapi API error',
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[updateAllQuotes] Erro ao buscar cotações na Brapi:',
+        'updateAllQuotes.brapiFailed',
         expect.objectContaining({ message: 'Brapi API error' }),
       );
       expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
@@ -530,7 +541,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
 
     it('não deve lançar erro quando a Brapi retorna vazio sem falhar', async () => {
       const consoleWarnSpy = jest
-        .spyOn(console, 'warn')
+        .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
       mockListActiveAssetTickers.mockResolvedValue([
         { ticker: 'HGLG11', assetType: 'FII' },

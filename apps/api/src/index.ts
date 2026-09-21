@@ -19,6 +19,7 @@ import {
   toPublicSubscription,
 } from './billing/entitlement.service';
 import { MeResponse } from 'dindin-shared-types';
+import { logError, logInfo } from './shared/logger';
 import {
   createWallet,
   deleteWallet,
@@ -47,12 +48,14 @@ import {
   updateItem,
   unfreezeItem,
 } from './wallet/fridge.controller';
+import { getDashboardSummary } from './dashboard/dashboard.controller';
 import {
   createDividend,
   deleteDividend,
   getDividend,
   getDividendProjection,
   getDividendYield,
+  getConsolidatedMonthlyIncome,
   getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
@@ -114,6 +117,37 @@ const app = express();
 // req.ip seria o do proxy e o rate limit trataria todos como um único cliente.
 app.set('trust proxy', true);
 
+/**
+ * Log de requisições para diagnóstico em produção.
+ *
+ * Escuta `finish` em vez de embrulhar `res.json` (issue #324): assim entram
+ * também as respostas sem corpo — os 204 de toda exclusão e os 401 do
+ * authMiddleware —, que são justamente as procuradas ao investigar "sumiu a
+ * posição" ou "não consigo entrar".
+ *
+ * Fica acima de tudo, inclusive do webhook da Stripe: registrado depois, o
+ * webhook casava primeiro e suas respostas ficavam fora do log — e é nele que
+ * assinatura inválida e evento antigo são descartados.
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  const { method, path } = req;
+
+  res.on('finish', () => {
+    logInfo('request', {
+      method,
+      path,
+      status: res.statusCode,
+      durationMs: Date.now() - start,
+      ...((req as AuthRequest).user?.uid
+        ? { uid: (req as AuthRequest).user?.uid }
+        : {}),
+    });
+  });
+
+  next();
+});
+
 // Webhook da Stripe precisa do body cru (Buffer) para validar a assinatura
 // e não passa pelo authMiddleware — registrar antes do express.json.
 app.post(
@@ -122,22 +156,6 @@ app.post(
   handleWebhook,
 );
 
-// Middleware de log de requisições para diagnóstico em produção
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  const start = Date.now();
-  const { method, path } = req;
-
-  // Captura o fim da resposta para logar status e duração
-  const originalJson = _res.json.bind(_res);
-  _res.json = function (body: unknown) {
-    const duration = Date.now() - start;
-    console.log(`[${method}] ${path} → ${_res.statusCode} (${duration}ms)`);
-    return originalJson(body);
-  };
-
-  next();
-});
-
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', project: 'dindin' });
 });
@@ -145,7 +163,9 @@ app.get('/api/health', (req: Request, res: Response) => {
 // Autenticação e rate limit **antes** dos parsers: ler o corpo é o passo caro
 // (até 10 MB na rota de import), e quem não está autenticado não deve chegar
 // a pagá-lo (issue #298). O `/api/health` fica acima, aberto.
-app.use('/api/*', apiRateLimiter, authMiddleware);
+// No Express 5 o curinga precisa de nome (`*splat`): `'/api/*'` é recusado
+// pelo path-to-regexp v8 (issue #317).
+app.use('/api/*splat', apiRateLimiter, authMiddleware);
 
 // O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
 // de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais.
@@ -163,6 +183,21 @@ app.use(
 
 app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
 
+/**
+ * Corpo ausente vira objeto vazio (issue #317).
+ *
+ * O body-parser 2, que vem com o Express 5, deixou de fazer
+ * `req.body = req.body || {}`. Sem isso, requisição sem corpo — ou com
+ * Content-Type que não seja JSON — chega aos handlers com `req.body`
+ * indefinido, e quem desestrutura direto lança TypeError: o cliente recebe
+ * 500 no lugar do 400 da validação. Normalizar aqui vale para toda rota, em
+ * vez de espalhar `?? {}` por cada handler.
+ */
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
+
 app.get('/api/me', async (req: AuthRequest, res: Response) => {
   const user = req.user!;
   const isAdmin = user.admin === true;
@@ -179,7 +214,11 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     };
     res.json(body);
   } catch (error) {
-    console.error('[GET /api/me] erro ao carregar assinatura', error);
+    logError('getMe', {
+      uid: user.uid,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -233,6 +272,11 @@ app.post('/api/wallets', createWallet);
 app.get('/api/wallets/:id', getWallet);
 app.put('/api/wallets/:id', updateWallet);
 app.delete('/api/wallets/:id', deleteWallet);
+
+// Agregados de todas as carteiras (issue #300). As rotas por carteira
+// continuam servindo a tela de Carteira, que mostra uma de cada vez.
+app.get('/api/monthly-income', getConsolidatedMonthlyIncome);
+app.get('/api/dashboard/summary', getDashboardSummary);
 
 app.get('/api/wallets/:walletId/dividend-yield', getDividendYield);
 app.get('/api/wallets/:walletId/monthly-income', getMonthlyIncome);
@@ -311,7 +355,7 @@ export function unhandledErrorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  console.error('[unhandledError]', {
+  logError('unhandledError', {
     method: req.method,
     path: req.path,
     message: err.message,

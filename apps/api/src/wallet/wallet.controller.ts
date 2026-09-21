@@ -10,6 +10,7 @@ import {
 import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { uid, walletsCollection } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 // O DinDin é BRL-only por decisão de produto (issue #266, herdada da #105):
 // projeção de proventos, patrimônio e totais consolidados somam valores sem
@@ -60,7 +61,9 @@ export const createWallet = asyncHandler(
 export const getWallet = asyncHandler(
   'getWallet',
   async (req: Request, res: Response) => {
-    const doc = await walletsCollection(uid(req)).doc(req.params.id).get();
+    const doc = await walletsCollection(uid(req))
+      .doc(routeParam(req, 'id'))
+      .get();
 
     if (!doc.exists) {
       res.status(404).json({ error: 'Carteira não encontrada' });
@@ -74,7 +77,7 @@ export const getWallet = asyncHandler(
 export const updateWallet = asyncHandler(
   'updateWallet',
   async (req: Request, res: Response) => {
-    const walletId = req.params.id;
+    const walletId = routeParam(req, 'id');
     const walletRef = walletsCollection(uid(req)).doc(walletId);
     const doc = await walletRef.get();
 
@@ -108,7 +111,7 @@ export const updateWallet = asyncHandler(
 export const deleteWallet = asyncHandler(
   'deleteWallet',
   async (req: Request, res: Response) => {
-    const walletRef = walletsCollection(uid(req)).doc(req.params.id);
+    const walletRef = walletsCollection(uid(req)).doc(routeParam(req, 'id'));
     const doc = await walletRef.get();
 
     if (!doc.exists) {

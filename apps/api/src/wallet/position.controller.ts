@@ -21,6 +21,7 @@ import {
   fridgesCollection,
   walletsCollection,
 } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 /**
  * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
@@ -60,7 +61,7 @@ const updatePositionSchema = positionSchema.partial();
 export const listPositions = asyncHandler(
   'listPositions',
   async (req: Request, res: Response) => {
-    const walletId = req.params.walletId;
+    const walletId = routeParam(req, 'walletId');
     const snapshot = await positionsCollection(uid(req), walletId).get();
     const positions = snapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Position,
@@ -73,7 +74,7 @@ export const createPosition = asyncHandler(
   'createPosition',
   async (req: Request, res: Response) => {
     const userId = uid(req);
-    const walletId = req.params.walletId;
+    const walletId = routeParam(req, 'walletId');
     const parsed = parseBody(positionSchema, req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error });
@@ -129,7 +130,8 @@ export const createPosition = asyncHandler(
 export const getPosition = asyncHandler(
   'getPosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
@@ -146,7 +148,8 @@ export const getPosition = asyncHandler(
 export const updatePosition = asyncHandler(
   'updatePosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
 
@@ -203,7 +206,8 @@ export const updatePosition = asyncHandler(
 export const deletePosition = asyncHandler(
   'deletePosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
 
@@ -221,7 +225,8 @@ export const moveToFridge = asyncHandler(
   'moveToFridge',
   async (req: Request, res: Response) => {
     const userId = uid(req);
-    const { walletId, id: positionId } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const positionId = routeParam(req, 'id');
     const { fridgeId, targetPrice } = req.body as {
       fridgeId?: string;
       targetPrice?: number;

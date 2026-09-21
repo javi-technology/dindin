@@ -4,6 +4,7 @@ import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 import { recordPaidDividends } from '../dividend/dividend-sync-record.service';
 import { today } from '../shared/date';
+import { logError, logInfo, logWarn } from '../shared/logger';
 
 // Processa os tickers com cotação em lotes, para não disparar centenas de
 // escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
@@ -30,10 +31,10 @@ async function recordTickerDividends(
   try {
     await recordPaidDividends(ticker, events, today);
   } catch (error) {
-    console.error(
-      `[updateAllQuotes] Erro ao registrar proventos de ${ticker}:`,
-      { message: (error as Error).message },
-    );
+    logError('updateAllQuotes.dividendFailed', {
+      ticker,
+      message: (error as Error).message,
+    });
   }
 }
 
@@ -52,11 +53,14 @@ async function processTickerQuote(
       dividend?.paymentDate,
       dividend?.annualDividend,
     );
-    console.log(
-      `[updateAllQuotes] ${ticker}: atualizado para R$ ${quote.price} (${QUOTE_SOURCE}).`,
-    );
+    logInfo('updateAllQuotes.tickerUpdated', {
+      ticker,
+      price: quote.price,
+      source: QUOTE_SOURCE,
+    });
   } catch (error) {
-    console.error(`[updateAllQuotes] Erro ao atualizar ${ticker}:`, {
+    logError('updateAllQuotes.tickerFailed', {
+      ticker,
       message: (error as Error).message,
     });
   }
@@ -79,17 +83,13 @@ async function fetchBrapiQuotes(
     quotes = await fetchQuotes(tickerList);
   } catch (error) {
     const brapiError = error as Error;
-    console.error('[updateAllQuotes] Erro ao buscar cotações na Brapi:', {
-      message: brapiError.message,
-    });
+    logError('updateAllQuotes.brapiFailed', { message: brapiError.message });
     throw new Error(`Nenhuma cotação obtida na Brapi: ${brapiError.message}`);
   }
 
   const withoutQuote = tickerList.filter((ticker) => !quotes.has(ticker));
   if (withoutQuote.length > 0) {
-    console.warn('[updateAllQuotes] Tickers sem cotação na Brapi:', {
-      tickers: withoutQuote,
-    });
+    logWarn('updateAllQuotes.tickersWithoutQuote', { tickers: withoutQuote });
   }
 
   return quotes;
@@ -115,13 +115,11 @@ export async function updateAllQuotes(): Promise<void> {
     const assetList = await listActiveAssetTickers();
 
     if (assetList.length === 0) {
-      console.log('[updateAllQuotes] Nenhum ativo ativo no catálogo.');
+      logInfo('updateAllQuotes.emptyCatalog');
       return;
     }
 
-    console.log(
-      `[updateAllQuotes] Buscando cotações para ${assetList.length} ticker(s) do catálogo.`,
-    );
+    logInfo('updateAllQuotes.start', { tickers: assetList.length });
 
     const tickerList = assetList.map((asset) => asset.ticker);
     const quotes = await fetchBrapiQuotes(tickerList);
@@ -130,7 +128,7 @@ export async function updateAllQuotes(): Promise<void> {
     try {
       dividends = await fetchMonthlyDividends(assetList);
     } catch (error) {
-      console.error('[updateAllQuotes] error ao buscar dividendos:', {
+      logError('updateAllQuotes.dividendsFailed', {
         message: (error as Error).message,
       });
       dividends = new Map();
@@ -147,11 +145,12 @@ export async function updateAllQuotes(): Promise<void> {
       );
     }
 
-    console.log(
-      `[updateAllQuotes] Concluído. ${quotes.size} de ${assetList.length} ticker(s) do catálogo atualizado(s) via Brapi.`,
-    );
+    logInfo('updateAllQuotes.done', {
+      updated: quotes.size,
+      tickers: assetList.length,
+    });
   } catch (error) {
-    console.error('[updateAllQuotes] error:', {
+    logError('updateAllQuotes.failed', {
       message: (error as Error).message,
     });
     throw error;

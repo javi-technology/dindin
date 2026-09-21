@@ -22,6 +22,7 @@ import { getQuotesByTicker } from '../quotes/quote-prices';
 import { validPrice } from '../shared/numbers';
 import { today } from '../shared/date';
 import { HttpError } from '../shared/http-error';
+import { logError, logWarn } from '../shared/logger';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -423,12 +424,9 @@ export function parseSuggestionOutput(
       ) {
         const { suggestedAmount: _suggestedAmount, ...itemWithoutAmount } =
           normalizedItem;
-        console.warn(
-          '[parseSuggestionOutput] compra em item extra convertida',
-          {
-            ticker: item.ticker,
-          },
-        );
+        logWarn('parseSuggestionOutput.extraConverted', {
+          ticker: item.ticker,
+        });
         return { ...itemWithoutAmount, action: 'hold' as const };
       }
       return normalizedItem;
@@ -454,10 +452,7 @@ export function parseSuggestionOutput(
               to: normalizedAmount,
             };
           });
-        console.warn(
-          '[parseSuggestionOutput] compras ajustadas ao total disponível',
-          { amounts },
-        );
+        logWarn('parseSuggestionOutput.amountsAdjusted', { amounts });
         normalizedItems = normalizedItems.map((item) => {
           if (
             item.action !== 'buy' ||
@@ -493,7 +488,7 @@ export function parseSuggestionOutput(
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error('[parseSuggestionOutput] resposta inválida', {
+    logError('parseSuggestionOutput.invalidResponse', {
       reason,
       snippet: raw.slice(0, 500),
     });
@@ -722,11 +717,13 @@ export async function callOpenRouter(
     const body =
       typeof response.text === 'function' ? await response.text() : '';
     const safeBody = body.split(apiKey).join('[redacted]').slice(0, 500);
-    console.error(
-      '[callOpenRouter] OpenRouter respondeu',
-      response.status,
-      safeBody,
-    );
+    // `responseBody`, e não `body`: o logger descarta a chave `body` para não
+    // deixar corpo de requisição vazar no log (issue #324), e aqui o conteúdo
+    // é a resposta do provedor — o dado mais útil para diagnosticar.
+    logError('callOpenRouter.badResponse', {
+      status: response.status,
+      responseBody: safeBody,
+    });
   };
   try {
     let response = await request(requestBody);
@@ -749,10 +746,9 @@ export async function callOpenRouter(
         .choices[0]?.message?.content !== 'string'
     ) {
       const serialized = JSON.stringify(data) ?? String(data);
-      console.error(
-        '[callOpenRouter] resposta inesperada',
-        serialized.slice(0, 500),
-      );
+      logError('callOpenRouter.unexpectedResponse', {
+        snippet: serialized.slice(0, 500),
+      });
       throw HttpError.badGateway('Falha ao consultar o provedor de IA');
     }
     const result = data as {
@@ -768,7 +764,9 @@ export async function callOpenRouter(
     ) {
       throw error;
     }
-    console.error('[callOpenRouter] falha', error);
+    logError('callOpenRouter.failed', {
+      message: (error as Error).message,
+    });
     throw HttpError.badGateway('Falha ao consultar o provedor de IA');
   } finally {
     clearTimeout(timeout);
@@ -924,7 +922,7 @@ export async function generateSuggestion(
     // ela falhar, quem precisa chegar ao cliente é o erro original — uma
     // falha aqui vira log, não um 500 genérico por cima do 502 do provedor.
     await releaseDailySuggestion(uid, reservedDay).catch((releaseError) =>
-      console.error('[generateSuggestion] falha ao devolver a cota', {
+      logError('generateSuggestion.quotaReleaseFailed', {
         uid,
         day: reservedDay,
         message: (releaseError as Error).message,

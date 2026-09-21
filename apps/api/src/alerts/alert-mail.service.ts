@@ -1,6 +1,7 @@
 import { getAuth } from 'firebase-admin/auth';
 import { Alert } from 'dindin-models';
 import { alertsCollection } from '../firestore/paths';
+import { logError, logWarn } from '../shared/logger';
 
 /**
  * Envio de e-mail dos alertas de preço-alvo (issue #265).
@@ -96,7 +97,8 @@ async function userEmail(userId: string): Promise<string | undefined> {
   try {
     return (await getAuth().getUser(userId)).email ?? undefined;
   } catch (error) {
-    console.warn(`[sendAlertEmails] Usuário ${userId} não encontrado no Auth`, {
+    logWarn('sendAlertEmails.userNotFound', {
+      uid: userId,
       message: (error as Error).message,
     });
     return undefined;
@@ -157,17 +159,16 @@ export async function sendAlertEmails(
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error(
-      `[sendAlertEmails] RESEND_API_KEY não configurada: ${pending.length} alerta(s) sem aviso`,
-    );
+    logError('sendAlertEmails.missingApiKey', { pending: pending.length });
     return 0;
   }
 
   const email = await userEmail(userId);
   if (!email) {
-    console.warn(
-      `[sendAlertEmails] Usuário ${userId} sem e-mail: ${pending.length} alerta(s) sem aviso`,
-    );
+    logWarn('sendAlertEmails.missingEmail', {
+      uid: userId,
+      pending: pending.length,
+    });
     return 0;
   }
 
@@ -183,10 +184,11 @@ export async function sendAlertEmails(
       sent += 1;
     } catch (error) {
       // Uma falha de envio não pode impedir o aviso dos demais ativos.
-      console.error(
-        `[sendAlertEmails] Erro ao enviar e-mail de ${alert.ticker} para ${userId}:`,
-        { message: redact((error as Error).message, apiKey) },
-      );
+      logError('sendAlertEmails.sendFailed', {
+        uid: userId,
+        ticker: alert.ticker,
+        message: redact((error as Error).message, apiKey),
+      });
     }
   }
 

@@ -1,16 +1,15 @@
 import { Request, Response } from 'express';
+import type { DividendHistoryEntry } from 'dindin-shared-types';
 import { asyncHandler } from '../middleware/async-handler';
 import { getMonthlyDividendHistory } from './quote-history.service';
+import { routeParam } from '../shared/route-params';
 
 export const MIN_MONTHS = 1;
 export const MAX_MONTHS = 60;
 export const DEFAULT_MONTHS = 12;
 export const MAX_TICKERS = 60;
 
-export interface DividendHistoryEntry {
-  date: string;
-  monthlyDividend: number;
-}
+export type { DividendHistoryEntry };
 
 /** Meses pedidos, ou `null` quando o parâmetro é inválido. */
 function parseMonths(months: unknown): number | null {
@@ -114,7 +113,7 @@ export const getDividendHistoryBatch = asyncHandler(
 export const getDividendHistory = asyncHandler(
   'getDividendHistory',
   async (req: Request, res: Response) => {
-    const ticker = (req.params.ticker ?? '').trim().toUpperCase();
+    const ticker = (routeParam(req, 'ticker') ?? '').trim().toUpperCase();
     if (ticker.length === 0) {
       res
         .status(400)

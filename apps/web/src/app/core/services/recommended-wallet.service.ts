@@ -7,13 +7,10 @@ import {
   RecommendedWallet,
   RecommendedWalletComparison,
 } from 'dindin-models';
+import type { ApplySuggestionItemRequest } from 'dindin-shared-types';
 
-export interface ApplySuggestionItemPayload {
-  ticker: string;
-  fallbackFor?: string;
-  quantity: number;
-  price: number;
-}
+/** Contrato compartilhado com a API (issue #313). */
+export type ApplySuggestionItemPayload = ApplySuggestionItemRequest;
 
 @Injectable({
   providedIn: 'root',

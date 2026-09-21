@@ -1,4 +1,4 @@
-import { MonthlyIncomeItem } from './monthly-income.service';
+import type { MonthlyIncomeItem, ScheduleTotals } from 'dindin-shared-types';
 import { todayAsUtcDate } from '../shared/date';
 
 /**
@@ -14,10 +14,7 @@ export const FREE_TICKER_LIMIT = 3;
 /** Datas de pagamento liberadas na agenda sem o entitlement `projections`. */
 export const FREE_SCHEDULE_DATE_LIMIT = 2;
 
-export interface ScheduleTotals {
-  upcomingTotal: number;
-  paidTotal: number;
-}
+export type { ScheduleTotals };
 
 export interface LimitedMonthlyIncome {
   /** Ativos liberados na projeção por ativo. */

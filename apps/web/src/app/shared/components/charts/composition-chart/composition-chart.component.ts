@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { Position } from 'dindin-models';
+import type { TickerValue } from 'dindin-shared-types';
 import { formatCurrency, formatPercent } from '../../../utils/format.util';
 
 export interface CompositionSlice {
@@ -33,10 +33,14 @@ const INNER_RADIUS = 55;
   templateUrl: './composition-chart.component.html',
 })
 export class CompositionChartComponent {
-  readonly positions = input.required<Position[]>();
+  /**
+   * Valor por ticker, já consolidado pela API (issue #300). Antes o gráfico
+   * recebia as posições e refazia a soma no cliente.
+   */
+  readonly items = input.required<TickerValue[]>();
 
   readonly total = computed(() =>
-    this.positions().reduce((sum, position) => sum + this.value(position), 0),
+    this.items().reduce((sum, item) => sum + Math.max(item.value, 0), 0),
   );
 
   readonly hasData = computed(() => this.total() > 0);
@@ -47,19 +51,10 @@ export class CompositionChartComponent {
       return [];
     }
 
-    const byTicker = new Map<string, number>();
-    for (const position of this.positions()) {
-      const value = this.value(position);
-      if (value <= 0) {
-        continue;
-      }
-      byTicker.set(
-        position.ticker,
-        (byTicker.get(position.ticker) ?? 0) + value,
-      );
-    }
-
-    const sorted = [...byTicker.entries()].sort(([, a], [, b]) => b - a);
+    const sorted = this.items()
+      .filter((item) => item.value > 0)
+      .map((item) => [item.ticker, item.value] as [string, number])
+      .sort(([, a], [, b]) => b - a);
     const entries =
       sorted.length > MAX_SLICES
         ? [
@@ -91,10 +86,6 @@ export class CompositionChartComponent {
 
   readonly formatCurrency = formatCurrency;
   readonly formatPercent = formatPercent;
-
-  private value(position: Position): number {
-    return position.quantity * (position.currentPrice ?? position.averagePrice);
-  }
 
   private arcPath(startAngle: number, endAngle: number, full: boolean): string {
     if (full) {

@@ -2,6 +2,7 @@ import { AssetType } from 'dindin-models';
 import { today as appToday } from '../shared/date';
 import { ActiveAsset } from '../assets/asset.service';
 import { BrapiHttpError, fetchInBatches } from './brapi-batch';
+import { logError, logWarn } from '../shared/logger';
 
 export interface PaidDividendEvent {
   paymentDate: string; // YYYY-MM-DD
@@ -318,7 +319,7 @@ export async function fetchMonthlyDividends(
       (batch) => fetchFiiDividendBatch(batch, today),
       BATCH_ERROR_LOG_MESSAGE,
     ).catch((error) => {
-      console.error('[fetchMonthlyDividends] Erro ao buscar FIIs:', {
+      logError('fetchMonthlyDividends.fiiFailed', {
         message: toError(error).message,
       });
       return new Map<string, DividendInfo>();
@@ -329,7 +330,7 @@ export async function fetchMonthlyDividends(
       (batch) => fetchStocksDividendBatch(batch, today),
       BATCH_ERROR_LOG_MESSAGE,
     ).catch((error) => {
-      console.error('[fetchMonthlyDividends] Erro ao buscar stocks:', {
+      logError('fetchMonthlyDividends.stocksFailed', {
         message: toError(error).message,
       });
       return new Map<string, DividendInfo>();
@@ -346,10 +347,9 @@ export async function fetchMonthlyDividends(
     .filter(([, info]) => !info.paymentDate)
     .map(([ticker]) => ticker);
   if (withoutPaymentDate.length > 0) {
-    console.warn(
-      '[fetchMonthlyDividends] Tickers com provento sem data de pagamento na Brapi:',
-      { tickers: withoutPaymentDate },
-    );
+    logWarn('fetchMonthlyDividends.withoutPaymentDate', {
+      tickers: withoutPaymentDate,
+    });
   }
 
   return merged;

@@ -23,6 +23,17 @@ jest.mock('firebase-admin/firestore', () => ({
   })),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { app, unhandledErrorHandler } from '../../src/index';
 
 // ---------------------------------------------------------------------------
@@ -73,9 +84,10 @@ describe('limite de corpo das requisições', () => {
   // do import, sem passar por autenticação nem rate limit (issue #298). Por
   // isso o teste olha a ordem das camadas, e não só a resposta.
   it('deve autenticar antes de qualquer parser de corpo', () => {
+    // No Express 5 a pilha fica em `app.router`; no 4 era `app._router`.
     const layers: { name: string }[] = (
-      app as unknown as { _router: { stack: { name: string }[] } }
-    )._router.stack;
+      app as unknown as { router: { stack: { name: string }[] } }
+    ).router.stack;
     const names = layers.map((layer) => layer.name);
 
     const auth = names.indexOf('authMiddleware');
@@ -128,7 +140,7 @@ describe('unhandledErrorHandler', () => {
   } as unknown as Parameters<typeof unhandledErrorHandler>[1];
 
   beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -185,5 +197,36 @@ describe('unhandledErrorHandler', () => {
     expect(res.json).toHaveBeenCalledWith({
       error: 'Erro interno do servidor',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corpo ausente depois do Express 5 (issue #317)
+//
+// O body-parser 2 deixou de fazer `req.body = req.body || {}`. Handlers que
+// desestruturam `req.body` direto passam a lançar TypeError em requisição sem
+// corpo (ou com Content-Type que não seja JSON) e respondem 500, no lugar do
+// 400 que a validação logo abaixo produziria.
+// ---------------------------------------------------------------------------
+
+describe('requisição sem corpo', () => {
+  const authHeader = 'Bearer valid-token';
+
+  beforeEach(() => {
+    verifyIdTokenMock.mockReset();
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123', admin: true });
+  });
+
+  it.each([
+    ['/api/wallets/wallet-1/positions/position-1/move-to-fridge'],
+    ['/api/fridges/fridge-1/items/item-1/unfreeze'],
+    ['/api/admin/recommended-wallets/bb-fii/import'],
+    ['/api/recommended-wallets/bb-fii/suggestions'],
+  ])('deve responder 400 em POST %s sem corpo', async (path) => {
+    const response = await request(app)
+      .post(path)
+      .set('Authorization', authHeader);
+
+    expect(response.status).toBe(400);
   });
 });

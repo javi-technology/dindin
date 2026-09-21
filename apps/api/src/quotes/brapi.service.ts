@@ -96,6 +96,6 @@ export async function fetchQuotes(
     tickers,
     getMaxSymbolsPerRequest(),
     fetchQuoteBatch,
-    '[fetchQuotes] Erro ao buscar lote de tickers:',
+    'fetchQuotes.batchFailed',
   );
 }

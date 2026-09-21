@@ -6,13 +6,17 @@ import {
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
-import { computeMonthlyIncome } from './monthly-income.service';
+import {
+  computeConsolidatedMonthlyIncome,
+  computeMonthlyIncome,
+} from './monthly-income.service';
 import {
   computeScheduleTotals,
   limitMonthlyIncome,
 } from './monthly-income-limit.service';
 import { hasEntitlement } from '../billing/entitlement.service';
 import { asyncHandler } from '../middleware/async-handler';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { getAllUserPositions } from '../wallet/position-reader';
 import {
   computeDividendYield,
@@ -29,6 +33,8 @@ import {
   positiveNumberField,
   tickerField,
 } from '../shared/validation';
+import { logError } from '../shared/logger';
+import { routeParam } from '../shared/route-params';
 
 const dividendSchema = z.object({
   ticker: tickerField(),
@@ -86,7 +92,7 @@ export const createDividend = asyncHandler(
 export const getDividend = asyncHandler(
   'getDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
     if (!doc.exists) {
@@ -101,7 +107,7 @@ export const getDividend = asyncHandler(
 export const updateDividend = asyncHandler(
   'updateDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 
@@ -140,10 +146,9 @@ export const updateDividend = asyncHandler(
         typeof quantity !== 'number' ||
         !Number.isFinite(totalAmount)
       ) {
-        console.error('[updateDividend] documento corrompido:', {
+        logError('updateDividend.corruptedDocument', {
           uid: uid(req),
           dividendId: id,
-          current,
         });
         res.status(500).json({ error: 'Erro interno do servidor' });
         return;
@@ -222,11 +227,17 @@ export const getDividendYield = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
     const [positions, dividends] = await Promise.all([
-      getAllUserPositions(userId, req.params.walletId),
+      getAllUserPositions(userId, routeParam(req, 'walletId')),
       readDividends(userId),
     ]);
 
-    res.json(computeDividendYield(positions, dividends));
+    // A cotação atual entra no valor investido; o `currentPrice` gravado na
+    // posição é resíduo da #86 e sai do banco na #326.
+    const priceByTicker = await getQuotePricesByTicker(
+      positions.map((position) => position.ticker),
+    );
+
+    res.json(computeDividendYield(positions, dividends, priceByTicker));
   },
 );
 
@@ -242,7 +253,7 @@ export const getDividendYield = asyncHandler(
 export const getMonthlyIncome = asyncHandler(
   'getMonthlyIncome',
   async (req: Request, res: Response) => {
-    const { walletId } = req.params;
+    const walletId = routeParam(req, 'walletId');
     const userId = uid(req);
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
@@ -282,10 +293,59 @@ export const getMonthlyIncome = asyncHandler(
   },
 );
 
+/**
+ * Renda mensal de **todas** as carteiras (issue #300).
+ *
+ * O recorte gratuito é aplicado aqui, sobre o agregado: por carteira, duas
+ * carteiras mostrariam seis ativos a quem não assina. O front também não
+ * precisa mais adivinhar quanto da geladeira contar.
+ */
+export const getConsolidatedMonthlyIncome = asyncHandler(
+  'getConsolidatedMonthlyIncome',
+  async (req: Request, res: Response) => {
+    const userId = uid(req);
+    const user = (req as AuthRequest).user;
+    const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
+      computeConsolidatedMonthlyIncome(userId),
+      hasEntitlement(userId, 'projections', user?.admin === true),
+    ]);
+
+    const today = todayAsUtcDate();
+    const scheduleTotals = computeScheduleTotals(byTicker, today);
+
+    if (entitled) {
+      res.json({
+        byTicker,
+        total,
+        totalFromFridge,
+        scheduleTotals,
+        limited: false,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        hiddenScheduleTickers: [],
+      });
+      return;
+    }
+
+    const limited = limitMonthlyIncome(byTicker, today);
+    res.json({
+      byTicker: limited.byTicker,
+      scheduleItems: limited.scheduleItems,
+      total,
+      totalFromFridge,
+      scheduleTotals,
+      limited: true,
+      hiddenTickers: limited.hiddenTickers,
+      hiddenPaymentDates: limited.hiddenPaymentDates,
+      hiddenScheduleTickers: limited.hiddenScheduleTickers,
+    });
+  },
+);
+
 export const deleteDividend = asyncHandler(
   'deleteDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 

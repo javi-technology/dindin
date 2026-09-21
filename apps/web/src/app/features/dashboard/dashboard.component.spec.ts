@@ -6,71 +6,29 @@ import {
 } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import {
-  Fridge,
-  FridgeItem,
-  PatrimonySnapshot,
-  Position,
-  Wallet,
-} from 'dindin-models';
+import { PatrimonySnapshot } from 'dindin-models';
+import type { DashboardSummaryResponse } from 'dindin-shared-types';
 import { DashboardComponent } from './dashboard.component';
-import { WalletService } from '../../core/services/wallet.service';
-import { PositionService } from '../../core/services/position.service';
-import { FridgeService } from '../../core/services/fridge.service';
-import { DividendService } from '../../core/services/dividend.service';
+import { DashboardService } from '../../core/services/dashboard.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
 import { PatrimonyService } from '../../core/services/patrimony.service';
 
 describe('DashboardComponent', () => {
   let fixture: ComponentFixture<DashboardComponent>;
-  let walletServiceMock: jasmine.SpyObj<WalletService>;
-  let positionServiceMock: jasmine.SpyObj<PositionService>;
-  let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
-  let dividendServiceMock: jasmine.SpyObj<DividendService>;
+  let dashboardServiceMock: jasmine.SpyObj<DashboardService>;
   let authServiceMock: { isAdmin: jasmine.Spy };
   let healthServiceMock: jasmine.SpyObj<HealthService>;
   let patrimonyServiceMock: jasmine.SpyObj<PatrimonyService>;
 
-  const wallet = (id: string): Wallet => ({
-    id,
-    ownerId: 'user-1',
-    name: `Carteira ${id}`,
-    currency: 'BRL',
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-  });
-
-  const position = (overrides: Partial<Position>): Position => ({
-    id: 'pos-1',
-    walletId: 'wallet-1',
-    ticker: 'HGLG11',
-    assetType: 'FII',
-    quantity: 10,
-    averagePrice: 100,
-    inFridge: false,
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    ...overrides,
-  });
-
-  const fridge = (id: string): Fridge => ({
-    id,
-    ownerId: 'user-1',
-    name: `Geladeira ${id}`,
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-  });
-
-  const fridgeItem = (overrides: Partial<FridgeItem>): FridgeItem => ({
-    id: 'item-1',
-    fridgeId: 'fridge-1',
-    ticker: 'MXRF11',
-    quantity: 100,
-    transferredPrice: 10,
-    targetPrice: 12,
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
+  const summary = (
+    overrides: Partial<DashboardSummaryResponse> = {},
+  ): DashboardSummaryResponse => ({
+    totalWallet: 0,
+    totalFridge: 0,
+    total: 0,
+    monthlyIncomeTotal: 0,
+    composition: [],
     ...overrides,
   });
 
@@ -85,14 +43,8 @@ describe('DashboardComponent', () => {
   });
 
   beforeEach(async () => {
-    walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
-    positionServiceMock = jasmine.createSpyObj('PositionService', ['list']);
-    fridgeServiceMock = jasmine.createSpyObj('FridgeService', [
-      'listFridges',
-      'listItems',
-    ]);
-    dividendServiceMock = jasmine.createSpyObj('DividendService', [
-      'getMonthlyIncome',
+    dashboardServiceMock = jasmine.createSpyObj('DashboardService', [
+      'getSummary',
     ]);
     authServiceMock = { isAdmin: jasmine.createSpy('isAdmin') };
     healthServiceMock = jasmine.createSpyObj('HealthService', ['check']);
@@ -101,13 +53,7 @@ describe('DashboardComponent', () => {
       'getHistory',
     ]);
 
-    walletServiceMock.list.and.returnValue(of([]));
-    positionServiceMock.list.and.returnValue(of([]));
-    fridgeServiceMock.listFridges.and.returnValue(of([]));
-    fridgeServiceMock.listItems.and.returnValue(of([]));
-    dividendServiceMock.getMonthlyIncome.and.returnValue(
-      of({ byTicker: [], total: 0, totalFromFridge: 0 }),
-    );
+    dashboardServiceMock.getSummary.and.returnValue(of(summary()));
     authServiceMock.isAdmin.and.returnValue(Promise.resolve(false));
     healthServiceMock.check.and.returnValue(
       of({ status: 'ok', project: 'dindin' }),
@@ -121,10 +67,7 @@ describe('DashboardComponent', () => {
       imports: [DashboardComponent],
       providers: [
         provideRouter([]),
-        { provide: WalletService, useValue: walletServiceMock },
-        { provide: PositionService, useValue: positionServiceMock },
-        { provide: FridgeService, useValue: fridgeServiceMock },
-        { provide: DividendService, useValue: dividendServiceMock },
+        { provide: DashboardService, useValue: dashboardServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: HealthService, useValue: healthServiceMock },
         { provide: PatrimonyService, useValue: patrimonyServiceMock },
@@ -134,35 +77,55 @@ describe('DashboardComponent', () => {
     fixture = TestBed.createComponent(DashboardComponent);
   });
 
-  it('deve somar o total da carteira usando preço atual quando disponível', () => {
-    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
-    positionServiceMock.list.and.callFake((walletId: string) =>
+  // As somas de patrimônio, geladeira e renda passaram para a API (#300) e
+  // são cobertas em `consolidated-income.spec`. Aqui só resta o consumo.
+  it('deve exibir os totais vindos do resumo', () => {
+    dashboardServiceMock.getSummary.and.returnValue(
       of(
-        walletId === 'w1'
-          ? [position({ quantity: 10, averagePrice: 100, currentPrice: 110 })]
-          : [position({ id: 'pos-2', quantity: 5, averagePrice: 20 })],
+        summary({
+          totalWallet: 1200,
+          totalFridge: 1090,
+          total: 2290,
+          monthlyIncomeTotal: 432.1,
+        }),
       ),
     );
 
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.totalWallet()).toBe(1200);
+    const component = fixture.componentInstance;
+    expect(component.totalWallet()).toBe(1200);
+    expect(component.totalFridge()).toBe(1090);
+    expect(component.totalDividends()).toBe(432.1);
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="card-dividends"]')
+        .textContent,
+    ).toContain('432,10');
   });
 
-  it('deve expor as posições de todas as carteiras para o gráfico de composição', () => {
-    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
-    positionServiceMock.list.and.callFake((walletId: string) =>
+  it('deve carregar o resumo numa única requisição', () => {
+    fixture.detectChanges();
+
+    expect(dashboardServiceMock.getSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('deve repassar a composição ao gráfico', () => {
+    dashboardServiceMock.getSummary.and.returnValue(
       of(
-        walletId === 'w1'
-          ? [position({ ticker: 'HGLG11' })]
-          : [position({ id: 'pos-2', ticker: 'PETR4' })],
+        summary({
+          totalWallet: 1400,
+          composition: [
+            { ticker: 'HGLG11', value: 1100 },
+            { ticker: 'PETR4', value: 300 },
+          ],
+        }),
       ),
     );
 
     fixture.detectChanges();
 
     expect(
-      fixture.componentInstance.positions().map((item) => item.ticker),
+      fixture.componentInstance.composition().map((item) => item.ticker),
     ).toEqual(['HGLG11', 'PETR4']);
     expect(
       fixture.nativeElement.querySelector('app-composition-chart'),
@@ -170,7 +133,7 @@ describe('DashboardComponent', () => {
   });
 
   it('não deve exibir o gráfico de composição quando o resumo falha', () => {
-    walletServiceMock.list.and.returnValue(
+    dashboardServiceMock.getSummary.and.returnValue(
       throwError(() => new Error('falha')),
     );
 
@@ -179,70 +142,6 @@ describe('DashboardComponent', () => {
     expect(
       fixture.nativeElement.querySelector('app-composition-chart'),
     ).toBeFalsy();
-  });
-
-  it('deve somar o total da geladeira usando preço de transferência como fallback', () => {
-    fridgeServiceMock.listFridges.and.returnValue(
-      of([fridge('f1'), fridge('f2')]),
-    );
-    fridgeServiceMock.listItems.and.callFake((fridgeId: string) =>
-      of(
-        fridgeId === 'f1'
-          ? [fridgeItem({ quantity: 100, transferredPrice: 10 })]
-          : [
-              fridgeItem({
-                id: 'item-2',
-                quantity: 10,
-                transferredPrice: 10,
-                currentPrice: 9,
-              }),
-            ],
-      ),
-    );
-
-    fixture.detectChanges();
-
-    expect(fixture.componentInstance.totalFridge()).toBe(1090);
-  });
-
-  it('deve exibir os proventos do mês da mesma fonte da carteira', () => {
-    walletServiceMock.list.and.returnValue(of([wallet('w1')]));
-    dividendServiceMock.getMonthlyIncome.and.returnValue(
-      of({ byTicker: [], total: 432.1, totalFromFridge: 0 }),
-    );
-
-    fixture.detectChanges();
-
-    expect(dividendServiceMock.getMonthlyIncome).toHaveBeenCalledWith('w1');
-    expect(fixture.componentInstance.totalDividends()).toBe(432.1);
-    expect(
-      fixture.nativeElement.querySelector('[data-testid="card-dividends"]')
-        .textContent,
-    ).toContain('432,10');
-  });
-
-  it('deve somar proventos de várias carteiras contando a geladeira uma única vez', () => {
-    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
-    dividendServiceMock.getMonthlyIncome.and.callFake((walletId: string) =>
-      of(
-        walletId === 'w1'
-          ? { byTicker: [], total: 130, totalFromFridge: 30 }
-          : { byTicker: [], total: 80, totalFromFridge: 30 },
-      ),
-    );
-
-    fixture.detectChanges();
-
-    expect(fixture.componentInstance.totalDividends()).toBe(180);
-  });
-
-  it('deve exibir proventos zerados quando não há carteiras', () => {
-    walletServiceMock.list.and.returnValue(of([]));
-
-    fixture.detectChanges();
-
-    expect(dividendServiceMock.getMonthlyIncome).not.toHaveBeenCalled();
-    expect(fixture.componentInstance.totalDividends()).toBe(0);
   });
 
   it('deve exibir os três cards de resumo', () => {
@@ -257,7 +156,7 @@ describe('DashboardComponent', () => {
   });
 
   it('deve exibir mensagem de erro quando falhar ao carregar o resumo', () => {
-    walletServiceMock.list.and.returnValue(
+    dashboardServiceMock.getSummary.and.returnValue(
       throwError(() => new Error('network error')),
     );
 
@@ -272,7 +171,7 @@ describe('DashboardComponent', () => {
   });
 
   it('não deve exibir valores quando o resumo falha', () => {
-    walletServiceMock.list.and.returnValue(
+    dashboardServiceMock.getSummary.and.returnValue(
       throwError(() => new Error('network error')),
     );
 

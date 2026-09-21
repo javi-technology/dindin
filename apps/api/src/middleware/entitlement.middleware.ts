@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { Entitlement } from 'dindin-shared-types';
 import { AuthRequest } from './auth.middleware';
 import { hasEntitlement } from '../billing/entitlement.service';
+import { logError } from '../shared/logger';
 
 /** Exige que o usuário autenticado possua o entitlement informado (403 SUBSCRIPTION_REQUIRED). */
 export function requireEntitlement(entitlement: Entitlement) {
@@ -29,10 +30,10 @@ export function requireEntitlement(entitlement: Entitlement) {
       }
       next();
     } catch (error) {
-      console.error('[requireEntitlement] erro ao verificar assinatura', {
+      logError('requireEntitlement.failed', {
         uid: req.user.uid,
         entitlement,
-        error,
+        message: (error as Error).message,
       });
       res.status(500).json({ error: 'Erro interno do servidor' });
     }

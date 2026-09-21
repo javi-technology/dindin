@@ -1,5 +1,6 @@
 import { bbFileName } from './bb-pdf.parser';
 import { currentMonth } from '../shared/date';
+import { logInfo } from '../shared/logger';
 
 export async function fetchLatestBbPdf(
   month = currentMonth(),
@@ -20,7 +21,7 @@ export async function fetchLatestBbPdf(
     );
     if (response.status === 403) {
       if (!latest) {
-        console.log('[fetchLatestBbPdf] bloqueado pelo BB (403)');
+        logInfo('fetchLatestBbPdf.blocked', { status: 403 });
         return null;
       }
       break;

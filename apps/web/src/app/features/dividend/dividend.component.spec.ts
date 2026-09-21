@@ -37,7 +37,7 @@ describe('DividendComponent', () => {
     TestBed.resetTestingModule();
 
     dividendServiceMock = jasmine.createSpyObj('DividendService', [
-      'getMonthlyIncome',
+      'getConsolidatedMonthlyIncome',
       'getMonthlyReport',
       'getDividendYield',
       'getDividendHistoryBatch',
@@ -45,7 +45,7 @@ describe('DividendComponent', () => {
     walletServiceMock = jasmine.createSpyObj('WalletService', ['list']);
 
     walletServiceMock.list.and.returnValue(of([wallet('w1')]));
-    dividendServiceMock.getMonthlyIncome.and.returnValue(
+    dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
       of({
         byTicker: [
           {
@@ -146,7 +146,7 @@ describe('DividendComponent', () => {
     });
 
     it('deve mostrar o último provento da Brapi como renda do ativo (#290)', async () => {
-      dividendServiceMock.getMonthlyIncome.and.returnValue(
+      dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
         of({
           byTicker: [
             {
@@ -348,11 +348,13 @@ describe('DividendComponent', () => {
     });
   });
 
-  it('deve usar a mesma fonte mensal da carteira ao inicializar', async () => {
+  // A tela passou a pedir a renda consolidada num endpoint só (issue #300).
+  it('deve carregar a renda consolidada ao inicializar', async () => {
     await setup();
 
-    expect(walletServiceMock.list).toHaveBeenCalled();
-    expect(dividendServiceMock.getMonthlyIncome).toHaveBeenCalledWith('w1');
+    expect(
+      dividendServiceMock.getConsolidatedMonthlyIncome,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('deve exibir o total mensal incluindo a geladeira', async () => {
@@ -393,36 +395,21 @@ describe('DividendComponent', () => {
     expect(dates[1].textContent?.trim()).toBe('—');
   });
 
-  it('deve consolidar várias carteiras contando a geladeira uma única vez', async () => {
-    walletServiceMock.list.and.returnValue(of([wallet('w1'), wallet('w2')]));
-    dividendServiceMock.getMonthlyIncome.and.callFake((walletId: string) =>
-      of(
-        walletId === 'w1'
-          ? {
-              byTicker: [
-                {
-                  ticker: 'HGLG11',
-                  quantity: 10,
-                  monthlyDividend: 1,
-                  monthlyIncome: 10,
-                },
-              ],
-              total: 40,
-              totalFromFridge: 30,
-            }
-          : {
-              byTicker: [
-                {
-                  ticker: 'HGLG11',
-                  quantity: 5,
-                  monthlyDividend: 1,
-                  monthlyIncome: 5,
-                },
-              ],
-              total: 35,
-              totalFromFridge: 30,
-            },
-      ),
+  // A consolidação virou responsabilidade da API (#300); aqui basta exibir.
+  it('deve exibir o consolidado que a API devolve', async () => {
+    dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
+      of({
+        byTicker: [
+          {
+            ticker: 'HGLG11',
+            quantity: 15,
+            monthlyDividend: 1,
+            monthlyIncome: 15,
+          },
+        ],
+        total: 45,
+        totalFromFridge: 30,
+      }),
     );
 
     await setup();
@@ -435,17 +422,18 @@ describe('DividendComponent', () => {
     expect(cards[0].textContent).toContain('15');
   });
 
-  it('deve exibir mensagem vazia quando não há carteiras', async () => {
-    walletServiceMock.list.and.returnValue(of([]));
+  it('deve exibir mensagem vazia quando não há ativos', async () => {
+    dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
+      of({ byTicker: [], total: 0, totalFromFridge: 0 }),
+    );
 
     await setup();
 
-    expect(dividendServiceMock.getMonthlyIncome).not.toHaveBeenCalled();
     expect(fixture.componentInstance.total()).toBe(0);
   });
 
   it('deve exibir mensagem de erro quando falha ao carregar proventos', async () => {
-    walletServiceMock.list.and.returnValue(
+    dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
       throwError(() => new Error('Network error')),
     );
 
@@ -729,7 +717,7 @@ describe('DividendComponent', () => {
     const comRecorte = async (
       resposta: Partial<MonthlyIncomeResponse> = {},
     ) => {
-      dividendServiceMock.getMonthlyIncome.and.returnValue(
+      dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
         of({
           byTicker: [
             item('AAAA11', 45, '2026-09-11'),
@@ -842,7 +830,7 @@ describe('DividendComponent', () => {
     });
 
     it('não deve exibir paywall para quem tem a projeção liberada', async () => {
-      dividendServiceMock.getMonthlyIncome.and.returnValue(
+      dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
         of({
           byTicker: [
             item('AAAA11', 45, '2026-09-11'),

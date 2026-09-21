@@ -1,5 +1,6 @@
 import pdfParse from 'pdf-parse';
 import { today } from '../shared/date';
+import { logWarn } from '../shared/logger';
 
 export interface ParsedRow {
   ticker: string;
@@ -147,9 +148,7 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
       text.includes('Fundos Recomendados'),
   );
   if (!ganhoPage) {
-    console.warn(
-      '[parseBbFiiPdf] Página da Carteira Ganho de Capital não encontrada',
-    );
+    logWarn('parseBbFiiPdf.ganhoPageMissing');
   }
 
   return {

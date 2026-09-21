@@ -8,6 +8,7 @@ import { roundCurrency, validPrice, validQuantity } from '../shared/numbers';
 import { today } from '../shared/date';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 import { getAllUserPositions } from '../wallet/position-reader';
+import { logError, logInfo } from '../shared/logger';
 
 const BATCH_SIZE = 10;
 
@@ -101,17 +102,15 @@ export async function saveAllPatrimonySnapshots(): Promise<void> {
         succeeded += 1;
       } else {
         failed += 1;
-        console.error(
-          `[saveAllPatrimonySnapshots] Erro ao salvar ${batch[index].id}:`,
-          { message: (result.reason as Error).message },
-        );
+        logError('saveAllPatrimonySnapshots.userFailed', {
+          uid: batch[index].id,
+          message: (result.reason as Error).message,
+        });
       }
     });
   }
 
-  console.log(
-    `[saveAllPatrimonySnapshots] Concluído. ${succeeded} usuário(s) atualizado(s), ${failed} falha(s).`,
-  );
+  logInfo('saveAllPatrimonySnapshots.done', { succeeded, failed });
 
   if (failed > 0) {
     throw new Error(

@@ -1,3 +1,14 @@
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { fetchQuotes } from '../../src/quotes/brapi.service';
 
 describe('BrapiService — fetchQuotes', () => {
@@ -188,7 +199,7 @@ describe('BrapiService — fetchQuotes', () => {
     it('deve continuar buscando os demais lotes quando um deles falha', async () => {
       process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = '1';
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       const fetchMock = jest.fn().mockImplementation((url: string) => {
         const symbol = new URL(url).searchParams.get('symbols') as string;
@@ -229,7 +240,7 @@ describe('BrapiService — fetchQuotes', () => {
 
     it('deve lançar erro quando todos os lotes falham', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockFetch({}, 400);
 
@@ -255,7 +266,7 @@ describe('BrapiService — fetchQuotes', () => {
 
     it('deve buscar ticker a ticker um lote que falhou, sem perder os tickers válidos', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       const prices: Record<string, number> = { HGLG11: 165.5, KNRI11: 152 };
       const fetchMock = jest.fn().mockImplementation((url: string) => {
@@ -284,7 +295,7 @@ describe('BrapiService — fetchQuotes', () => {
       expect(result.get('KNRI11')?.price).toBe(152);
       expect(result.has('MXRF11')).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[fetchQuotes] Erro ao buscar lote de tickers:',
+        'fetchQuotes.batchFailed',
         expect.objectContaining({ tickers: ['MXRF11'] }),
       );
 
@@ -295,7 +306,7 @@ describe('BrapiService — fetchQuotes', () => {
       'não deve repetir ticker a ticker quando a Brapi responde %s (erro que afeta todas as requisições)',
       async (status) => {
         const consoleErrorSpy = jest
-          .spyOn(console, 'error')
+          .spyOn(functionsLogger, 'error')
           .mockImplementation(() => {});
         mockFetch({}, status);
 
@@ -374,13 +385,13 @@ describe('BrapiService — fetchQuotes', () => {
 
     it('deve lançar erro tratado quando fetch rejeita com um valor que não é Error', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       globalThis.fetch = jest.fn().mockRejectedValue('string de erro qualquer');
 
       await expect(fetchQuotes(['HGLG11'])).rejects.toThrow();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[fetchQuotes] Erro ao buscar lote de tickers:',
+        'fetchQuotes.batchFailed',
         expect.objectContaining({
           tickers: ['HGLG11'],
           message: expect.any(String),

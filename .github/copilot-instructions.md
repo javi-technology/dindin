@@ -281,8 +281,16 @@ Monorepo estruturado da seguinte forma:
 
 ### Logs
 
-- Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).
-- Em produção, considerar logger estruturado.
+- Usar o **logger estruturado** (`apps/api/src/shared/logger.ts`): `logInfo`,
+  `logWarn` e `logError`, com um nome de evento (`'updateAllQuotes.done'`) e
+  campos em objeto. Nada de `console.log`/`console.error` com texto
+  interpolado — o Cloud Logging publica os campos como `jsonPayload`, que é
+  filtrável por rota, status ou uid.
+- **Nunca logar o corpo da requisição**: o logger descarta a chave `body`, e o
+  que trafega nas rotas é dado financeiro do usuário. Método, rota e uid
+  bastam para localizar a falha.
+- Toda resposta é registrada pelo middleware de requisições, inclusive as sem
+  corpo (204, 401).
 
 <!-- rtk-instructions v2 -->
 

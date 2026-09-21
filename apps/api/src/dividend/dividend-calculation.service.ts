@@ -1,4 +1,9 @@
 import { Dividend, Position } from 'dindin-models';
+import type {
+  DividendYieldResponse,
+  TickerDividendYield,
+} from 'dindin-shared-types';
+import { logError } from '../shared/logger';
 
 /**
  * Cálculo de proventos: projeção mensal e dividend yield (issue #225).
@@ -16,21 +21,10 @@ export interface MonthlyDividendProjection {
   monthlyAmount: number;
 }
 
-export interface TickerDividendYield {
-  ticker: string;
-  annualIncome: number;
-  currentValue: number;
-  yield: number;
-}
+export type { TickerDividendYield };
 
-export interface WalletDividendYieldResponse {
-  byTicker: TickerDividendYield[];
-  total: {
-    annualIncome: number;
-    currentValue: number;
-    yield: number;
-  };
-}
+/** Resposta de `GET /api/wallets/:walletId/dividend-yield`. */
+export type WalletDividendYieldResponse = DividendYieldResponse;
 
 /** Meses considerados na anualização da renda de proventos. */
 const MONTHS_PER_YEAR = 12;
@@ -81,16 +75,13 @@ export function latestDividendByTickerMap(
 
   for (const dividend of dividends) {
     if (!isValidDividend(dividend)) {
-      console.error(
-        '[latestDividendByTicker] dividendo mal formado ignorado:',
-        {
-          id: dividend.id,
-          ticker: dividend.ticker,
-          paymentDate: dividend.paymentDate,
-          amountPerShare: dividend.amountPerShare,
-          quantity: dividend.quantity,
-        },
-      );
+      logError('latestDividendByTicker.malformedDividend', {
+        id: dividend.id,
+        ticker: dividend.ticker,
+        paymentDate: dividend.paymentDate,
+        amountPerShare: dividend.amountPerShare,
+        quantity: dividend.quantity,
+      });
       continue;
     }
 
@@ -161,9 +152,19 @@ export function latestDividendByTicker(
  * valor investido o yield é zero, e não `Infinity`: dividir renda por um
  * denominador zerado não é informação, é erro de cálculo exposto na tela.
  */
+/**
+ * Yield anualizado por ticker e total.
+ *
+ * O valor investido usa a **cotação atual** (`priceByTicker`), caindo para o
+ * preço médio quando o ticker não tem cotação. Antes vinha do `currentPrice`
+ * gravado na posição — resíduo da denormalização que a #86 encerrou, e que
+ * ficou congelado no valor do dia em que o job parou de atualizá-lo
+ * (issue #326).
+ */
 export function computeDividendYield(
   positions: Position[],
   dividends: Dividend[],
+  priceByTicker: Map<string, number> = new Map(),
 ): WalletDividendYieldResponse {
   const latestByTicker = latestDividendByTickerMap(dividends);
 
@@ -172,7 +173,10 @@ export function computeDividendYield(
   let totalCurrentValue = 0;
 
   for (const position of positions) {
-    const unitPrice = position.currentPrice ?? position.averagePrice ?? 0;
+    const unitPrice =
+      priceByTicker.get(normalizeTicker(position.ticker)) ??
+      position.averagePrice ??
+      0;
     const quantity = validQuantity(position);
     const currentValue = quantity * unitPrice;
 

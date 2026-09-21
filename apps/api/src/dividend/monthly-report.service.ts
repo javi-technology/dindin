@@ -1,23 +1,11 @@
 import { Dividend } from 'dindin-models';
+import type {
+  MonthlyDividendReport,
+  MonthlyDividendReportMonth,
+  TickerTotal,
+} from 'dindin-shared-types';
 
-export interface TickerTotal {
-  ticker: string;
-  total: number;
-}
-
-export interface MonthlyDividendReportMonth {
-  month: string;
-  total: number;
-  byTicker: TickerTotal[];
-}
-
-export interface MonthlyDividendReport {
-  year: number;
-  months: MonthlyDividendReportMonth[];
-  byTicker: TickerTotal[];
-  total: number;
-  availableYears: number[];
-}
+export type { MonthlyDividendReport, MonthlyDividendReportMonth, TickerTotal };
 
 export const MIN_REPORT_YEAR = 1900;
 export const MAX_REPORT_YEAR = 2100;
