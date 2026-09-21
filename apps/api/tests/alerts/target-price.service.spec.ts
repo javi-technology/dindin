@@ -13,6 +13,17 @@ jest.mock('../../src/alerts/alert-mail.service', () => ({
   sendAlertEmails: jest.fn().mockResolvedValue(0),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { sendAlertEmails } from '../../src/alerts/alert-mail.service';
 import {
   checkAllTargetPrices,
@@ -133,8 +144,8 @@ const item = (overrides: Record<string, unknown> = {}) => ({
 describe('TargetPriceService – detecção do preço-alvo', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -321,8 +332,8 @@ describe('TargetPriceService – detecção do preço-alvo', () => {
 describe('TargetPriceService – casos que duplicariam o aviso', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -422,8 +433,8 @@ describe('TargetPriceService – casos que duplicariam o aviso', () => {
 describe('TargetPriceService – avisos pendentes de execuções anteriores', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -483,8 +494,8 @@ describe('TargetPriceService – avisos pendentes de execuções anteriores', ()
 describe('TargetPriceService – execução do job', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -522,8 +533,8 @@ describe('TargetPriceService – execução do job', () => {
 describe('TargetPriceService – notificação dos alertas criados', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -569,15 +580,15 @@ describe('TargetPriceService – notificação dos alertas criados', () => {
     );
 
     await expect(checkAllTargetPrices()).resolves.toBeUndefined();
-    expect(console.error).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
   });
 });
 
 describe('TargetPriceService – envio dos avisos pelo job', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {

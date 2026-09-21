@@ -1,4 +1,15 @@
 import { fetchMonthlyDividends } from '../../src/quotes/dividend-fetch.service';
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { ActiveAsset } from '../../src/assets/asset.service';
 
 describe('DividendFetchService — fetchMonthlyDividends', () => {
@@ -397,7 +408,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
 
     it('deve buscar ticker a ticker um lote de ações recusado, sem perder as ações válidas', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       const rates: Record<string, number> = { PETR4: 1.25, VALE3: 2.1 };
       const fetchMock = jest.fn().mockImplementation((url: string) => {
@@ -434,7 +445,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
 
     it('deve buscar ticker a ticker um lote de FIIs que falhou', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       const fetchMock = jest.fn().mockImplementation((url: string) => {
         const symbols = new URL(url).searchParams.get('symbols') as string;
@@ -475,7 +486,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
 
     it('não deve repetir ticker a ticker quando a Brapi recusa a autenticação (401)', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockFetch({ error: 'Unauthorized' }, 401);
 
@@ -522,7 +533,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
   describe('falha parcial', () => {
     it('deve logar erro e continuar quando um lote falha', async () => {
       const consoleErrorSpy = jest
-        .spyOn(console, 'error')
+        .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockFetch({ error: 'Unauthorized' }, 401);
 
@@ -584,7 +595,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
   describe('tickers sem data de pagamento', () => {
     it('deve logar os tickers com provento mas sem data de pagamento na Brapi', async () => {
       const consoleWarnSpy = jest
-        .spyOn(console, 'warn')
+        .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
       mockFetch({
         dividends: [
@@ -609,7 +620,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       ]);
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '[fetchMonthlyDividends] Tickers com provento sem data de pagamento na Brapi:',
+        'fetchMonthlyDividends.withoutPaymentDate',
         { tickers: ['XPLG11'] },
       );
       consoleWarnSpy.mockRestore();
@@ -617,7 +628,7 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
 
     it('não deve logar quando todos os proventos têm data de pagamento', async () => {
       const consoleWarnSpy = jest
-        .spyOn(console, 'warn')
+        .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
       mockFetch({
         dividends: [

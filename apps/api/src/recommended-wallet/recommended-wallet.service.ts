@@ -16,6 +16,7 @@ import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
+import { logInfo } from '../shared/logger';
 
 export function recommendedWalletId(month: string): string {
   return `bb-fii_${month}`.toLowerCase();
@@ -52,9 +53,10 @@ export async function buildRecommendedWallet(
     ? (existingDoc.data() as RecommendedWallet)
     : undefined;
   if (existing && existing.revision >= parsedFile.revision) {
-    console.log(
-      `[buildRecommendedWallet] Ignorada ${sourceFile}: revisão ${parsedFile.revision} já processada`,
-    );
+    logInfo('buildRecommendedWallet.skipped', {
+      sourceFile,
+      revision: parsedFile.revision,
+    });
     return { ...existing, id: existing.id ?? id };
   }
 
@@ -99,9 +101,10 @@ export async function persistRecommendedWallet(
       createdAt: existing?.createdAt ?? wallet.createdAt,
     };
     transaction.set(docRef, persisted);
-    console.log(
-      `[persistRecommendedWallet] Importada ${wallet.id} revisão ${wallet.revision}`,
-    );
+    logInfo('persistRecommendedWallet.imported', {
+      walletId: wallet.id,
+      revision: wallet.revision,
+    });
     return persisted;
   });
 }
@@ -110,7 +113,7 @@ export async function importBbWallet(
   buffer: Buffer,
   sourceFile: string,
 ): Promise<RecommendedWallet> {
-  console.log(`[importBbWallet] Iniciando importação: ${sourceFile}`);
+  logInfo('importBbWallet.start', { sourceFile });
   const wallet = await buildRecommendedWallet(buffer, sourceFile);
   return persistRecommendedWallet(wallet);
 }
@@ -248,7 +251,7 @@ export async function compareWithWallet(
 export async function syncBbWallet(): Promise<void> {
   const found = await fetchLatestBbPdf(currentMonth());
   if (!found) {
-    console.log('[syncBbWallet] Nenhum PDF disponível');
+    logInfo('syncBbWallet.noPdf');
     return;
   }
   const sourceFile = `${BB_WALLET_PREFIX}${found.fileName}`;

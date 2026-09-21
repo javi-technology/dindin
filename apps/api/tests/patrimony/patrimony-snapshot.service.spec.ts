@@ -9,6 +9,17 @@ jest.mock('firebase-admin/firestore', () => ({
   getFirestore: jest.fn(() => firestoreMock),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   computeUserPatrimony,
   listPatrimonySnapshots,
@@ -253,8 +264,8 @@ describe('PatrimonySnapshotService', () => {
         throw new Error(`Coleção inesperada: ${name}`);
       }),
     };
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
 
     await expect(saveAllPatrimonySnapshots()).rejects.toThrow(
       '[saveAllPatrimonySnapshots] 1 de 2 snapshot(s) falharam',
@@ -265,7 +276,7 @@ describe('PatrimonySnapshotService', () => {
     expect(set).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1' }),
     );
-    expect(console.error).toHaveBeenCalled();
-    expect(console.log).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
+    expect(functionsLogger.info).toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ import {
   isInForce,
   reserveCheckoutSession,
 } from './checkout-session.service';
+import { logError, logWarn } from '../shared/logger';
 
 function sendAlreadySubscribed(res: Response): void {
   res.status(409).json({
@@ -110,7 +111,7 @@ export async function handleWebhook(
       secret,
     );
   } catch {
-    console.warn('[billing.webhook] assinatura inválida');
+    logWarn('billing.webhook.invalidSignature');
     res.status(400).json({ error: 'Assinatura inválida' });
     return;
   }
@@ -124,7 +125,9 @@ export async function handleWebhook(
       return;
     }
   } catch (error) {
-    console.error('[billing.webhook] erro ao consultar billingEvents', error);
+    logError('billing.webhook.eventLookupFailed', {
+      message: (error as Error).message,
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
@@ -132,7 +135,10 @@ export async function handleWebhook(
   try {
     await processStripeEvent(event);
   } catch (error) {
-    console.error('[billing.webhook]', event.type, (error as Error).message);
+    logError('billing.webhook.processingFailed', {
+      type: event.type,
+      message: (error as Error).message,
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
@@ -147,11 +153,10 @@ export async function handleWebhook(
   } catch (error) {
     // O processamento já ocorreu — falhar aqui faria a Stripe retentar o
     // evento, o que é inócuo, mas respondemos 200 para não gerar ruído.
-    console.error(
-      '[billing.webhook] falha ao registrar evento',
-      event.id,
-      (error as Error).message,
-    );
+    logError('billing.webhook.eventRecordFailed', {
+      eventId: event.id,
+      message: (error as Error).message,
+    });
   }
   res.json({ received: true });
 }

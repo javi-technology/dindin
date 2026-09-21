@@ -32,6 +32,7 @@ import {
   positiveNumberField,
   tickerField,
 } from '../shared/validation';
+import { logError } from '../shared/logger';
 
 const dividendSchema = z.object({
   ticker: tickerField(),
@@ -143,10 +144,9 @@ export const updateDividend = asyncHandler(
         typeof quantity !== 'number' ||
         !Number.isFinite(totalAmount)
       ) {
-        console.error('[updateDividend] documento corrompido:', {
+        logError('updateDividend.corruptedDocument', {
           uid: uid(req),
           dividendId: id,
-          current,
         });
         res.status(500).json({ error: 'Erro interno do servidor' });
         return;

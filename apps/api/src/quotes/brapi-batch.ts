@@ -1,3 +1,4 @@
+import { logError } from '../shared/logger';
 /** Erro HTTP da Brapi, com o status para decidir se vale repetir a consulta. */
 export class BrapiHttpError extends Error {
   constructor(
@@ -48,7 +49,7 @@ export async function fetchInBatches<T>(
       return undefined;
     } catch (error) {
       lastError = toError(error);
-      console.error(errorLogMessage, {
+      logError(errorLogMessage, {
         tickers: batch,
         message: lastError.message,
       });

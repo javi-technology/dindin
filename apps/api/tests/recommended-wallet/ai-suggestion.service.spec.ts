@@ -70,6 +70,17 @@ jest.mock('../../src/dividend/monthly-income.service', () => ({
     computeMonthlyIncomeMock(...args),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   buildSuggestionInput,
   callOpenRouter,
@@ -220,10 +231,10 @@ describe('ai-suggestion.service', () => {
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
     consoleErrorSpy = jest
-      .spyOn(console, 'error')
+      .spyOn(functionsLogger, 'error')
       .mockImplementation(() => undefined);
     consoleWarnSpy = jest
-      .spyOn(console, 'warn')
+      .spyOn(functionsLogger, 'warn')
       .mockImplementation(() => undefined);
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_MODEL;
@@ -872,7 +883,7 @@ describe('ai-suggestion.service', () => {
     ]);
     expect(result.items[0]).not.toHaveProperty('suggestedAmount');
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] compra em item extra convertida',
+      'parseSuggestionOutput.extraConverted',
       { ticker: 'XPML11' },
     );
   });
@@ -912,7 +923,7 @@ describe('ai-suggestion.service', () => {
       ]),
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] compras ajustadas ao total disponível',
+      'parseSuggestionOutput.amountsAdjusted',
       {
         amounts: [
           { ticker: 'HGLG11', from: 70, to: 58.33 },
@@ -1599,7 +1610,7 @@ describe('ai-suggestion.service', () => {
       parseSuggestionOutput('{invalido', new Map([['HGLG11', 'match']])),
     ).toThrow('Resposta inválida da IA');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] resposta inválida',
+      'parseSuggestionOutput.invalidResponse',
       { reason: 'JSON inválido', snippet: '{invalido' },
     );
   });
@@ -1709,11 +1720,10 @@ describe('ai-suggestion.service', () => {
     expect(
       JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body),
     ).not.toHaveProperty('response_format');
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[callOpenRouter] OpenRouter respondeu',
-      400,
-      'response_format não suportado',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('callOpenRouter.badResponse', {
+      status: 400,
+      responseBody: 'response_format não suportado',
+    });
   });
 
   it('deve retornar 502 quando a tentativa e o retry falharem', async () => {
@@ -1736,11 +1746,10 @@ describe('ai-suggestion.service', () => {
       message: 'Falha ao consultar o provedor de IA',
     });
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[callOpenRouter] OpenRouter respondeu',
-      422,
-      'segundo erro',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('callOpenRouter.badResponse', {
+      status: 422,
+      responseBody: 'segundo erro',
+    });
   });
 
   it('deve converter falha do provedor em erro 502', async () => {

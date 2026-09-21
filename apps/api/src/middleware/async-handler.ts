@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from './auth.middleware';
+import { logError } from '../shared/logger';
 
 /** Handler de rota que só cuida do caminho feliz e das respostas de negócio. */
 type RouteHandler = (req: Request, res: Response) => Promise<void> | void;
@@ -61,7 +62,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       // para a linha da conversão, não para a falha real (issue #304).
       const cause = (error as { cause?: unknown }).cause;
 
-      console.error(`[${name}] error:`, {
+      logError(name, {
         method: req.method,
         path: req.path,
         uid: (req as AuthRequest).user?.uid,

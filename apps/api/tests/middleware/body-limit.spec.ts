@@ -23,6 +23,17 @@ jest.mock('firebase-admin/firestore', () => ({
   })),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { app, unhandledErrorHandler } from '../../src/index';
 
 // ---------------------------------------------------------------------------
@@ -128,7 +139,7 @@ describe('unhandledErrorHandler', () => {
   } as unknown as Parameters<typeof unhandledErrorHandler>[1];
 
   beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
   });
 
   afterEach(() => {

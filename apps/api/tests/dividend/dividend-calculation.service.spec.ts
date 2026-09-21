@@ -1,4 +1,15 @@
 import { Dividend, Position } from 'dindin-models';
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   computeDividendYield,
   latestDividendByTicker,
@@ -97,7 +108,7 @@ describe('latestDividendByTickerMap', () => {
 
   it('deve ignorar provento mal formado', () => {
     const errorSpy = jest
-      .spyOn(console, 'error')
+      .spyOn(functionsLogger, 'error')
       .mockImplementation(() => undefined);
 
     const map = latestDividendByTickerMap([

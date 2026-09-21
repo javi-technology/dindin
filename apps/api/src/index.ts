@@ -19,6 +19,7 @@ import {
   toPublicSubscription,
 } from './billing/entitlement.service';
 import { MeResponse } from 'dindin-shared-types';
+import { logError, logInfo } from './shared/logger';
 import {
   createWallet,
   deleteWallet,
@@ -124,18 +125,29 @@ app.post(
   handleWebhook,
 );
 
-// Middleware de log de requisições para diagnóstico em produção
-app.use((req: Request, _res: Response, next: NextFunction) => {
+/**
+ * Log de requisições para diagnóstico em produção.
+ *
+ * Escuta `finish` em vez de embrulhar `res.json` (issue #324): assim entram
+ * também as respostas sem corpo — os 204 de toda exclusão e os 401 do
+ * authMiddleware —, que são justamente as procuradas ao investigar "sumiu a
+ * posição" ou "não consigo entrar".
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   const { method, path } = req;
 
-  // Captura o fim da resposta para logar status e duração
-  const originalJson = _res.json.bind(_res);
-  _res.json = function (body: unknown) {
-    const duration = Date.now() - start;
-    console.log(`[${method}] ${path} → ${_res.statusCode} (${duration}ms)`);
-    return originalJson(body);
-  };
+  res.on('finish', () => {
+    logInfo('request', {
+      method,
+      path,
+      status: res.statusCode,
+      durationMs: Date.now() - start,
+      ...((req as AuthRequest).user?.uid
+        ? { uid: (req as AuthRequest).user?.uid }
+        : {}),
+    });
+  });
 
   next();
 });
@@ -181,7 +193,11 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
     };
     res.json(body);
   } catch (error) {
-    console.error('[GET /api/me] erro ao carregar assinatura', error);
+    logError('getMe', {
+      uid: user.uid,
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -318,7 +334,7 @@ export function unhandledErrorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  console.error('[unhandledError]', {
+  logError('unhandledError', {
     method: req.method,
     path: req.path,
     message: err.message,

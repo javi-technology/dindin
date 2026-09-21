@@ -3,6 +3,7 @@ import type {
   DividendYieldResponse,
   TickerDividendYield,
 } from 'dindin-shared-types';
+import { logError } from '../shared/logger';
 
 /**
  * Cálculo de proventos: projeção mensal e dividend yield (issue #225).
@@ -74,16 +75,13 @@ export function latestDividendByTickerMap(
 
   for (const dividend of dividends) {
     if (!isValidDividend(dividend)) {
-      console.error(
-        '[latestDividendByTicker] dividendo mal formado ignorado:',
-        {
-          id: dividend.id,
-          ticker: dividend.ticker,
-          paymentDate: dividend.paymentDate,
-          amountPerShare: dividend.amountPerShare,
-          quantity: dividend.quantity,
-        },
-      );
+      logError('latestDividendByTicker.malformedDividend', {
+        id: dividend.id,
+        ticker: dividend.ticker,
+        paymentDate: dividend.paymentDate,
+        amountPerShare: dividend.amountPerShare,
+        quantity: dividend.quantity,
+      });
       continue;
     }
 

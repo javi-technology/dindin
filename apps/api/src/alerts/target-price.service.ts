@@ -4,6 +4,7 @@ import { loadAllQuotePrices } from '../quotes/quote-prices';
 import { validPositivePrice } from '../shared/numbers';
 import { getAllUserFridgeItemsWithFridge } from '../wallet/fridge-reader';
 import { sendAlertEmails } from './alert-mail.service';
+import { logError, logInfo } from '../shared/logger';
 
 const BATCH_SIZE = 10;
 
@@ -162,10 +163,10 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
         }
       } else {
         failed += 1;
-        console.error(
-          `[checkAllTargetPrices] Erro ao verificar ${batch[index].id}:`,
-          { message: (result.reason as Error).message },
-        );
+        logError('checkAllTargetPrices.userFailed', {
+          uid: batch[index].id,
+          message: (result.reason as Error).message,
+        });
       }
     });
   }
@@ -178,13 +179,12 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
       notified += await sendAlertEmails(userId, alerts, now);
     } catch (error) {
       failed += 1;
-      console.error(`[checkAllTargetPrices] Erro ao notificar ${userId}:`, {
+      logError('checkAllTargetPrices.notifyFailed', {
+        uid: userId,
         message: (error as Error).message,
       });
     }
   }
 
-  console.log(
-    `[checkAllTargetPrices] Concluído. ${created} alerta(s) criado(s), ${notified} aviso(s) enviado(s), ${failed} falha(s).`,
-  );
+  logInfo('checkAllTargetPrices.done', { created, notified, failed });
 }
