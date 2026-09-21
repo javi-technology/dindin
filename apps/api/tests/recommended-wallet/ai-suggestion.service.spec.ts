@@ -1927,6 +1927,87 @@ describe('ai-suggestion.service', () => {
     expect(store.counts.get(today())?.count).toBe(5);
   });
 
+  // `computeMonthlyIncome` só conhece os tickers que o usuário já tem. Os
+  // recomendados que faltam na carteira (`status: 'missing'`) são justamente
+  // os que a IA deve avaliar comprar, e chegavam ao prompt com
+  // `monthlyDividend=indisponível` (issue #299).
+  it('deve informar o provento dos recomendados que o usuário ainda não tem', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue({
+      ...comparison,
+      recommended: {
+        ...comparison.recommended,
+        renda: [
+          ...comparison.recommended.renda,
+          {
+            ticker: 'KNCR11',
+            segment: 'Recebíveis',
+            weight: 0.3,
+            closePrice: 100,
+          },
+        ],
+      },
+      items: [
+        ...comparison.items,
+        {
+          ticker: 'KNCR11',
+          recommendedWeight: 0.3,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+    });
+    // O usuário só tem HGLG11: o provento de KNCR11 não vem daqui.
+    computeMonthlyIncomeMock.mockResolvedValue({
+      byTicker: [],
+      total: 2.5,
+      totalFromFridge: 0,
+      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Resumo',
+                items: [
+                  {
+                    ticker: 'KNCR11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Entrar no ativo.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const store = createUsageFirestore();
+    firestoreMock = store.firestore;
+    store.firestore.getAll = jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({
+        id: ref.id,
+        exists: ref.id === 'KNCR11',
+        data: () => ({ price: 100, monthlyDividend: 0.95 }),
+      })),
+    );
+
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+
+    const [saved] = store.suggestionDoc.set.mock.calls[0];
+    const item = saved.input.items.find(
+      (entry: { ticker: string }) => entry.ticker === 'KNCR11',
+    );
+    expect(item.monthlyDividend).toBe(0.95);
+  });
+
   it('deve retornar a sugestão salva sem consultar a IA', async () => {
     const saved = { id: 'wallet-1_2026-09_renda', summary: 'Salva' };
     const doc = {

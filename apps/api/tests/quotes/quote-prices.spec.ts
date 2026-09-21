@@ -5,6 +5,7 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import {
+  getQuotePricesByTicker,
   getQuotesByTicker,
   loadAllQuotePrices,
   quotePricesFromDocs,
@@ -156,6 +157,70 @@ describe('quotes/quote-prices', () => {
 
       expect(getAll).not.toHaveBeenCalled();
       expect(quotes.size).toBe(0);
+    });
+  });
+
+  // Havia duas implementações do mesmo laço `getAll`: esta e a de
+  // `quote-history.service`, que aceitava NaN e não normalizava a caixa. Um
+  // `price: NaN` aparecia como `currentPrice: NaN` na listagem de posições e
+  // caía no preço médio no patrimônio — a divergência de total entre telas
+  // que a #302 dizia ter eliminado.
+  describe('getQuotePricesByTicker', () => {
+    function firestoreWithQuotes(quotes: Record<string, unknown>) {
+      const getAll = jest.fn(async (...refs: { id: string }[]) =>
+        refs.map((ref) => ({
+          id: ref.id,
+          exists: quotes[ref.id] !== undefined,
+          data: () => quotes[ref.id],
+        })),
+      );
+      getFirestoreMock.mockReturnValue({
+        collection: jest.fn(() => ({ doc: (id: string) => ({ id }) })),
+        getAll,
+      });
+      return getAll;
+    }
+
+    it('deve resolver vários tickers numa única viagem', async () => {
+      const getAll = firestoreWithQuotes({
+        HGLG11: { price: 160.5 },
+        XPML11: { price: 104.2 },
+      });
+
+      const prices = await getQuotePricesByTicker(['HGLG11', 'XPML11']);
+
+      expect(getAll).toHaveBeenCalledTimes(1);
+      expect(prices.get('HGLG11')).toBe(160.5);
+      expect(prices.get('XPML11')).toBe(104.2);
+    });
+
+    it('deve omitir ticker sem cotação em vez de devolver zero', async () => {
+      firestoreWithQuotes({ HGLG11: { price: 160.5 } });
+
+      const prices = await getQuotePricesByTicker(['HGLG11', 'DESCONHECIDO11']);
+
+      expect(prices.has('DESCONHECIDO11')).toBe(false);
+    });
+
+    it('deve descartar preço NaN em vez de propagá-lo', async () => {
+      firestoreWithQuotes({ HGLG11: { price: Number.NaN } });
+
+      const prices = await getQuotePricesByTicker(['HGLG11']);
+
+      expect(prices.has('HGLG11')).toBe(false);
+    });
+
+    it('deve fatiar em lotes de 500', async () => {
+      const tickers = Array.from({ length: 501 }, (_, i) => `TICK${i}`);
+      const getAll = firestoreWithQuotes(
+        Object.fromEntries(tickers.map((ticker) => [ticker, { price: 1 }])),
+      );
+
+      const prices = await getQuotePricesByTicker(tickers);
+
+      expect(getAll).toHaveBeenCalledTimes(2);
+      expect(getAll.mock.calls[0]).toHaveLength(500);
+      expect(prices.size).toBe(501);
     });
   });
 });
