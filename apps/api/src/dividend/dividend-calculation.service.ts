@@ -152,9 +152,19 @@ export function latestDividendByTicker(
  * valor investido o yield é zero, e não `Infinity`: dividir renda por um
  * denominador zerado não é informação, é erro de cálculo exposto na tela.
  */
+/**
+ * Yield anualizado por ticker e total.
+ *
+ * O valor investido usa a **cotação atual** (`priceByTicker`), caindo para o
+ * preço médio quando o ticker não tem cotação. Antes vinha do `currentPrice`
+ * gravado na posição — resíduo da denormalização que a #86 encerrou, e que
+ * ficou congelado no valor do dia em que o job parou de atualizá-lo
+ * (issue #326).
+ */
 export function computeDividendYield(
   positions: Position[],
   dividends: Dividend[],
+  priceByTicker: Map<string, number> = new Map(),
 ): WalletDividendYieldResponse {
   const latestByTicker = latestDividendByTickerMap(dividends);
 
@@ -163,7 +173,10 @@ export function computeDividendYield(
   let totalCurrentValue = 0;
 
   for (const position of positions) {
-    const unitPrice = position.currentPrice ?? position.averagePrice ?? 0;
+    const unitPrice =
+      priceByTicker.get(normalizeTicker(position.ticker)) ??
+      position.averagePrice ??
+      0;
     const quantity = validQuantity(position);
     const currentValue = quantity * unitPrice;
 

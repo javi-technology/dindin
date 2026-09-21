@@ -323,8 +323,34 @@ function createFirestoreMockWithWalletsAndPositions(
     }),
   };
 
+  // O yield passou a usar a cotação atual (issue #326): o mock serve os preços
+  // por ticker, derivados do `currentPrice` que os fixtures das posições já
+  // declaram — assim os casos continuam exercitando os mesmos números.
+  const priceByTicker = new Map<string, number>();
+  Object.values(positionsByWallet).forEach((positions) =>
+    positions.forEach((position) => {
+      // Há fixture com ticker inválido de propósito.
+      if (
+        typeof position.currentPrice === 'number' &&
+        typeof position.ticker === 'string'
+      ) {
+        priceByTicker.set(position.ticker.toUpperCase(), position.currentPrice);
+      }
+    }),
+  );
+
   return {
+    getAll: jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({
+        id: ref.id,
+        exists: priceByTicker.has(ref.id.toUpperCase()),
+        data: () => ({ price: priceByTicker.get(ref.id.toUpperCase()) }),
+      })),
+    ),
     collection: jest.fn((path: string) => {
+      if (path === 'quotes') {
+        return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
+      }
       if (path === 'users') {
         return {
           doc: jest.fn((uid: string) => {

@@ -14,7 +14,8 @@
     "logs": "firebase functions:log",
     "seed:assets": "npm run build && node lib/scripts/seed-assets.js",
     "set:admin-claim": "npm run build && node lib/scripts/set-admin-claim.js",
-    "backfill:dividend-history": "npm run build && node lib/scripts/backfill-dividend-history.js"
+    "backfill:dividend-history": "npm run build && node lib/scripts/backfill-dividend-history.js",
+    "migrate:legacy": "npm run build && node lib/scripts/migrate-legacy-data.js"
   },
   "engines": {
     "node": "22"

@@ -259,6 +259,28 @@ expostos em `GET /api/me`):
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
   `portal-session`.
 
+## Migração de dados legados
+
+Duas mudanças anteriores deixaram resíduo no Firestore, e o script
+`apps/api/src/scripts/migrate-legacy-data.ts` limpa os dois:
+
+1. **`currentPrice` em posições e itens** — a #86 passou a resolver o preço a
+   partir de `quotes` na leitura, mas o campo antigo continuou gravado,
+   congelado no valor do dia em que o job parou de atualizá-lo.
+2. **Proventos automáticos com id antigo** (`YYYY-MM_TICKER`) — o sync atual
+   usa `YYYY-MM-DD_TICKER`. Enquanto existirem, `dividend-sync-record`
+   precisa do tratamento especial `LEGACY_AUTO_ID`.
+
+O script **simula por padrão** e é idempotente:
+
+```bash
+npm run migrate:legacy --workspace=apps/api            # simula e conta
+npm run migrate:legacy --workspace=apps/api -- --apply # aplica
+```
+
+Depois de aplicado em produção, o tratamento `LEGACY_AUTO_ID` em
+`dividend-sync-record.service.ts` pode ser removido.
+
 ## Moeda: BRL-only
 
 O app trabalha **apenas com reais** (issue #266, herdada da #105). Projeção de

@@ -16,6 +16,7 @@ import {
 } from './monthly-income-limit.service';
 import { hasEntitlement } from '../billing/entitlement.service';
 import { asyncHandler } from '../middleware/async-handler';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { getAllUserPositions } from '../wallet/position-reader';
 import {
   computeDividendYield,
@@ -230,7 +231,13 @@ export const getDividendYield = asyncHandler(
       readDividends(userId),
     ]);
 
-    res.json(computeDividendYield(positions, dividends));
+    // A cotação atual entra no valor investido; o `currentPrice` gravado na
+    // posição é resíduo da #86 e sai do banco na #326.
+    const priceByTicker = await getQuotePricesByTicker(
+      positions.map((position) => position.ticker),
+    );
+
+    res.json(computeDividendYield(positions, dividends, priceByTicker));
   },
 );
 
