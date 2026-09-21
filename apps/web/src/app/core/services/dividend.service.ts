@@ -43,6 +43,14 @@ export class DividendService {
     );
   }
 
+  /**
+   * Renda mensal de todas as carteiras, já com a geladeira contada uma vez e
+   * o recorte gratuito aplicado pela API (issue #300).
+   */
+  getConsolidatedMonthlyIncome(): Observable<MonthlyIncomeResponse> {
+    return this.http.get<MonthlyIncomeResponse>('/api/monthly-income');
+  }
+
   getMonthlyIncome(walletId: string): Observable<MonthlyIncomeResponse> {
     return this.http.get<MonthlyIncomeResponse>(
       `/api/wallets/${walletId}/monthly-income`,

@@ -22,8 +22,6 @@ import {
   formatDate,
   formatPercent,
 } from '../../shared/utils/format.util';
-import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
-import { buildFreeView } from '../../shared/utils/monthly-income-limit.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
 import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
 import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
@@ -68,25 +66,23 @@ export class DividendComponent implements OnInit {
     // destruído, apesar dos `takeUntilDestroyed` a jusante.
     .pipe(shareReplay({ bufferSize: 1, refCount: true }));
 
-  /** Respostas cruas das carteiras; o recorte gratuito é derivado delas. */
-  private readonly incomeResponses = signal<MonthlyIncomeResponse[]>([]);
   /**
-   * Recorte gratuito (#262): sem o entitlement `projections` a API já devolve
-   * menos ativos e menos datas, e aqui o limite é reaplicado sobre o agregado
-   * das carteiras.
+   * Renda consolidada de todas as carteiras. O recorte gratuito (#262) vem
+   * pronto da API, sobre o agregado — antes a tela reaplicava a regra no
+   * cliente, sobre uma resposta por carteira (issue #300).
    */
-  readonly freeView = computed(() =>
-    buildFreeView(this.incomeResponses(), this.today()),
-  );
+  private readonly income = signal<MonthlyIncomeResponse | null>(null);
   readonly byTicker = computed<MonthlyIncomeItem[]>(
-    () => this.freeView().byTicker,
+    () => this.income()?.byTicker ?? [],
   );
-  readonly hiddenCount = computed(() => this.freeView().hiddenCount);
+  readonly hiddenCount = computed(
+    () => this.income()?.hiddenTickers?.length ?? 0,
+  );
   readonly hiddenScheduleCount = computed(
-    () => this.freeView().hiddenScheduleCount,
+    () => this.income()?.hiddenPaymentDates?.length ?? 0,
   );
   readonly hiddenWithoutDateCount = computed(
-    () => this.freeView().hiddenWithoutDateCount,
+    () => this.income()?.hiddenScheduleTickers?.length ?? 0,
   );
   total = signal<number>(0);
   totalFromFridge = signal<number>(0);
@@ -127,16 +123,17 @@ export class DividendComponent implements OnInit {
    * calculados sobre todos os ativos.
    */
   readonly schedule = computed(() => {
-    const view = this.freeView();
+    const income = this.income();
+    const limited = income?.limited === true;
     const schedule = buildPaymentSchedule(
-      view.limited ? view.scheduleItems : view.byTicker,
+      limited ? (income?.scheduleItems ?? []) : this.byTicker(),
       this.today(),
     );
-    return view.limited
+    return limited && income?.scheduleTotals
       ? {
           ...schedule,
-          upcomingTotal: view.scheduleTotals.upcomingTotal,
-          paidTotal: view.scheduleTotals.paidTotal,
+          upcomingTotal: income.scheduleTotals.upcomingTotal,
+          paidTotal: income.scheduleTotals.paidTotal,
         }
       : schedule;
   });
@@ -177,25 +174,14 @@ export class DividendComponent implements OnInit {
   }
 
   private loadMonthlyIncome(): void {
-    this.wallets$
-      .pipe(
-        switchMap((wallets) =>
-          wallets.length === 0
-            ? of([])
-            : forkJoin(
-                wallets.map((wallet) =>
-                  this.dividendService.getMonthlyIncome(wallet.id),
-                ),
-              ),
-        ),
-        takeUntilDestroyed(this.destroyRef),
-      )
+    this.dividendService
+      .getConsolidatedMonthlyIncome()
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (responses) => {
-          const aggregated = aggregateMonthlyIncome(responses);
-          this.incomeResponses.set(responses);
-          this.total.set(aggregated.total);
-          this.totalFromFridge.set(aggregated.totalFromFridge);
+        next: (response) => {
+          this.income.set(response);
+          this.total.set(response.total);
+          this.totalFromFridge.set(response.totalFromFridge);
           this.loading.set(false);
           this.loadHistories(this.byTicker());
         },

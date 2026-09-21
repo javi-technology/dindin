@@ -47,12 +47,14 @@ import {
   updateItem,
   unfreezeItem,
 } from './wallet/fridge.controller';
+import { getDashboardSummary } from './dashboard/dashboard.controller';
 import {
   createDividend,
   deleteDividend,
   getDividend,
   getDividendProjection,
   getDividendYield,
+  getConsolidatedMonthlyIncome,
   getMonthlyDividendReport,
   getMonthlyIncome,
   listDividends,
@@ -233,6 +235,11 @@ app.post('/api/wallets', createWallet);
 app.get('/api/wallets/:id', getWallet);
 app.put('/api/wallets/:id', updateWallet);
 app.delete('/api/wallets/:id', deleteWallet);
+
+// Agregados de todas as carteiras (issue #300). As rotas por carteira
+// continuam servindo a tela de Carteira, que mostra uma de cada vez.
+app.get('/api/monthly-income', getConsolidatedMonthlyIncome);
+app.get('/api/dashboard/summary', getDashboardSummary);
 
 app.get('/api/wallets/:walletId/dividend-yield', getDividendYield);
 app.get('/api/wallets/:walletId/monthly-income', getMonthlyIncome);

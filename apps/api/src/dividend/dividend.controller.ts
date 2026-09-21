@@ -6,7 +6,10 @@ import {
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
-import { computeMonthlyIncome } from './monthly-income.service';
+import {
+  computeConsolidatedMonthlyIncome,
+  computeMonthlyIncome,
+} from './monthly-income.service';
 import {
   computeScheduleTotals,
   limitMonthlyIncome,
@@ -247,6 +250,55 @@ export const getMonthlyIncome = asyncHandler(
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
       computeMonthlyIncome(userId, walletId),
+      hasEntitlement(userId, 'projections', user?.admin === true),
+    ]);
+
+    const today = todayAsUtcDate();
+    const scheduleTotals = computeScheduleTotals(byTicker, today);
+
+    if (entitled) {
+      res.json({
+        byTicker,
+        total,
+        totalFromFridge,
+        scheduleTotals,
+        limited: false,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        hiddenScheduleTickers: [],
+      });
+      return;
+    }
+
+    const limited = limitMonthlyIncome(byTicker, today);
+    res.json({
+      byTicker: limited.byTicker,
+      scheduleItems: limited.scheduleItems,
+      total,
+      totalFromFridge,
+      scheduleTotals,
+      limited: true,
+      hiddenTickers: limited.hiddenTickers,
+      hiddenPaymentDates: limited.hiddenPaymentDates,
+      hiddenScheduleTickers: limited.hiddenScheduleTickers,
+    });
+  },
+);
+
+/**
+ * Renda mensal de **todas** as carteiras (issue #300).
+ *
+ * O recorte gratuito é aplicado aqui, sobre o agregado: por carteira, duas
+ * carteiras mostrariam seis ativos a quem não assina. O front também não
+ * precisa mais adivinhar quanto da geladeira contar.
+ */
+export const getConsolidatedMonthlyIncome = asyncHandler(
+  'getConsolidatedMonthlyIncome',
+  async (req: Request, res: Response) => {
+    const userId = uid(req);
+    const user = (req as AuthRequest).user;
+    const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
+      computeConsolidatedMonthlyIncome(userId),
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
