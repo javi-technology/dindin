@@ -1,4 +1,13 @@
-import { Component, HostListener, OnInit, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  HostListener,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { EMPTY, Subject, catchError, switchMap, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
@@ -46,6 +55,14 @@ export class FridgeComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly setupService = inject(SetupService);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /**
+   * Geladeira a carregar. O switchMap sobre este Subject cancela a requisição
+   * anterior, para que a resposta de uma geladeira trocada não sobrescreva a
+   * lista da geladeira atual.
+   */
+  private readonly fridgeToLoad$ = new Subject<string>();
 
   fridges = signal<Fridge[]>([]);
   selectedFridge = signal<Fridge | null>(null);
@@ -73,6 +90,15 @@ export class FridgeComponent implements OnInit {
     walletId: ['', Validators.required],
   });
 
+  constructor() {
+    this.fridgeToLoad$
+      .pipe(
+        switchMap((fridgeId) => this.items$(fridgeId)),
+        takeUntilDestroyed(),
+      )
+      .subscribe();
+  }
+
   ngOnInit(): void {
     this.loadFridges();
     this.loadAssets();
@@ -80,55 +106,67 @@ export class FridgeComponent implements OnInit {
   }
 
   private loadAssets(): void {
-    this.assetService.list().subscribe({
-      next: (response) => {
-        this.assets.set(response);
-        this.assetsError.set(null);
-      },
-      error: () => {
-        this.assetsError.set(
-          'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
-        );
-      },
-    });
+    this.assetService
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.assets.set(response);
+          this.assetsError.set(null);
+        },
+        error: () => {
+          this.assetsError.set(
+            'Erro ao carregar catálogo de ativos. Recarregue a página para tentar novamente.',
+          );
+        },
+      });
   }
 
   private loadWallets(): void {
-    this.walletService.list().subscribe({
-      next: (response) => this.wallets.set(response),
-      error: () => this.error.set('Erro ao carregar carteiras.'),
-    });
+    this.walletService
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => this.wallets.set(response),
+        error: () => this.error.set('Erro ao carregar carteiras.'),
+      });
   }
 
   private loadFridges(): void {
     this.loading.set(true);
-    this.fridgeService.listFridges().subscribe({
-      next: (response) => {
-        this.fridges.set(response);
-        if (response.length > 0) {
-          this.selectFridge(response[0]);
-        } else {
-          this.selectedFridge.set(null);
-          this.items.set([]);
-        }
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Erro ao carregar geladeiras.');
-        this.loading.set(false);
-      },
-    });
+    this.fridgeService
+      .listFridges()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.fridges.set(response);
+          if (response.length > 0) {
+            this.selectFridge(response[0]);
+          } else {
+            this.selectedFridge.set(null);
+            this.items.set([]);
+          }
+          this.loading.set(false);
+        },
+        error: () => {
+          this.error.set('Erro ao carregar geladeiras.');
+          this.loading.set(false);
+        },
+      });
   }
 
   createDefaultFridge(): void {
     this.loading.set(true);
-    this.setupService.createDefault('fridge').subscribe({
-      next: () => this.loadFridges(),
-      error: () => {
-        this.error.set('Erro ao criar geladeira padrão.');
-        this.loading.set(false);
-      },
-    });
+    this.setupService
+      .createDefault('fridge')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.loadFridges(),
+        error: () => {
+          this.error.set('Erro ao criar geladeira padrão.');
+          this.loading.set(false);
+        },
+      });
   }
 
   selectFridge(fridge: Fridge): void {
@@ -144,18 +182,28 @@ export class FridgeComponent implements OnInit {
     }
   }
 
+  /** Dispara o carregamento dos itens, cancelando o anterior. */
   loadItems(fridgeId: string): void {
+    this.fridgeToLoad$.next(fridgeId);
+  }
+
+  /**
+   * Trata o próprio erro e segue com EMPTY, para que uma falha não encerre o
+   * fluxo e impeça as trocas de geladeira seguintes.
+   */
+  private items$(fridgeId: string) {
     this.loading.set(true);
-    this.fridgeService.listItems(fridgeId).subscribe({
-      next: (response) => {
+    return this.fridgeService.listItems(fridgeId).pipe(
+      tap((response) => {
         this.items.set(response);
         this.loading.set(false);
-      },
-      error: () => {
+      }),
+      catchError(() => {
         this.error.set('Erro ao carregar itens.');
         this.loading.set(false);
-      },
-    });
+        return EMPTY;
+      }),
+    );
   }
 
   openForm(item: FridgeItem | null = null): void {
@@ -234,17 +282,20 @@ export class FridgeComponent implements OnInit {
         targetPrice,
       };
 
-      this.fridgeService.updateItem(fridge.id, editing.id, payload).subscribe({
-        next: () => {
-          this.closeForm();
-          this.loadItems(fridge.id);
-        },
-        error: () => {
-          this.formError.set(
-            'Erro ao atualizar item. Verifique os dados e tente novamente.',
-          );
-        },
-      });
+      this.fridgeService
+        .updateItem(fridge.id, editing.id, payload)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.closeForm();
+            this.loadItems(fridge.id);
+          },
+          error: () => {
+            this.formError.set(
+              'Erro ao atualizar item. Verifique os dados e tente novamente.',
+            );
+          },
+        });
     } else {
       const payload: {
         ticker: string;
@@ -258,17 +309,20 @@ export class FridgeComponent implements OnInit {
         targetPrice,
       };
 
-      this.fridgeService.createItem(fridge.id, payload).subscribe({
-        next: () => {
-          this.closeForm();
-          this.loadItems(fridge.id);
-        },
-        error: () => {
-          this.formError.set(
-            'Erro ao criar item. Verifique os dados e tente novamente.',
-          );
-        },
-      });
+      this.fridgeService
+        .createItem(fridge.id, payload)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.closeForm();
+            this.loadItems(fridge.id);
+          },
+          error: () => {
+            this.formError.set(
+              'Erro ao criar item. Verifique os dados e tente novamente.',
+            );
+          },
+        });
     }
   }
 
@@ -281,13 +335,16 @@ export class FridgeComponent implements OnInit {
     const fridge = this.selectedFridge();
     if (!item || !fridge) return;
 
-    this.fridgeService.deleteItem(fridge.id, item.id).subscribe({
-      next: () => {
-        this.deleteConfirmItem.set(null);
-        this.loadItems(fridge.id);
-      },
-      error: () => this.error.set('Erro ao remover item.'),
-    });
+    this.fridgeService
+      .deleteItem(fridge.id, item.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deleteConfirmItem.set(null);
+          this.loadItems(fridge.id);
+        },
+        error: () => this.error.set('Erro ao remover item.'),
+      });
   }
 
   cancelDelete(): void {
@@ -317,15 +374,18 @@ export class FridgeComponent implements OnInit {
     }
 
     const walletId = this.unfreezeForm.value.walletId as string;
-    this.fridgeService.unfreezeItem(fridge.id, item.id, walletId).subscribe({
-      next: () => {
-        this.items.update((current) =>
-          current.filter((currentItem) => currentItem.id !== item.id),
-        );
-        this.cancelUnfreeze();
-      },
-      error: () => this.unfreezeError.set('Erro ao descongelar item.'),
-    });
+    this.fridgeService
+      .unfreezeItem(fridge.id, item.id, walletId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.items.update((current) =>
+            current.filter((currentItem) => currentItem.id !== item.id),
+          );
+          this.cancelUnfreeze();
+        },
+        error: () => this.unfreezeError.set('Erro ao descongelar item.'),
+      });
   }
 
   /** Calcula o potencial de ganho em percentual, ou null se não houver base. */
