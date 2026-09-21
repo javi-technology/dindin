@@ -1,4 +1,4 @@
-import { Position } from 'dindin-models';
+import { Position, Quote } from 'dindin-models';
 import type { MonthlyIncomeItem } from 'dindin-shared-types';
 import { positionsCollection } from '../firestore/paths';
 import { getQuotesByTicker } from '../quotes/quote-prices';
@@ -18,20 +18,26 @@ export interface MonthlyIncome {
 export const fetchFridgeItems = getAllUserFridgeItems;
 
 /**
- * Núcleo do cálculo: recebe posições e itens já lidos e devolve a projeção.
+ * Núcleo do cálculo: recebe posições e itens **já lidos** e devolve a
+ * projeção. Exportado para quem já tem os dados em mãos — o resumo do
+ * dashboard lia tudo de novo pelo caminho de conveniência.
  * Posições do mesmo ticker — inclusive em carteiras diferentes — viram uma
  * linha só, somando quantidade e renda (issue #300).
  */
-async function buildMonthlyIncome(
+export async function buildMonthlyIncome(
   positions: Position[],
   fridgeItems: { ticker: string; quantity?: unknown }[],
+  /** Cotações já lidas, para quem as tem em mãos (ver dashboard). */
+  knownQuotes?: Map<string, Quote>,
 ): Promise<MonthlyIncome> {
   // Só as cotações dos ativos do usuário: varrer `quotes` cobrava uma leitura
   // por ativo do catálogo a cada requisição (issue #299).
-  const quotes = await getQuotesByTicker([
-    ...positions.map((position) => position.ticker),
-    ...fridgeItems.map((item) => item.ticker),
-  ]);
+  const quotes =
+    knownQuotes ??
+    (await getQuotesByTicker([
+      ...positions.map((position) => position.ticker),
+      ...fridgeItems.map((item) => item.ticker),
+    ]));
 
   const monthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
@@ -59,7 +65,10 @@ async function buildMonthlyIncome(
     const current = itemByTicker.get(ticker);
 
     itemByTicker.set(ticker, {
-      ticker: position.ticker,
+      // O ticker normalizado, e não o do último documento lido: o mesmo ativo
+      // pode aparecer com caixa diferente entre carteiras (dado importado), e
+      // o front usa este valor para pedir o histórico.
+      ticker,
       quantity: (current?.quantity ?? 0) + quantity,
       monthlyDividend,
       monthlyIncome: roundCurrency(

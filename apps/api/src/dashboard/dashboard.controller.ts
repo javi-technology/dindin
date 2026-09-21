@@ -5,7 +5,7 @@ import type {
 } from 'dindin-shared-types';
 import { uid } from '../firestore/paths';
 import { asyncHandler } from '../middleware/async-handler';
-import { computeConsolidatedMonthlyIncome } from '../dividend/monthly-income.service';
+import { buildMonthlyIncome } from '../dividend/monthly-income.service';
 import { getQuotesByTicker } from '../quotes/quote-prices';
 import { roundCurrency, validPrice, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
@@ -25,16 +25,20 @@ export const getDashboardSummary = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
 
-    const [positions, fridgeItems, income] = await Promise.all([
+    // Uma leitura de cada coisa: posições, itens e cotações são
+    // compartilhadas entre o patrimônio e a projeção de renda. Chamar
+    // `computeConsolidatedMonthlyIncome` aqui releria tudo.
+    const [positions, fridgeItems] = await Promise.all([
       getAllUserPositions(userId),
       getAllUserFridgeItems(userId),
-      computeConsolidatedMonthlyIncome(userId),
     ]);
 
     const quotes = await getQuotesByTicker([
       ...positions.map((position) => position.ticker),
       ...fridgeItems.map((item) => item.ticker),
     ]);
+
+    const income = await buildMonthlyIncome(positions, fridgeItems, quotes);
 
     const priceOf = (ticker: string, fallback: unknown): number =>
       validPrice(quotes.get(ticker.toUpperCase())?.price) ??

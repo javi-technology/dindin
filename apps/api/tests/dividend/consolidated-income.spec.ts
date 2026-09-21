@@ -101,7 +101,9 @@ function createFirestoreMock(options: {
     })),
   };
 
-  return {
+  const firestore = {
+    walletsCollection,
+    fridgesCollection,
     getAll: jest.fn(async (...refs: { id: string }[]) =>
       refs.map((ref) => ({
         id: ref.id,
@@ -128,6 +130,8 @@ function createFirestoreMock(options: {
       throw new Error(`Coleção inesperada: ${name}`);
     }),
   };
+
+  return firestore;
 }
 
 describe('GET /api/monthly-income', () => {
@@ -190,6 +194,28 @@ describe('GET /api/monthly-income', () => {
 
     expect(response.body.totalFromFridge).toBe(10);
     expect(response.body.total).toBe(30);
+  });
+
+  // Dado importado/antigo pode ter a mesma ação com caixa diferente entre
+  // carteiras. A linha consolidada precisa de um ticker estável: o front usa
+  // esse valor para pedir o histórico do ativo.
+  it('deve normalizar o ticker ao consolidar carteiras', async () => {
+    firestoreMock = createFirestoreMock({
+      wallets: [
+        { id: 'wallet-1', positions: [{ ticker: 'PETR4', quantity: 10 }] },
+        { id: 'wallet-2', positions: [{ ticker: 'petr4', quantity: 5 }] },
+      ],
+      quotes: { PETR4: { monthlyDividend: 1 } },
+      subscription: assinante,
+    });
+
+    const response = await request(app)
+      .get('/api/monthly-income')
+      .set('Authorization', authHeader);
+
+    expect(response.body.byTicker).toEqual([
+      expect.objectContaining({ ticker: 'PETR4', quantity: 15 }),
+    ]);
   });
 
   it('deve devolver zero para usuário sem carteira', async () => {
@@ -328,5 +354,30 @@ describe('GET /api/dashboard/summary', () => {
     const response = await request(app).get('/api/dashboard/summary');
 
     expect(response.status).toBe(401);
+  });
+
+  // O endpoint existe para cortar leitura (issue #300). Buscar posições e
+  // itens por fora e de novo dentro do cálculo de renda dobrava o custo.
+  it('deve ler posições, itens e cotações uma única vez', async () => {
+    const mock = createFirestoreMock({
+      wallets: [
+        {
+          id: 'wallet-1',
+          positions: [{ ticker: 'HGLG11', quantity: 10, averagePrice: 100 }],
+        },
+      ],
+      fridgeItems: [{ ticker: 'KNCR11', quantity: 8, transferredPrice: 90 }],
+      quotes: { HGLG11: { price: 110 }, KNCR11: { price: 100 } },
+      subscription: { status: 'active', plan: 'basic' },
+    });
+    firestoreMock = mock;
+
+    await request(app)
+      .get('/api/dashboard/summary')
+      .set('Authorization', authHeader);
+
+    expect(mock.walletsCollection.get.mock.calls).toHaveLength(1);
+    expect(mock.fridgesCollection.get.mock.calls).toHaveLength(1);
+    expect(mock.getAll.mock.calls).toHaveLength(1);
   });
 });
