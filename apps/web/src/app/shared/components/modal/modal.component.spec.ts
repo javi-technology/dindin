@@ -15,20 +15,23 @@ import { ModalComponent } from './modal.component';
   imports: [ModalComponent],
   template: `
     <button type="button" data-testid="gatilho">Abrir</button>
-    <app-modal
-      [title]="'Adicionar item'"
-      [testId]="'item-form'"
-      (closed)="fechado = fechado + 1"
-    >
-      <form>
-        <label for="ticker">Ticker <strong>obrigatório</strong></label>
-        <input id="ticker" />
-        <button type="submit" data-testid="salvar">Salvar</button>
-      </form>
-    </app-modal>
+    @if (aberto) {
+      <app-modal
+        [title]="'Adicionar item'"
+        [testId]="'item-form'"
+        (closed)="fechado = fechado + 1"
+      >
+        <form>
+          <label for="ticker">Ticker <strong>obrigatório</strong></label>
+          <input id="ticker" />
+          <button type="submit" data-testid="salvar">Salvar</button>
+        </form>
+      </app-modal>
+    }
   `,
 })
 class HostComponent {
+  aberto = true;
   fechado = 0;
 }
 
@@ -87,12 +90,20 @@ describe('ModalComponent', () => {
     });
 
     it('deve devolver o foco ao gatilho ao fechar', () => {
+      // Parte do modal fechado para que o gatilho seja mesmo o elemento
+      // focado no momento da abertura, como acontece no uso real.
+      host.aberto = false;
+      fixture.detectChanges();
+
       const gatilho = element('[data-testid="gatilho"]') as HTMLButtonElement;
       gatilho.focus();
 
-      const novo = TestBed.createComponent(HostComponent);
-      novo.detectChanges();
-      novo.destroy();
+      host.aberto = true;
+      fixture.detectChanges();
+      expect(document.activeElement).toBe(dialog());
+
+      host.aberto = false;
+      fixture.detectChanges();
 
       expect(document.activeElement).toBe(gatilho);
     });
