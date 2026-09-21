@@ -1,11 +1,4 @@
-import {
-  Component,
-  DestroyRef,
-  OnInit,
-  inject,
-  signal,
-  computed,
-} from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import {
   EMPTY,
   Observable,
@@ -20,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
+import { PositionsTableComponent } from './components/positions-table/positions-table.component';
 import {
   FormBuilder,
   FormGroup,
@@ -41,38 +35,13 @@ import { Wallet, Position, AssetType, Asset, Fridge } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
-  formatPercent,
   parseDecimal,
 } from '../../shared/utils/format.util';
 import {
   resolveQuantity,
   weightedAveragePrice,
 } from '../../shared/utils/position-quantity.util';
-import {
-  LucideWallet,
-  LucidePlus,
-  LucidePencil,
-  LucideTrash2,
-  LucideRefrigerator,
-  LucideArrowUp,
-  LucideArrowDown,
-  LucideArrowUpDown,
-} from '@lucide/angular';
-
-export type PositionSortColumn =
-  | 'ticker'
-  | 'quantity'
-  | 'currentPrice'
-  | 'total'
-  | 'monthlyIncome'
-  | 'dividendYield';
-
-export interface PositionSort {
-  column: PositionSortColumn;
-  direction: 'asc' | 'desc';
-}
-
-const tickerCollator = new Intl.Collator('pt-BR');
+import { LucideWallet, LucidePlus } from '@lucide/angular';
 
 @Component({
   selector: 'app-wallet',
@@ -82,14 +51,9 @@ const tickerCollator = new Intl.Collator('pt-BR');
     ReactiveFormsModule,
     LucideWallet,
     LucidePlus,
-    LucidePencil,
-    LucideTrash2,
-    LucideRefrigerator,
-    LucideArrowUp,
-    LucideArrowDown,
-    LucideArrowUpDown,
     ConfirmDialogComponent,
     ModalComponent,
+    PositionsTableComponent,
   ],
   templateUrl: './wallet.component.html',
 })
@@ -116,8 +80,6 @@ export class WalletComponent implements OnInit {
   assetsError = signal<string | null>(null);
   dividendYield = signal<DividendYieldResponse | null>(null);
   monthlyIncome = signal<MonthlyIncomeResponse | null>(null);
-  /** Coluna e direção da tabela de posições (#274). */
-  sort = signal<PositionSort>({ column: 'ticker', direction: 'asc' });
   loading = signal(false);
   error = signal<string | null>(null);
 
@@ -147,124 +109,6 @@ export class WalletComponent implements OnInit {
     averagePrice: ['0', [Validators.required, decimalValidator()]],
     purchasePrice: ['', [decimalValidator()]],
   });
-
-  /** Retorna o preço unitário atual (mercado) ou o preço médio como fallback. */
-  unitPrice = (position: Position): number =>
-    position.currentPrice ?? position.averagePrice;
-
-  /** Retorna o valor total da posição (quantidade × preço unitário atual). */
-  totalPosition = (position: Position): number =>
-    position.quantity * this.unitPrice(position);
-
-  totalGeral = computed(() =>
-    this.positions().reduce(
-      (sum, position) => sum + this.totalPosition(position),
-      0,
-    ),
-  );
-
-  totalDividendYield = computed(() => this.dividendYield()?.total?.yield ?? 0);
-
-  totalProventos = computed(() => this.monthlyIncome()?.total ?? 0);
-  totalProventosFromFridge = computed(
-    () => this.monthlyIncome()?.totalFromFridge ?? 0,
-  );
-
-  dividendYieldFor = (position: Position): number => {
-    const found = this.dividendYield()?.byTicker.find(
-      (item) => item.ticker === position.ticker,
-    );
-    return found?.yield ?? 0;
-  };
-
-  /**
-   * `null` quando a projeção do ativo ficou de fora do recorte gratuito
-   * (#262): exibir R$ 0,00 nesse caso seria número errado, não bloqueio.
-   */
-  totalProventosFor = (position: Position): number | null => {
-    const income = this.monthlyIncome();
-    const found = income?.byTicker.find(
-      (item) => item.ticker === position.ticker,
-    );
-    if (found) return found.monthlyIncome;
-    return income?.limited ? null : 0;
-  };
-
-  readonly sortableColumns: {
-    column: PositionSortColumn;
-    label: string;
-  }[] = [
-    { column: 'ticker', label: 'Ticker' },
-    { column: 'quantity', label: 'Quantidade' },
-    { column: 'currentPrice', label: 'Preço atual' },
-    { column: 'total', label: 'Total' },
-    { column: 'monthlyIncome', label: 'Proventos/mês' },
-    { column: 'dividendYield', label: 'DY' },
-  ];
-
-  /**
-   * Posições na ordem escolhida. Quem não tem valor na coluna (projeção
-   * bloqueada no plano gratuito) vai para o fim nas duas direções, e empates
-   * seguem o Ticker A→Z para a ordem não oscilar.
-   */
-  sortedPositions = computed(() => {
-    const { column, direction } = this.sort();
-    const factor = direction === 'asc' ? 1 : -1;
-    const byTicker = (a: Position, b: Position) =>
-      tickerCollator.compare(a.ticker, b.ticker);
-
-    return this.positions()
-      .map((position) => ({
-        position,
-        value: this.sortValue(position, column),
-      }))
-      .sort((a, b) => {
-        if (column === 'ticker') {
-          return factor * byTicker(a.position, b.position);
-        }
-        if (a.value === null || b.value === null) {
-          if (a.value !== b.value) return a.value === null ? 1 : -1;
-          return byTicker(a.position, b.position);
-        }
-        return factor * (a.value - b.value) || byTicker(a.position, b.position);
-      })
-      .map(({ position }) => position);
-  });
-
-  toggleSort(column: PositionSortColumn): void {
-    this.sort.update((current) =>
-      current.column === column
-        ? { column, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-        : { column, direction: 'asc' },
-    );
-  }
-
-  ariaSort(column: PositionSortColumn): 'ascending' | 'descending' | 'none' {
-    const { column: active, direction } = this.sort();
-    if (active !== column) return 'none';
-    return direction === 'asc' ? 'ascending' : 'descending';
-  }
-
-  private sortValue(
-    position: Position,
-    column: PositionSortColumn,
-  ): number | null {
-    switch (column) {
-      case 'quantity':
-        return position.quantity;
-      // Os mesmos valores da tabela: sem cotação, vale o preço médio.
-      case 'currentPrice':
-        return this.unitPrice(position);
-      case 'total':
-        return this.totalPosition(position);
-      case 'monthlyIncome':
-        return this.totalProventosFor(position);
-      case 'dividendYield':
-        return this.dividendYieldFor(position);
-      default:
-        return null;
-    }
-  }
 
   constructor() {
     this.walletToLoad$
@@ -647,7 +491,6 @@ export class WalletComponent implements OnInit {
   }
 
   formatCurrency = formatCurrency;
-  formatPercent = formatPercent;
 
   private parseDecimal(value: string | number | null): number | null {
     return parseDecimal(value);

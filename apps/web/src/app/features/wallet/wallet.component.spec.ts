@@ -1479,10 +1479,8 @@ describe('WalletComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(fixture.componentInstance.sort()).toEqual({
-        column: 'total',
-        direction: 'desc',
-      });
+      // A tabela é um subcomponente (#309) e guarda a própria ordenação:
+      // trocar de carteira não a recria, então a escolha sobrevive.
       expect(header('total').getAttribute('aria-sort')).toBe('descending');
     });
   });
