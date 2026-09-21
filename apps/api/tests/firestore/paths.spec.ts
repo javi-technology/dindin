@@ -34,13 +34,23 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import {
+  aiSuggestionUsageCollection,
+  aiSuggestionsCollection,
   alertsCollection,
+  assetsCollection,
+  billingEventsCollection,
   dividendsCollection,
   fridgeItemsCollection,
   fridgesCollection,
   patrimonySnapshotsCollection,
   positionsCollection,
+  quoteDividendHistoryCollection,
+  quoteHistoryCollection,
+  quotesCollection,
+  recommendedWalletsCollection,
+  subscriptionDocument,
   uid,
+  usersCollection,
   walletsCollection,
 } from '../../src/firestore/paths';
 
@@ -130,6 +140,95 @@ describe('caminhos do Firestore', () => {
         'doc:user-123',
         'collection:patrimonySnapshots',
       ]);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Coleções que ficavam fora do módulo (issue #302)
+  // ---------------------------------------------------------------------
+
+  describe('coleções do usuário que faltavam', () => {
+    it('deve montar users/{uid}/aiSuggestions', () => {
+      aiSuggestionsCollection('user-123');
+
+      expect(visited).toEqual([
+        'collection:users',
+        'doc:user-123',
+        'collection:aiSuggestions',
+      ]);
+    });
+
+    it('deve montar users/{uid}/aiSuggestionUsage', () => {
+      aiSuggestionUsageCollection('user-123');
+
+      expect(visited).toEqual([
+        'collection:users',
+        'doc:user-123',
+        'collection:aiSuggestionUsage',
+      ]);
+    });
+
+    it('deve montar users/{uid}/billing/subscription', () => {
+      subscriptionDocument('user-123');
+
+      expect(visited).toEqual([
+        'collection:users',
+        'doc:user-123',
+        'collection:billing',
+        'doc:subscription',
+      ]);
+    });
+  });
+
+  describe('coleções de topo', () => {
+    it('deve montar users', () => {
+      usersCollection();
+
+      expect(visited).toEqual(['collection:users']);
+    });
+
+    it('deve montar assets', () => {
+      assetsCollection();
+
+      expect(visited).toEqual(['collection:assets']);
+    });
+
+    it('deve montar quotes', () => {
+      quotesCollection();
+
+      expect(visited).toEqual(['collection:quotes']);
+    });
+
+    it('deve montar quotes/{ticker}/history', () => {
+      quoteHistoryCollection('HGLG11');
+
+      expect(visited).toEqual([
+        'collection:quotes',
+        'doc:HGLG11',
+        'collection:history',
+      ]);
+    });
+
+    it('deve montar quotes/{ticker}/dividendHistory', () => {
+      quoteDividendHistoryCollection('HGLG11');
+
+      expect(visited).toEqual([
+        'collection:quotes',
+        'doc:HGLG11',
+        'collection:dividendHistory',
+      ]);
+    });
+
+    it('deve montar recommendedWallets', () => {
+      recommendedWalletsCollection();
+
+      expect(visited).toEqual(['collection:recommendedWallets']);
+    });
+
+    it('deve montar billingEvents', () => {
+      billingEventsCollection();
+
+      expect(visited).toEqual(['collection:billingEvents']);
     });
   });
 });

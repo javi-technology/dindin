@@ -35,17 +35,23 @@ function createFirestoreMock(
   fridges: TestFridge[] = [],
   subscription: Partial<UserSubscription> | null = null,
 ) {
+  const quoteByTicker = new Map(
+    quotes.map((quote) => [quote.ticker.toUpperCase(), quote]),
+  );
+
   return {
+    // As cotações passaram a ser buscadas por ticker, com getAll, em vez de
+    // varrer a coleção inteira (issue #299).
+    getAll: jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({
+        id: ref.id,
+        exists: quoteByTicker.has(ref.id),
+        data: () => quoteByTicker.get(ref.id),
+      })),
+    ),
     collection: jest.fn((path: string) => {
       if (path === 'quotes') {
-        return {
-          get: jest.fn().mockResolvedValue({
-            docs: quotes.map((quote) => ({
-              id: quote.ticker,
-              data: () => ({ ...quote }),
-            })),
-          }),
-        };
+        return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
       }
       if (path === 'users') {
         return {
@@ -73,27 +79,34 @@ function createFirestoreMock(
                 };
               }
               if (subPath === 'fridges' && uid === 'user-123') {
+                // A leitura passou a sair de `fridgeItemsCollection(uid,
+                // fridgeId)` em vez de `fridgeDoc.ref.collection(...)` —
+                // mesmo caminho, montado pelo módulo de paths (issue #302).
+                const itemsOf = (fridgeId: string) => ({
+                  get: jest.fn().mockResolvedValue({
+                    docs: (
+                      fridges.find((fridge) => fridge.id === fridgeId)?.items ??
+                      []
+                    ).map((item) => ({
+                      id: item.id,
+                      data: () => ({ ...item }),
+                    })),
+                  }),
+                });
+
                 return {
+                  doc: jest.fn((fridgeId: string) => ({
+                    collection: jest.fn((innerPath: string) => {
+                      if (innerPath === 'fridgeItems') return itemsOf(fridgeId);
+                      throw new Error(
+                        `Unexpected inner collection: ${innerPath}`,
+                      );
+                    }),
+                  })),
                   get: jest.fn().mockResolvedValue({
                     docs: fridges.map((fridge) => ({
                       id: fridge.id,
-                      ref: {
-                        collection: jest.fn((innerPath: string) => {
-                          if (innerPath === 'fridgeItems') {
-                            return {
-                              get: jest.fn().mockResolvedValue({
-                                docs: fridge.items.map((item) => ({
-                                  id: item.id,
-                                  data: () => ({ ...item }),
-                                })),
-                              }),
-                            };
-                          }
-                          throw new Error(
-                            `Unexpected inner collection: ${innerPath}`,
-                          );
-                        }),
-                      },
+                      data: () => ({ name: fridge.id }),
                     })),
                   }),
                 };

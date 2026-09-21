@@ -623,7 +623,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'User not found' });
+      expect(response.body).toEqual({ error: 'Usuário não encontrado' });
       expect(txSetMock).not.toHaveBeenCalled();
     });
   });
@@ -722,7 +722,9 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Manual subscription not found' });
+      expect(response.body).toEqual({
+        error: 'Assinatura manual não encontrada',
+      });
       expect(txUpdateMock).not.toHaveBeenCalled();
     });
 
@@ -730,7 +732,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Subscription not found' });
+      expect(response.body).toEqual({ error: 'Assinatura não encontrada' });
       expect(txUpdateMock).not.toHaveBeenCalled();
     });
 

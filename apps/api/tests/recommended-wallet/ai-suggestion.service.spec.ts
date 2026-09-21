@@ -10,13 +10,21 @@ jest.mock('firebase-admin/app', () => ({
 }));
 
 /**
- * Garante `runTransaction` em qualquer mock de Firestore: a cota diária passou
- * a ser reservada dentro de uma transação (issue #297), e os mocks dos testes
- * de geração só descrevem as collections que lhes interessam. As transações
- * são serializadas, como o Firestore faz ao detectar conflito.
+ * Completa qualquer mock de Firestore com as capacidades que os testes de
+ * geração não descrevem: `runTransaction`, usado pela reserva de cota (issue
+ * #297), e `getAll`, usado pela busca de cotações por ticker (issue #299).
+ * As transações são serializadas, como o Firestore faz ao detectar conflito.
  */
 function mockQuotaTransaction(firestore: any) {
-  if (!firestore || firestore.runTransaction) return firestore;
+  if (!firestore) return firestore;
+
+  if (!firestore.getAll) {
+    firestore.getAll = jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({ id: ref.id, exists: false, data: () => undefined })),
+    );
+  }
+
+  if (firestore.runTransaction) return firestore;
 
   const counts = new Map<string, any>();
   const transaction = {
@@ -100,7 +108,7 @@ describe('ai-suggestion.service', () => {
     options: {
       counts?: Record<string, { count: number }>;
       suggestionDoc?: { get: jest.Mock; set: jest.Mock };
-      quotes?: { docs: unknown[] };
+      quotes?: Record<string, unknown>;
     } = {},
   ) {
     const counts = new Map<string, { count: number; expiresAt?: unknown }>(
@@ -138,16 +146,22 @@ describe('ai-suggestion.service', () => {
       return result;
     });
 
+    // As cotações passaram a ser buscadas por ticker, com getAll (issue #299).
+    const quoteByTicker: Record<string, unknown> = options.quotes ?? {};
+
     return {
       firestore: {
         collection: jest.fn((name: string) =>
           name === 'quotes'
-            ? {
-                get: jest
-                  .fn()
-                  .mockResolvedValue(options.quotes ?? { docs: [] }),
-              }
+            ? { doc: jest.fn((ticker: string) => ({ id: ticker })) }
             : { doc: jest.fn(() => userDoc) },
+        ),
+        getAll: jest.fn(async (...refs: { id: string }[]) =>
+          refs.map((ref) => ({
+            id: ref.id,
+            exists: quoteByTicker[ref.id] !== undefined,
+            data: () => quoteByTicker[ref.id],
+          })),
         ),
         runTransaction,
       },
@@ -1903,14 +1917,7 @@ describe('ai-suggestion.service', () => {
       }),
     });
     const store = createUsageFirestore({
-      quotes: {
-        docs: [
-          {
-            id: 'HGLG11',
-            data: () => ({ monthlyDividend: 1.25 }),
-          },
-        ],
-      },
+      quotes: { HGLG11: { monthlyDividend: 1.25 } },
     });
     firestoreMock = store.firestore;
 
@@ -1925,6 +1932,82 @@ describe('ai-suggestion.service', () => {
       message: 'Limite diário de sugestões atingido',
     });
     expect(store.counts.get(today())?.count).toBe(5);
+  });
+
+  // `computeMonthlyIncome` só conhece os tickers que o usuário já tem. Os
+  // recomendados que faltam na carteira (`status: 'missing'`) são justamente
+  // os que a IA deve avaliar comprar, e chegavam ao prompt com
+  // `monthlyDividend=indisponível` (issue #299).
+  it('deve informar o provento dos recomendados que o usuário ainda não tem', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue({
+      ...comparison,
+      recommended: {
+        ...comparison.recommended,
+        renda: [
+          ...comparison.recommended.renda,
+          {
+            ticker: 'KNCR11',
+            segment: 'Recebíveis',
+            weight: 0.3,
+            closePrice: 100,
+          },
+        ],
+      },
+      items: [
+        ...comparison.items,
+        {
+          ticker: 'KNCR11',
+          recommendedWeight: 0.3,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+    });
+    // O usuário só tem HGLG11: o provento de KNCR11 não vem daqui.
+    computeMonthlyIncomeMock.mockResolvedValue({
+      byTicker: [],
+      total: 2.5,
+      totalFromFridge: 0,
+      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Resumo',
+                items: [
+                  {
+                    ticker: 'KNCR11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Entrar no ativo.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const store = createUsageFirestore({
+      quotes: { KNCR11: { price: 100, monthlyDividend: 0.95 } },
+    });
+    firestoreMock = store.firestore;
+
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+
+    const [saved] = store.suggestionDoc.set.mock.calls[0];
+    const item = saved.input.items.find(
+      (entry: { ticker: string }) => entry.ticker === 'KNCR11',
+    );
+    expect(item.monthlyDividend).toBe(0.95);
   });
 
   it('deve retornar a sugestão salva sem consultar a IA', async () => {
@@ -2022,16 +2105,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({
@@ -2189,9 +2263,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({ docs: [] }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn((id?: string) => ({
@@ -2337,16 +2409,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({
@@ -2438,16 +2501,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({

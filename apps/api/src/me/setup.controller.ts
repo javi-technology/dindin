@@ -13,7 +13,7 @@ export const setupDefaults = asyncHandler(
     const { resource } = (req.body ?? {}) as SetupRequest;
 
     if (resource !== undefined && !RESOURCES.includes(resource)) {
-      res.status(400).json({ error: 'Invalid resource' });
+      res.status(400).json({ error: 'Recurso inválido' });
       return;
     }
 

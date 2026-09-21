@@ -35,16 +35,13 @@ function userDataFirestore(options: {
       docs: options.positions ?? [],
     }),
   };
+  // A navegação passou a sair de `positionsCollection(uid, walletId)` em vez
+  // de `walletDoc.ref.collection('positions')` — mesmo caminho, montado pelo
+  // módulo de paths (issue #302).
   const walletsCollection = {
+    doc: jest.fn(() => ({ collection: jest.fn(() => positionsCollection) })),
     get: jest.fn().mockResolvedValue({
-      docs: [
-        {
-          id: 'wallet-1',
-          ref: {
-            collection: jest.fn(() => positionsCollection),
-          },
-        },
-      ],
+      docs: [{ id: 'wallet-1' }],
     }),
   };
   const itemsCollection = {
@@ -53,15 +50,9 @@ function userDataFirestore(options: {
     }),
   };
   const fridgesCollection = {
+    doc: jest.fn(() => ({ collection: jest.fn(() => itemsCollection) })),
     get: jest.fn().mockResolvedValue({
-      docs: [
-        {
-          id: 'fridge-1',
-          ref: {
-            collection: jest.fn(() => itemsCollection),
-          },
-        },
-      ],
+      docs: [{ id: 'fridge-1', data: () => ({ name: 'Geladeira Principal' }) }],
     }),
   };
   const snapshotsCollection = {

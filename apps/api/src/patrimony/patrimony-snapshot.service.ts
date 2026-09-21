@@ -1,77 +1,24 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { FridgeItem, PatrimonySnapshot, Position, Quote } from 'dindin-models';
+import { PatrimonySnapshot } from 'dindin-models';
+import {
+  patrimonySnapshotsCollection,
+  usersCollection,
+} from '../firestore/paths';
+import { loadAllQuotePrices } from '../quotes/quote-prices';
+import { roundCurrency, validPrice, validQuantity } from '../shared/numbers';
 import { today } from '../shared/date';
+import { getAllUserFridgeItems } from '../wallet/fridge-reader';
+import { getAllUserPositions } from '../wallet/position-reader';
 
 const BATCH_SIZE = 10;
-
-function userCollection(userId: string, collection: string) {
-  return getFirestore().collection('users').doc(userId).collection(collection);
-}
-
-function validQuantity(quantity: unknown): number {
-  return typeof quantity === 'number' &&
-    Number.isFinite(quantity) &&
-    quantity >= 0
-    ? quantity
-    : 0;
-}
-
-function validPrice(price: unknown): number | undefined {
-  return typeof price === 'number' && Number.isFinite(price)
-    ? price
-    : undefined;
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-export async function getAllUserPositions(userId: string): Promise<Position[]> {
-  const walletsSnapshot = await userCollection(userId, 'wallets').get();
-  const positionsByWallet = await Promise.all(
-    walletsSnapshot.docs.map((walletDoc) =>
-      walletDoc.ref.collection('positions').get(),
-    ),
-  );
-
-  return positionsByWallet.flatMap((positionsSnapshot) =>
-    positionsSnapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
-    ),
-  );
-}
-
-export async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
-  const items: FridgeItem[] = [];
-  const fridgesSnapshot = await userCollection(userId, 'fridges').get();
-
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({ id: itemDoc.id, ...itemDoc.data() } as FridgeItem);
-    }
-  }
-
-  return items;
-}
 
 export async function computeUserPatrimony(
   userId: string,
 ): Promise<{ totalWallet: number; totalFridge: number; total: number }> {
-  const [quotesSnapshot, positions, fridgeItems] = await Promise.all([
-    getFirestore().collection('quotes').get(),
+  const [quoteByTicker, positions, fridgeItems] = await Promise.all([
+    loadAllQuotePrices(),
     getAllUserPositions(userId),
-    fetchFridgeItems(userId),
+    getAllUserFridgeItems(userId),
   ]);
-
-  const quoteByTicker = new Map<string, number>();
-  for (const quoteDoc of quotesSnapshot.docs) {
-    const quote = quoteDoc.data() as Quote;
-    const price = validPrice(quote.price);
-    if (price !== undefined) {
-      quoteByTicker.set(quoteDoc.id.toUpperCase(), price);
-    }
-  }
 
   const valueOf = (
     item: { ticker: unknown; quantity: unknown },
@@ -120,7 +67,7 @@ export async function savePatrimonySnapshot(
     createdAt: new Date().toISOString(),
   };
 
-  await userCollection(userId, 'patrimonySnapshots').doc(date).set(snapshot);
+  await patrimonySnapshotsCollection(userId).doc(date).set(snapshot);
   return snapshot;
 }
 
@@ -128,7 +75,7 @@ export async function listPatrimonySnapshots(
   userId: string,
   limit = 365,
 ): Promise<PatrimonySnapshot[]> {
-  const snapshot = await userCollection(userId, 'patrimonySnapshots')
+  const snapshot = await patrimonySnapshotsCollection(userId)
     .orderBy('date', 'desc')
     .limit(limit)
     .get();
@@ -139,9 +86,7 @@ export async function listPatrimonySnapshots(
 }
 
 export async function saveAllPatrimonySnapshots(): Promise<void> {
-  const userDocuments = await getFirestore()
-    .collection('users')
-    .listDocuments();
+  const userDocuments = await usersCollection().listDocuments();
   let succeeded = 0;
   let failed = 0;
 

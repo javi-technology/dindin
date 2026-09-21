@@ -31,7 +31,7 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   keyGenerator: (req) => (req.ip ? ipKeyGenerator(req.ip) : UNKNOWN_IP_KEY),
-  message: { error: 'Too many requests' },
+  message: { error: 'Muitas requisições' },
   validate: { trustProxy: false },
 });
 
@@ -52,5 +52,5 @@ export const adminRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req: AuthRequest) =>
     req.user?.uid ?? ipKeyGenerator(req.ip ?? ''),
-  message: { error: 'Too many requests' },
+  message: { error: 'Muitas requisições' },
 });

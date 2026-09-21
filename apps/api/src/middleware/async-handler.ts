@@ -36,15 +36,6 @@ function exposeOf(error: unknown, statusCode: number): boolean {
 }
 
 /**
- * Erro 404 lançado de dentro de uma transação, onde não dá para responder
- * direto: o `asyncHandler` lê o `statusCode` e devolve a mensagem, que por
- * ser 4xx já é exposta ao cliente (issue #295).
- */
-export function notFound(message: string): Error & { statusCode: number } {
-  return Object.assign(new Error(message), { statusCode: 404 });
-}
-
-/**
  * Envolve um handler de rota, capturando qualquer erro não tratado (issue #222).
  *
  * Antes, cada um dos ~55 handlers repetia `try` → `console.error` → 500. Além
@@ -65,6 +56,11 @@ export function asyncHandler(name: string, handler: RouteHandler) {
     try {
       await handler(req, res);
     } catch (error) {
+      // O `cause` guarda o erro que originou este (ex.: a validação do
+      // parser do PDF convertida em 400). Sem o stack dele, o log aponta
+      // para a linha da conversão, não para a falha real (issue #304).
+      const cause = (error as { cause?: unknown }).cause;
+
       console.error(`[${name}] error:`, {
         method: req.method,
         path: req.path,
@@ -72,6 +68,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
         params: req.params,
         message: (error as Error).message,
         stack: (error as Error).stack,
+        ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
       });
 
       // Um handler pode falhar depois de já ter respondido; um segundo status
@@ -83,7 +80,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       res.status(code).json({
         error: exposeOf(error, code)
           ? (error as Error).message
-          : 'Internal server error',
+          : 'Erro interno do servidor',
       });
     }
   };

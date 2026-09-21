@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import { billingEventsCollection } from '../firestore/paths';
 import { getAuth } from 'firebase-admin/auth';
 import type Stripe from 'stripe';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -115,7 +115,7 @@ export async function handleWebhook(
     return;
   }
 
-  const eventDoc = getFirestore().collection('billingEvents').doc(event.id);
+  const eventDoc = billingEventsCollection().doc(event.id);
 
   try {
     const snapshot = await eventDoc.get();
@@ -125,7 +125,7 @@ export async function handleWebhook(
     }
   } catch (error) {
     console.error('[billing.webhook] erro ao consultar billingEvents', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
 
@@ -133,7 +133,7 @@ export async function handleWebhook(
     await processStripeEvent(event);
   } catch (error) {
     console.error('[billing.webhook]', event.type, (error as Error).message);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro interno do servidor' });
     return;
   }
 

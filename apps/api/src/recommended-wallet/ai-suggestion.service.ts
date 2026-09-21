@@ -9,13 +9,19 @@ import {
 } from 'dindin-models';
 import {
   compareWithWallet,
-  getQuotePrices,
   getRecommendedWallet,
 } from './recommended-wallet.service';
 import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
+import {
+  aiSuggestionUsageCollection,
+  aiSuggestionsCollection,
+} from '../firestore/paths';
+import { getQuotesByTicker } from '../quotes/quote-prices';
+import { validPrice } from '../shared/numbers';
 import { today } from '../shared/date';
+import { HttpError } from '../shared/http-error';
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -49,39 +55,6 @@ export interface AiSuggestionInput {
 const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
 export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
-
-type StatusError = Error & { statusCode?: number; expose?: boolean };
-
-/**
- * `expose: true` libera a mensagem para o cliente mesmo em 5xx. Só vale para
- * texto escrito para a tela; detalhe interno ("OPENROUTER_API_KEY não
- * configurada") não recebe a marca e sai como mensagem genérica.
- */
-function createError(
-  message: string,
-  statusCode: number,
-  { expose }: { expose?: boolean } = {},
-): StatusError {
-  return Object.assign(
-    new Error(message),
-    { statusCode },
-    expose === undefined ? {} : { expose },
-  );
-}
-
-function suggestionsCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestions');
-}
-
-function usageCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestionUsage');
-}
 
 function isTab(value: unknown): value is AiSuggestionTab {
   return value === 'renda' || value === 'ganho';
@@ -723,7 +696,7 @@ export async function callOpenRouter(
   user: string,
 ): Promise<{ content: string; model: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw createError('OPENROUTER_API_KEY não configurada', 500);
+  if (!apiKey) throw HttpError.internal('OPENROUTER_API_KEY não configurada');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
   const requestBody = {
@@ -763,9 +736,7 @@ export async function callOpenRouter(
       response = await request(retryBody);
       if (!response.ok) {
         await logResponseError(response);
-        throw createError('Falha ao consultar o provedor de IA', 502, {
-          expose: true,
-        });
+        throw HttpError.badGateway('Falha ao consultar o provedor de IA');
       }
     }
     const data: unknown = await response.json();
@@ -782,9 +753,7 @@ export async function callOpenRouter(
         '[callOpenRouter] resposta inesperada',
         serialized.slice(0, 500),
       );
-      throw createError('Falha ao consultar o provedor de IA', 502, {
-        expose: true,
-      });
+      throw HttpError.badGateway('Falha ao consultar o provedor de IA');
     }
     const result = data as {
       model: string;
@@ -795,14 +764,12 @@ export async function callOpenRouter(
     if (
       typeof error === 'object' &&
       error !== null &&
-      (error as StatusError).statusCode === 502
+      (error as HttpError).statusCode === 502
     ) {
       throw error;
     }
     console.error('[callOpenRouter] falha', error);
-    throw createError('Falha ao consultar o provedor de IA', 502, {
-      expose: true,
-    });
+    throw HttpError.badGateway('Falha ao consultar o provedor de IA');
   } finally {
     clearTimeout(timeout);
   }
@@ -832,14 +799,14 @@ export async function reserveDailySuggestion(
   now: Date = new Date(),
 ): Promise<string> {
   const day = today(now);
-  const reference = usageCollection(uid).doc(day);
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
 
   await getFirestore().runTransaction(async (transaction) => {
     const document = await transaction.get(reference);
     const count = (document.data()?.count as number | undefined) ?? 0;
 
     if (count >= DAILY_SUGGESTION_LIMIT) {
-      throw createError('Limite diário de sugestões atingido', 429);
+      throw HttpError.tooManyRequests('Limite diário de sugestões atingido');
     }
 
     transaction.set(reference, {
@@ -862,7 +829,7 @@ export async function releaseDailySuggestion(
   uid: string,
   day: string,
 ): Promise<void> {
-  const reference = usageCollection(uid).doc(day);
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
 
   await getFirestore().runTransaction(async (transaction) => {
     const document = await transaction.get(reference);
@@ -896,7 +863,7 @@ export async function getSavedSuggestion(
   tab: AiSuggestionTab,
 ): Promise<AiSuggestion | null> {
   const id = suggestionId(walletId, month, tab);
-  const doc = await suggestionsCollection(uid).doc(id).get();
+  const doc = await aiSuggestionsCollection(uid).doc(id).get();
   if (!doc.exists) return null;
   const { input: _input, ...data } = doc.data() as AiSuggestion & {
     input?: AiSuggestionInput;
@@ -912,7 +879,7 @@ export async function generateSuggestion(
   force: boolean,
   contribution?: number,
 ): Promise<AiSuggestion> {
-  if (!isTab(tab)) throw createError('Aba inválida', 400);
+  if (!isTab(tab)) throw HttpError.badRequest('Aba inválida');
   const comparison = await compareWithWallet(uid, walletId, month, tab);
   const historyMonths = previousMonths(comparison.recommended.month);
   const historyWallets = (
@@ -991,15 +958,36 @@ async function buildAndSaveSuggestion({
   contribution,
   saved,
 }: BuildSuggestionArgs): Promise<AiSuggestion> {
-  const [income, quotePrices, qualifiedTickers] = await Promise.all([
+  // Só os tickers em jogo: os da comparação (posições do usuário) e os da
+  // carteira recomendada do mês (issue #299). A mesma leitura serve para
+  // preço e provento — `computeMonthlyIncome` só conhece o que o usuário já
+  // tem, e os recomendados que faltam na carteira são justamente os que a IA
+  // precisa avaliar.
+  const tickersInPlay = [
+    ...comparison.items.map((item) => item.ticker),
+    ...comparison.recommended[tab].map((asset) => asset.ticker),
+  ];
+  const [income, quotes, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
-    getQuotePrices(),
+    getQuotesByTicker(tickersInPlay),
     listQualifiedInvestorTickers(),
   ]);
+
+  const quotePrices = new Map<string, number>();
+  const monthlyDividendByTicker = new Map(income.monthlyDividendByTicker);
+  for (const [ticker, quote] of quotes) {
+    const price = validPrice(quote.price);
+    if (price !== undefined) quotePrices.set(ticker, price);
+
+    const monthlyDividend = validPrice(quote.monthlyDividend);
+    if (monthlyDividend !== undefined && !monthlyDividendByTicker.has(ticker)) {
+      monthlyDividendByTicker.set(ticker, monthlyDividend);
+    }
+  }
   const input = buildSuggestionInput(
     comparison,
     tab,
-    income.monthlyDividendByTicker,
+    monthlyDividendByTicker,
     contribution,
     history,
     income.total,
@@ -1063,7 +1051,7 @@ async function buildAndSaveSuggestion({
       ? { appliedItems: saved.appliedItems }
       : {}),
   };
-  await suggestionsCollection(uid)
+  await aiSuggestionsCollection(uid)
     .doc(id)
     .set({ ...suggestion, input });
   return suggestion;

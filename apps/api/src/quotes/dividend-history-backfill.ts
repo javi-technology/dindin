@@ -1,4 +1,7 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import {
+  quoteDividendHistoryCollection,
+  quoteHistoryCollection,
+} from '../firestore/paths';
 import { MonthlyDividendHistory, QuoteHistory } from 'dindin-models';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,16 +61,14 @@ export function buildMonthlyEntries(
 export async function backfillTickerDividendHistory(
   ticker: string,
 ): Promise<number> {
-  const firestore = getFirestore();
-  const quoteRef = firestore.collection('quotes').doc(ticker);
-  const snapshot = await quoteRef.collection('history').get();
+  const snapshot = await quoteHistoryCollection(ticker).get();
 
   const entries = buildMonthlyEntries(
     snapshot.docs.map((doc) => doc.data() as QuoteHistory),
   );
 
   for (const entry of entries) {
-    await quoteRef.collection('dividendHistory').doc(entry.month).set(entry);
+    await quoteDividendHistoryCollection(ticker).doc(entry.month).set(entry);
   }
 
   return entries.length;

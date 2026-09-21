@@ -60,7 +60,8 @@ export const getDividendHistoryBatch = asyncHandler(
 
     if (typeof tickers !== 'string' || tickers.trim().length === 0) {
       res.status(400).json({
-        error: 'Tickers is required and must be a comma-separated list',
+        error:
+          'Tickers é obrigatório e deve ser uma lista separada por vírgula',
       });
       return;
     }
@@ -76,7 +77,7 @@ export const getDividendHistoryBatch = asyncHandler(
 
     if (requested.length === 0 || requested.length > MAX_TICKERS) {
       res.status(400).json({
-        error: `Tickers must contain between 1 and ${MAX_TICKERS} items`,
+        error: `Tickers deve conter entre 1 e ${MAX_TICKERS} itens`,
       });
       return;
     }
@@ -84,7 +85,7 @@ export const getDividendHistoryBatch = asyncHandler(
     const months = parseMonths(req.query.months);
     if (months === null) {
       res.status(400).json({
-        error: `Months must be an integer between ${MIN_MONTHS} and ${MAX_MONTHS}`,
+        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
       });
       return;
     }
@@ -117,14 +118,14 @@ export const getDividendHistory = asyncHandler(
     if (ticker.length === 0) {
       res
         .status(400)
-        .json({ error: 'Ticker is required and must be a non-empty string' });
+        .json({ error: 'Ticker é obrigatório e deve ser um texto não vazio' });
       return;
     }
 
     const months = parseMonths(req.query.months);
     if (months === null) {
       res.status(400).json({
-        error: `Months must be an integer between ${MIN_MONTHS} and ${MAX_MONTHS}`,
+        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
       });
       return;
     }

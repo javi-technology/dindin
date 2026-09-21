@@ -1,5 +1,8 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { FridgeItem, Position, Quote } from 'dindin-models';
+import { Position } from 'dindin-models';
+import { positionsCollection } from '../firestore/paths';
+import { getQuotesByTicker } from '../quotes/quote-prices';
+import { roundCurrency, validQuantity } from '../shared/numbers';
+import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 
 export interface MonthlyIncomeItem {
   ticker: string;
@@ -17,52 +20,31 @@ export interface MonthlyIncome {
   monthlyDividendByTicker: Map<string, number>;
 }
 
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
-
-function fridgesCollection(userId: string) {
-  return getFirestore().collection('users').doc(userId).collection('fridges');
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-export async function fetchFridgeItems(userId: string): Promise<FridgeItem[]> {
-  const items: FridgeItem[] = [];
-  const fridgesSnapshot = await fridgesCollection(userId).get();
-
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const itemsSnapshot = await fridgeDoc.ref.collection('fridgeItems').get();
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({ id: itemDoc.id, ...itemDoc.data() } as FridgeItem);
-    }
-  }
-
-  return items;
-}
+export const fetchFridgeItems = getAllUserFridgeItems;
 
 export async function computeMonthlyIncome(
   userId: string,
   walletId: string,
 ): Promise<MonthlyIncome> {
-  const [positionsSnapshot, quotesSnapshot, fridgeItems] = await Promise.all([
+  const [positionsSnapshot, fridgeItems] = await Promise.all([
     positionsCollection(userId, walletId).get(),
-    getFirestore().collection('quotes').get(),
     fetchFridgeItems(userId),
+  ]);
+
+  // Só as cotações dos ativos do usuário: varrer `quotes` cobrava uma leitura
+  // por ativo do catálogo a cada requisição, e esta rota é chamada uma vez
+  // por carteira (issue #299).
+  const positions = positionsSnapshot.docs.map(
+    (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+  );
+  const quotes = await getQuotesByTicker([
+    ...positions.map((position) => position.ticker),
+    ...fridgeItems.map((item) => item.ticker),
   ]);
 
   const monthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
-  for (const doc of quotesSnapshot.docs) {
-    const data = doc.data() as Quote;
-    const ticker = doc.id.toUpperCase();
+  for (const [ticker, data] of quotes) {
     if (typeof data.dividendPaymentDate === 'string') {
       paymentDateByTicker.set(ticker, data.dividendPaymentDate);
     }
@@ -77,15 +59,10 @@ export async function computeMonthlyIncome(
   const byTicker: MonthlyIncomeItem[] = [];
   let total = 0;
 
-  for (const doc of positionsSnapshot.docs) {
-    const position = { id: doc.id, ...doc.data() } as Position;
+  for (const position of positions) {
     const monthlyDividend =
       monthlyDividendByTicker.get(position.ticker.toUpperCase()) ?? 0;
-    const quantity =
-      typeof position.quantity === 'number' &&
-      Number.isFinite(position.quantity)
-        ? position.quantity
-        : 0;
+    const quantity = validQuantity(position.quantity);
     const monthlyIncome = roundCurrency(quantity * monthlyDividend);
     const paymentDate = paymentDateByTicker.get(position.ticker.toUpperCase());
 
@@ -103,10 +80,7 @@ export async function computeMonthlyIncome(
   for (const item of fridgeItems) {
     const monthlyDividend =
       monthlyDividendByTicker.get(item.ticker.toUpperCase()) ?? 0;
-    const quantity =
-      typeof item.quantity === 'number' && Number.isFinite(item.quantity)
-        ? item.quantity
-        : 0;
+    const quantity = validQuantity(item.quantity);
     totalFromFridge += quantity * monthlyDividend;
   }
   totalFromFridge = roundCurrency(totalFromFridge);

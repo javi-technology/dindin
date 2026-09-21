@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
 import { uid } from '../firestore/paths';
 import { parseBbFileName } from './bb-pdf.parser';
 import { saveBbPdf } from './storage.service';
@@ -96,9 +97,7 @@ export const importRecommended = asyncHandler(
       );
     } catch (error) {
       // Falha ao interpretar o PDF enviado é erro do cliente, não interno.
-      const inputError = error as Error & { statusCode?: number };
-      inputError.statusCode = 400;
-      throw inputError;
+      throw HttpError.badRequest((error as Error).message, { cause: error });
     }
 
     const sourceFile = await saveBbPdf(fileName, buffer);

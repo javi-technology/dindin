@@ -265,6 +265,20 @@ Monorepo estruturado da seguinte forma:
   preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
   markup do modal na feature.
 
+### Erros da API
+
+- Falha de negócio é sinalizada com **`HttpError`** (`apps/api/src/shared/http-error.ts`),
+  nunca com `Object.assign(new Error(...), { statusCode })` à mão: use as
+  fábricas `badRequest`, `notFound`, `conflict`, `tooManyRequests`,
+  `badGateway` e `internal`. O `asyncHandler` traduz `statusCode`/`expose` em
+  resposta.
+- `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não. Só marque
+  um 5xx como exposto quando o texto for escrito para a tela (ex.: o 502 do
+  provedor de IA).
+- **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
+  tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
+  contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.
+
 ### Logs
 
 - Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).

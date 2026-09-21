@@ -539,7 +539,7 @@ describe('Position CRUD', () => {
         });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Wallet not found' });
+      expect(response.body).toEqual({ error: 'Carteira não encontrada' });
     });
 
     it('deve retornar 400 quando ticker não é informado', async () => {
@@ -604,7 +604,7 @@ describe('Position CRUD', () => {
         .post('/api/wallets/wallet-1/positions')
         .set('Authorization', authHeader)
         .send({
-          ticker: 'INEXISTENTE11',
+          ticker: 'ZZZZ11',
           quantity: 10,
           averagePrice: 110.5,
           assetType: 'FII',
@@ -728,7 +728,7 @@ describe('Position CRUD', () => {
       const response = await request(app)
         .put('/api/wallets/wallet-1/positions/position-1')
         .set('Authorization', authHeader)
-        .send({ ticker: 'INEXISTENTE11' });
+        .send({ ticker: 'ZZZZ11' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('catálogo');
@@ -848,7 +848,7 @@ describe('Position CRUD', () => {
         .send({ fridgeId: 'fridge-1', targetPrice: 120 });
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Position not found');
+      expect(response.body.error).toContain('Posição não encontrada');
     });
 
     it('deve retornar 404 se geladeira não existe', async () => {
@@ -860,7 +860,7 @@ describe('Position CRUD', () => {
         .send({ fridgeId: 'fridge-inexistente', targetPrice: 120 });
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toContain('Fridge not found');
+      expect(response.body.error).toContain('Geladeira não encontrada');
     });
 
     it('deve retornar 400 se fridgeId não informado', async () => {

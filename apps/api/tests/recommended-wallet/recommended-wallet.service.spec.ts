@@ -234,17 +234,19 @@ describe('recommended-wallet.service', () => {
         })),
       })),
     };
-    const quotes = {
-      get: jest.fn().mockResolvedValue({
-        docs: [
-          {
-            id: 'MXRF11',
-            data: () => ({ price: 9.18 }),
-          },
-        ],
-      }),
+    // As cotações passaram a ser buscadas por ticker, com getAll (issue #299).
+    const quotePrices: Record<string, { price: number }> = {
+      MXRF11: { price: 9.18 },
     };
+    const quotes = { doc: jest.fn((ticker: string) => ({ id: ticker })) };
     firestoreMock = {
+      getAll: jest.fn(async (...refs: { id: string }[]) =>
+        refs.map((ref) => ({
+          id: ref.id,
+          exists: quotePrices[ref.id] !== undefined,
+          data: () => quotePrices[ref.id],
+        })),
+      ),
       collection: jest.fn((name: string) => {
         if (name === 'recommendedWallets') {
           return {

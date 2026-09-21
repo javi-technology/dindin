@@ -135,7 +135,7 @@ describe('checkout abandonado após concessão manual expirada (#173)', () => {
 
     expect(response.status).toBe(403);
     expect(response.body).toEqual({
-      error: 'Forbidden',
+      error: 'Acesso negado',
       code: 'SUBSCRIPTION_REQUIRED',
     });
     expect(getSavedSuggestionMock).not.toHaveBeenCalled();

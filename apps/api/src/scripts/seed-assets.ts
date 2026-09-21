@@ -26,6 +26,7 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Asset, AssetType } from 'dindin-models';
+import { assetsCollection } from '../firestore/paths';
 
 interface SeedAsset {
   ticker: string;
@@ -53,7 +54,7 @@ const SEED_ASSETS: SeedAsset[] = [
 
 async function seedAssets(): Promise<void> {
   initializeApp();
-  const assetsCollection = getFirestore().collection('assets');
+  const assets = assetsCollection();
   const now = new Date().toISOString();
 
   const batch = getFirestore().batch();
@@ -64,7 +65,7 @@ async function seedAssets(): Promise<void> {
       createdAt: now,
       updatedAt: now,
     };
-    batch.set(assetsCollection.doc(seed.ticker), asset, { merge: true });
+    batch.set(assets.doc(seed.ticker), asset, { merge: true });
   }
   await batch.commit();
 

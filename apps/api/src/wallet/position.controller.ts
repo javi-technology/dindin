@@ -1,13 +1,22 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import type { FridgeItem, Position } from 'dindin-models';
-import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-history.service';
-import { asyncHandler, notFound } from '../middleware/async-handler';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
+import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
+import {
+  assetTypeField,
+  nonNegativeNumberField,
+  parseBody,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 import {
   uid,
+  fridgeItemsCollection,
   positionsCollection,
   fridgesCollection,
   walletsCollection,
@@ -34,83 +43,19 @@ async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
   }));
 }
 
-function validatePositionBody(
-  body: Partial<Position>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, averagePrice, assetType } = body;
+const positionSchema = z.object({
+  ticker: tickerField(),
+  quantity: positiveNumberField('Quantidade'),
+  averagePrice: nonNegativeNumberField('Preço médio'),
+  assetType: assetTypeField(),
+  inFridge: z.boolean({ error: 'inFridge deve ser booleano' }).optional(),
+  // `null` remove o preço-alvo gravado.
+  targetPrice: nonNegativeNumberField('Preço-alvo').nullish(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker is required and must be a non-empty string',
-      };
-    }
-  }
-
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantity is required and must be a positive number',
-      };
-    }
-  }
-
-  if (!allowPartial || averagePrice !== undefined) {
-    if (
-      typeof averagePrice !== 'number' ||
-      averagePrice < 0 ||
-      !Number.isFinite(averagePrice)
-    ) {
-      return {
-        valid: false,
-        error: 'Average price is required and must be a non-negative number',
-      };
-    }
-  }
-
-  if (!allowPartial || assetType !== undefined) {
-    if (!isAssetType(assetType)) {
-      return {
-        valid: false,
-        error: `Asset type is required and must be one of: ${ASSET_TYPES.join(', ')}`,
-      };
-    }
-  }
-
-  // currentPrice não é mais aceito no cadastro/atualização de posições:
-  // é resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
-  // valor enviado pelo cliente é silenciosamente ignorado por
-  // createPosition/updatePosition, então não é validado aqui.
-
-  if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
-    return {
-      valid: false,
-      error: 'inFridge must be a boolean',
-    };
-  }
-
-  if (
-    body.targetPrice !== undefined &&
-    body.targetPrice !== null &&
-    (typeof body.targetPrice !== 'number' ||
-      body.targetPrice < 0 ||
-      !Number.isFinite(body.targetPrice))
-  ) {
-    return {
-      valid: false,
-      error: 'Target price must be a non-negative number',
-    };
-  }
-
-  return { valid: true };
-}
+// currentPrice não é aceito no cadastro/atualização: é resolvido a partir de
+// `quotes/{ticker}` na leitura (issue #86). Um valor enviado é ignorado.
+const updatePositionSchema = positionSchema.partial();
 
 export const listPositions = asyncHandler(
   'listPositions',
@@ -129,13 +74,13 @@ export const createPosition = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
     const walletId = req.params.walletId;
-    const body = req.body as Partial<Position>;
-
-    const validation = validatePositionBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(positionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+
+    const body = parsed.data;
 
     // Sem esta checagem a posição nasce órfã sob uma carteira inexistente:
     // a API não a alcança, porque navega a partir das carteiras, mas o
@@ -144,11 +89,11 @@ export const createPosition = asyncHandler(
     // mesma verificação que `createItem` já faz com a geladeira.
     const walletDoc = await walletsCollection(userId).doc(walletId).get();
     if (!walletDoc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
-    const ticker = body.ticker!.trim().toUpperCase();
+    const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
       res.status(400).json({
         error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -162,15 +107,15 @@ export const createPosition = asyncHandler(
     const positionData: Omit<Position, 'id'> = {
       walletId,
       ticker,
-      assetType: body.assetType!,
-      quantity: body.quantity!,
-      averagePrice: body.averagePrice!,
+      assetType: body.assetType,
+      quantity: body.quantity,
+      averagePrice: body.averagePrice,
       inFridge: body.inFridge ?? false,
       createdAt: now,
       updatedAt: now,
     };
 
-    if (body.targetPrice !== undefined) {
+    if (body.targetPrice !== undefined && body.targetPrice !== null) {
       positionData.targetPrice = body.targetPrice;
     }
 
@@ -188,7 +133,7 @@ export const getPosition = asyncHandler(
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -206,20 +151,19 @@ export const updatePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
-    const body = req.body as Partial<Position>;
-    const validation = validatePositionBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updatePositionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    let ticker: string | undefined;
-    if (body.ticker !== undefined) {
-      ticker = body.ticker.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
+    if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
         res.status(400).json({
           error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -264,7 +208,7 @@ export const deletePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -285,7 +229,7 @@ export const moveToFridge = asyncHandler(
 
     // Validação dos campos obrigatórios
     if (!fridgeId || typeof fridgeId !== 'string') {
-      res.status(400).json({ error: 'fridgeId is required' });
+      res.status(400).json({ error: 'fridgeId é obrigatório' });
       return;
     }
 
@@ -297,14 +241,14 @@ export const moveToFridge = asyncHandler(
       !Number.isFinite(targetPrice)
     ) {
       res.status(400).json({
-        error: 'targetPrice is required and must be a non-negative number',
+        error: 'targetPrice é obrigatório e deve ser um número não negativo',
       });
       return;
     }
 
     const positionRef = positionsCollection(userId, walletId).doc(positionId);
     const fridgeRef = fridgesCollection(userId).doc(fridgeId);
-    const fridgeItemRef = fridgeRef.collection('fridgeItems').doc();
+    const fridgeItemRef = fridgeItemsCollection(userId, fridgeId).doc();
 
     // A posição é lida dentro da transação, não antes dela: `delete` de um
     // documento que já sumiu não falha, então com a leitura fora duas
@@ -317,8 +261,10 @@ export const moveToFridge = asyncHandler(
           transaction.get(fridgeRef),
         ]);
 
-        if (!positionDoc.exists) throw notFound('Position not found');
-        if (!fridgeDoc.exists) throw notFound('Fridge not found');
+        if (!positionDoc.exists)
+          throw HttpError.notFound('Posição não encontrada');
+        if (!fridgeDoc.exists)
+          throw HttpError.notFound('Geladeira não encontrada');
 
         const positionData = positionDoc.data() as Position;
         const now = new Date().toISOString();
