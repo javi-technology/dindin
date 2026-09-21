@@ -18,6 +18,7 @@ jest.mock('firebase-functions/logger', () => ({
 }));
 
 import {
+  isMissingCredentialsError,
   migrateLegacyAutoDividends,
   removeLegacyCurrentPrice,
 } from '../../src/scripts/migrate-legacy-data';
@@ -262,6 +263,31 @@ describe('scripts/migrate-legacy-data', () => {
 
       expect(result).toEqual({ migrated: 0, skipped: 1 });
       expect(writes).toHaveLength(0);
+    });
+  });
+
+  // Sem credenciais o google-auth lança um stack longo e pouco acionável; o
+  // script precisa reconhecer esse caso e dizer o que fazer.
+  describe('isMissingCredentialsError', () => {
+    it('deve reconhecer a falta de Application Default Credentials', () => {
+      const error = new Error(
+        'Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started',
+      );
+
+      expect(isMissingCredentialsError(error)).toBe(true);
+    });
+
+    it('deve reconhecer a falta de projeto configurado', () => {
+      expect(
+        isMissingCredentialsError(new Error('Unable to detect a Project Id')),
+      ).toBe(true);
+    });
+
+    it('não deve confundir com outras falhas', () => {
+      expect(isMissingCredentialsError(new Error('Firestore caiu'))).toBe(
+        false,
+      );
+      expect(isMissingCredentialsError('texto solto')).toBe(false);
     });
   });
 });

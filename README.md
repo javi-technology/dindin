@@ -271,12 +271,29 @@ Duas mudanças anteriores deixaram resíduo no Firestore, e o script
    usa `YYYY-MM-DD_TICKER`. Enquanto existirem, `dividend-sync-record`
    precisa do tratamento especial `LEGACY_AUTO_ID`.
 
-O script **simula por padrão** e é idempotente:
+O script **simula por padrão** e é idempotente. Requer credenciais com
+permissão de escrita no Firestore do projeto, como os demais scripts:
 
 ```bash
-npm run migrate:legacy --workspace=apps/api            # simula e conta
-npm run migrate:legacy --workspace=apps/api -- --apply # aplica
+# simula e conta
+GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+  npm run migrate:legacy --workspace=apps/api
+
+# aplica
+GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+  npm run migrate:legacy --workspace=apps/api -- --apply
 ```
+
+Para ensaiar sem tocar em produção, aponte para o emulador:
+
+```bash
+firebase emulators:start --only firestore   # em outro terminal
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=dindin-4e720 \
+  npm run migrate:legacy --workspace=apps/api -- --apply
+```
+
+Sem credencial, o script para com `migrateLegacyData.missingCredentials` e a
+instrução do que definir — em vez do stack do `google-auth`.
 
 Depois de aplicado em produção, o tratamento `LEGACY_AUTO_ID` em
 `dividend-sync-record.service.ts` pode ser removido.

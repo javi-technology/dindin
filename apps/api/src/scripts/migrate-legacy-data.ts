@@ -14,8 +14,19 @@
  * rodar de novo não faz nada, porque procura exatamente o que ainda não foi
  * migrado.
  *
- *   npm run migrate:legacy --workspace=apps/api            # simula
- *   npm run migrate:legacy --workspace=apps/api -- --apply # aplica
+ * Uso (a partir da raiz do repositório), com credenciais de escrita no
+ * Firestore do projeto — `gcloud auth application-default login` ou uma
+ * service account key:
+ *
+ *   GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+ *     npm run migrate:legacy --workspace=apps/api            # simula
+ *   GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+ *     npm run migrate:legacy --workspace=apps/api -- --apply # aplica
+ *
+ * Para ensaiar contra o emulador, sem tocar em produção:
+ *
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+ *     npm run migrate:legacy --workspace=apps/api -- --apply
  */
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -129,6 +140,19 @@ export async function migrateLegacyAutoDividends({
   return result;
 }
 
+/**
+ * Falta de credencial do Google. O `google-auth` lança um stack longo e pouco
+ * acionável; o script prefere dizer o que fazer.
+ */
+export function isMissingCredentialsError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  return (
+    error.message.includes('Could not load the default credentials') ||
+    error.message.includes('Unable to detect a Project Id')
+  );
+}
+
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
 
@@ -155,6 +179,18 @@ async function main(): Promise<void> {
 // Só executa quando chamado direto, não quando importado pelos testes.
 if (require.main === module) {
   main().catch((error) => {
+    if (isMissingCredentialsError(error)) {
+      logError('migrateLegacyData.missingCredentials', {
+        hint:
+          'defina GOOGLE_APPLICATION_CREDENTIALS com uma service account ' +
+          '(ex.: GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json), rode ' +
+          '`gcloud auth application-default login`, ou aponte para o ' +
+          'emulador com FIRESTORE_EMULATOR_HOST=127.0.0.1:8080',
+      });
+      process.exitCode = 1;
+      return;
+    }
+
     logError('migrateLegacyData.failed', {
       message: (error as Error).message,
     });
