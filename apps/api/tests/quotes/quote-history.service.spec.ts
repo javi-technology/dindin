@@ -12,7 +12,6 @@ jest.mock('firebase-admin/firestore', () => ({
 import {
   saveQuoteHistory,
   getQuoteHistory,
-  getQuotePricesByTicker,
 } from '../../src/quotes/quote-history.service';
 
 describe('QuoteHistoryService', () => {
@@ -338,101 +337,5 @@ describe('QuoteHistoryService', () => {
 
       expect(result).toEqual([]);
     });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getQuotePricesByTicker (issue #221)
-// Antes, resolver o preço de N tickers custava N leituras do Firestore, uma
-// por ticker. Uma carteira com 30 ativos distintos fazia 30 leituras a cada
-// GET de posições. Agora vai numa única viagem via getAll().
-// ---------------------------------------------------------------------------
-
-describe('getQuotePricesByTicker', () => {
-  /** Mock que registra quantas viagens ao Firestore foram feitas. */
-  function createFirestoreMock(prices: Record<string, number | undefined>) {
-    const getAll = jest.fn((...refs: { id: string }[]) =>
-      Promise.resolve(
-        refs.map((ref) => ({
-          id: ref.id,
-          exists: prices[ref.id] !== undefined,
-          data: () => ({ ticker: ref.id, price: prices[ref.id] }),
-        })),
-      ),
-    );
-
-    return {
-      getAll,
-      collection: jest.fn((path: string) => {
-        if (path !== 'quotes') throw new Error(`Unexpected: ${path}`);
-        return { doc: jest.fn((id: string) => ({ id })) };
-      }),
-    };
-  }
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('deve resolver N tickers numa única ida ao Firestore', async () => {
-    const mock = createFirestoreMock({
-      HGLG11: 160.5,
-      XPML11: 104.2,
-      MXRF11: 10.1,
-    });
-    firestoreMock = mock;
-
-    const prices = await getQuotePricesByTicker(['HGLG11', 'XPML11', 'MXRF11']);
-
-    expect(mock.getAll).toHaveBeenCalledTimes(1);
-    expect(prices.get('HGLG11')).toBe(160.5);
-    expect(prices.get('XPML11')).toBe(104.2);
-    expect(prices.get('MXRF11')).toBe(10.1);
-  });
-
-  it('deve omitir ticker sem cotação em vez de retornar zero', async () => {
-    firestoreMock = createFirestoreMock({ HGLG11: 160.5 });
-
-    const prices = await getQuotePricesByTicker(['HGLG11', 'DESCONHECIDO11']);
-
-    expect(prices.get('HGLG11')).toBe(160.5);
-    expect(prices.has('DESCONHECIDO11')).toBe(false);
-  });
-
-  // O getAll() do Firestore rejeita chamada sem nenhum documento.
-  it('não deve chamar getAll com lista vazia', async () => {
-    const mock = createFirestoreMock({});
-    firestoreMock = mock;
-
-    const prices = await getQuotePricesByTicker([]);
-
-    expect(mock.getAll).not.toHaveBeenCalled();
-    expect(prices.size).toBe(0);
-  });
-
-  it('deve deduplicar tickers repetidos', async () => {
-    const mock = createFirestoreMock({ HGLG11: 160.5 });
-    firestoreMock = mock;
-
-    await getQuotePricesByTicker(['HGLG11', 'HGLG11', 'HGLG11']);
-
-    expect(mock.getAll).toHaveBeenCalledTimes(1);
-    expect(mock.getAll.mock.calls[0]).toHaveLength(1);
-  });
-
-  // getAll() aceita no máximo 500 documentos por chamada.
-  it('deve fatiar em lotes de 500 acima do limite', async () => {
-    const tickers = Array.from({ length: 501 }, (_, i) => `TICK${i}`);
-    const mock = createFirestoreMock(
-      Object.fromEntries(tickers.map((t) => [t, 1])),
-    );
-    firestoreMock = mock;
-
-    const prices = await getQuotePricesByTicker(tickers);
-
-    expect(mock.getAll).toHaveBeenCalledTimes(2);
-    expect(mock.getAll.mock.calls[0]).toHaveLength(500);
-    expect(mock.getAll.mock.calls[1]).toHaveLength(1);
-    expect(prices.size).toBe(501);
   });
 });

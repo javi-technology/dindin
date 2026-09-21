@@ -19,6 +19,8 @@ import {
   aiSuggestionUsageCollection,
   aiSuggestionsCollection,
 } from '../firestore/paths';
+import { getQuotesByTicker } from '../quotes/quote-prices';
+import { validPrice } from '../shared/numbers';
 import { today } from '../shared/date';
 import { HttpError } from '../shared/http-error';
 
@@ -958,19 +960,35 @@ async function buildAndSaveSuggestion({
   saved,
 }: BuildSuggestionArgs): Promise<AiSuggestion> {
   // Só os tickers em jogo: os da comparação (posições do usuário) e os da
-  // carteira recomendada do mês (issue #299).
-  const [income, quotePrices, qualifiedTickers] = await Promise.all([
+  // carteira recomendada do mês (issue #299). A mesma leitura serve para
+  // preço e provento — `computeMonthlyIncome` só conhece o que o usuário já
+  // tem, e os recomendados que faltam na carteira são justamente os que a IA
+  // precisa avaliar.
+  const tickersInPlay = [
+    ...comparison.items.map((item) => item.ticker),
+    ...comparison.recommended[tab].map((asset) => asset.ticker),
+  ];
+  const [income, quotes, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
-    getQuotePrices([
-      ...comparison.items.map((item) => item.ticker),
-      ...comparison.recommended[tab].map((asset) => asset.ticker),
-    ]),
+    getQuotesByTicker(tickersInPlay),
     listQualifiedInvestorTickers(),
   ]);
+
+  const quotePrices = new Map<string, number>();
+  const monthlyDividendByTicker = new Map(income.monthlyDividendByTicker);
+  for (const [ticker, quote] of quotes) {
+    const price = validPrice(quote.price);
+    if (price !== undefined) quotePrices.set(ticker, price);
+
+    const monthlyDividend = validPrice(quote.monthlyDividend);
+    if (monthlyDividend !== undefined && !monthlyDividendByTicker.has(ticker)) {
+      monthlyDividendByTicker.set(ticker, monthlyDividend);
+    }
+  }
   const input = buildSuggestionInput(
     comparison,
     tab,
-    income.monthlyDividendByTicker,
+    monthlyDividendByTicker,
     contribution,
     history,
     income.total,

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';

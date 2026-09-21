@@ -98,8 +98,13 @@ export async function getQuotesByTicker(
   return quotes;
 }
 
-/** Mapa `ticker → preço` apenas dos tickers informados. */
-export async function getQuotePricesByTickers(
+/**
+ * Mapa `ticker → preço` apenas dos tickers informados (issue #221).
+ *
+ * Tickers repetidos são deduplicados e os sem cotação ficam **fora** do Map,
+ * em vez de virarem zero: quem chama distingue "sem cotação" de "vale zero".
+ */
+export async function getQuotePricesByTicker(
   tickers: string[],
 ): Promise<Map<string, number>> {
   const quotes = await getQuotesByTicker(tickers);

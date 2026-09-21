@@ -132,47 +132,6 @@ export async function getMonthlyDividendHistory(
     .reverse();
 }
 
-/** Máximo de documentos aceitos numa chamada de `getAll` do Firestore. */
-const GET_ALL_LIMIT = 500;
-
-/**
- * Resolve o preço de vários tickers numa única ida ao Firestore (issue #221).
- *
- * A versão anterior lia um ticker por vez. Chamada em `Promise.all` sobre a
- * lista de tickers de uma carteira, o custo e a latência crescem linearmente
- * com a diversificação — 30 ativos distintos custavam 30 leituras a cada
- * listagem de posições. `getAll` resolve o mesmo em uma viagem.
- *
- * Tickers repetidos são deduplicados e os sem cotação ficam **fora** do Map,
- * em vez de virarem zero: quem chama distingue "sem cotação" de "vale zero".
- */
-export async function getQuotePricesByTicker(
-  tickers: string[],
-): Promise<Map<string, number>> {
-  const unique = [...new Set(tickers)];
-  const prices = new Map<string, number>();
-
-  // getAll() rejeita chamada sem nenhum documento.
-  if (unique.length === 0) return prices;
-
-  const firestore = getFirestore();
-
-  for (let index = 0; index < unique.length; index += GET_ALL_LIMIT) {
-    const batch = unique.slice(index, index + GET_ALL_LIMIT);
-    const snapshots = await firestore.getAll(
-      ...batch.map((ticker) => quotesCollection().doc(ticker)),
-    );
-
-    snapshots.forEach((snapshot) => {
-      if (!snapshot.exists) return;
-      const { price } = snapshot.data() as Quote;
-      if (typeof price === 'number') prices.set(snapshot.id, price);
-    });
-  }
-
-  return prices;
-}
-
 export async function getQuoteHistory(
   ticker: string,
   limit = 30,

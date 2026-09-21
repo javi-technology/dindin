@@ -3,7 +3,7 @@ import {
   positionsCollection,
   recommendedWalletsCollection,
 } from '../firestore/paths';
-import { getQuotePricesByTickers } from '../quotes/quote-prices';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { currentMonth } from '../shared/date';
 import { HttpError } from '../shared/http-error';
 import {
@@ -165,7 +165,7 @@ export async function confirmRecommendedWallet(
 export async function getQuotePrices(
   tickers: string[],
 ): Promise<Map<string, number>> {
-  return getQuotePricesByTickers(tickers);
+  return getQuotePricesByTicker(tickers);
 }
 
 export async function compareWithWallet(
@@ -185,7 +185,7 @@ export async function compareWithWallet(
   );
   // Os recomendados entram na busca porque a comparação mostra também o que
   // o usuário ainda não tem na carteira.
-  const quotesByTicker = await getQuotePricesByTickers([
+  const quotesByTicker = await getQuotePricesByTicker([
     ...positionTickers,
     ...recommended[wallet].map((asset) => asset.ticker),
   ]);

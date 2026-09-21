@@ -4,7 +4,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import type { FridgeItem, Position } from 'dindin-models';
 import { ASSET_TYPES, isAssetType } from '../assets/asset-type';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
 import {
