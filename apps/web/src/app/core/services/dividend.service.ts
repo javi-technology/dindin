@@ -1,86 +1,35 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import type {
+  DividendHistoryBatchResponse,
+  DividendHistoryEntry,
+  DividendHistoryResponse,
+  DividendYieldResponse,
+  MonthlyDividendReport,
+  MonthlyDividendReportMonth,
+  MonthlyIncomeItem,
+  MonthlyIncomeResponse,
+  ScheduleTotals,
+  TickerDividendYield,
+  TickerTotal,
+} from 'dindin-shared-types';
 
-export interface TickerDividendYield {
-  ticker: string;
-  annualIncome: number;
-  currentValue: number;
-  yield: number;
-}
-
-export interface DividendYieldResponse {
-  byTicker: TickerDividendYield[];
-  total: {
-    annualIncome: number;
-    currentValue: number;
-    yield: number;
-  };
-}
-
-export interface MonthlyIncomeItem {
-  ticker: string;
-  quantity: number;
-  monthlyDividend: number;
-  monthlyIncome: number;
-  paymentDate?: string; // YYYY-MM-DD
-}
-
-/** Totais da agenda calculados na API sobre todos os ativos da carteira. */
-export interface ScheduleTotals {
-  upcomingTotal: number;
-  paidTotal: number;
-}
-
-export interface MonthlyIncomeResponse {
-  byTicker: MonthlyIncomeItem[];
-  total: number;
-  totalFromFridge: number;
-  /** Recorte gratuito aplicado pela API (#262). */
-  limited?: boolean;
-  /** Ativos das datas de pagamento liberadas; ausente quando não há recorte. */
-  scheduleItems?: MonthlyIncomeItem[];
-  scheduleTotals?: ScheduleTotals;
-  /** Tickers omitidos em `byTicker` pelo recorte gratuito. */
-  hiddenTickers?: string[];
-  /** Datas de pagamento omitidas na agenda pelo recorte gratuito. */
-  hiddenPaymentDates?: string[];
-  /** Tickers sem data anunciada omitidos da agenda pelo recorte gratuito. */
-  hiddenScheduleTickers?: string[];
-}
-
-export interface TickerTotal {
-  ticker: string;
-  total: number;
-}
-
-export interface MonthlyDividendReportMonth {
-  month: string;
-  total: number;
-  byTicker: TickerTotal[];
-}
-
-export interface MonthlyDividendReport {
-  year: number;
-  months: MonthlyDividendReportMonth[];
-  byTicker: TickerTotal[];
-  total: number;
-  availableYears: number[];
-}
-
-export interface DividendHistoryEntry {
-  date: string;
-  monthlyDividend: number;
-}
-
-export interface DividendHistoryResponse {
-  ticker: string;
-  history: DividendHistoryEntry[];
-}
-
-export interface DividendHistoryBatchResponse {
-  byTicker: Record<string, DividendHistoryEntry[]>;
-}
+// Os contratos vivem em `dindin-shared-types`, com a API (issue #313). O
+// reexport mantém os imports das features apontando para o serviço.
+export type {
+  DividendHistoryBatchResponse,
+  DividendHistoryEntry,
+  DividendHistoryResponse,
+  DividendYieldResponse,
+  MonthlyDividendReport,
+  MonthlyDividendReportMonth,
+  MonthlyIncomeItem,
+  MonthlyIncomeResponse,
+  ScheduleTotals,
+  TickerDividendYield,
+  TickerTotal,
+};
 
 @Injectable({
   providedIn: 'root',

@@ -1,17 +1,11 @@
 import { Position } from 'dindin-models';
+import type { MonthlyIncomeItem } from 'dindin-shared-types';
 import { positionsCollection } from '../firestore/paths';
 import { getQuotesByTicker } from '../quotes/quote-prices';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 
-export interface MonthlyIncomeItem {
-  ticker: string;
-  quantity: number;
-  monthlyDividend: number;
-  /** Último provento pago informado pela Brapi × quantidade (#290). */
-  monthlyIncome: number;
-  paymentDate?: string; // YYYY-MM-DD
-}
+export type { MonthlyIncomeItem };
 
 export interface MonthlyIncome {
   byTicker: MonthlyIncomeItem[];

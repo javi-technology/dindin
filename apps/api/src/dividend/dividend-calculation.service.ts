@@ -1,4 +1,8 @@
 import { Dividend, Position } from 'dindin-models';
+import type {
+  DividendYieldResponse,
+  TickerDividendYield,
+} from 'dindin-shared-types';
 
 /**
  * Cálculo de proventos: projeção mensal e dividend yield (issue #225).
@@ -16,21 +20,10 @@ export interface MonthlyDividendProjection {
   monthlyAmount: number;
 }
 
-export interface TickerDividendYield {
-  ticker: string;
-  annualIncome: number;
-  currentValue: number;
-  yield: number;
-}
+export type { TickerDividendYield };
 
-export interface WalletDividendYieldResponse {
-  byTicker: TickerDividendYield[];
-  total: {
-    annualIncome: number;
-    currentValue: number;
-    yield: number;
-  };
-}
+/** Resposta de `GET /api/wallets/:walletId/dividend-yield`. */
+export type WalletDividendYieldResponse = DividendYieldResponse;
 
 /** Meses considerados na anualização da renda de proventos. */
 const MONTHS_PER_YEAR = 12;

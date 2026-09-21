@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { DividendHistoryEntry } from 'dindin-shared-types';
 import { asyncHandler } from '../middleware/async-handler';
 import { getMonthlyDividendHistory } from './quote-history.service';
 
@@ -7,10 +8,7 @@ export const MAX_MONTHS = 60;
 export const DEFAULT_MONTHS = 12;
 export const MAX_TICKERS = 60;
 
-export interface DividendHistoryEntry {
-  date: string;
-  monthlyDividend: number;
-}
+export type { DividendHistoryEntry };
 
 /** Meses pedidos, ou `null` quando o parâmetro é inválido. */
 function parseMonths(months: unknown): number | null {
