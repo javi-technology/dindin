@@ -9,6 +9,7 @@ import {
   parseBodyAll,
 } from '../shared/validation';
 import { assetsCollection } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 /**
  * Lista os ativos disponíveis no catálogo para seleção em posições/itens
@@ -100,7 +101,7 @@ export const createAsset = asyncHandler(
 export const updateAsset = asyncHandler(
   'updateAsset',
   async (req: Request, res: Response) => {
-    const normalizedTicker = req.params.ticker.trim().toUpperCase();
+    const normalizedTicker = routeParam(req, 'ticker').trim().toUpperCase();
     const docRef = assetsCollection().doc(normalizedTicker);
     const existing = await docRef.get();
 

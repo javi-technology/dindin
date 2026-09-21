@@ -84,9 +84,10 @@ describe('limite de corpo das requisições', () => {
   // do import, sem passar por autenticação nem rate limit (issue #298). Por
   // isso o teste olha a ordem das camadas, e não só a resposta.
   it('deve autenticar antes de qualquer parser de corpo', () => {
+    // No Express 5 a pilha fica em `app.router`; no 4 era `app._router`.
     const layers: { name: string }[] = (
-      app as unknown as { _router: { stack: { name: string }[] } }
-    )._router.stack;
+      app as unknown as { router: { stack: { name: string }[] } }
+    ).router.stack;
     const names = layers.map((layer) => layer.name);
 
     const auth = names.indexOf('authMiddleware');

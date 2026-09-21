@@ -33,6 +33,7 @@ import {
   tickerField,
 } from '../shared/validation';
 import { logError } from '../shared/logger';
+import { routeParam } from '../shared/route-params';
 
 const dividendSchema = z.object({
   ticker: tickerField(),
@@ -90,7 +91,7 @@ export const createDividend = asyncHandler(
 export const getDividend = asyncHandler(
   'getDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
     if (!doc.exists) {
@@ -105,7 +106,7 @@ export const getDividend = asyncHandler(
 export const updateDividend = asyncHandler(
   'updateDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 
@@ -225,7 +226,7 @@ export const getDividendYield = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
     const [positions, dividends] = await Promise.all([
-      getAllUserPositions(userId, req.params.walletId),
+      getAllUserPositions(userId, routeParam(req, 'walletId')),
       readDividends(userId),
     ]);
 
@@ -245,7 +246,7 @@ export const getDividendYield = asyncHandler(
 export const getMonthlyIncome = asyncHandler(
   'getMonthlyIncome',
   async (req: Request, res: Response) => {
-    const { walletId } = req.params;
+    const walletId = routeParam(req, 'walletId');
     const userId = uid(req);
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
@@ -337,7 +338,7 @@ export const getConsolidatedMonthlyIncome = asyncHandler(
 export const deleteDividend = asyncHandler(
   'deleteDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 

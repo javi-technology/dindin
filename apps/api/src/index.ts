@@ -163,7 +163,9 @@ app.get('/api/health', (req: Request, res: Response) => {
 // Autenticação e rate limit **antes** dos parsers: ler o corpo é o passo caro
 // (até 10 MB na rota de import), e quem não está autenticado não deve chegar
 // a pagá-lo (issue #298). O `/api/health` fica acima, aberto.
-app.use('/api/*', apiRateLimiter, authMiddleware);
+// No Express 5 o curinga precisa de nome (`*splat`): `'/api/*'` é recusado
+// pelo path-to-regexp v8 (issue #317).
+app.use('/api/*splat', apiRateLimiter, authMiddleware);
 
 // O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
 // de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais.

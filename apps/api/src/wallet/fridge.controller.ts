@@ -22,6 +22,7 @@ import {
   positionsCollection,
   walletsCollection,
 } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 /**
  * Resolve o `currentPrice` de cada item a partir da collection `quotes`
@@ -84,7 +85,7 @@ export const createFridge = asyncHandler(
 export const getFridge = asyncHandler(
   'getFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const doc = await fridgesCollection(uid(req)).doc(fridgeId).get();
 
     if (!doc.exists) {
@@ -99,7 +100,7 @@ export const getFridge = asyncHandler(
 export const updateFridge = asyncHandler(
   'updateFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
 
@@ -131,7 +132,7 @@ export const updateFridge = asyncHandler(
 export const deleteFridge = asyncHandler(
   'deleteFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
 
@@ -189,7 +190,7 @@ const updateItemSchema = itemSchema.partial();
 export const listItems = asyncHandler(
   'listItems',
   async (req: Request, res: Response) => {
-    const { fridgeId } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -205,7 +206,7 @@ export const listItems = asyncHandler(
 export const createItem = asyncHandler(
   'createItem',
   async (req: Request, res: Response) => {
-    const { fridgeId } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
@@ -245,7 +246,8 @@ export const createItem = asyncHandler(
 export const getItem = asyncHandler(
   'getItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -266,7 +268,8 @@ export const getItem = asyncHandler(
 export const updateItem = asyncHandler(
   'updateItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -319,7 +322,8 @@ export const updateItem = asyncHandler(
 export const deleteItem = asyncHandler(
   'deleteItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -341,7 +345,8 @@ export const unfreezeItem = asyncHandler(
   'unfreezeItem',
   async (req: Request, res: Response) => {
     const userId = uid(req);
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const { walletId } = req.body as { walletId?: unknown };
 
     if (!walletId || typeof walletId !== 'string') {

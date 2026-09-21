@@ -17,6 +17,7 @@ import {
   toStripeState,
 } from '../../billing/entitlement.service';
 import { asyncHandler } from '../../middleware/async-handler';
+import { routeParam } from '../../shared/route-params';
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
@@ -127,7 +128,7 @@ export const grantSubscription = asyncHandler(
       return;
     }
 
-    const user = await findAuthUser(req.params.uid);
+    const user = await findAuthUser(routeParam(req, 'uid'));
     if (!user) {
       res.status(404).json({ error: 'Usuário não encontrado' });
       return;
@@ -182,7 +183,7 @@ export const grantSubscription = asyncHandler(
 export const revokeSubscription = asyncHandler(
   'revokeSubscription',
   async (req: Request, res: Response) => {
-    const { uid } = req.params;
+    const uid = routeParam(req, 'uid');
     const ref = subscriptionDoc(uid);
     // Leitura e gravação na mesma transação: o webhook pode ativar a Stripe
     // entre as duas e a revogação não pode cancelar essa assinatura.

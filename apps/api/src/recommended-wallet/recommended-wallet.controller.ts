@@ -20,6 +20,7 @@ import {
   AppliedItemInput,
   recordAppliedItem,
 } from './suggestion-applied.service';
+import { routeParam } from '../shared/route-params';
 
 // O mapeamento de `error.statusCode` para status HTTP, antes repetido em seis
 // handlers deste arquivo, passou para o asyncHandler (issue #222): basta
@@ -62,7 +63,7 @@ export const compareRecommended = asyncHandler(
     res.json(
       await compareWithWallet(
         uid(req),
-        req.params.walletId,
+        routeParam(req, 'walletId'),
         monthQuery(req),
         selectedWallet,
       ),
@@ -110,7 +111,7 @@ export const importRecommended = asyncHandler(
 export const confirmRecommended = asyncHandler(
   'confirmRecommended',
   async (req: Request, res: Response) => {
-    res.json(await confirmRecommendedWallet(req.params.id));
+    res.json(await confirmRecommendedWallet(routeParam(req, 'id')));
   },
 );
 
@@ -191,7 +192,7 @@ export const applySuggestionItem = asyncHandler(
     res.json(
       await recordAppliedItem(
         uid(req),
-        req.params.id,
+        routeParam(req, 'id'),
         (req.body ?? {}) as AppliedItemInput,
       ),
     );
