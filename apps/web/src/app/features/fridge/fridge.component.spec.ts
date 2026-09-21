@@ -4,7 +4,7 @@ import {
   fakeAsync,
   tick,
 } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { SetupService } from '../../core/services/setup.service';
 import { FridgeComponent } from './fridge.component';
 import { FridgeService } from '../../core/services/fridge.service';
@@ -599,5 +599,36 @@ describe('FridgeComponent', () => {
     expect(
       fixture.componentInstance.form.get('transferredPrice')?.valid,
     ).toBeTrue();
+  });
+
+  it('deve descartar a resposta antiga ao trocar de geladeira antes dela chegar', () => {
+    const secondFridge: Fridge = {
+      ...fridges[0],
+      id: 'fridge-2',
+      name: 'Geladeira Secundária',
+    };
+    const firstItems$ = new Subject<FridgeItem[]>();
+    const secondItems$ = new Subject<FridgeItem[]>();
+    const secondItems: FridgeItem[] = [
+      { ...items[0], id: 'item-3', fridgeId: 'fridge-2', ticker: 'MXRF11' },
+    ];
+
+    fridgeServiceMock.listFridges.and.returnValue(
+      of([fridges[0], secondFridge]),
+    );
+    fridgeServiceMock.listItems.and.returnValues(firstItems$, secondItems$);
+
+    fixture = TestBed.createComponent(FridgeComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectFridge(secondFridge);
+
+    // A resposta da segunda geladeira chega antes da primeira.
+    secondItems$.next(secondItems);
+    firstItems$.next(items);
+
+    expect(fixture.componentInstance.items().map((item) => item.id)).toEqual([
+      'item-3',
+    ]);
   });
 });
