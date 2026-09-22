@@ -96,6 +96,7 @@ describe('LoginComponent', () => {
     expect(button.disabled).toBeTrue();
 
     rejectLogin(new Error('popup closed'));
+    await Promise.resolve();
     await fixture.whenStable();
 
     expect(fixture.nativeElement.textContent).toContain(
