@@ -1,0 +1,73 @@
+<div
+  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+  data-testid="kpi-grid"
+>
+  <div
+    class="bg-green-50 text-green-800 rounded-lg p-5"
+    data-testid="total-projection"
+  >
+    <p class="text-sm font-medium">Projeção de proventos/mês</p>
+    <p class="text-3xl font-bold" data-testid="total-value">
+      {{ formatCurrency(total()) }}
+    </p>
+    <p class="text-sm mt-2" data-testid="fridge-value">
+      Geladeira: {{ formatCurrency(totalFromFridge()) }}
+    </p>
+  </div>
+
+  @if (lastMonth(); as last) {
+    <div class="bg-gray-50 rounded-lg p-5">
+      <p class="text-sm font-medium text-gray-600">
+        Último mês ({{ formatMonth(last.month) }})
+      </p>
+      <p class="text-3xl font-bold text-gray-900" data-testid="kpi-last-month">
+        {{ formatCurrency(last.total) }}
+      </p>
+      @if (last.variation !== null) {
+        <p
+          class="text-sm mt-2 font-medium"
+          [class.text-green-700]="last.variation >= 0"
+          [class.text-red-700]="last.variation < 0"
+          data-testid="kpi-last-month-variation"
+        >
+          {{ last.variation >= 0 ? '▲' : '▼' }}
+          {{ formatPercent(absolute(last.variation)) }} vs. mês anterior
+        </p>
+      }
+    </div>
+  }
+
+  <div class="bg-gray-50 rounded-lg p-5">
+    <p class="text-sm font-medium text-gray-600">
+      Recebido em {{ selectedYear() }}
+    </p>
+    <p class="text-3xl font-bold text-gray-900" data-testid="kpi-year-total">
+      {{ formatCurrency(yearTotal()) }}
+    </p>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-5">
+    <p class="text-sm font-medium text-gray-600">Média mensal</p>
+    <p class="text-3xl font-bold text-gray-900" data-testid="kpi-average">
+      {{ formatCurrency(monthlyAverage()) }}
+    </p>
+    <p class="text-sm mt-2 text-gray-500">
+      Sobre os meses com provento registrado
+    </p>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-5">
+    <p class="text-sm font-medium text-gray-600">Dividend yield da carteira</p>
+    <p class="text-3xl font-bold text-gray-900" data-testid="kpi-yield">
+      {{ formatPercent(dividendYield()) }}
+    </p>
+    @if (yieldNeedsRecords()) {
+      <p class="text-sm mt-2 text-amber-700" data-testid="kpi-yield-note">
+        Calculado sobre os proventos já registrados. Os pagamentos são
+        registrados automaticamente na data em que caem.
+      </p>
+    } @else {
+      <p class="text-sm mt-2 text-gray-500">Projeção anual</p>
+    }
+  </div>
+</div>

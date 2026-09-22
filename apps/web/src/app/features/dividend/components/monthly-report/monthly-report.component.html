@@ -1,0 +1,162 @@
+<section class="mt-8 border-t border-gray-200 pt-8">
+  <h2 class="text-xl font-semibold text-gray-900 mb-4">Relatório mensal</h2>
+
+  @if (loading()) {
+    <p class="text-gray-600" data-testid="report-loading">
+      Carregando relatório...
+    </p>
+  } @else if (error()) {
+    <div
+      class="bg-red-50 text-red-800 rounded-lg p-4"
+      data-testid="report-error"
+    >
+      <p class="font-medium">{{ error() }}</p>
+    </div>
+  } @else {
+    @if (report(); as monthlyReport) {
+      <div class="flex flex-wrap items-end justify-between gap-4 mb-5">
+        <label
+          class="flex items-center gap-3 text-sm font-medium text-gray-700"
+          for="report-year"
+        >
+          Ano
+          <select
+            id="report-year"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2"
+            data-testid="year-select"
+            [value]="selectedYear()"
+            (change)="yearChange.emit($event)"
+          >
+            @for (year of years(); track year) {
+              <option [value]="year">{{ year }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (monthlyReport.months.length === 0) {
+        <p class="text-gray-600" data-testid="report-empty">
+          Nenhum provento registrado em {{ selectedYear() }}.
+        </p>
+      } @else {
+        <div class="mb-6" data-testid="monthly-chart">
+          <app-bar-chart
+            [series]="series()"
+            [averageValue]="monthlyAverage()"
+            [ariaLabel]="'Proventos recebidos por mês em ' + selectedYear()"
+          ></app-bar-chart>
+          <p class="mt-2 text-sm text-gray-500">
+            A linha tracejada marca a média mensal de
+            {{ formatCurrency(monthlyAverage()) }}.
+          </p>
+        </div>
+
+        <details class="mb-6" data-testid="month-details">
+          <summary
+            class="cursor-pointer text-sm font-medium text-gray-700 py-2"
+          >
+            Detalhamento por mês e ticker
+          </summary>
+          <div class="overflow-x-auto mt-2">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-gray-200">
+                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                    Mês
+                  </th>
+                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (month of monthlyReport.months; track month.month) {
+                  <tr
+                    class="border-b border-gray-100"
+                    data-testid="report-month-row"
+                  >
+                    <td class="py-3 px-4 text-gray-900">
+                      {{ formatMonth(month.month) }}
+                    </td>
+                    <td class="py-3 px-4 text-gray-900">
+                      {{ formatCurrency(month.total) }}
+                    </td>
+                  </tr>
+                  @for (ticker of month.byTicker; track ticker.ticker) {
+                    <tr
+                      class="border-b border-gray-100 bg-gray-50"
+                      data-testid="report-ticker-row"
+                    >
+                      <td class="py-2 pl-10 pr-4 text-gray-700">
+                        {{ ticker.ticker }}
+                      </td>
+                      <td class="py-2 px-4 text-gray-700">
+                        {{ formatCurrency(ticker.total) }}
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <h3 class="text-lg font-semibold text-gray-900 mt-6 mb-3">
+          Concentração por ticker
+        </h3>
+        <div class="mb-4" data-testid="concentration-chart">
+          <app-bar-chart
+            [series]="concentration()"
+            orientation="horizontal"
+            [ariaLabel]="
+              'Concentração dos proventos por ticker em ' + selectedYear()
+            "
+          ></app-bar-chart>
+        </div>
+
+        <details data-testid="ticker-details">
+          <summary
+            class="cursor-pointer text-sm font-medium text-gray-700 py-2"
+          >
+            Total por ticker em tabela
+          </summary>
+          <div class="overflow-x-auto mt-2">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-gray-200">
+                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                    Ticker
+                  </th>
+                  <th class="py-3 px-4 text-sm font-medium text-gray-700">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ticker of monthlyReport.byTicker; track ticker.ticker) {
+                  <tr
+                    class="border-b border-gray-100"
+                    data-testid="report-ticker-total-row"
+                  >
+                    <td class="py-3 px-4 text-gray-900">
+                      {{ ticker.ticker }}
+                    </td>
+                    <td class="py-3 px-4 text-gray-900">
+                      {{ formatCurrency(ticker.total) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </details>
+        <p class="mt-4 text-lg font-semibold text-gray-900">
+          Total do ano:
+          <span data-testid="report-total">
+            {{ formatCurrency(monthlyReport.total) }}
+          </span>
+        </p>
+      }
+    }
+  }
+</section>

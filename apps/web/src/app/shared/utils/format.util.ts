@@ -76,3 +76,19 @@ export function formatPercent(value: number): string {
     maximumFractionDigits: 2,
   }).format(value / 100);
 }
+
+/**
+ * Mês `YYYY-MM` como "set/2026". Fica aqui desde a divisão da tela de
+ * proventos (#311), quando os indicadores e o relatório mensal, que passaram
+ * a ser componentes distintos, precisaram do mesmo rótulo.
+ */
+export function formatMonth(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: 'short',
+    year: 'numeric',
+  })
+    .format(new Date(year, monthNumber - 1, 1))
+    .replace(/\./g, '')
+    .replace(' de ', '/');
+}

@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   OnInit,
   DestroyRef,
@@ -20,6 +21,7 @@ import { WalletService } from '../../core/services/wallet.service';
 import {
   formatCurrency,
   formatDate,
+  formatMonth,
   formatPercent,
 } from '../../shared/utils/format.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
@@ -27,26 +29,34 @@ import { buildTickerConcentration } from '../../shared/utils/ticker-concentratio
 import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
 import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
 import { SparklineComponent } from '../../shared/components/charts/sparkline/sparkline.component';
+import { DividendKpisComponent } from './components/dividend-kpis/dividend-kpis.component';
+import { PaymentScheduleComponent } from './components/payment-schedule/payment-schedule.component';
 import {
-  DividendTrend,
-  dividendTrend,
-} from '../../shared/utils/dividend-trend.util';
+  TickerCard,
+  TickerProjectionComponent,
+} from './components/ticker-projection/ticker-projection.component';
+import { MonthlyReportComponent } from './components/monthly-report/monthly-report.component';
+import { dividendTrend } from '../../shared/utils/dividend-trend.util';
 import {
   aggregateDividendYield,
   lastMonthSummary,
   monthlyAverage,
 } from '../../shared/utils/dividend-kpi.util';
 
-interface TickerCard {
-  item: MonthlyIncomeItem;
-  history: number[];
-  trend: DividendTrend | null;
-}
-
 @Component({
   selector: 'app-dividend',
   standalone: true,
-  imports: [CommonModule, RouterLink, BarChartComponent, SparklineComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    CommonModule,
+    RouterLink,
+    BarChartComponent,
+    SparklineComponent,
+    DividendKpisComponent,
+    PaymentScheduleComponent,
+    TickerProjectionComponent,
+    MonthlyReportComponent,
+  ],
   templateUrl: './dividend.component.html',
 })
 export class DividendComponent implements OnInit {
@@ -254,33 +264,7 @@ export class DividendComponent implements OnInit {
     this.loadReport(year);
   }
 
-  formatMonth(month: string): string {
-    const [year, monthNumber] = month.split('-').map(Number);
-    return new Intl.DateTimeFormat('pt-BR', {
-      month: 'short',
-      year: 'numeric',
-    })
-      .format(new Date(year, monthNumber - 1, 1))
-      .replace(/\./g, '')
-      .replace(' de ', '/');
-  }
-
-  trendSymbol(trend: DividendTrend): string {
-    if (trend === 'up') return '▲';
-    return trend === 'down' ? '▼' : '=';
-  }
-
-  trendLabel(trend: DividendTrend): string {
-    if (trend === 'up') return 'Provento por cota subiu';
-    return trend === 'down'
-      ? 'Provento por cota caiu'
-      : 'Provento por cota estável';
-  }
-
-  absolute(value: number): number {
-    return Math.abs(value);
-  }
-
+  formatMonth = formatMonth;
   formatCurrency = formatCurrency;
   formatDate = formatDate;
   formatPercent = formatPercent;
