@@ -55,15 +55,16 @@ describe('WalletComparisonComponent', () => {
       {
         ticker: 'HGLG11',
         status: 'match',
-        recommendedWeight: 12.5,
-        currentWeight: 12,
+        // A API devolve peso em fração: 0.125 é 12,50%.
+        recommendedWeight: 0.125,
+        currentWeight: 0.1198,
         quantity: 10,
         currentValue: 1600,
       },
       {
         ticker: 'XPLG11',
         status: 'missing',
-        recommendedWeight: 7.5,
+        recommendedWeight: 0.075,
         currentWeight: null,
         quantity: 0,
         currentValue: 0,
@@ -130,6 +131,16 @@ describe('WalletComparisonComponent', () => {
 
     expect(rows().length).toBe(2);
     expect(rows()[0].textContent).toContain('HGLG11');
+  });
+
+  it('deve exibir os pesos em percentual', () => {
+    setup();
+
+    // A API devolve fração: 0.125 precisa aparecer como 12,50%, não 0,13%.
+    const hglg = rows()[0].textContent ?? '';
+
+    expect(hglg).toContain('12,50%');
+    expect(hglg).toContain('11,98%');
   });
 
   it('deve exibir traço para o peso ausente', () => {
