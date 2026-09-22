@@ -4,7 +4,7 @@ import { join } from 'path';
 // ---------------------------------------------------------------------------
 // Testes de versões do frontend (issue #143)
 // Angular 19 está fora de suporte e acumula alertas high/medium sem patch.
-// Garante que apps/web esteja no Angular 20 e com TypeScript na faixa que ele
+// Garante que apps/web esteja no Angular 22 e com TypeScript na faixa que ele
 // exige. O @angular/fire saiu na #364 e o teste agora impede que ele volte.
 // ---------------------------------------------------------------------------
 
@@ -23,9 +23,9 @@ describe('apps/web/package.json – versões do Angular', () => {
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
   it.each(Object.keys(deps).filter((name) => name.startsWith('@angular/')))(
-    '%s deve estar no major 20',
+    '%s deve estar no major 22',
     (name) => {
-      expect(majorOf(deps[name])).toBe(20);
+      expect(majorOf(deps[name])).toBe(22);
     },
   );
 
@@ -40,8 +40,10 @@ describe('apps/web/package.json – versões do Angular', () => {
     expect(deps['@angular/fire']).toBeUndefined();
   });
 
-  it('deve usar TypeScript >= 5.8', () => {
+  // O Angular 22 declara peer `typescript: >=6.0 <6.1`.
+  it('deve usar TypeScript na faixa 6.0', () => {
     const [, major, minor] = /(\d+)\.(\d+)/.exec(deps['typescript']) ?? [];
-    expect(Number(major) * 100 + Number(minor)).toBeGreaterThanOrEqual(508);
+    expect(Number(major)).toBe(6);
+    expect(Number(minor)).toBe(0);
   });
 });
