@@ -2,63 +2,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Funções auxiliares
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    // Documento do usuário
+    // Documento do usuário e suas subcoleções
     //
-    // Leitura pelo proprietário; escrita exclusiva do Admin SDK (issue #218).
-    // Toda gravação nas coleções de domínio passa pela API, que valida moeda,
-    // tipo de ativo, quantidade e preço antes de persistir. O frontend nunca
-    // escreve direto no Firestore — consome a API via HttpClient. Liberar
-    // escrita ao cliente abriria um caminho para contornar essa validação e
-    // gravar, por exemplo, posição com quantidade negativa ou moeda inexistente.
+    // Sem acesso do cliente, nem leitura nem escrita (issue #314). A escrita
+    // já era exclusiva do Admin SDK (issue #218); a leitura era liberada ao
+    // dono, mas nenhum cliente a usava — o frontend consome a API via
+    // HttpClient e o SDK do Firestore saiu do bundle. Uma superfície que
+    // ninguém exerce só amplia o estrago de um token vazado.
+    // A escrita segue fechada porque toda gravação passa pela API, que valida
+    // moeda, tipo de ativo, quantidade e preço antes de persistir: liberá-la
+    // abriria caminho para contornar essa validação (issue #218).
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if false;
+      allow read, write: if false;
 
       // Carteiras do usuário
       match /wallets/{walletId} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
 
         // Posições dentro de uma carteira
         match /positions/{positionId} {
-          allow read: if isOwner(userId);
-          allow write: if false;
+          allow read, write: if false;
         }
       }
 
       // Geladeiras do usuário
       match /fridges/{fridgeId} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
 
         // Itens dentro de uma geladeira
         match /fridgeItems/{itemId} {
-          allow read: if isOwner(userId);
-          allow write: if false;
+          allow read, write: if false;
         }
       }
 
       // Proventos do usuário
       match /dividends/{dividendId} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
       }
 
       // Snapshots patrimoniais gerados exclusivamente pelo backend
       match /patrimonySnapshots/{date} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
       }
 
       // Sugestões geradas pela IA exclusivamente via Cloud Function
       match /aiSuggestions/{id} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
       }
 
       match /aiSuggestionUsage/{id} {
@@ -67,14 +56,12 @@ service cloud.firestore {
 
       // Alertas de preço-alvo gerados pelo job da geladeira (issue #118)
       match /alerts/{alertId} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
       }
 
       // Assinatura do usuário — escrita exclusiva pelo Admin SDK
       match /billing/{doc} {
-        allow read: if isOwner(userId);
-        allow write: if false;
+        allow read, write: if false;
       }
 
     }
