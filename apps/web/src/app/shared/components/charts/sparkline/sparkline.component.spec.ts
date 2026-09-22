@@ -68,7 +68,7 @@ describe('SparklineComponent', () => {
       .split(/\s+/)
       .map((par) => Number(par.split(',')[1]));
 
-    expect(ys.every((y) => Number.isFinite(y))).toBeTrue();
+    expect(ys.every((y) => Number.isFinite(y))).toBe(true);
     expect(new Set(ys).size).toBe(1);
   });
 

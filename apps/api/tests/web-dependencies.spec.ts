@@ -4,9 +4,8 @@ import { join } from 'path';
 // ---------------------------------------------------------------------------
 // Testes de versões do frontend (issue #143)
 // Angular 19 está fora de suporte e acumula alertas high/medium sem patch.
-// Garante que apps/web esteja no Angular 20, com @angular/fire compatível,
-// sem o @angular/fire 19 (que arrastava firebase-tools 13 para produção) e
-// com TypeScript na faixa exigida pelo Angular 20.
+// Garante que apps/web esteja no Angular 22 e com TypeScript na faixa que ele
+// exige. O @angular/fire saiu na #364 e o teste agora impede que ele volte.
 // ---------------------------------------------------------------------------
 
 describe('apps/web/package.json – versões do Angular', () => {
@@ -24,19 +23,32 @@ describe('apps/web/package.json – versões do Angular', () => {
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
   it.each(Object.keys(deps).filter((name) => name.startsWith('@angular/')))(
-    '%s deve estar no major 20',
+    '%s deve estar no major 22',
     (name) => {
-      expect(majorOf(deps[name])).toBe(20);
+      expect(majorOf(deps[name])).toBe(22);
     },
   );
 
-  it('deve declarar @angular/core e @angular/fire', () => {
+  it('deve declarar @angular/core', () => {
     expect(deps['@angular/core']).toBeDefined();
-    expect(deps['@angular/fire']).toBeDefined();
   });
 
-  it('deve usar TypeScript >= 5.8', () => {
+  // O @angular/fire saiu na #364: não tinha versão estável para o Angular 21+
+  // e prendia o SDK `firebase` numa faixa antiga. O front passou a usar o SDK
+  // direto, então o pacote não pode voltar sem uma decisão explícita.
+  it('não deve declarar @angular/fire', () => {
+    expect(deps['@angular/fire']).toBeUndefined();
+  });
+
+  // O Angular 22 declara peer `typescript: >=6.0 <6.1`.
+  it('deve usar TypeScript na faixa 6.0', () => {
     const [, major, minor] = /(\d+)\.(\d+)/.exec(deps['typescript']) ?? [];
-    expect(Number(major) * 100 + Number(minor)).toBeGreaterThanOrEqual(508);
+    expect(Number(major)).toBe(6);
+    expect(Number(minor)).toBe(0);
+  });
+
+  // O SDK firebase foi atualizado para a v12 na #318.
+  it('deve usar firebase no major 12', () => {
+    expect(majorOf(deps['firebase'])).toBe(12);
   });
 });

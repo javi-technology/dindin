@@ -1,4 +1,10 @@
-import { Component, DestroyRef, effect, inject } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  effect,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   RouterOutlet,
@@ -14,6 +20,7 @@ import { APP_VERSION } from '../environments/version';
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './app.component.scss',
 })
 export class AppComponent {

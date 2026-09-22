@@ -119,15 +119,14 @@ describe('configuração do ESLint', () => {
       expect(dependabot).not.toMatch(/husky|lint-staged/);
     });
 
-    it.each([
-      'CLAUDE.md',
-      '.github/copilot-instructions.md',
-      '.devin/rules/code-standards.md',
-    ])('não deve documentar hook de pre-commit em %s', (file) => {
-      const content = readFileSync(join(repoRoot, file), 'utf-8');
+    it.each(['CLAUDE.md', '.github/copilot-instructions.md', 'GEMINI.md'])(
+      'não deve documentar hook de pre-commit em %s',
+      (file) => {
+        const content = readFileSync(join(repoRoot, file), 'utf-8');
 
-      expect(content).not.toMatch(/husky|lint-staged/i);
-    });
+        expect(content).not.toMatch(/husky|lint-staged/i);
+      },
+    );
   });
 
   describe('CI', () => {

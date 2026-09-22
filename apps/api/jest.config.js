@@ -2,6 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/tests/setup-supertest.js'],
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.spec.ts'],
   transform: {

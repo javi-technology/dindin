@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
-import { Auth } from '@angular/fire/auth';
+import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let getIdTokenResultSpy: jasmine.Spy;
+  let getIdTokenResultSpy: any;
 
   beforeEach(() => {
     getIdTokenResultSpy = jasmine.createSpy('getIdTokenResult');
@@ -15,7 +15,7 @@ describe('AuthService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [AuthService, { provide: Auth, useValue: authMock }],
+      providers: [AuthService, { provide: FIREBASE_AUTH, useValue: authMock }],
     });
     service = TestBed.inject(AuthService);
   });
@@ -31,7 +31,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
     expect(getIdTokenResultSpy).toHaveBeenCalledWith(true);
   });
 
@@ -40,7 +40,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeFalse();
+    expect(result).toBe(false);
   });
 
   it('isAdmin deve retornar false quando não há usuário logado', async () => {
@@ -49,7 +49,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeFalse();
+    expect(result).toBe(false);
     expect(getIdTokenResultSpy).not.toHaveBeenCalled();
   });
 });

@@ -38,12 +38,12 @@ describe('RecommendedWalletComponent', () => {
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let positionServiceMock: jasmine.SpyObj<PositionService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
-  let authServiceMock: { isAdmin: jasmine.Spy };
+  let authServiceMock: { isAdmin: any };
   let billingServiceMock: {
     hasAi: ReturnType<typeof signal<boolean>>;
     loaded: ReturnType<typeof signal<boolean>>;
     subscriptionRequired: ReturnType<typeof signal<boolean>>;
-    loadMe: jasmine.Spy;
+    loadMe: any;
   };
 
   const me: MeResponse = {
@@ -233,11 +233,11 @@ describe('RecommendedWalletComponent', () => {
     fixture.detectChanges();
 
     fixture.componentInstance.openConfirmModal();
-    expect(fixture.componentInstance.confirmModalOpen()).toBeTrue();
+    expect(fixture.componentInstance.confirmModalOpen()).toBe(true);
     fixture.componentInstance.confirmWallet();
 
     expect(serviceMock.confirm).toHaveBeenCalledWith(wallet.id);
-    expect(fixture.componentInstance.confirmModalOpen()).toBeFalse();
+    expect(fixture.componentInstance.confirmModalOpen()).toBe(false);
     expect(fixture.componentInstance.recommendedWallet()?.status).toBe(
       'confirmed',
     );
@@ -305,7 +305,7 @@ describe('RecommendedWalletComponent', () => {
     fixture.detectChanges();
 
     fixture.componentInstance.selectedWalletId.set(null);
-    expect(fixture.componentInstance.canGenerateSuggestion()).toBeFalse();
+    expect(fixture.componentInstance.canGenerateSuggestion()).toBe(false);
   });
 
   it('deve mostrar loading enquanto gera sugestão', () => {
@@ -315,7 +315,7 @@ describe('RecommendedWalletComponent', () => {
 
     clickGenerate();
 
-    expect(fixture.componentInstance.suggestionLoading()).toBeTrue();
+    expect(fixture.componentInstance.suggestionLoading()).toBe(true);
     fixture.detectChanges();
     expect(
       fixture.nativeElement.querySelector(
@@ -338,7 +338,7 @@ describe('RecommendedWalletComponent', () => {
     pending.next({} as AiSuggestion);
 
     expect(fixture.componentInstance.suggestion()).toBeNull();
-    expect(fixture.componentInstance.suggestionLoading()).toBeFalse();
+    expect(fixture.componentInstance.suggestionLoading()).toBe(false);
   });
 
   it('deve renderizar itens da sugestão com seus badges', () => {
@@ -385,7 +385,7 @@ describe('RecommendedWalletComponent', () => {
     const badge = item?.querySelector('span');
 
     expect(item!.textContent).toContain('Aguardar');
-    expect(badge?.classList.contains('bg-green-100')).toBeFalse();
+    expect(badge?.classList.contains('bg-green-100')).toBe(false);
     expect(item!.textContent).toContain(
       'Valor insuficiente para 1 cota (R$\u00a096,44); aguarde acumular ou redistribua.',
     );
@@ -604,7 +604,7 @@ describe('RecommendedWalletComponent', () => {
       assetServiceMock.list.and.returnValue(of(assets));
       positionServiceMock.update.and.returnValue(of(positions[0]));
       positionServiceMock.create.and.returnValue(of(positions[0]));
-      serviceMock.applySuggestionItem.and.callFake((_id, body) =>
+      serviceMock.applySuggestionItem.and.callFake((_id: any, body: any) =>
         of({
           ...suggestion,
           appliedItems: [{ ...body, appliedAt: '2026-09-18T00:00:00Z' }],
@@ -654,7 +654,8 @@ describe('RecommendedWalletComponent', () => {
       // A API lança a posição e marca o item na mesma transação.
       expect(positionServiceMock.update).not.toHaveBeenCalled();
       expect(positionServiceMock.create).not.toHaveBeenCalled();
-      expect(serviceMock.applySuggestionItem).toHaveBeenCalledOnceWith(
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledTimes(1);
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
         'wallet-1_2026-09_renda',
         { ticker: 'HGLG11', quantity: 2, price: 89.2 },
       );
@@ -689,17 +690,17 @@ describe('RecommendedWalletComponent', () => {
       open('apply-item-HGLG11');
 
       type('apply-quantity', '0');
-      expect(confirmButton().disabled).toBeTrue();
+      expect(confirmButton().disabled).toBe(true);
 
       type('apply-quantity', '1');
       type('apply-price', '-1');
-      expect(confirmButton().disabled).toBeTrue();
+      expect(confirmButton().disabled).toBe(true);
 
       type('apply-price', 'abc');
-      expect(confirmButton().disabled).toBeTrue();
+      expect(confirmButton().disabled).toBe(true);
 
       type('apply-price', '95');
-      expect(confirmButton().disabled).toBeFalse();
+      expect(confirmButton().disabled).toBe(false);
     });
 
     it('deve marcar como aplicado e impedir nova aplicação', () => {
@@ -717,13 +718,13 @@ describe('RecommendedWalletComponent', () => {
       fixture.detectChanges();
 
       const applied = button('apply-item-HGLG11')!;
-      expect(applied.disabled).toBeTrue();
+      expect(applied.disabled).toBe(true);
       expect(applied.closest('li')!.textContent).toContain('Aplicado');
       expect(applied.closest('li')!.textContent).toMatch(
         /3 cotas a R\$\s?94,50/,
       );
       // A alternativa é outra compra e continua disponível.
-      expect(button('apply-fallback-HGLG11-HGCR11')!.disabled).toBeFalse();
+      expect(button('apply-fallback-HGLG11-HGCR11')!.disabled).toBe(false);
     });
 
     it('deve mostrar o erro da API no modal sem marcar o item', () => {
@@ -776,7 +777,7 @@ describe('RecommendedWalletComponent', () => {
       fixture.detectChanges();
 
       expect(modal()).not.toBeNull();
-      expect(confirmButton().disabled).toBeTrue();
+      expect(confirmButton().disabled).toBe(true);
 
       pending.next({ ...suggestion, appliedItems: [] });
       pending.complete();

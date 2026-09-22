@@ -63,4 +63,13 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },
+  {
+    // Adaptador transitório para manter os testes Jasmine legados executáveis
+    // durante a migração para Vitest. Os tipos dinâmicos são inerentes à API
+    // global que ele reproduz e não devem se propagar para o código do app.
+    files: ['src/test-setup.ts', 'src/jasmine.d.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 );

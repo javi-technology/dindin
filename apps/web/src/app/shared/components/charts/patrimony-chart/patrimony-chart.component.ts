@@ -1,4 +1,9 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component,
+  computed,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { PatrimonySnapshot } from 'dindin-models';
 import { formatCompactCurrency } from '../../../utils/format.util';
 
@@ -17,6 +22,7 @@ interface ChartTick {
 @Component({
   selector: 'app-patrimony-chart',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './patrimony-chart.component.html',
 })
 export class PatrimonyChartComponent {

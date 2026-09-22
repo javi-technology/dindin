@@ -55,7 +55,7 @@ describe('PatrimonyChartComponent', () => {
     expect(
       element.querySelector('[data-testid="patrimony-chart"]'),
     ).toBeTruthy();
-    expect(element.querySelectorAll('circle')).toHaveSize(3);
+    expect(element.querySelectorAll('circle')).toHaveLength(3);
     expect(element.querySelector('polyline')).toBeTruthy();
     expect(
       element.querySelector('path[data-testid="patrimony-area"]'),

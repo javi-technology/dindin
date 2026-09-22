@@ -52,7 +52,7 @@ describe('CompositionChartComponent', () => {
     fixture.detectChanges();
 
     const slices = fixture.componentInstance.slices();
-    expect(slices).toHaveSize(1);
+    expect(slices).toHaveLength(1);
     expect(slices[0].value).toBe(200);
     expect(slices[0].percent).toBe(100);
   });
@@ -71,11 +71,11 @@ describe('CompositionChartComponent', () => {
     ).toBeTruthy();
     expect(
       element.querySelectorAll('path[data-testid="composition-slice"]'),
-    ).toHaveSize(3);
+    ).toHaveLength(3);
     const legend = element.querySelectorAll(
       '[data-testid="composition-legend-item"]',
     );
-    expect(legend).toHaveSize(3);
+    expect(legend).toHaveLength(3);
     expect(legend[0].textContent).toContain('HGLG11');
     expect(legend[0].textContent).toContain('33,33%');
   });
@@ -90,7 +90,7 @@ describe('CompositionChartComponent', () => {
     fixture.detectChanges();
 
     const slices = fixture.componentInstance.slices();
-    expect(slices).toHaveSize(9);
+    expect(slices).toHaveLength(9);
     expect(slices[8].label).toBe('Outros');
     expect(slices[8].value).toBe(92 + 91 + 90 + 89);
   });

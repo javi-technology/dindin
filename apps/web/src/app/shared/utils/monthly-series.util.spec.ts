@@ -25,13 +25,13 @@ describe('buildMonthlySeries', () => {
 
     expect(serie.length).toBe(12);
     expect(serie[0]).toEqual(
-      jasmine.objectContaining({ label: 'jan', value: 180 }),
+      expect.objectContaining({ label: 'jan', value: 180 }),
     );
     expect(serie[1]).toEqual(
-      jasmine.objectContaining({ label: 'fev', value: 0 }),
+      expect.objectContaining({ label: 'fev', value: 0 }),
     );
     expect(serie[2]).toEqual(
-      jasmine.objectContaining({ label: 'mar', value: 120 }),
+      expect.objectContaining({ label: 'mar', value: 120 }),
     );
     expect(serie[11].label).toBe('dez');
   });
@@ -56,7 +56,7 @@ describe('buildMonthlySeries', () => {
       new Date(2026, 5, 10),
     );
 
-    expect(serie.some((item) => item.highlight)).toBeFalse();
+    expect(serie.some((item) => item.highlight)).toBe(false);
   });
 
   it('deve ignorar meses de outros anos presentes no relatório', () => {
@@ -77,6 +77,6 @@ describe('buildMonthlySeries', () => {
     const serie = buildMonthlySeries(null, 2026, new Date(2026, 5, 10));
 
     expect(serie.length).toBe(12);
-    expect(serie.every((item) => item.value === 0)).toBeTrue();
+    expect(serie.every((item) => item.value === 0)).toBe(true);
   });
 });

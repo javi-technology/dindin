@@ -582,7 +582,7 @@ describe('FridgeComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.formVisible()).toBeFalse();
+    expect(fixture.componentInstance.formVisible()).toBe(false);
   });
 
   it('deve fechar modal de exclusão ao pressionar Esc', () => {
@@ -605,7 +605,7 @@ describe('FridgeComponent', () => {
 
     expect(
       itemForm().form.get('transferredPrice')?.hasError('invalidDecimal'),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('deve aceitar preço com vírgula como separador decimal', () => {
@@ -614,7 +614,7 @@ describe('FridgeComponent', () => {
     itemForm().form.get('transferredPrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(itemForm().form.get('transferredPrice')?.valid).toBeTrue();
+    expect(itemForm().form.get('transferredPrice')?.valid).toBe(true);
   });
 
   it('deve descartar a resposta antiga ao trocar de geladeira antes dela chegar', () => {

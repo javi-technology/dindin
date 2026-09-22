@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalComponent } from './modal.component';
 
@@ -13,9 +13,10 @@ import { ModalComponent } from './modal.component';
 @Component({
   standalone: true,
   imports: [ModalComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button type="button" data-testid="gatilho">Abrir</button>
-    @if (aberto) {
+    @if (aberto()) {
       <app-modal
         [title]="'Adicionar item'"
         [testId]="'item-form'"
@@ -31,7 +32,9 @@ import { ModalComponent } from './modal.component';
   `,
 })
 class HostComponent {
-  aberto = true;
+  // Signal porque o host é OnPush, como os pais reais do modal: campo simples
+  // não marcaria a view como suja e o @if não reavaliaria.
+  readonly aberto = signal(true);
   fechado = 0;
 }
 
@@ -92,17 +95,17 @@ describe('ModalComponent', () => {
     it('deve devolver o foco ao gatilho ao fechar', () => {
       // Parte do modal fechado para que o gatilho seja mesmo o elemento
       // focado no momento da abertura, como acontece no uso real.
-      host.aberto = false;
+      host.aberto.set(false);
       fixture.detectChanges();
 
       const gatilho = element('[data-testid="gatilho"]') as HTMLButtonElement;
       gatilho.focus();
 
-      host.aberto = true;
+      host.aberto.set(true);
       fixture.detectChanges();
       expect(document.activeElement).toBe(dialog());
 
-      host.aberto = false;
+      host.aberto.set(false);
       fixture.detectChanges();
 
       expect(document.activeElement).toBe(gatilho);
@@ -117,7 +120,7 @@ describe('ModalComponent', () => {
       );
       fixture.detectChanges();
 
-      expect(dialog().contains(document.activeElement)).toBeTrue();
+      expect(dialog().contains(document.activeElement)).toBe(true);
     });
   });
 

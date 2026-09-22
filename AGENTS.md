@@ -1,56 +1,64 @@
-# DinDin — Diretrizes para Agentes
+# DinDin — Diretrizes do Projeto
 
-> Este arquivo deriva de `CLAUDE.md`. Ao mudar uma regra, mantenha os dois
-> arquivos, `.github/copilot-instructions.md` e `.devin/rules/` sincronizados.
+> Orientações para agentes que trabalham neste repositório. Consolidado a partir de `CLAUDE.md` e `GEMINI.md`; mantenha as diretrizes dos três arquivos sincronizadas.
 
-## Idioma e contexto
+> Fonte das regras: `.github/copilot-instructions.md` e `.devin/rules/`. Ao alterar uma regra aqui, mantenha esses arquivos sincronizados.
 
-- Responda, escreva comentários, descrições de PR e mensagens de commit sempre
-  em português do Brasil (pt-BR).
-- DinDin é um monorepo de finanças pessoais: Angular 19 + Tailwind CSS 4 no
-  frontend; Cloud Functions + Express + Node 22 na API; Firestore e Firebase
-  Auth/Hosting. Projeto Firebase: `dindin-4e720`.
-- Estrutura principal:
-  - `apps/api`: Cloud Functions, regras de negócio e APIs (`src/`, `tests/`).
-  - `apps/web`: Angular (`src/app/{core,features,shared}/`).
-  - `packages/models`: modelos do Firestore.
-  - `packages/shared-types`: tipos compartilhados entre frontend e backend.
+## Idioma
+
+- **Sempre responder em português do Brasil (pt-BR)**: interações, explicações, comentários, descrições de PR e mensagens de commit.
+
+## Visão Geral
+
+Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+
+### Estrutura do Repositório
+
+```
+apps/
+  api/    # Cloud Functions (Express + TypeScript) — regras de negócio e APIs; src/ e tests/
+  web/    # Angular + Tailwind — src/app/{core,features,shared}/
+packages/
+  models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
+  shared-types/  # Tipos TypeScript compartilhados entre frontend e backend
+```
 
 ## Comandos
 
 ```bash
-npm install
-firebase emulators:start
-npm run api:build
-npm run build --workspace=apps/web
-npm run test --workspace=apps/api
-npm run test --workspace=apps/web
-npm run lint
-npm run format
-npm run format:check
-firebase deploy
+npm install                                    # instalar dependências
+firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
+npm run api:build                              # build da API
+npm run build --workspace=apps/web             # build do frontend
+npm run test --workspace=apps/api              # testes da API (Jest)
+npm run test --workspace=apps/web              # testes do frontend (Vitest)
+npm run lint                                   # análise estática (ESLint)
+npm run format                                 # formatar com Prettier
+npm run format:check                           # verificar formatação
+firebase deploy                                # deploy completo
 ```
 
-Use `rtk` antes de comandos de shell sempre que disponível (por exemplo,
-`rtk git status`, `rtk npm run test`). Os comandos próprios do RTK (`rtk gain`,
-`rtk discover` e `rtk proxy`) não precisam do prefixo.
+## Fluxo de Trabalho Obrigatório
 
-## Workflow obrigatório
+### Vínculo com Issues
 
-### Issues e GitHub Projects
+- **Toda implementação deve estar vinculada a uma issue do GitHub Projects** (https://github.com/orgs/javi-technology/projects/4).
+- Antes de iniciar qualquer trabalho, verificar se existe issue aberta (`gh issue list`). Se não existir, criar.
+- Nenhum commit sem o número da issue correspondente.
 
-- Toda implementação deve estar vinculada a uma issue do GitHub Projects:
-  `https://github.com/orgs/javi-technology/projects/4`.
-- Antes de começar, procure uma issue aberta com `gh issue list`. Se não houver
-  issue, crie uma; nenhum commit pode existir sem o número correspondente.
-- Toda issue deve usar exatamente um template de `.github/ISSUE_TEMPLATE/`:
-  - bug, regressão ou teste intermitente: `bug_report.md`, título `[Bug] - ...`
-    e label `bug`;
-  - feature, melhoria, refactor ou documentação: `feature_request.md`, título
-    `[Feature] - ...` e label `enhancement`.
-- `custom.md` é vazio e não deve ser usado. Labels complementares somam-se à
-  label do template, nunca a substituem.
-- O corpo usa apenas estas seções, nesta ordem, com bullets simples:
+#### Template obrigatório
+
+**Toda issue DEVE seguir, de forma obrigatória, um template de `.github/ISSUE_TEMPLATE/`.**
+Isso vale também para issues criadas pela CLI (`gh issue create`), que não aplica o
+template sozinha. Uma issue fora do template não está pronta para ser trabalhada.
+
+| Tipo de issue                                      | Template             | Título            | Label         |
+| -------------------------------------------------- | -------------------- | ----------------- | ------------- |
+| Defeito (bug, regressão, teste intermitente)       | `bug_report.md`      | `[Bug] - ...`     | `bug`         |
+| Demais (funcionalidade, melhoria, refactor, docs…) | `feature_request.md` | `[Feature] - ...` | `enhancement` |
+
+- O corpo segue **exatamente** o formato do template, sem acrescentar nem trocar
+  estrutura:
 
   ```markdown
   **Contexto:**
@@ -66,70 +74,118 @@ Use `rtk` antes de comandos de shell sempre que disponível (por exemplo,
   - ...
   ```
 
-  Não use checkboxes, sub-bullets, tabelas, títulos extras ou seções extras.
-  Contexto descreve o problema; DOR deixa o trabalho pronto para começar; DOD
-  contém um critério de aceite por bullet.
+  - As seções são **Contexto**, **DOR** e **DOD**, nessa ordem, com o título em
+    negrito terminado em dois-pontos.
+  - Cada seção contém só bullet points simples (`- `). **Não usar** checkbox
+    (`- [ ]`), sub-bullets, tabelas, títulos (`##`) nem seções extras.
+  - **Contexto:** o problema e por que ele importa. **DOR** (Definition of Ready):
+    o que se quer e o que precisa estar claro para começar. **DOD** (Definition of
+    Done): os critérios de aceite, um por bullet.
+  - Detalhes extras (escopo, fora de escopo, exemplos) viram bullets dentro dessas
+    seções.
 
-- Adicione a issue ao projeto e preencha `Estimate` (1, 2, 3, 5 ou 8), `Size`
-  (XS, S, M, L ou XL) e `Priority` (P0–P3). Sem esses campos, a issue não está
-  pronta.
-- Status do card:
-  - issue refinada e com os campos preenchidos: `Ready`;
-  - branch `issue-<N>` criada: `In progress`;
-  - PR aberto: `In review`.
-- Antes de criar uma branch, confirme que a issue está em `Ready`. Em stacked
-  PRs, cada issue segue esse ciclo independentemente.
-- Reconfirme IDs com `gh project field-list 4 --owner javi-technology` antes de
-  editar o projeto. Os IDs atuais são:
+- Labels complementares (`fase-N`, `test`, `debito-tecnico`, `documentation`…) são
+  somadas à label do template, nunca a substituem.
+- `custom.md` está vazio e não deve ser usado.
 
-  | Referência  | Id                               |
-  | ----------- | -------------------------------- |
-  | project_id  | `PVT_kwDODUNtT84Bc4Zk`           |
-  | status_id   | `PVTSSF_lADODUNtT84Bc4ZkzhXd-0o` |
-  | Backlog     | `f75ad846`                       |
-  | Ready       | `61e4505c`                       |
-  | In progress | `47fc9ee4`                       |
-  | In review   | `df73e18b`                       |
-  | Done        | `98236657`                       |
+#### Campos obrigatórios no GitHub Projects
 
-### TDD estrito
+Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
 
-Todo desenvolvimento segue Red → Green → Refactor, sem exceção:
+| Campo      | Valores                      | Critério                                                                                              |
+| ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Estimate` | 1, 2, 3, 5, 8 (story points) | Esforço relativo (ex.: ajuste pontual = 1–2, feature ponta a ponta = 5)                               |
+| `Size`     | XS, S, M, L, XL              | Tamanho da mudança (arquivos/camadas afetadas)                                                        |
+| `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
-1. RED: escreva o teste do comportamento e confirme que ele falha.
-2. GREEN: escreva o mínimo necessário e confirme que passa.
-3. REFACTOR: melhore o código mantendo os testes verdes.
+```bash
+gh issue create --title "[Feature] - ..." --label "enhancement" --body-file issue.md  # corpo no formato do template
+gh project item-add 4 --owner javi-technology --url <url_da_issue>
+gh project field-list 4 --owner javi-technology           # ids dos campos e opções
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <estimate_id> --number <pontos>
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <size_id> --single-select-option-id <opcao_id>
+gh project item-edit --project-id <project_id> --id <item_id> --field-id <priority_id> --single-select-option-id <opcao_id>
+```
 
-Nunca escreva código de produção antes de um teste falhando nem mais código do
-que o necessário. Mantenha os testes junto à camada que validam.
+- Uma issue sem `Estimate`, `Size` e `Priority` não está pronta para ser trabalhada.
 
-### Fluxo de uma tarefa
+#### Status do card no GitHub Projects
 
-1. Verifique ou crie a issue, preencha Estimate, Size e Priority e leve-a a
-   `Ready`.
-2. Atualize `develop` com `main`, crie `issue-<N>` e mova o card a `In progress`.
-3. Faça RED → GREEN → REFACTOR em commits atômicos (`test(#N)`, `feat(#N)`,
-   `refactor(#N)`).
-4. Abra PR para `develop`, ou para a branch anterior se for uma pilha, com
-   `Closes #N`; mova o card a `In review`.
-5. Faça merge depois da revisão.
+O `Status` acompanha o andamento e é atualizado em três momentos — o board só
+serve para saber o que está em andamento se ele refletir a realidade:
+
+| Momento                                                       | Status        |
+| ------------------------------------------------------------- | ------------- |
+| Issue criada, com `Estimate`, `Size` e `Priority` preenchidos | `Ready`       |
+| Branch `issue-<N>` criada                                     | `In progress` |
+| PR aberto                                                     | `In review`   |
+
+- **Antes de criar a branch**, garantir que o card esteja em `Ready`: um card em
+  `Backlog` sinaliza que a issue ainda não foi refinada.
+- A transição para `In progress` acompanha a criação da branch, não o primeiro
+  commit.
+- Em stacked PR, cada issue da pilha segue o ciclo por conta própria.
+
+```bash
+# id do item da issue no project
+gh project item-list 4 --owner javi-technology --format json
+
+gh project item-edit --project-id <project_id> --id <item_id> \
+  --field-id <status_id> --single-select-option-id <opcao_id>
+```
+
+Ids atuais do project (reconferir com `gh project field-list 4 --owner javi-technology`):
+
+| Referência    | Id                               |
+| ------------- | -------------------------------- |
+| `project_id`  | `PVT_kwDODUNtT84Bc4Zk`           |
+| `status_id`   | `PVTSSF_lADODUNtT84Bc4ZkzhXd-0o` |
+| `Backlog`     | `f75ad846`                       |
+| `Ready`       | `61e4505c`                       |
+| `In progress` | `47fc9ee4`                       |
+| `In review`   | `df73e18b`                       |
+| `Done`        | `98236657`                       |
+
+### TDD Estrito (Red → Green → Refactor)
+
+Todo desenvolvimento segue TDD. Não há exceção.
+
+1. **RED** — Escrever teste que descreve o comportamento esperado. Rodar e confirmar que falha.
+2. **GREEN** — Escrever o mínimo de código para o teste passar. Rodar e confirmar que passa.
+3. **REFACTOR** — Refatorar sem quebrar os testes.
+
+Regras:
+
+- Nunca escrever código de produção antes de ter um teste falhando.
+- Nunca escrever mais código do que o necessário para o teste passar.
+- Testes mantidos junto ao código que testam, conforme a localização de cada camada (tabela abaixo).
+
+### Fluxo Completo de Tarefa
+
+1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
+3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
+5. Merge após revisão
 
 ## Testes
 
-| Camada   | Ferramenta      | Localização                   |
-| -------- | --------------- | ----------------------------- |
-| API      | Jest            | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Karma + Jasmine | `apps/web/src/**/*.spec.ts`   |
+| Camada   | Ferramenta | Localização                   |
+| -------- | ---------- | ----------------------------- |
+| API      | Jest       | `apps/api/tests/**/*.spec.ts` |
+| Frontend | Vitest     | `apps/web/src/**/*.spec.ts`   |
 
-- Testes unitários do frontend sempre devem ser browserless, usando
-  ChromeHeadless e `singleRun: true` em `apps/web/karma.conf.js`.
-- Evite APIs reais do navegador quando não forem essenciais; prefira mocks de
-  serviços e inputs/outputs.
-- Não adicione browsers reais à configuração de testes.
+### Frontend: testes unitários browserless
 
-## Git, branches e commits
+- **Os testes unitários do frontend DEVEM rodar em modo browserless.** Não há exceção: um teste que exija janela de navegador não entra no projeto.
+- Vitest rodando em Node.js com **jsdom** — rápidos, determinísticos e compatíveis com CI sem interface gráfica.
+- Evitar dependências de APIs de navegador (`window`, `document`, `setTimeout` reais) quando não forem essenciais.
+- Preferir mockar serviços e inputs/outputs de componentes em vez de disparar eventos reais do DOM.
+- Não adicionar browsers reais (Chrome, Firefox, Safari) na configuração de testes.
 
-Antes de implementar, prepare a branch:
+## Git e Branches
+
+### Preparação de Branch (sempre executar antes de implementar)
 
 ```bash
 git checkout main && git pull origin main
@@ -139,74 +195,142 @@ git merge main
 git checkout -b issue-<numero_issue>
 ```
 
-- A branch da issue é exatamente `issue-<numero_issue>`.
-- O fluxo normal parte de `develop` e retorna a `develop` por PR. Nunca faça
-  commit direto em `main` ou `develop`.
-- Em stacked PRs, crie a próxima branch a partir da anterior e aponte seu PR
-  para ela. Revise e faça merge na ordem da pilha.
-- Se uma base da pilha mudar, atualize as branches acima com
-  `git rebase --onto <base-nova> <ponta-antiga> issue-<N>` e
-  `git push --force-with-lease`; nunca use `--force` puro.
-- Mantenha `develop` sincronizada com `main` antes de abrir uma nova branch.
+### Regras de Branch
 
-Formato obrigatório de commit:
+- Branch da issue: **exatamente** `issue-<numero_issue>` (ex: `issue-3`).
+- Toda implementação parte da `develop` e retorna para `develop` via PR.
+- **Exceção — stacked PR:** quando for solicitado stacked PR, é permitido criar a
+  branch `issue-<N>` a partir da branch de outra issue da pilha
+  (`git checkout -b issue-<N> issue-<anterior>`), e o PR aponta para essa branch.
+  Só o primeiro PR da pilha aponta para `develop`.
+  - Os PRs são revisados e mergeados **na ordem da pilha**.
+  - Correção numa branch da base exige atualizar as de cima em ordem
+    (`git rebase --onto <base-nova> <ponta-antiga> issue-<N>`) e reenviar com
+    `git push --force-with-lease`, nunca `--force` puro.
+- A `develop` deve estar sincronizada com a `main` antes de criar nova branch.
+- Nunca commitar diretamente na `main` ou `develop`.
 
-```text
+### Padrão de Commits
+
+```
 <tipo>(#<issue>): <descrição curta no imperativo>
 ```
 
-- Tipos válidos: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`, `style`.
-- Descrição em pt-BR, imperativo, até 72 caracteres na primeira linha, sem
-  ponto final. Um commit por mudança lógica.
-- Não faça commit com testes falhando.
+Tipos: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`, `style`.
 
-## Padrões de código e UX
+Exemplos:
 
-- Use somente ícones de `@lucide/angular`, importando apenas os utilizados.
-- Antes de todo commit, execute Prettier (`npm run format`) e ESLint
-  (`npm run lint`). Não há hook de pre-commit; a formatação não é verificada
-  pelo CI, mas o lint bloqueia deploy.
-- Campos monetários aceitam vírgula como separador decimal e devem ser
-  convertidos corretamente antes da chamada à API.
+```
+feat(#12): adiciona endpoint GET /api/wallet
+test(#12): adiciona testes do endpoint GET /api/wallet
+fix(#15): corrige cálculo de total da carteira
+```
 
-### Subscriptions Angular
+Regras:
 
-- Encerre toda subscription com `takeUntilDestroyed` de
-  `@angular/core/rxjs-interop`.
-- Fora do contexto de injeção, passe o `DestroyRef`:
-  `takeUntilDestroyed(this.destroyRef)`.
-- Não crie `destroy$` nem `ngOnDestroy` apenas para limpar subscriptions.
-- Para cancelar uma requisição em voo ao trocar parâmetros, use `switchMap`
-  sobre um `Subject` dos parâmetros. Cancelamento de requisição e destruição
-  do componente são responsabilidades distintas.
+- Descrição **sempre em português (pt-BR)**, no imperativo ("adiciona", "corrige", "remove").
+- Máximo 72 caracteres na primeira linha. Sem ponto final.
+- Commits atômicos: um commit por mudança lógica.
+- Nunca commitar com testes falhando.
 
-### Modais destrutivos
+## Padrões de UX e Código
 
-- Nunca use `window.confirm`, `window.alert` ou `window.prompt`.
-- Confirmações de exclusão e ações destrutivas usam
-  `shared/components/confirm-dialog` (`<app-confirm-dialog>`).
-- Formulários modais usam `shared/components/modal` (`<app-modal>`), com
-  `title`, `testId`, `maxWidth` quando necessário e tratamento de `(closed)`.
-  Os botões pertencem ao formulário projetado.
-- Não reimplemente o markup, `@HostListener` de Escape ou acessibilidade que os
-  modais compartilhados já oferecem.
+### Ícones
 
-### API, erros e logs
+- Usar **@lucide/angular** (open source). Importar apenas os ícones utilizados (SVG inline, tree-shakable).
 
-- Para falhas de negócio, use `HttpError` de
-  `apps/api/src/shared/http-error.ts` e suas fábricas (`badRequest`, `notFound`,
-  `conflict`, `tooManyRequests`, `badGateway`, `internal`); não crie erros com
-  `Object.assign` manualmente.
-- Mensagens de erro são sempre pt-BR. Apenas `statusText` HTTP e códigos de
-  contrato, como `SUBSCRIPTION_REQUIRED`, permanecem em inglês.
-- O padrão de `expose` é 4xx exposto e 5xx não exposto; exponha um 5xx somente
-  se sua mensagem for adequada para a tela.
-- Use `logInfo`, `logWarn` e `logError` do logger estruturado, com evento e
-  campos em objeto. Não use `console.log` ou `console.error` interpolados.
-- Nunca registre o corpo da requisição. O middleware registra todas as
-  respostas, inclusive 204 e 401.
+### Formatação
+
+- Código formatado com **Prettier** (`npm run format`) antes de commitar.
+- Código analisado com **ESLint** (`npm run lint`) antes de commitar. Flat config:
+  `eslint.config.mjs` na raiz (api e packages) e `apps/web/eslint.config.mjs`
+  (angular-eslint, incluindo regras de template `.html`).
+- **Não há hook de pre-commit**: rodar `npm run format` e `npm run lint`
+  manualmente antes de cada commit.
+- O job `lint` do CI bloqueia o deploy. A formatação **não** é verificada no CI,
+  então depende de rodar o Prettier antes do commit.
+
+### Locale Brasileiro em Campos Numéricos
+
+- Campos de preço/valor monetário devem aceitar vírgula como separador decimal (ex: `1,55`, `0,95`).
+- Fazer parse correto desses valores para número antes de enviar à API.
+
+### Subscriptions em Componentes
+
+- Encerrar toda subscription com **`takeUntilDestroyed`** (`@angular/core/rxjs-interop`).
+  Fora de contexto de injeção, passar o `DestroyRef`: `takeUntilDestroyed(this.destroyRef)`.
+- **Não** criar `Subject` de destruição (`destroy$`) nem `ngOnDestroy` só para
+  limpar subscription: esquecer o `next()` vaza sem erro de compilação ou teste.
+- Para **cancelar requisição em voo** (ex.: trocar de carteira antes da resposta
+  chegar), usar `switchMap` sobre um `Subject` do parâmetro, não um `Subject` de
+  abort manual. Cancelamento e destruição são preocupações diferentes.
+
+### Confirmação de Ações Destrutivas
+
+- **Não usar** `window.confirm`, `window.alert` ou `window.prompt` nativos.
+- Sempre usar **modal customizado** para confirmação de exclusão ou ações destrutivas.
+- Para confirmação, usar o componente compartilhado
+  `shared/components/confirm-dialog` (`<app-confirm-dialog>`), que já traz
+  `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
+  preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
+  markup do modal na feature.
+- Para **modal de formulário**, usar `shared/components/modal`
+  (`<app-modal>`), que traz as mesmas garantias e projeta o formulário com
+  `<ng-content>`. A feature informa `title`, `testId` e, quando precisar,
+  `maxWidth`, e reage a `(closed)`. O rodapé com os botões pertence ao
+  formulário projetado, porque só ele sabe quando o envio é válido.
+- Com o modal compartilhado, a feature **não** declara `@HostListener` de
+  `Escape`: quem escuta o teclado é o modal.
+
+### Erros da API
+
+- Falha de negócio é sinalizada com **`HttpError`** (`apps/api/src/shared/http-error.ts`),
+  nunca com `Object.assign(new Error(...), { statusCode })` à mão: use as
+  fábricas `badRequest`, `notFound`, `conflict`, `tooManyRequests`,
+  `badGateway` e `internal`. O `asyncHandler` traduz `statusCode`/`expose` em
+  resposta.
+- `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não. Só marque
+  um 5xx como exposto quando o texto for escrito para a tela (ex.: o 502 do
+  provedor de IA).
+- **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
+  tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
+  contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.
+
+### Logs
+
+- Usar o **logger estruturado** (`apps/api/src/shared/logger.ts`): `logInfo`,
+  `logWarn` e `logError`, com um nome de evento (`'updateAllQuotes.done'`) e
+  campos em objeto. Nada de `console.log`/`console.error` com texto
+  interpolado — o Cloud Logging publica os campos como `jsonPayload`, que é
+  filtrável por rota, status ou uid.
+- **Nunca logar o corpo da requisição**: o logger descarta a chave `body`, e o
+  que trafega nas rotas é dado financeiro do usuário. Método, rota e uid
+  bastam para localizar a falha.
+- Toda resposta é registrada pelo middleware de requisições, inclusive as sem
+  corpo (204, 401).
 
 ## Segurança
 
-- Nunca versione credenciais. `sa-key.json`, `service-account*.json` e `.env*`
-  devem permanecer ignorados pelo Git.
+- Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
+
+## RTK — Token-Optimized CLI
+
+**rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
+
+Sempre prefixar comandos de shell com `rtk`:
+
+```bash
+# Em vez de:              Use:
+git status                 rtk git status
+git log -10                rtk git log -10
+npm run test               rtk npm run test
+```
+
+Comandos meta (usar diretamente):
+
+```bash
+rtk gain              # dashboard de economia de tokens
+rtk gain --history    # histórico de economia por comando
+rtk discover          # encontrar oportunidades perdidas de uso do rtk
+rtk proxy <cmd>       # rodar sem filtragem, mas registrar uso
+```

@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-Monorepo de app financeiro pessoal. Stack: Angular 19 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
 
 ## Fluxo de Trabalho Obrigatório
 
@@ -128,16 +128,16 @@ Regras:
 
 ### Estrutura de Testes
 
-| Camada   | Ferramenta                | Localização                   |
-| -------- | ------------------------- | ----------------------------- |
-| API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
+| Camada   | Ferramenta | Localização                   |
+| -------- | ---------- | ----------------------------- |
+| API      | Jest       | `apps/api/tests/**/*.spec.ts` |
+| Frontend | Vitest     | `apps/web/src/**/*.spec.ts`   |
 
-### Regras de Teste Frontend
+### Frontend: testes unitários browserless
 
-- Os testes unitários do frontend devem ser **browserless**.
-- O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
-- Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
+- **Os testes unitários do frontend DEVEM rodar em modo browserless.** Não há exceção: um teste que exija janela de navegador não entra no projeto.
+- Vitest rodando em Node.js com **jsdom** — rápidos, determinísticos e compatíveis com CI sem interface gráfica.
+- Evitar dependências de APIs de navegador (`window`, `document`, `setTimeout` reais) quando não forem essenciais.
 - Prefira mockar serviços e inputs/outputs em vez de disparar eventos de DOM real.
 - Não adicione dependências de browsers reais na configuração de testes.
 
@@ -196,7 +196,7 @@ Regras:
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
 2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`) → `Status: In review`
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão
 
 ## Comandos
