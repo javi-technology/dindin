@@ -153,10 +153,13 @@ export class RecommendedWalletComponent implements OnInit {
   ngOnInit(): void {
     this.loadRecommendedWallets();
     this.loadWallets();
-    this.billingService.loadMe().subscribe({
-      next: () => this.loadSavedSuggestion(),
-      error: () => {},
-    });
+    this.billingService
+      .loadMe()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.loadSavedSuggestion(),
+        error: () => {},
+      });
     this.authService
       .isAdmin()
       .then((isAdmin) => this.isAdmin.set(isAdmin))
@@ -193,19 +196,24 @@ export class RecommendedWalletComponent implements OnInit {
     const wallet = this.recommendedWallet();
     if (!wallet) return;
 
-    this.recommendedWalletService.confirm(wallet.id).subscribe({
-      next: (confirmed) => {
-        this.recommendedWallets.update((wallets) =>
-          wallets.map((item) => (item.id === confirmed.id ? confirmed : item)),
-        );
-        this.confirmModalOpen.set(false);
-        this.successMessage.set('Carteira confirmada com sucesso.');
-      },
-      error: () => {
-        this.error.set('Erro ao confirmar carteira recomendada.');
-        this.confirmModalOpen.set(false);
-      },
-    });
+    this.recommendedWalletService
+      .confirm(wallet.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (confirmed) => {
+          this.recommendedWallets.update((wallets) =>
+            wallets.map((item) =>
+              item.id === confirmed.id ? confirmed : item,
+            ),
+          );
+          this.confirmModalOpen.set(false);
+          this.successMessage.set('Carteira confirmada com sucesso.');
+        },
+        error: () => {
+          this.error.set('Erro ao confirmar carteira recomendada.');
+          this.confirmModalOpen.set(false);
+        },
+      });
   }
 
   onFileSelected(event: Event): void {
@@ -227,24 +235,27 @@ export class RecommendedWalletComponent implements OnInit {
       const contentBase64 = result.includes(',')
         ? result.split(',')[1]
         : result;
-      this.recommendedWalletService.import(file.name, contentBase64).subscribe({
-        next: (imported) => {
-          this.recommendedWallets.update((wallets) => {
-            const found = wallets.some((item) => item.id === imported.id);
-            return found
-              ? wallets.map((item) =>
-                  item.id === imported.id ? imported : item,
-                )
-              : [imported, ...wallets];
-          });
-          this.selectedMonth.set(imported.month);
-          this.successMessage.set('PDF importado com sucesso.');
-          this.loadComparison();
-        },
-        error: () => {
-          this.error.set('Erro ao importar PDF da carteira recomendada.');
-        },
-      });
+      this.recommendedWalletService
+        .import(file.name, contentBase64)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (imported) => {
+            this.recommendedWallets.update((wallets) => {
+              const found = wallets.some((item) => item.id === imported.id);
+              return found
+                ? wallets.map((item) =>
+                    item.id === imported.id ? imported : item,
+                  )
+                : [imported, ...wallets];
+            });
+            this.selectedMonth.set(imported.month);
+            this.successMessage.set('PDF importado com sucesso.');
+            this.loadComparison();
+          },
+          error: () => {
+            this.error.set('Erro ao importar PDF da carteira recomendada.');
+          },
+        });
     };
     reader.onerror = () => {
       this.error.set('Não foi possível ler o arquivo PDF.');
@@ -399,34 +410,40 @@ export class RecommendedWalletComponent implements OnInit {
   private loadRecommendedWallets(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.recommendedWalletService.list().subscribe({
-      next: (wallets) => {
-        const ordered = [...wallets].sort((a, b) =>
-          b.month.localeCompare(a.month),
-        );
-        this.recommendedWallets.set(ordered);
-        this.selectedMonth.set(ordered[0]?.month ?? null);
-        this.loading.set(false);
-        this.loadComparison();
-      },
-      error: () => {
-        this.loading.set(false);
-        this.error.set('Erro ao carregar carteiras recomendadas.');
-      },
-    });
+    this.recommendedWalletService
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (wallets) => {
+          const ordered = [...wallets].sort((a, b) =>
+            b.month.localeCompare(a.month),
+          );
+          this.recommendedWallets.set(ordered);
+          this.selectedMonth.set(ordered[0]?.month ?? null);
+          this.loading.set(false);
+          this.loadComparison();
+        },
+        error: () => {
+          this.loading.set(false);
+          this.error.set('Erro ao carregar carteiras recomendadas.');
+        },
+      });
   }
 
   private loadWallets(): void {
-    this.walletService.list().subscribe({
-      next: (wallets) => {
-        this.wallets.set(wallets);
-        this.selectedWalletId.set(wallets[0]?.id ?? null);
-        this.loadComparison();
-      },
-      error: () => {
-        this.error.set('Erro ao carregar carteiras do usuário.');
-      },
-    });
+    this.walletService
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (wallets) => {
+          this.wallets.set(wallets);
+          this.selectedWalletId.set(wallets[0]?.id ?? null);
+          this.loadComparison();
+        },
+        error: () => {
+          this.error.set('Erro ao carregar carteiras do usuário.');
+        },
+      });
   }
 
   private loadComparison(): void {
@@ -460,6 +477,7 @@ export class RecommendedWalletComponent implements OnInit {
 
     this.recommendedWalletService
       .getSuggestion(walletId, month, tab)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (suggestion) => {
           if (

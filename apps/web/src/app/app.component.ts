@@ -1,4 +1,5 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, DestroyRef, effect, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   RouterOutlet,
   RouterLink,
@@ -19,6 +20,7 @@ export class AppComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly billingService = inject(BillingService);
+  private readonly destroyRef = inject(DestroyRef);
 
   user = this.authService.user;
   readonly subscriptionLoaded = this.billingService.loaded;
@@ -30,7 +32,10 @@ export class AppComponent {
     // estado ao trocar de usuário, o que dispara um novo carregamento.
     effect(() => {
       if (this.user() && !this.subscriptionLoaded()) {
-        this.billingService.loadMe().subscribe({ error: () => undefined });
+        this.billingService
+          .loadMe()
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({ error: () => undefined });
       }
     });
   }
