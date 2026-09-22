@@ -1,4 +1,9 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component,
+  computed,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 const WIDTH = 120;
 const HEIGHT = 32;
@@ -7,6 +12,7 @@ const PADDING = 3;
 @Component({
   selector: 'app-sparkline',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sparkline.component.html',
 })
 export class SparklineComponent {

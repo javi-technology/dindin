@@ -5,14 +5,19 @@ import {
   tick,
 } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { AppComponent } from './app.component';
 import { of } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { BillingService } from './core/services/billing.service';
 import { APP_VERSION } from '../environments/version';
 
-@Component({ selector: 'app-stub', standalone: true, template: '' })
+@Component({
+  selector: 'app-stub',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
 class StubComponent {}
 
 describe('AppComponent', () => {

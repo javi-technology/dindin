@@ -1,4 +1,11 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
@@ -23,6 +30,7 @@ import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
     LucideArrowLeft,
     LucidePencil,
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-assets.component.html',
 })
 export class AdminAssetsComponent implements OnInit {

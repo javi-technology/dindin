@@ -1,4 +1,9 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component,
+  computed,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { TickerValue } from 'dindin-shared-types';
 import { formatCurrency, formatPercent } from '../../../utils/format.util';
 
@@ -30,6 +35,7 @@ const INNER_RADIUS = 55;
 @Component({
   selector: 'app-composition-chart',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './composition-chart.component.html',
 })
 export class CompositionChartComponent {

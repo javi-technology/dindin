@@ -1,4 +1,9 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component,
+  computed,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { formatCompactCurrency } from '../../../utils/format.util';
 
 export interface BarChartItem {
@@ -57,6 +62,7 @@ const TICK_COUNT = 4;
 @Component({
   selector: 'app-bar-chart',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './bar-chart.component.html',
 })
 export class BarChartComponent {
