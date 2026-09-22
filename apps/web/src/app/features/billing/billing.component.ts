@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -18,6 +19,7 @@ import { BillingService } from '../../core/services/billing.service';
   selector: 'app-billing',
   standalone: true,
   imports: [CommonModule, RouterLink, LucideArrowLeft],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './billing.component.html',
 })
 export class BillingComponent implements OnInit {

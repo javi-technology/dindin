@@ -1,30 +1,31 @@
-import {
-  ComponentFixture,
-  TestBed,
-  fakeAsync,
-  tick,
-} from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Component, signal } from '@angular/core';
+import { provideLocationMocks } from '@angular/common/testing';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { AppComponent } from './app.component';
 import { of } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { BillingService } from './core/services/billing.service';
 import { APP_VERSION } from '../environments/version';
 
-@Component({ selector: 'app-stub', standalone: true, template: '' })
+@Component({
+  selector: 'app-stub',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
 class StubComponent {}
 
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let authServiceMock: {
     user: ReturnType<typeof signal>;
-    logout: jasmine.Spy;
+    logout: any;
   };
   let billingServiceMock: {
     loaded: ReturnType<typeof signal<boolean>>;
     isSubscriber: ReturnType<typeof signal<boolean>>;
-    loadMe: jasmine.Spy;
+    loadMe: any;
   };
 
   beforeEach(async () => {
@@ -42,6 +43,7 @@ describe('AppComponent', () => {
       imports: [AppComponent],
       providers: [
         provideRouter([{ path: 'carteira', component: StubComponent }]),
+        provideLocationMocks(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: BillingService, useValue: billingServiceMock },
       ],
@@ -69,12 +71,11 @@ describe('AppComponent', () => {
     ]);
   });
 
-  it('deve destacar a rota ativa sobrepondo a cor base do link', fakeAsync(() => {
+  it('deve destacar a rota ativa sobrepondo a cor base do link', async () => {
     authServiceMock.user.set({ email: 'user@dindin.app' });
     fixture.detectChanges();
 
-    TestBed.inject(Router).navigate(['/carteira']);
-    tick();
+    await TestBed.inject(Router).navigateByUrl('/carteira');
     fixture.detectChanges();
 
     const active = fixture.nativeElement.querySelector(
@@ -82,7 +83,7 @@ describe('AppComponent', () => {
     ) as HTMLAnchorElement;
 
     expect(active.classList).toContain('text-blue-600!');
-  }));
+  });
 
   it('não deve exibir navegação quando não autenticado', () => {
     fixture.detectChanges();

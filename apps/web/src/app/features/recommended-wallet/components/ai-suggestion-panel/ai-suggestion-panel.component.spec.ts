@@ -152,7 +152,7 @@ describe('AiSuggestionPanelComponent', () => {
             '[data-testid="generate-suggestion-button"]',
           ) as HTMLButtonElement
         ).disabled,
-      ).toBeTrue();
+      ).toBe(true);
     });
 
     it('deve pedir regeração forçada', () => {
@@ -231,7 +231,7 @@ describe('AiSuggestionPanelComponent', () => {
         '[data-testid="apply-item-HGLG11"]',
       ) as HTMLButtonElement;
 
-      expect(button.disabled).toBeTrue();
+      expect(button.disabled).toBe(true);
       expect(button.textContent).toContain('Aplicado');
     });
   });

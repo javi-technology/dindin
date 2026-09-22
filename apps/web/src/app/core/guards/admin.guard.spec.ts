@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, UrlTree } from '@angular/router';
-import { Auth, User } from '@angular/fire/auth';
+import { User } from 'firebase/auth';
+import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 import { adminGuard } from './admin.guard';
 import { AuthService } from '../services/auth.service';
 
 describe('adminGuard', () => {
-  let authMock: { authStateReady: jasmine.Spy; currentUser: User | null };
-  let authServiceMock: { isAdmin: jasmine.Spy };
+  let authMock: { authStateReady: any; currentUser: User | null };
+  let authServiceMock: { isAdmin: any };
   let routerMock: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
@@ -24,7 +25,7 @@ describe('adminGuard', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: Auth, useValue: authMock },
+        { provide: FIREBASE_AUTH, useValue: authMock },
         { provide: AuthService, useValue: authServiceMock },
         { provide: Router, useValue: routerMock },
       ],
@@ -39,7 +40,7 @@ describe('adminGuard', () => {
       adminGuard({} as never, {} as never),
     );
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
     expect(routerMock.parseUrl).not.toHaveBeenCalled();
   });
 

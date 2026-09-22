@@ -67,7 +67,7 @@ describe('FridgeItemFormComponent', () => {
     setup();
 
     expect(component.form.value).toEqual(
-      jasmine.objectContaining({
+      expect.objectContaining({
         ticker: '',
         quantity: 0,
         transferredPrice: '0',
@@ -80,7 +80,7 @@ describe('FridgeItemFormComponent', () => {
     setup(item);
 
     expect(component.form.value).toEqual(
-      jasmine.objectContaining({
+      expect.objectContaining({
         ticker: 'HGLG11',
         quantity: 10,
         transferredPrice: '110.5',
@@ -149,7 +149,7 @@ describe('FridgeItemFormComponent', () => {
     component.submit();
 
     expect(salvos).toEqual([]);
-    expect(component.form.get('ticker')?.touched).toBeTrue();
+    expect(component.form.get('ticker')?.touched).toBe(true);
   });
 
   it('deve acusar preço com formato inválido', () => {
@@ -160,7 +160,7 @@ describe('FridgeItemFormComponent', () => {
 
     expect(
       component.form.get('transferredPrice')?.hasError('invalidDecimal'),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('deve aceitar preço com vírgula como separador decimal', () => {
@@ -169,7 +169,7 @@ describe('FridgeItemFormComponent', () => {
     component.form.get('transferredPrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(component.form.get('transferredPrice')?.valid).toBeTrue();
+    expect(component.form.get('transferredPrice')?.valid).toBe(true);
   });
 
   it('deve emitir closed no botão de cancelar', () => {

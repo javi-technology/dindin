@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 
@@ -13,13 +13,14 @@ import { ConfirmDialogComponent } from './confirm-dialog.component';
 @Component({
   standalone: true,
   imports: [ConfirmDialogComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button type="button" data-testid="gatilho">Abrir</button>
     <app-confirm-dialog
       [title]="'Confirmar exclusão'"
       [confirmLabel]="'Remover'"
-      [variant]="variant"
-      [confirmDisabled]="confirmDisabled"
+      [variant]="variant()"
+      [confirmDisabled]="confirmDisabled()"
       (confirmed)="confirmado = confirmado + 1"
       (cancelled)="cancelado = cancelado + 1"
     >
@@ -28,8 +29,9 @@ import { ConfirmDialogComponent } from './confirm-dialog.component';
   `,
 })
 class HostComponent {
-  variant: 'danger' | 'primary' = 'danger';
-  confirmDisabled = false;
+  // Signals porque o host é OnPush, como os pais reais do diálogo.
+  readonly variant = signal<'danger' | 'primary'>('danger');
+  readonly confirmDisabled = signal(false);
   confirmado = 0;
   cancelado = 0;
 }
@@ -132,7 +134,7 @@ describe('ConfirmDialogComponent', () => {
     });
 
     it('não deve emitir confirmed com o botão desabilitado', () => {
-      host.confirmDisabled = true;
+      host.confirmDisabled.set(true);
       fixture.detectChanges();
 
       element('[data-testid="confirm-dialog-confirm"]')?.click();
@@ -149,7 +151,7 @@ describe('ConfirmDialogComponent', () => {
     });
 
     it('deve usar verde na variante primária', () => {
-      host.variant = 'primary';
+      host.variant.set('primary');
       fixture.detectChanges();
 
       const confirm = element('[data-testid="confirm-dialog-confirm"]');

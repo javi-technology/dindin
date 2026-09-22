@@ -60,7 +60,7 @@ describe('buildTickerConcentration', () => {
     const itens = buildTickerConcentration(report(tickers(8)));
 
     expect(itens.length).toBe(8);
-    expect(itens.some((item) => item.label === 'Outros')).toBeFalse();
+    expect(itens.some((item) => item.label === 'Outros')).toBe(false);
   });
 
   it('deve retornar lista vazia sem proventos no ano', () => {

@@ -105,7 +105,7 @@ describe('MoveToFridgeFormComponent', () => {
     component.submit();
 
     expect(confirmados).toEqual([]);
-    expect(component.form.get('targetPrice')?.touched).toBeTrue();
+    expect(component.form.get('targetPrice')?.touched).toBe(true);
   });
 
   it('deve exibir o erro recebido do pai', () => {

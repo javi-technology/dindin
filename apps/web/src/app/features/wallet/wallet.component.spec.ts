@@ -608,13 +608,13 @@ describe('WalletComponent', () => {
     tick();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.loading()).toBeFalse();
+    expect(fixture.componentInstance.loading()).toBe(false);
 
     fixture.componentInstance.selectWallet(wallet2);
     tick(50);
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.loading()).toBeFalse();
+    expect(fixture.componentInstance.loading()).toBe(false);
   }));
 
   it('deve exibir mensagem de erro no formulário quando falha ao carregar catálogo de ativos', fakeAsync(() => {
@@ -860,7 +860,7 @@ describe('WalletComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.formVisible()).toBeFalse();
+    expect(fixture.componentInstance.formVisible()).toBe(false);
   });
 
   it('deve fechar modal de exclusão ao pressionar Esc', () => {
@@ -883,7 +883,7 @@ describe('WalletComponent', () => {
 
     expect(
       positionForm().form.get('averagePrice')?.hasError('invalidDecimal'),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('deve aceitar preço médio com vírgula como separador decimal', () => {
@@ -892,7 +892,7 @@ describe('WalletComponent', () => {
     positionForm().form.get('averagePrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(positionForm().form.get('averagePrice')?.valid).toBeTrue();
+    expect(positionForm().form.get('averagePrice')?.valid).toBe(true);
   });
 
   describe('moveToFridge', () => {
@@ -1118,7 +1118,7 @@ describe('WalletComponent', () => {
       expect(positionServiceMock.update).toHaveBeenCalledWith(
         'wallet-1',
         'position-mxrf',
-        jasmine.objectContaining({ quantity: 22, averagePrice: 9.18 }),
+        expect.objectContaining({ quantity: 22, averagePrice: 9.18 }),
       );
     }));
 
@@ -1130,7 +1130,7 @@ describe('WalletComponent', () => {
       expect(positionServiceMock.update).toHaveBeenCalledWith(
         'wallet-1',
         'position-mxrf',
-        jasmine.objectContaining({ quantity: 59 }),
+        expect.objectContaining({ quantity: 59 }),
       );
     }));
 
@@ -1174,7 +1174,7 @@ describe('WalletComponent', () => {
       expect(positionServiceMock.update).toHaveBeenCalledWith(
         'wallet-1',
         'position-mxrf',
-        jasmine.objectContaining({ quantity: 59, averagePrice: 9.3 }),
+        expect.objectContaining({ quantity: 59, averagePrice: 9.3 }),
       );
     }));
 
@@ -1192,7 +1192,7 @@ describe('WalletComponent', () => {
 
     it('não deve salvar quando o resultado não for maior que zero', fakeAsync(() => {
       editWith({ quantity: '-32' });
-      expect(positionForm().form.get('quantity')?.invalid).toBeTrue();
+      expect(positionForm().form.get('quantity')?.invalid).toBe(true);
 
       positionForm().submit();
       tick();
@@ -1231,7 +1231,7 @@ describe('WalletComponent', () => {
     it('deve rejeitar -N na criação de posição', () => {
       openPositionForm();
       positionForm().form.patchValue({ quantity: '-5' });
-      expect(positionForm().form.get('quantity')?.invalid).toBeTrue();
+      expect(positionForm().form.get('quantity')?.invalid).toBe(true);
     });
   });
 
@@ -1405,7 +1405,7 @@ describe('WalletComponent', () => {
       );
       const acoes = headers[headers.length - 1];
       expect(acoes.textContent).toContain('Ações');
-      expect(acoes.hasAttribute('aria-sort')).toBeFalse();
+      expect(acoes.hasAttribute('aria-sort')).toBe(false);
       expect(acoes.querySelector('button')).toBeNull();
     });
 

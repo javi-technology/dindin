@@ -74,7 +74,7 @@ describe('PositionFormComponent', () => {
       setup();
 
       expect(component.form.value).toEqual(
-        jasmine.objectContaining({
+        expect.objectContaining({
           ticker: '',
           assetType: 'FII',
           quantity: '0',
@@ -87,7 +87,7 @@ describe('PositionFormComponent', () => {
       setup(mxrf);
 
       expect(component.form.value).toEqual(
-        jasmine.objectContaining({
+        expect.objectContaining({
           ticker: 'MXRF11',
           assetType: 'FII',
           quantity: '32',
@@ -137,7 +137,7 @@ describe('PositionFormComponent', () => {
       component.submit();
 
       expect(salvos).toEqual([]);
-      expect(component.form.get('ticker')?.touched).toBeTrue();
+      expect(component.form.get('ticker')?.touched).toBe(true);
     });
 
     it('deve acusar preço médio com formato inválido', () => {
@@ -148,7 +148,7 @@ describe('PositionFormComponent', () => {
 
       expect(
         component.form.get('averagePrice')?.hasError('invalidDecimal'),
-      ).toBeTrue();
+      ).toBe(true);
     });
 
     it('deve aceitar preço com vírgula como separador decimal', () => {
@@ -157,7 +157,7 @@ describe('PositionFormComponent', () => {
       component.form.get('averagePrice')?.markAsTouched();
       fixture.detectChanges();
 
-      expect(component.form.get('averagePrice')?.valid).toBeTrue();
+      expect(component.form.get('averagePrice')?.valid).toBe(true);
     });
   });
 
@@ -195,7 +195,7 @@ describe('PositionFormComponent', () => {
       component.submit();
 
       expect(salvos[0]).toEqual(
-        jasmine.objectContaining({ quantity: 22, averagePrice: 9.18 }),
+        expect.objectContaining({ quantity: 22, averagePrice: 9.18 }),
       );
     });
 
@@ -205,7 +205,7 @@ describe('PositionFormComponent', () => {
 
       component.submit();
 
-      expect(salvos[0]).toEqual(jasmine.objectContaining({ quantity: 59 }));
+      expect(salvos[0]).toEqual(expect.objectContaining({ quantity: 59 }));
     });
 
     it('deve exibir o total resultante ao informar variação', () => {
@@ -228,7 +228,7 @@ describe('PositionFormComponent', () => {
       setup(mxrf);
       patch({ quantity: '-32' });
 
-      expect(component.form.get('quantity')?.valid).toBeFalse();
+      expect(component.form.get('quantity')?.valid).toBe(false);
     });
   });
 

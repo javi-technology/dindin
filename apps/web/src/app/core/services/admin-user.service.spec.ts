@@ -46,7 +46,7 @@ describe('AdminUserService', () => {
 
     const req = httpMock.expectOne('/api/admin/users');
     expect(req.request.method).toBe('GET');
-    expect(req.request.params.has('search')).toBeFalse();
+    expect(req.request.params.has('search')).toBe(false);
     req.flush([user]);
   });
 

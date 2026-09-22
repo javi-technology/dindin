@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, UrlTree } from '@angular/router';
-import { Auth, User } from '@angular/fire/auth';
+import { User } from 'firebase/auth';
+import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 import { loginGuard } from './login.guard';
 
 describe('loginGuard', () => {
-  let authMock: { authStateReady: jasmine.Spy; currentUser: User | null };
+  let authMock: { authStateReady: any; currentUser: User | null };
   let routerMock: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
@@ -19,7 +20,7 @@ describe('loginGuard', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: Auth, useValue: authMock },
+        { provide: FIREBASE_AUTH, useValue: authMock },
         { provide: Router, useValue: routerMock },
       ],
     });
@@ -32,7 +33,7 @@ describe('loginGuard', () => {
       loginGuard({} as never, {} as never),
     );
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
     expect(routerMock.parseUrl).not.toHaveBeenCalled();
   });
 

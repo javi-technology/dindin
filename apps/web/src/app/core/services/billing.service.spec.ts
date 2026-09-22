@@ -51,15 +51,15 @@ describe('BillingService', () => {
     expect(request.request.method).toBe('GET');
     request.flush(me);
 
-    expect(service.loaded()).toBeTrue();
+    expect(service.loaded()).toBe(true);
     expect(service.subscription().status).toBe('active');
     expect(service.entitlements()).toEqual(['ai', 'projections']);
-    expect(service.hasAi()).toBeTrue();
-    expect(service.hasProjections()).toBeTrue();
+    expect(service.hasAi()).toBe(true);
+    expect(service.hasProjections()).toBe(true);
   });
 
   it('deve expor valores padrão antes de carregar', () => {
-    expect(service.loaded()).toBeFalse();
+    expect(service.loaded()).toBe(false);
     expect(service.subscription()).toEqual({
       status: 'none',
       plan: null,
@@ -68,12 +68,12 @@ describe('BillingService', () => {
       cancelAtPeriodEnd: false,
     });
     expect(service.entitlements()).toEqual([]);
-    expect(service.hasAi()).toBeFalse();
-    expect(service.hasProjections()).toBeFalse();
+    expect(service.hasAi()).toBe(false);
+    expect(service.hasProjections()).toBe(false);
   });
 
   it('não deve considerar assinante antes de carregar', () => {
-    expect(service.isSubscriber()).toBeFalse();
+    expect(service.isSubscriber()).toBe(false);
   });
 
   (
@@ -104,11 +104,11 @@ describe('BillingService', () => {
       entitlements: ['ai', 'projections'],
     });
 
-    expect(service.isSubscriber()).toBeFalse();
+    expect(service.isSubscriber()).toBe(false);
   });
 
   it('deve iniciar checkout e redirecionar para a url retornada', () => {
-    spyOn(service, 'redirectTo');
+    vi.spyOn(service, 'redirectTo').mockImplementation(() => {});
 
     service.startCheckout('year').subscribe();
 
@@ -123,7 +123,7 @@ describe('BillingService', () => {
   });
 
   it('deve abrir o portal e redirecionar para a url retornada', () => {
-    spyOn(service, 'redirectTo');
+    vi.spyOn(service, 'redirectTo').mockImplementation(() => {});
 
     service.openPortal().subscribe();
 
@@ -142,31 +142,31 @@ describe('BillingService', () => {
 
     service.markSubscriptionRequired();
 
-    expect(service.subscriptionRequired()).toBeTrue();
+    expect(service.subscriptionRequired()).toBe(true);
     expect(service.entitlements()).toEqual([]);
-    expect(service.hasAi()).toBeFalse();
-    expect(service.hasProjections()).toBeFalse();
+    expect(service.hasAi()).toBe(false);
+    expect(service.hasProjections()).toBe(false);
   });
 
   it('deve limpar a flag ao recarregar /api/me', () => {
     service.markSubscriptionRequired();
-    expect(service.subscriptionRequired()).toBeTrue();
+    expect(service.subscriptionRequired()).toBe(true);
 
     service.loadMe().subscribe();
     httpMock.expectOne('/api/me').flush(me);
 
-    expect(service.subscriptionRequired()).toBeFalse();
+    expect(service.subscriptionRequired()).toBe(false);
   });
 
   it('deve limpar o estado quando o usuário mudar', () => {
     user$.next({ uid: 'user-1' });
     service.loadMe().subscribe();
     httpMock.expectOne('/api/me').flush(me);
-    expect(service.loaded()).toBeTrue();
+    expect(service.loaded()).toBe(true);
 
     user$.next({ uid: 'user-2' });
 
-    expect(service.loaded()).toBeFalse();
+    expect(service.loaded()).toBe(false);
     expect(service.subscription().status).toBe('none');
     expect(service.entitlements()).toEqual([]);
   });
@@ -178,8 +178,8 @@ describe('BillingService', () => {
 
     user$.next({ uid: 'user-1' });
 
-    expect(service.loaded()).toBeTrue();
-    expect(service.hasAi()).toBeTrue();
+    expect(service.loaded()).toBe(true);
+    expect(service.hasAi()).toBe(true);
   });
 
   it('deve limpar o estado ao deslogar', () => {
@@ -190,17 +190,17 @@ describe('BillingService', () => {
 
     user$.next(null);
 
-    expect(service.loaded()).toBeFalse();
+    expect(service.loaded()).toBe(false);
     expect(service.subscription().status).toBe('none');
-    expect(service.subscriptionRequired()).toBeFalse();
+    expect(service.subscriptionRequired()).toBe(false);
   });
 
   it('deve encerrar a assinatura de user$ ao destruir o injector', () => {
-    expect(user$.observed).toBeTrue();
+    expect(user$.observed).toBe(true);
 
     httpMock.verify();
     TestBed.resetTestingModule();
 
-    expect(user$.observed).toBeFalse();
+    expect(user$.observed).toBe(false);
   });
 });

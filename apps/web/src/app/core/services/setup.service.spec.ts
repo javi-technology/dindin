@@ -9,7 +9,7 @@ import { SetupService } from './setup.service';
 describe('SetupService (#275)', () => {
   let service: SetupService;
   let httpMock: HttpTestingController;
-  let consoleErrorSpy: jasmine.Spy;
+  let consoleErrorSpy: any;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -17,7 +17,7 @@ describe('SetupService (#275)', () => {
     });
     service = TestBed.inject(SetupService);
     httpMock = TestBed.inject(HttpTestingController);
-    consoleErrorSpy = spyOn(console, 'error');
+    consoleErrorSpy = vi.spyOn(console, 'error');
   });
 
   afterEach(() => {
@@ -33,8 +33,8 @@ describe('SetupService (#275)', () => {
     expect(req.request.body).toEqual({});
     req.flush({ walletCreated: true, fridgeCreated: true });
 
-    await expectAsync(first).toBeResolved();
-    await expectAsync(second).toBeResolved();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
 
     await service.ensureDefaults('user-123');
     httpMock.expectNone('/api/me/setup');
@@ -52,7 +52,7 @@ describe('SetupService (#275)', () => {
       .expectOne('/api/me/setup')
       .flush({ walletCreated: true, fridgeCreated: true });
 
-    await expectAsync(other).toBeResolved();
+    await expect(other).resolves.toBeUndefined();
   });
 
   it('deve logar a falha sem bloquear a navegação', async () => {
@@ -62,7 +62,7 @@ describe('SetupService (#275)', () => {
       .expectOne('/api/me/setup')
       .flush('erro', { status: 500, statusText: 'Server Error' });
 
-    await expectAsync(pending).toBeResolved();
+    await expect(pending).resolves.toBeUndefined();
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 
