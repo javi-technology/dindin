@@ -1,4 +1,9 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
@@ -16,32 +21,32 @@ export class LoginComponent {
 
   email = '';
   password = '';
-  error: string | null = null;
-  loading = false;
+  readonly error = signal<string | null>(null);
+  readonly loading = signal(false);
 
   async loginWithEmail(): Promise<void> {
-    this.loading = true;
-    this.error = null;
+    this.loading.set(true);
+    this.error.set(null);
     try {
       await this.authService.loginWithEmail(this.email, this.password);
       await this.router.navigate(['/']);
     } catch {
-      this.error = 'E-mail ou senha inválidos.';
+      this.error.set('E-mail ou senha inválidos.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
   async loginWithGoogle(): Promise<void> {
-    this.loading = true;
-    this.error = null;
+    this.loading.set(true);
+    this.error.set(null);
     try {
       await this.authService.loginWithGoogle();
       await this.router.navigate(['/']);
     } catch {
-      this.error = 'Erro ao fazer login com Google.';
+      this.error.set('Erro ao fazer login com Google.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 }

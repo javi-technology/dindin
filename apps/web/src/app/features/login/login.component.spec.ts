@@ -46,7 +46,7 @@ describe('LoginComponent', () => {
       'secret',
     );
     expect(routerMock.navigate).toHaveBeenCalledWith(['/']);
-    expect(fixture.componentInstance.error).toBeNull();
+    expect(fixture.componentInstance.error()).toBeNull();
   });
 
   it('deve exibir mensagem de erro quando login falhar', async () => {
@@ -56,7 +56,9 @@ describe('LoginComponent', () => {
     fixture.componentInstance.password = 'wrong';
     await fixture.componentInstance.loginWithEmail();
 
-    expect(fixture.componentInstance.error).toBe('E-mail ou senha inválidos.');
+    expect(fixture.componentInstance.error()).toBe(
+      'E-mail ou senha inválidos.',
+    );
   });
 
   it('deve fazer login com Google e redirecionar para home', async () => {
@@ -73,8 +75,32 @@ describe('LoginComponent', () => {
 
     await fixture.componentInstance.loginWithGoogle();
 
-    expect(fixture.componentInstance.error).toBe(
+    expect(fixture.componentInstance.error()).toBe(
       'Erro ao fazer login com Google.',
     );
+  });
+
+  it('deve atualizar a tela quando o login com Google falhar', async () => {
+    let rejectLogin!: (reason: Error) => void;
+    authServiceMock.loginWithGoogle.and.returnValue(
+      new Promise<void>((_resolve, reject) => {
+        rejectLogin = reject;
+      }),
+    );
+
+    const button = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      'button',
+    )[1] as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBeTrue();
+
+    rejectLogin(new Error('popup closed'));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Erro ao fazer login com Google.',
+    );
+    expect(button.disabled).toBeFalse();
   });
 });
