@@ -196,7 +196,7 @@ Regras:
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
 2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), referenciando a issue (`Closes #N`) → `Status: In review`
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão
 
 ## Comandos
