@@ -785,4 +785,30 @@ describe('RecommendedWalletComponent', () => {
       expect(modal()).toBeNull();
     });
   });
+
+  // Regressão: a validação do aporte mora no painel (#310), mas o erro é do
+  // contexto carteira/mês/aba. Sem isso ele sobrevive à troca e fica sobre uma
+  // sugestão que nada tem a ver com ele.
+  it('deve limpar o erro de aporte inválido ao trocar de carteira', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = 'abc';
+    input.dispatchEvent(new Event('input'));
+
+    clickGenerate();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-error"]')
+        .textContent,
+    ).toContain('Informe um valor de aporte válido.');
+
+    fixture.componentInstance.selectWallet('wallet-2');
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-error"]'),
+    ).toBeNull();
+  });
 });
