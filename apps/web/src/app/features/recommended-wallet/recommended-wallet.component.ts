@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   OnInit,
@@ -9,6 +10,21 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import {
+  ApplySuggestionFormComponent,
+  ApplySuggestionValue,
+  ApplyTarget,
+} from './components/apply-suggestion-form/apply-suggestion-form.component';
+import {
+  AiSuggestionPanelComponent,
+  ApplyRequest,
+  GenerateRequest,
+} from './components/ai-suggestion-panel/ai-suggestion-panel.component';
+import {
+  RecommendedAssetsTableComponent,
+  WalletTab,
+} from './components/recommended-assets-table/recommended-assets-table.component';
+import { WalletComparisonComponent } from './components/wallet-comparison/wallet-comparison.component';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Subject, forkJoin, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -23,51 +39,28 @@ import {
   RecommendedWalletAsset,
   RecommendedWalletComparison,
   AiSuggestion,
-  AiSuggestionAppliedItem,
-  AiSuggestionFallbackAllocation,
-  AiSuggestionItem,
   Asset,
   Position,
   Wallet,
 } from 'dindin-models';
-import {
-  formatCurrency,
-  formatPercent,
-  parseBrlNumber,
-  parseDecimal,
-} from '../../shared/utils/format.util';
-import { weightedAveragePrice } from '../../shared/utils/position-quantity.util';
-import {
-  LucideArrowLeft,
-  LucideCheck,
-  LucideSparkles,
-  LucideUpload,
-  LucideWallet,
-  LucideX,
-} from '@lucide/angular';
-
-type WalletTab = 'renda' | 'ganho';
-
-/** Compra da sugestão que o usuário está lançando na carteira (#276). */
-interface ApplyTarget {
-  ticker: string;
-  /** FII de origem, quando a compra é uma alternativa de redistribuição. */
-  fallbackFor?: string;
-}
+import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
+import { LucideArrowLeft, LucideCheck, LucideUpload } from '@lucide/angular';
 
 @Component({
   selector: 'app-recommended-wallet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterLink,
     LucideArrowLeft,
     LucideCheck,
-    LucideSparkles,
     LucideUpload,
-    LucideWallet,
-    LucideX,
     ConfirmDialogComponent,
+    ApplySuggestionFormComponent,
+    AiSuggestionPanelComponent,
+    RecommendedAssetsTableComponent,
+    WalletComparisonComponent,
   ],
   templateUrl: './recommended-wallet.component.html',
 })
@@ -116,7 +109,6 @@ export class RecommendedWalletComponent implements OnInit {
   suggestion = signal<AiSuggestion | null>(null);
   suggestionLoading = signal(false);
   suggestionError = signal<string | null>(null);
-  contributionInput = signal('');
   successMessage = signal<string | null>(null);
   isAdmin = signal(false);
   confirmModalOpen = signal(false);
@@ -158,65 +150,6 @@ export class RecommendedWalletComponent implements OnInit {
       this.wallets().find((wallet) => wallet.id === this.selectedWalletId())
         ?.name ?? '',
   );
-  applyExisting = computed<Position | null>(() => {
-    const target = this.applyTarget();
-    const positions = this.applyPositions();
-    if (!target || !positions) return null;
-    return (
-      positions.find(
-        (position) =>
-          position.ticker.toUpperCase() === target.ticker.toUpperCase(),
-      ) ?? null
-    );
-  });
-  applyAssetType = computed(() => {
-    const target = this.applyTarget();
-    if (!target) return null;
-    return (
-      this.applyExisting()?.assetType ??
-      this.applyAssets().find(
-        (asset) => asset.ticker.toUpperCase() === target.ticker.toUpperCase(),
-      )?.assetType ??
-      null
-    );
-  });
-  /** Quantidade e preço médio antes → depois da compra. */
-  applyPreview = computed(() => {
-    const quantity = parseDecimal(this.applyQuantity());
-    const price = parseDecimal(this.applyPrice());
-    if (
-      quantity === null ||
-      price === null ||
-      quantity <= 0 ||
-      price <= 0 ||
-      this.applyPositions() === null
-    ) {
-      return null;
-    }
-    const existing = this.applyExisting();
-    return {
-      quantity,
-      price,
-      currentQuantity: existing?.quantity ?? 0,
-      newQuantity: (existing?.quantity ?? 0) + quantity,
-      currentAverage: existing?.averagePrice ?? null,
-      newAverage: existing
-        ? weightedAveragePrice(
-            existing.quantity,
-            existing.averagePrice,
-            quantity,
-            price,
-          )
-        : price,
-    };
-  });
-  canConfirmApply = computed(
-    () =>
-      this.applyPreview() !== null &&
-      this.applyAssetType() !== null &&
-      !this.applySaving(),
-  );
-
   ngOnInit(): void {
     this.loadRecommendedWallets();
     this.loadWallets();
@@ -323,14 +256,6 @@ export class RecommendedWalletComponent implements OnInit {
     return status === 'confirmed' ? 'Confirmada' : 'Aguardando revisão';
   }
 
-  comparisonStatusLabel(
-    status: RecommendedWalletComparison['items'][number]['status'],
-  ): string {
-    if (status === 'match') return 'Recomendado e possuído';
-    if (status === 'missing') return 'Falta comprar';
-    return 'Fora da recomendação';
-  }
-
   formatCurrency(value: number): string {
     return formatCurrency(value);
   }
@@ -339,37 +264,7 @@ export class RecommendedWalletComponent implements OnInit {
     return formatPercent(value * 100);
   }
 
-  actionLabel(action: AiSuggestionItem['action']): string {
-    if (action === 'buy') return 'Comprar';
-    if (action === 'reduce') return 'Reduzir';
-    return 'Manter';
-  }
-
-  isUnaffordable(item: AiSuggestionItem): boolean {
-    return item.action === 'buy' && item.suggestedQuantity === 0;
-  }
-
-  quantityLabel(quantity: number): string {
-    return quantity === 1 ? 'cota' : 'cotas';
-  }
-
-  appliedEntry(
-    ticker: string,
-    fallbackFor?: string,
-  ): AiSuggestionAppliedItem | null {
-    return (
-      this.suggestion()?.appliedItems?.find(
-        (applied) =>
-          applied.ticker.toUpperCase() === ticker.toUpperCase() &&
-          applied.fallbackFor?.toUpperCase() === fallbackFor?.toUpperCase(),
-      ) ?? null
-    );
-  }
-
-  openApply(
-    item: AiSuggestionItem,
-    alternative?: AiSuggestionFallbackAllocation,
-  ): void {
+  openApply({ item, alternative }: ApplyRequest): void {
     const walletId = this.selectedWalletId();
     if (!walletId) return;
 
@@ -407,11 +302,6 @@ export class RecommendedWalletComponent implements OnInit {
       });
   }
 
-  onApplyInput(field: 'quantity' | 'price', event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    (field === 'quantity' ? this.applyQuantity : this.applyPrice).set(value);
-  }
-
   closeApply(): void {
     // Enquanto a compra é lançada o modal fica aberto: fechar e abrir outro
     // item deixaria a resposta desta chegar no modal errado.
@@ -420,11 +310,10 @@ export class RecommendedWalletComponent implements OnInit {
     this.applyError.set(null);
   }
 
-  confirmApply(): void {
+  confirmApply(value: ApplySuggestionValue): void {
     const target = this.applyTarget();
-    const preview = this.applyPreview();
     const suggestion = this.suggestion();
-    if (!target || !preview || !suggestion || !this.canConfirmApply()) return;
+    if (!target || !suggestion) return;
 
     // A API lança a posição e marca o item na mesma transação (#276).
     this.applySaving.set(true);
@@ -433,8 +322,8 @@ export class RecommendedWalletComponent implements OnInit {
       .applySuggestionItem(suggestion.id, {
         ticker: target.ticker,
         ...(target.fallbackFor ? { fallbackFor: target.fallbackFor } : {}),
-        quantity: preview.quantity,
-        price: preview.price,
+        quantity: value.quantity,
+        price: value.price,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -454,24 +343,13 @@ export class RecommendedWalletComponent implements OnInit {
       });
   }
 
-  generateSuggestion(force = false): void {
+  generateSuggestion({ contribution, force }: GenerateRequest): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
     const tab = this.selectedTab();
     if (!walletId || !month || !this.hasAiAccess()) return;
 
     this.suggestionError.set(null);
-    const rawContribution = this.contributionInput().trim();
-    const contribution =
-      rawContribution === '' ? undefined : parseBrlNumber(rawContribution);
-    if (
-      contribution === null ||
-      (contribution !== undefined && contribution < 0)
-    ) {
-      this.suggestionError.set('Informe um valor de aporte válido.');
-      return;
-    }
-
     this.suggestionLoading.set(true);
     const request =
       contribution === undefined
@@ -488,7 +366,7 @@ export class RecommendedWalletComponent implements OnInit {
             force,
             contribution,
           );
-    request.subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (suggestion) => {
         if (
           walletId === this.selectedWalletId() &&

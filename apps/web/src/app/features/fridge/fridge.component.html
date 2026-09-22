@@ -78,89 +78,12 @@
             </div>
           }
 
-          @if (items().length > 0) {
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="border-b border-gray-200">
-                    <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Ticker
-                    </th>
-                    <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Quantidade
-                    </th>
-                    <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Preço atual
-                    </th>
-                    <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Preço-alvo
-                    </th>
-                    <th class="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Potencial
-                    </th>
-                    <th
-                      class="py-3 px-4 text-sm font-semibold text-gray-700 text-right"
-                    >
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of items(); track item.id; let i = $index) {
-                    <tr
-                      class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                    >
-                      <td class="py-3 px-4 text-gray-900 font-medium">
-                        {{ item.ticker }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-700">
-                        {{ item.quantity }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-700">
-                        {{
-                          item.currentPrice != null
-                            ? formatCurrency(item.currentPrice)
-                            : formatCurrency(item.transferredPrice)
-                        }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-700">
-                        {{ formatCurrency(item.targetPrice) }}
-                      </td>
-                      <td class="py-3 px-4 text-gray-700">
-                        {{ formatPotential(item) }}
-                      </td>
-                      <td class="py-3 px-4 text-right">
-                        <button
-                          [attr.data-testid]="'btn-descongelar-item-' + i"
-                          class="text-emerald-600 hover:text-emerald-800 font-medium text-sm mr-3 inline-flex items-center"
-                          (click)="openUnfreeze(item)"
-                        >
-                          <svg lucideFlame [size]="14" class="mr-1"></svg>
-                          Descongelar
-                        </button>
-                        <button
-                          [attr.data-testid]="'btn-editar-item-' + i"
-                          class="text-cyan-600 hover:text-cyan-800 font-medium text-sm mr-3 inline-flex items-center"
-                          (click)="openForm(item)"
-                        >
-                          <svg lucidePencil [size]="14" class="mr-1"></svg>
-                          Editar
-                        </button>
-                        <button
-                          [attr.data-testid]="'btn-remover-item-' + i"
-                          class="text-red-600 hover:text-red-800 font-medium text-sm inline-flex items-center"
-                          (click)="deleteItem(item)"
-                        >
-                          <svg lucideTrash2 [size]="14" class="mr-1"></svg>
-                          Remover
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
+          <app-fridge-items-table
+            [items]="items()"
+            (unfreeze)="openUnfreeze($event)"
+            (edit)="openForm($event)"
+            (remove)="deleteItem($event)"
+          />
         }
       }
     </div>
@@ -168,115 +91,20 @@
 
   <!-- Modal de formulário (adicionar/editar item) -->
   @if (formVisible()) {
-    <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    <app-modal
+      [title]="editingItem() ? 'Editar item' : 'Adicionar item'"
+      testId="item-form"
+      (closed)="closeForm()"
     >
-      <div
-        class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
-        data-testid="item-form"
-      >
-        <h2 class="text-xl font-bold text-gray-900 mb-4">
-          {{ editingItem() ? 'Editar item' : 'Adicionar item' }}
-        </h2>
-
-        @if (formError()) {
-          <div
-            class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
-            data-testid="form-error"
-          >
-            {{ formError() }}
-          </div>
-        }
-
-        <form [formGroup]="form" (ngSubmit)="saveItem()" class="space-y-4">
-          <div>
-            <label
-              for="item-ticker"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Ticker</label
-            >
-            <select
-              id="item-ticker"
-              formControlName="ticker"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="" disabled>Selecione um ativo</option>
-              @for (asset of assets(); track asset.ticker) {
-                <option [value]="asset.ticker">
-                  {{ asset.ticker }} — {{ asset.name }}
-                </option>
-              }
-            </select>
-            @if (assetsError()) {
-              <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
-                {{ assetsError() }}
-              </p>
-            }
-          </div>
-
-          <div>
-            <label
-              for="item-quantity"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Quantidade</label
-            >
-            <input
-              id="item-quantity"
-              type="number"
-              step="any"
-              formControlName="quantity"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-            />
-          </div>
-
-          <div>
-            <label
-              for="item-transferred-price"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Preço de transferência (R$)</label
-            >
-            <input
-              id="item-transferred-price"
-              type="text"
-              formControlName="transferredPrice"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-              placeholder="Ex: 110,50"
-            />
-          </div>
-
-          <div>
-            <label
-              for="item-target-price"
-              class="block text-sm font-medium text-gray-700 mb-1"
-              >Preço-alvo (R$)</label
-            >
-            <input
-              id="item-target-price"
-              type="text"
-              formControlName="targetPrice"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
-              placeholder="Ex: 120,00"
-            />
-          </div>
-
-          <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              (click)="closeForm()"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
-            >
-              {{ editingItem() ? 'Salvar' : 'Adicionar' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <app-fridge-item-form
+        [item]="editingItem()"
+        [assets]="assets()"
+        [assetsError]="assetsError()"
+        [error]="formError()"
+        (save)="saveItem($event)"
+        (closed)="closeForm()"
+      />
+    </app-modal>
   }
 
   <!-- Modal de confirmação de exclusão -->
@@ -295,62 +123,19 @@
   }
 
   @if (unfreezeItemTarget()) {
-    <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    <app-modal
+      title="Descongelar item"
+      maxWidth="sm"
+      testId="unfreeze-modal"
+      (closed)="cancelUnfreeze()"
     >
-      <div
-        class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
-        data-testid="unfreeze-modal"
-      >
-        <h2 class="text-lg font-bold text-gray-900 mb-2">Descongelar item</h2>
-        <p class="text-gray-600 mb-6">
-          Mover
-          <strong>{{ unfreezeItemTarget()?.ticker }}</strong> da geladeira para
-          a carteira:
-        </p>
-
-        <form
-          [formGroup]="unfreezeForm"
-          (ngSubmit)="confirmUnfreeze()"
-          class="space-y-4"
-        >
-          @if (wallets().length > 0) {
-            <select
-              formControlName="walletId"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-            >
-              @for (wallet of wallets(); track wallet.id) {
-                <option [value]="wallet.id">{{ wallet.name }}</option>
-              }
-            </select>
-          } @else {
-            <p class="text-gray-500 text-sm">Nenhuma carteira disponível.</p>
-          }
-
-          @if (unfreezeError()) {
-            <p class="text-red-600 text-sm" data-testid="unfreeze-error">
-              {{ unfreezeError() }}
-            </p>
-          }
-
-          <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              (click)="cancelUnfreeze()"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              [disabled]="wallets().length === 0 || unfreezeForm.invalid"
-            >
-              Descongelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <app-unfreeze-form
+        [item]="unfreezeItemTarget()!"
+        [wallets]="wallets()"
+        [error]="unfreezeError()"
+        (confirmed)="confirmUnfreeze($event)"
+        (closed)="cancelUnfreeze()"
+      />
+    </app-modal>
   }
 </main>

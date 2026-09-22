@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, tap } from 'rxjs';
 import {
@@ -57,14 +58,16 @@ export class BillingService {
   private lastUid: string | null = null;
 
   constructor() {
-    inject(AuthService).user$.subscribe((user) => {
-      const uid = user?.uid ?? null;
-      if (uid !== this.lastUid) {
-        this.meState.set(null);
-        this.subscriptionRequired.set(false);
-        this.lastUid = uid;
-      }
-    });
+    inject(AuthService)
+      .user$.pipe(takeUntilDestroyed())
+      .subscribe((user) => {
+        const uid = user?.uid ?? null;
+        if (uid !== this.lastUid) {
+          this.meState.set(null);
+          this.subscriptionRequired.set(false);
+          this.lastUid = uid;
+        }
+      });
   }
 
   loadMe(): Observable<MeResponse> {

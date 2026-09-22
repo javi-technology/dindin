@@ -1,4 +1,12 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideArrowLeft } from '@lucide/angular';
@@ -15,6 +23,7 @@ import { BillingService } from '../../core/services/billing.service';
 export class BillingComponent implements OnInit {
   private readonly billingService = inject(BillingService);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly subscription = this.billingService.subscription;
   readonly status = computed(() => this.subscription().status);
@@ -37,9 +46,12 @@ export class BillingComponent implements OnInit {
           'Checkout cancelado. Você pode assinar quando quiser.',
         );
       }
-      this.billingService.loadMe().subscribe({
-        error: () => this.error.set('Erro ao carregar sua assinatura.'),
-      });
+      this.billingService
+        .loadMe()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          error: () => this.error.set('Erro ao carregar sua assinatura.'),
+        });
     }
   }
 
@@ -53,6 +65,7 @@ export class BillingComponent implements OnInit {
           this.billingService.loadMe().pipe(catchError(() => EMPTY)),
         ),
         takeWhile((me) => !this.isSubscribed(me), true),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
         next: (me) => {
@@ -85,32 +98,41 @@ export class BillingComponent implements OnInit {
   subscribe(interval: SubscriptionInterval): void {
     this.error.set(null);
     this.checkoutLoading.set(true);
-    this.billingService.startCheckout(interval).subscribe({
-      error: (error: { status?: number }) => {
-        this.checkoutLoading.set(false);
-        if (error?.status === 409) {
-          this.billingService.loadMe().subscribe({
-            error: () => this.error.set('Erro ao carregar sua assinatura.'),
-          });
-        } else {
-          this.error.set(
-            'Não foi possível iniciar o checkout. Tente novamente.',
-          );
-        }
-      },
-    });
+    this.billingService
+      .startCheckout(interval)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        error: (error: { status?: number }) => {
+          this.checkoutLoading.set(false);
+          if (error?.status === 409) {
+            this.billingService
+              .loadMe()
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                error: () => this.error.set('Erro ao carregar sua assinatura.'),
+              });
+          } else {
+            this.error.set(
+              'Não foi possível iniciar o checkout. Tente novamente.',
+            );
+          }
+        },
+      });
   }
 
   openPortal(): void {
     this.error.set(null);
     this.portalLoading.set(true);
-    this.billingService.openPortal().subscribe({
-      error: () => {
-        this.portalLoading.set(false);
-        this.error.set(
-          'Não foi possível abrir o portal de assinatura. Tente novamente.',
-        );
-      },
-    });
+    this.billingService
+      .openPortal()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        error: () => {
+          this.portalLoading.set(false);
+          this.error.set(
+            'Não foi possível abrir o portal de assinatura. Tente novamente.',
+          );
+        },
+      });
   }
 }

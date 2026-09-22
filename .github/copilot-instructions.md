@@ -264,6 +264,13 @@ Monorepo estruturado da seguinte forma:
   `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
   preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
   markup do modal na feature.
+- Para **modal de formulário**, usar `shared/components/modal`
+  (`<app-modal>`), que traz as mesmas garantias e projeta o formulário com
+  `<ng-content>`. A feature informa `title`, `testId` e, quando precisar,
+  `maxWidth`, e reage a `(closed)`. O rodapé com os botões pertence ao
+  formulário projetado, porque só ele sabe quando o envio é válido.
+- Com o modal compartilhado, a feature **não** declara `@HostListener` de
+  `Escape`: quem escuta o teclado é o modal.
 
 ### Erros da API
 

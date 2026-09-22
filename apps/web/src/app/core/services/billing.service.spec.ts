@@ -194,4 +194,13 @@ describe('BillingService', () => {
     expect(service.subscription().status).toBe('none');
     expect(service.subscriptionRequired()).toBeFalse();
   });
+
+  it('deve encerrar a assinatura de user$ ao destruir o injector', () => {
+    expect(user$.observed).toBeTrue();
+
+    httpMock.verify();
+    TestBed.resetTestingModule();
+
+    expect(user$.observed).toBeFalse();
+  });
 });
