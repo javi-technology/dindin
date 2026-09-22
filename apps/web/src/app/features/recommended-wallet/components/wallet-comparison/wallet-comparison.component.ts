@@ -45,5 +45,13 @@ export class WalletComparisonComponent {
   }
 
   formatCurrency = formatCurrency;
-  formatPercent = formatPercent;
+
+  /**
+   * Peso em percentual. A API devolve fração (0.125 para 12,50%) e
+   * `formatPercent` espera unidade percentual, daí o `* 100` — sem ele o
+   * valor aparece dividido por 100 (issue #360).
+   */
+  formatWeight(value: number): string {
+    return formatPercent(value * 100);
+  }
 }

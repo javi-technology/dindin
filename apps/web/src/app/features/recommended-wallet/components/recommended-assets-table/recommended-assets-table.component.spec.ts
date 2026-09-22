@@ -22,7 +22,8 @@ describe('RecommendedAssetsTableComponent', () => {
     {
       ticker: 'HGLG11',
       segment: 'Logística',
-      weight: 12.5,
+      // A API devolve peso em fração: 0.125 é 12,50%.
+      weight: 0.125,
       closePrice: 160.25,
       ifixWeight: 3.1,
       inCatalog: true,
@@ -30,7 +31,7 @@ describe('RecommendedAssetsTableComponent', () => {
     {
       ticker: 'XPLG11',
       segment: 'Logística',
-      weight: 7.5,
+      weight: 0.075,
       closePrice: 98.4,
       ifixWeight: 1.8,
       inCatalog: false,
