@@ -32,7 +32,7 @@ function enrichSpy(spy: any) {
 }
 
 (globalThis as any).jasmine = {
-  createSpy: (name?: string) => enrichSpy(vi.fn()),
+  createSpy: (_name?: string) => enrichSpy(vi.fn()),
   createSpyObj: (
     baseNameOrMethods: string | any[] | any,
     methodNames?: any[] | any,

@@ -654,6 +654,7 @@ describe('RecommendedWalletComponent', () => {
       // A API lança a posição e marca o item na mesma transação.
       expect(positionServiceMock.update).not.toHaveBeenCalled();
       expect(positionServiceMock.create).not.toHaveBeenCalled();
+      expect(serviceMock.applySuggestionItem).toHaveBeenCalledTimes(1);
       expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
         'wallet-1_2026-09_renda',
         { ticker: 'HGLG11', quantity: 2, price: 89.2 },
