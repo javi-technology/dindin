@@ -46,4 +46,9 @@ describe('apps/web/package.json – versões do Angular', () => {
     expect(Number(major)).toBe(6);
     expect(Number(minor)).toBe(0);
   });
+
+  // O SDK firebase foi atualizado para a v12 na #318.
+  it('deve usar firebase no major 12', () => {
+    expect(majorOf(deps['firebase'])).toBe(12);
+  });
 });
