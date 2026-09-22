@@ -10,3 +10,5 @@ ui-debug.log
 sa-key.json
 service-account*.json
 *-sa-key.json
+.gemini/
+.antigravitycli/
