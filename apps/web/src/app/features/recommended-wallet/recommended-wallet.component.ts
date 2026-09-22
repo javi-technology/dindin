@@ -14,6 +14,11 @@ import {
   ApplySuggestionValue,
   ApplyTarget,
 } from './components/apply-suggestion-form/apply-suggestion-form.component';
+import {
+  AiSuggestionPanelComponent,
+  ApplyRequest,
+  GenerateRequest,
+} from './components/ai-suggestion-panel/ai-suggestion-panel.component';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Subject, forkJoin, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -28,18 +33,11 @@ import {
   RecommendedWalletAsset,
   RecommendedWalletComparison,
   AiSuggestion,
-  AiSuggestionAppliedItem,
-  AiSuggestionFallbackAllocation,
-  AiSuggestionItem,
   Asset,
   Position,
   Wallet,
 } from 'dindin-models';
-import {
-  formatCurrency,
-  formatPercent,
-  parseBrlNumber,
-} from '../../shared/utils/format.util';
+import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
 import {
   LucideArrowLeft,
   LucideCheck,
@@ -65,6 +63,7 @@ type WalletTab = 'renda' | 'ganho';
     LucideX,
     ConfirmDialogComponent,
     ApplySuggestionFormComponent,
+    AiSuggestionPanelComponent,
   ],
   templateUrl: './recommended-wallet.component.html',
 })
@@ -113,7 +112,6 @@ export class RecommendedWalletComponent implements OnInit {
   suggestion = signal<AiSuggestion | null>(null);
   suggestionLoading = signal(false);
   suggestionError = signal<string | null>(null);
-  contributionInput = signal('');
   successMessage = signal<string | null>(null);
   isAdmin = signal(false);
   confirmModalOpen = signal(false);
@@ -277,37 +275,7 @@ export class RecommendedWalletComponent implements OnInit {
     return formatPercent(value * 100);
   }
 
-  actionLabel(action: AiSuggestionItem['action']): string {
-    if (action === 'buy') return 'Comprar';
-    if (action === 'reduce') return 'Reduzir';
-    return 'Manter';
-  }
-
-  isUnaffordable(item: AiSuggestionItem): boolean {
-    return item.action === 'buy' && item.suggestedQuantity === 0;
-  }
-
-  quantityLabel(quantity: number): string {
-    return quantity === 1 ? 'cota' : 'cotas';
-  }
-
-  appliedEntry(
-    ticker: string,
-    fallbackFor?: string,
-  ): AiSuggestionAppliedItem | null {
-    return (
-      this.suggestion()?.appliedItems?.find(
-        (applied) =>
-          applied.ticker.toUpperCase() === ticker.toUpperCase() &&
-          applied.fallbackFor?.toUpperCase() === fallbackFor?.toUpperCase(),
-      ) ?? null
-    );
-  }
-
-  openApply(
-    item: AiSuggestionItem,
-    alternative?: AiSuggestionFallbackAllocation,
-  ): void {
+  openApply({ item, alternative }: ApplyRequest): void {
     const walletId = this.selectedWalletId();
     if (!walletId) return;
 
@@ -386,24 +354,13 @@ export class RecommendedWalletComponent implements OnInit {
       });
   }
 
-  generateSuggestion(force = false): void {
+  generateSuggestion({ contribution, force }: GenerateRequest): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
     const tab = this.selectedTab();
     if (!walletId || !month || !this.hasAiAccess()) return;
 
     this.suggestionError.set(null);
-    const rawContribution = this.contributionInput().trim();
-    const contribution =
-      rawContribution === '' ? undefined : parseBrlNumber(rawContribution);
-    if (
-      contribution === null ||
-      (contribution !== undefined && contribution < 0)
-    ) {
-      this.suggestionError.set('Informe um valor de aporte válido.');
-      return;
-    }
-
     this.suggestionLoading.set(true);
     const request =
       contribution === undefined
@@ -420,7 +377,7 @@ export class RecommendedWalletComponent implements OnInit {
             force,
             contribution,
           );
-    request.subscribe({
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (suggestion) => {
         if (
           walletId === this.selectedWalletId() &&
