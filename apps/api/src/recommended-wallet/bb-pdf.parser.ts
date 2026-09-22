@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { today } from '../shared/date';
 import { logWarn } from '../shared/logger';
 
@@ -40,8 +40,11 @@ function parsePercentage(value: string): number {
 }
 
 export function parseWalletTable(pageText: string): ParsedRow[] {
+  // Os `\s*` entre as colunas absorvem a diferença de extração do pdf-parse 2
+  // (issue #319): a v1 entregava `1,07%R$ 88,04` colado, a v2 entrega
+  // `1,07% R$ 88,04`. O padrão aceita os dois.
   const regex =
-    /^([A-Z]{4}11)([^\d%]+?)(-?\d+,\d{2}%)R\$\s?([\d.]+,\d{2})(\d+,\d{2}%)/gm;
+    /^([A-Z]{4}11)([^\d%]+?)(-?\d+,\d{2}%)\s*R\$\s*([\d.]+,\d{2})\s*(\d+,\d{2}%)/gm;
   const rows: ParsedRow[] = [];
   let match: RegExpExecArray | null;
 
@@ -109,26 +112,26 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
   renda: ParsedRow[];
   ganho: ParsedRow[];
 }> {
-  const pages: string[] = [];
-  const parsed = await pdfParse(buffer, {
-    pagerender: async (pageData: {
-      getTextContent: () => Promise<{
-        items: Array<{ transform: number[]; str: string }>;
-      }>;
-    }) => {
-      const textContent = await pageData.getTextContent();
-      let lastY: number | undefined;
-      let text = '';
-      for (const item of textContent.items) {
-        const y = item.transform[5];
-        if (lastY !== undefined && lastY !== y) text += '\n';
-        text += item.str;
-        lastY = y;
-      }
-      pages.push(text);
-      return text;
-    },
-  });
+  /**
+   * O pdf-parse 2 já quebra linha por coordenada e separa colunas (issue
+   * #319); na v1 isso era feito à mão num `pagerender`. Os limiares abaixo
+   * reproduzem aquele comportamento: `lineThreshold: 0` quebra a qualquer
+   * mudança de Y, como o `lastY !== y` de antes, e `cellSeparator: ''`
+   * mantém os itens da mesma linha concatenados sem separador — é assim que
+   * `parseWalletTable` espera as linhas da tabela.
+   */
+  const parser = new PDFParse({ data: buffer });
+  let parsed;
+  try {
+    parsed = await parser.getText({
+      lineEnforce: true,
+      lineThreshold: 0,
+      cellSeparator: '',
+    });
+  } finally {
+    await parser.destroy();
+  }
+  const pages = parsed.pages.map((page) => page.text);
 
   const rendaPage = pages.find(
     (text) =>

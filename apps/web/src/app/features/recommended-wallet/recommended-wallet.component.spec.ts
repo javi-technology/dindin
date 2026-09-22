@@ -811,4 +811,33 @@ describe('RecommendedWalletComponent', () => {
       fixture.nativeElement.querySelector('[data-testid="suggestion-error"]'),
     ).toBeNull();
   });
+
+  // Sair da tela com uma requisição em voo deixava a resposta escrever em
+  // signals de um componente já destruído (#353).
+  it('não deve aplicar a lista que chega depois de destruir o componente', () => {
+    const pendente = new Subject<RecommendedWallet[]>();
+    serviceMock.list.and.returnValue(pendente.asObservable());
+
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.recommendedWallets()).toEqual([]);
+
+    fixture.destroy();
+    pendente.next([wallet]);
+
+    expect(component.recommendedWallets()).toEqual([]);
+  });
+
+  it('não deve aplicar as carteiras do usuário que chegam depois de destruir', () => {
+    const pendente = new Subject<Wallet[]>();
+    walletServiceMock.list.and.returnValue(pendente.asObservable());
+
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    fixture.destroy();
+    pendente.next([userWallet]);
+
+    expect(component.wallets()).toEqual([]);
+  });
 });

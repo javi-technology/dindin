@@ -83,20 +83,22 @@ import * as functionsLogger from 'firebase-functions/logger';
 
 import {
   buildSuggestionInput,
-  callOpenRouter,
   releaseDailySuggestion,
   reserveDailySuggestion,
   generateSuggestion,
   buildSuggestionHistory,
   previousMonths,
-  applySuggestedQuantities,
-  applyQualifiedInvestor,
-  applyFallbackAllocations,
-  redistributeUnspentAmounts,
   getSavedSuggestion,
-  parseSuggestionOutput,
   suggestionId,
 } from '../../src/recommended-wallet/ai-suggestion.service';
+import {
+  applyFallbackAllocations,
+  applyQualifiedInvestor,
+  applySuggestedQuantities,
+  redistributeUnspentAmounts,
+} from '../../src/recommended-wallet/ai-suggestion.allocation';
+import { parseSuggestionOutput } from '../../src/recommended-wallet/ai-suggestion.parser';
+import { callOpenRouter } from '../../src/recommended-wallet/openrouter.client';
 import {
   buildUserPrompt,
   SYSTEM_PROMPT,
