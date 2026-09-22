@@ -43,7 +43,6 @@ import {
   Position,
   Wallet,
 } from 'dindin-models';
-import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
 import { LucideArrowLeft, LucideCheck, LucideUpload } from '@lucide/angular';
 
 @Component({
@@ -265,14 +264,6 @@ export class RecommendedWalletComponent implements OnInit {
 
   statusLabel(status: RecommendedWallet['status']): string {
     return status === 'confirmed' ? 'Confirmada' : 'Aguardando revisão';
-  }
-
-  formatCurrency(value: number): string {
-    return formatCurrency(value);
-  }
-
-  formatPercent(value: number): string {
-    return formatPercent(value * 100);
   }
 
   openApply({ item, alternative }: ApplyRequest): void {
