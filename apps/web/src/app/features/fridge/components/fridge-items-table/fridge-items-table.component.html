@@ -1,0 +1,79 @@
+@if (items().length > 0) {
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">Ticker</th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Quantidade
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Preço atual
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Preço-alvo
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Potencial
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700 text-right">
+            Ações
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of items(); track item.id; let i = $index) {
+          <tr
+            class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+          >
+            <td class="py-3 px-4 text-gray-900 font-medium">
+              {{ item.ticker }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">
+              {{ item.quantity }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">
+              {{
+                item.currentPrice != null
+                  ? formatCurrency(item.currentPrice)
+                  : formatCurrency(item.transferredPrice)
+              }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">
+              {{ formatCurrency(item.targetPrice) }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">
+              {{ formatPotential(item) }}
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button
+                [attr.data-testid]="'btn-descongelar-item-' + i"
+                class="text-emerald-600 hover:text-emerald-800 font-medium text-sm mr-3 inline-flex items-center"
+                (click)="unfreeze.emit(item)"
+              >
+                <svg lucideFlame [size]="14" class="mr-1"></svg>
+                Descongelar
+              </button>
+              <button
+                [attr.data-testid]="'btn-editar-item-' + i"
+                class="text-cyan-600 hover:text-cyan-800 font-medium text-sm mr-3 inline-flex items-center"
+                (click)="edit.emit(item)"
+              >
+                <svg lucidePencil [size]="14" class="mr-1"></svg>
+                Editar
+              </button>
+              <button
+                [attr.data-testid]="'btn-remover-item-' + i"
+                class="text-red-600 hover:text-red-800 font-medium text-sm inline-flex items-center"
+                (click)="remove.emit(item)"
+              >
+                <svg lucideTrash2 [size]="14" class="mr-1"></svg>
+                Remover
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

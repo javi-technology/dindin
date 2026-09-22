@@ -1,25 +1,29 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, Subject, catchError, switchMap, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
+import { FridgeItemsTableComponent } from './components/fridge-items-table/fridge-items-table.component';
 import {
-  FormBuilder,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+  FridgeItemFormComponent,
+  FridgeItemFormValue,
+} from './components/fridge-item-form/fridge-item-form.component';
+import { UnfreezeFormComponent } from './components/unfreeze-form/unfreeze-form.component';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { SetupService } from '../../core/services/setup.service';
 import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
-import {
-  decimalValidator,
-  formatCurrency,
-  parseDecimal,
-} from '../../shared/utils/format.util';
+import { formatCurrency, parseDecimal } from '../../shared/utils/format.util';
 import {
   LucideRefrigerator,
   LucidePlus,
@@ -31,6 +35,7 @@ import {
 @Component({
   selector: 'app-fridge',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -41,6 +46,9 @@ import {
     LucideFlame,
     ConfirmDialogComponent,
     ModalComponent,
+    FridgeItemsTableComponent,
+    FridgeItemFormComponent,
+    UnfreezeFormComponent,
   ],
   templateUrl: './fridge.component.html',
 })
@@ -74,16 +82,6 @@ export class FridgeComponent implements OnInit {
   deleteConfirmItem = signal<FridgeItem | null>(null);
   unfreezeItemTarget = signal<FridgeItem | null>(null);
   unfreezeError = signal<string | null>(null);
-
-  form: FormGroup = this.fb.group({
-    ticker: ['', [Validators.required]],
-    quantity: [0, [Validators.required, Validators.min(0.0001)]],
-    transferredPrice: ['0', [Validators.required, decimalValidator()]],
-    targetPrice: ['0', [Validators.required, decimalValidator()]],
-  });
-  unfreezeForm: FormGroup = this.fb.group({
-    walletId: ['', Validators.required],
-  });
 
   constructor() {
     this.fridgeToLoad$
@@ -205,22 +203,6 @@ export class FridgeComponent implements OnInit {
     this.editingItem.set(item);
     this.formVisible.set(true);
     this.formError.set(null);
-
-    if (item) {
-      this.form.patchValue({
-        ticker: item.ticker,
-        quantity: item.quantity,
-        transferredPrice: String(item.transferredPrice),
-        targetPrice: String(item.targetPrice),
-      });
-    } else {
-      this.form.reset({
-        ticker: '',
-        quantity: 0,
-        transferredPrice: '0',
-        targetPrice: '0',
-      });
-    }
   }
 
   closeForm(): void {
@@ -228,12 +210,8 @@ export class FridgeComponent implements OnInit {
     this.editingItem.set(null);
   }
 
-  saveItem(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
+  /** Recebe o payload já montado pelo formulário e decide criar ou editar. */
+  saveItem(payload: FridgeItemFormValue): void {
     const fridge = this.selectedFridge();
     if (!fridge) {
       this.formError.set(
@@ -242,83 +220,24 @@ export class FridgeComponent implements OnInit {
       return;
     }
 
-    const ticker = this.form.value.ticker as string;
-    const quantity = Number(this.form.value.quantity);
-    const transferredPrice = this.parseDecimal(
-      this.form.value.transferredPrice,
-    );
-    const targetPrice = this.parseDecimal(this.form.value.targetPrice);
-
-    if (
-      !ticker ||
-      Number.isNaN(quantity) ||
-      quantity <= 0 ||
-      transferredPrice === null ||
-      transferredPrice < 0 ||
-      targetPrice === null ||
-      targetPrice < 0
-    ) {
-      this.formError.set('Preencha todos os campos obrigatórios corretamente.');
-      this.form.markAllAsTouched();
-      return;
-    }
-
     const editing = this.editingItem();
-    if (editing) {
-      const payload: {
-        ticker: string;
-        quantity: number;
-        transferredPrice: number;
-        targetPrice: number;
-      } = {
-        ticker: ticker.trim().toUpperCase(),
-        quantity,
-        transferredPrice,
-        targetPrice,
-      };
+    const request$ = editing
+      ? this.fridgeService.updateItem(fridge.id, editing.id, payload)
+      : this.fridgeService.createItem(fridge.id, payload);
 
-      this.fridgeService
-        .updateItem(fridge.id, editing.id, payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            this.closeForm();
-            this.loadItems(fridge.id);
-          },
-          error: () => {
-            this.formError.set(
-              'Erro ao atualizar item. Verifique os dados e tente novamente.',
-            );
-          },
-        });
-    } else {
-      const payload: {
-        ticker: string;
-        quantity: number;
-        transferredPrice: number;
-        targetPrice: number;
-      } = {
-        ticker: ticker.trim().toUpperCase(),
-        quantity,
-        transferredPrice,
-        targetPrice,
-      };
-
-      this.fridgeService
-        .createItem(fridge.id, payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            this.closeForm();
-            this.loadItems(fridge.id);
-          },
-          error: () => {
-            this.formError.set(
-              'Erro ao criar item. Verifique os dados e tente novamente.',
-            );
-          },
-        });
-    }
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.closeForm();
+        this.loadItems(fridge.id);
+      },
+      error: () => {
+        this.formError.set(
+          editing
+            ? 'Erro ao atualizar item. Verifique os dados e tente novamente.'
+            : 'Erro ao criar item. Verifique os dados e tente novamente.',
+        );
+      },
+    });
   }
 
   deleteItem(item: FridgeItem): void {
@@ -349,26 +268,18 @@ export class FridgeComponent implements OnInit {
   openUnfreeze(item: FridgeItem): void {
     this.unfreezeItemTarget.set(item);
     this.unfreezeError.set(null);
-    this.unfreezeForm.reset({
-      walletId: this.wallets()[0]?.id ?? '',
-    });
   }
 
   cancelUnfreeze(): void {
     this.unfreezeItemTarget.set(null);
     this.unfreezeError.set(null);
-    this.unfreezeForm.reset({ walletId: '' });
   }
 
-  confirmUnfreeze(): void {
+  confirmUnfreeze(walletId: string): void {
     const item = this.unfreezeItemTarget();
     const fridge = this.selectedFridge();
-    if (!item || !fridge || this.unfreezeForm.invalid) {
-      this.unfreezeForm.markAllAsTouched();
-      return;
-    }
+    if (!item || !fridge) return;
 
-    const walletId = this.unfreezeForm.value.walletId as string;
     this.fridgeService
       .unfreezeItem(fridge.id, item.id, walletId)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -381,24 +292,6 @@ export class FridgeComponent implements OnInit {
         },
         error: () => this.unfreezeError.set('Erro ao descongelar item.'),
       });
-  }
-
-  /** Calcula o potencial de ganho em percentual, ou null se não houver base. */
-  potentialGain(item: FridgeItem): number | null {
-    if (!item.targetPrice) return null;
-    const base = item.currentPrice ?? item.transferredPrice;
-    if (!base || base === 0) return null;
-    return ((item.targetPrice - base) / base) * 100;
-  }
-
-  formatPotential(item: FridgeItem): string {
-    const gain = this.potentialGain(item);
-    if (gain === null) return '—';
-    const formatted = gain.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    return `${formatted}%`;
   }
 
   formatCurrency = formatCurrency;
