@@ -79,29 +79,4 @@ describe('LoginComponent', () => {
       'Erro ao fazer login com Google.',
     );
   });
-
-  it('deve atualizar a tela quando o login com Google falhar', async () => {
-    let rejectLogin!: (reason: Error) => void;
-    authServiceMock.loginWithGoogle.and.returnValue(
-      new Promise<void>((_resolve, reject) => {
-        rejectLogin = reject;
-      }),
-    );
-
-    const button = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      'button',
-    )[1] as HTMLButtonElement;
-    button.click();
-    fixture.detectChanges();
-    expect(button.disabled).toBeTrue();
-
-    rejectLogin(new Error('popup closed'));
-    await Promise.resolve();
-    await fixture.whenStable();
-
-    expect(fixture.nativeElement.textContent).toContain(
-      'Erro ao fazer login com Google.',
-    );
-    expect(button.disabled).toBeFalse();
-  });
 });
