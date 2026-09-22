@@ -1,4 +1,5 @@
-import request from 'supertest';
+import { Server } from 'node:http';
+import supertest from 'supertest';
 
 const verifyIdTokenMock = jest.fn();
 
@@ -21,6 +22,13 @@ jest.mock('firebase-admin/firestore', () => ({
 
 import { app } from '../../src/index';
 import { Dividend, Position } from 'dindin-models';
+
+let testServer: Server;
+
+// O Supertest abre e fecha um servidor efêmero para cada `request(app)`.
+// Esta suíte faz dezenas de chamadas; compartilhar o servidor elimina a
+// corrida de socket que deixava requisições intermitentemente penduradas.
+const request = (_app: typeof app) => supertest(testServer);
 
 function createDividendSnapshot(dividend: Dividend) {
   return {
@@ -414,6 +422,22 @@ describe('Dividend CRUD', () => {
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   };
+
+  beforeAll(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        testServer = app.listen(0);
+        testServer.once('listening', resolve);
+        testServer.once('error', reject);
+      }),
+  );
+
+  afterAll(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        testServer.close((error) => (error ? reject(error) : resolve()));
+      }),
+  );
 
   beforeEach(() => {
     verifyIdTokenMock.mockReset();
