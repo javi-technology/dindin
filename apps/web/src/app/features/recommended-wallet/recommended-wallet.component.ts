@@ -44,14 +44,7 @@ import {
   Wallet,
 } from 'dindin-models';
 import { formatCurrency, formatPercent } from '../../shared/utils/format.util';
-import {
-  LucideArrowLeft,
-  LucideCheck,
-  LucideSparkles,
-  LucideUpload,
-  LucideWallet,
-  LucideX,
-} from '@lucide/angular';
+import { LucideArrowLeft, LucideCheck, LucideUpload } from '@lucide/angular';
 
 @Component({
   selector: 'app-recommended-wallet',
@@ -62,10 +55,7 @@ import {
     RouterLink,
     LucideArrowLeft,
     LucideCheck,
-    LucideSparkles,
     LucideUpload,
-    LucideWallet,
-    LucideX,
     ConfirmDialogComponent,
     ApplySuggestionFormComponent,
     AiSuggestionPanelComponent,

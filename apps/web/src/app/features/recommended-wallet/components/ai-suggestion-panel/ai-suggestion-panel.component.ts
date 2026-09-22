@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   input,
   output,
   signal,
@@ -58,12 +57,14 @@ export class AiSuggestionPanelComponent {
 
   readonly generate = output<GenerateRequest>();
   readonly apply = output<ApplyRequest>();
+  /**
+   * Aporte em formato inválido. O erro sobe porque ele pertence ao contexto
+   * carteira/mês/aba, que é do pai: guardá-lo aqui o deixaria na tela depois
+   * de uma troca de contexto, sobre uma sugestão sem relação com ele.
+   */
+  readonly validationError = output<string>();
 
   readonly contributionInput = signal('');
-
-  /** Aporte digitado em formato inválido: erro do próprio painel. */
-  private readonly localError = signal<string | null>(null);
-  readonly shownError = computed(() => this.error() ?? this.localError());
 
   onContributionInput(event: Event): void {
     this.contributionInput.set((event.target as HTMLInputElement).value);
@@ -77,11 +78,10 @@ export class AiSuggestionPanelComponent {
       contribution === null ||
       (contribution !== undefined && contribution < 0)
     ) {
-      this.localError.set('Informe um valor de aporte válido.');
+      this.validationError.emit('Informe um valor de aporte válido.');
       return;
     }
 
-    this.localError.set(null);
     this.generate.emit({ contribution, force });
   }
 

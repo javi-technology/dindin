@@ -52,12 +52,12 @@
   }
 
   @if (hasAiAccess()) {
-    @if (shownError()) {
+    @if (error()) {
       <p
         class="text-red-700 bg-red-50 rounded-lg p-3 mt-4"
         data-testid="suggestion-error"
       >
-        {{ shownError() }}
+        {{ error() }}
       </p>
     }
 

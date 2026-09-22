@@ -104,6 +104,7 @@
             [showPaywall]="showPaywall()"
             [canGenerate]="canGenerateSuggestion()"
             (generate)="generateSuggestion($event)"
+            (validationError)="suggestionError.set($event)"
             (apply)="openApply($event)"
           />
         </section>

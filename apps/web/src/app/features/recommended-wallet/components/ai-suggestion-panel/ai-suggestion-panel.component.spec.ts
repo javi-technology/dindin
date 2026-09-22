@@ -20,6 +20,7 @@ describe('AiSuggestionPanelComponent', () => {
   let component: AiSuggestionPanelComponent;
   let geracoes: GenerateRequest[];
   let aplicacoes: ApplyRequest[];
+  let invalidos: string[];
 
   const suggestion: AiSuggestion = {
     id: 'suggestion-1',
@@ -72,8 +73,10 @@ describe('AiSuggestionPanelComponent', () => {
     }
     geracoes = [];
     aplicacoes = [];
+    invalidos = [];
     component.generate.subscribe((value) => geracoes.push(value));
     component.apply.subscribe((value) => aplicacoes.push(value));
+    component.validationError.subscribe((value) => invalidos.push(value));
     fixture.detectChanges();
   }
 
@@ -128,17 +131,16 @@ describe('AiSuggestionPanelComponent', () => {
       expect(geracoes).toEqual([{ contribution: 1500.5, force: false }]);
     });
 
-    it('deve recusar aporte inválido sem pedir a geração', () => {
+    it('deve recusar aporte inválido e avisar o pai', () => {
       setup();
       type('contribution-input', 'abc');
 
       element('[data-testid="generate-suggestion-button"]')?.click();
       fixture.detectChanges();
 
+      // O erro sobe: quem o exibe e o limpa na troca de contexto é o pai.
       expect(geracoes).toEqual([]);
-      expect(
-        element('[data-testid="suggestion-error"]')?.textContent,
-      ).toContain('Informe um valor de aporte válido.');
+      expect(invalidos).toEqual(['Informe um valor de aporte válido.']);
     });
 
     it('deve desabilitar o botão sem carteira e mês escolhidos', () => {
