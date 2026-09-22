@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from './auth.middleware';
+import { logError } from '../shared/logger';
 
 /** Handler de rota que só cuida do caminho feliz e das respostas de negócio. */
 type RouteHandler = (req: Request, res: Response) => Promise<void> | void;
@@ -56,13 +57,19 @@ export function asyncHandler(name: string, handler: RouteHandler) {
     try {
       await handler(req, res);
     } catch (error) {
-      console.error(`[${name}] error:`, {
+      // O `cause` guarda o erro que originou este (ex.: a validação do
+      // parser do PDF convertida em 400). Sem o stack dele, o log aponta
+      // para a linha da conversão, não para a falha real (issue #304).
+      const cause = (error as { cause?: unknown }).cause;
+
+      logError(name, {
         method: req.method,
         path: req.path,
         uid: (req as AuthRequest).user?.uid,
         params: req.params,
         message: (error as Error).message,
         stack: (error as Error).stack,
+        ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
       });
 
       // Um handler pode falhar depois de já ter respondido; um segundo status
@@ -74,7 +81,7 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       res.status(code).json({
         error: exposeOf(error, code)
           ? (error as Error).message
-          : 'Internal server error',
+          : 'Erro interno do servidor',
       });
     }
   };

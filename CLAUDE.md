@@ -44,6 +44,48 @@ firebase deploy                                # deploy completo
 - Antes de iniciar qualquer trabalho, verificar se existe issue aberta (`gh issue list`). Se não existir, criar.
 - Nenhum commit sem o número da issue correspondente.
 
+#### Template obrigatório
+
+**Toda issue DEVE seguir, de forma obrigatória, um template de `.github/ISSUE_TEMPLATE/`.**
+Isso vale também para issues criadas pela CLI (`gh issue create`), que não aplica o
+template sozinha. Uma issue fora do template não está pronta para ser trabalhada.
+
+| Tipo de issue                                      | Template             | Título            | Label         |
+| -------------------------------------------------- | -------------------- | ----------------- | ------------- |
+| Defeito (bug, regressão, teste intermitente)       | `bug_report.md`      | `[Bug] - ...`     | `bug`         |
+| Demais (funcionalidade, melhoria, refactor, docs…) | `feature_request.md` | `[Feature] - ...` | `enhancement` |
+
+- O corpo segue **exatamente** o formato do template, sem acrescentar nem trocar
+  estrutura:
+
+  ```markdown
+  **Contexto:**
+
+  - ...
+
+  **DOR:**
+
+  - ...
+
+  **DOD:**
+
+  - ...
+  ```
+
+  - As seções são **Contexto**, **DOR** e **DOD**, nessa ordem, com o título em
+    negrito terminado em dois-pontos.
+  - Cada seção contém só bullet points simples (`- `). **Não usar** checkbox
+    (`- [ ]`), sub-bullets, tabelas, títulos (`##`) nem seções extras.
+  - **Contexto:** o problema e por que ele importa. **DOR** (Definition of Ready):
+    o que se quer e o que precisa estar claro para começar. **DOD** (Definition of
+    Done): os critérios de aceite, um por bullet.
+  - Detalhes extras (escopo, fora de escopo, exemplos) viram bullets dentro dessas
+    seções.
+
+- Labels complementares (`fase-N`, `test`, `debito-tecnico`, `documentation`…) são
+  somadas à label do template, nunca a substituem.
+- `custom.md` está vazio e não deve ser usado.
+
 #### Campos obrigatórios no GitHub Projects
 
 Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchidos (além de `Status`, que começa em `Backlog`):
@@ -55,7 +97,7 @@ Toda issue criada deve ser adicionada ao project e ter os campos abaixo preenchi
 | `Priority` | P0, P1, P2, P3               | P0 = incidente/bloqueante, P1 = risco financeiro ou de dados, P2 = melhoria relevante, P3 = desejável |
 
 ```bash
-gh issue create --title "..." --label "..." --body-file issue.md
+gh issue create --title "[Feature] - ..." --label "enhancement" --body-file issue.md  # corpo no formato do template
 gh project item-add 4 --owner javi-technology --url <url_da_issue>
 gh project field-list 4 --owner javi-technology           # ids dos campos e opções
 gh project item-edit --project-id <project_id> --id <item_id> --field-id <estimate_id> --number <pontos>
@@ -230,11 +272,40 @@ Regras:
   `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
   preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
   markup do modal na feature.
+- Para **modal de formulário**, usar `shared/components/modal`
+  (`<app-modal>`), que traz as mesmas garantias e projeta o formulário com
+  `<ng-content>`. A feature informa `title`, `testId` e, quando precisar,
+  `maxWidth`, e reage a `(closed)`. O rodapé com os botões pertence ao
+  formulário projetado, porque só ele sabe quando o envio é válido.
+- Com o modal compartilhado, a feature **não** declara `@HostListener` de
+  `Escape`: quem escuta o teclado é o modal.
+
+### Erros da API
+
+- Falha de negócio é sinalizada com **`HttpError`** (`apps/api/src/shared/http-error.ts`),
+  nunca com `Object.assign(new Error(...), { statusCode })` à mão: use as
+  fábricas `badRequest`, `notFound`, `conflict`, `tooManyRequests`,
+  `badGateway` e `internal`. O `asyncHandler` traduz `statusCode`/`expose` em
+  resposta.
+- `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não. Só marque
+  um 5xx como exposto quando o texto for escrito para a tela (ex.: o 502 do
+  provedor de IA).
+- **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
+  tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
+  contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.
 
 ### Logs
 
-- Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).
-- Em produção, considerar logger estruturado.
+- Usar o **logger estruturado** (`apps/api/src/shared/logger.ts`): `logInfo`,
+  `logWarn` e `logError`, com um nome de evento (`'updateAllQuotes.done'`) e
+  campos em objeto. Nada de `console.log`/`console.error` com texto
+  interpolado — o Cloud Logging publica os campos como `jsonPayload`, que é
+  filtrável por rota, status ou uid.
+- **Nunca logar o corpo da requisição**: o logger descarta a chave `body`, e o
+  que trafega nas rotas é dado financeiro do usuário. Método, rota e uid
+  bastam para localizar a falha.
+- Toda resposta é registrada pelo middleware de requisições, inclusive as sem
+  corpo (204, 401).
 
 ## Segurança
 

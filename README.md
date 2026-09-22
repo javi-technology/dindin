@@ -154,6 +154,24 @@ sugestões.
 `GET /api/me` devolve
 `{ uid, admin, subscription: { status, plan, interval, currentPeriodEnd, cancelAtPeriodEnd }, entitlements: ['ai'] }`.
 
+### Limite diário de sugestões de IA
+
+São 5 gerações por dia por usuário. O contador fica em
+`users/{uid}/aiSuggestionUsage/{YYYY-MM-DD}`, com o dia no fuso
+`America/Sao_Paulo` — em UTC o limite reiniciaria às 21h de Brasília.
+
+A cota é **reservada numa transação antes** da chamada ao provedor de IA, que
+pode levar até 120 s, e devolvida se a geração falhar. Contar o uso só depois
+da resposta deixava requisições paralelas passarem todas pelo limite.
+
+Cada documento grava `expiresAt` (30 dias). Para o Firestore apagá-los
+sozinho, habilite a política de TTL uma vez por projeto:
+
+```bash
+gcloud firestore fields ttls update expiresAt \
+  --collection-group=aiSuggestionUsage --enable-ttl --project=dindin-4e720
+```
+
 ### Stripe
 
 O provedor de pagamento é a Stripe (Checkout + Customer Portal + webhooks).
@@ -240,6 +258,45 @@ expostos em `GET /api/me`):
   `checkout.session.expired` (somente se ainda for a mesma sessão).
 - `portalRateLimit: { windowStart, count }` — janela fixa de 1 minuto para
   `portal-session`.
+
+## Migração de dados legados
+
+Duas mudanças anteriores deixaram resíduo no Firestore, e o script
+`apps/api/src/scripts/migrate-legacy-data.ts` limpa os dois:
+
+1. **`currentPrice` em posições e itens** — a #86 passou a resolver o preço a
+   partir de `quotes` na leitura, mas o campo antigo continuou gravado,
+   congelado no valor do dia em que o job parou de atualizá-lo.
+2. **Proventos automáticos com id antigo** (`YYYY-MM_TICKER`) — o sync atual
+   usa `YYYY-MM-DD_TICKER`. Enquanto existirem, `dividend-sync-record`
+   precisa do tratamento especial `LEGACY_AUTO_ID`.
+
+O script **simula por padrão** e é idempotente. Requer credenciais com
+permissão de escrita no Firestore do projeto, como os demais scripts:
+
+```bash
+# simula e conta
+GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+  npm run migrate:legacy --workspace=apps/api
+
+# aplica
+GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
+  npm run migrate:legacy --workspace=apps/api -- --apply
+```
+
+Para ensaiar sem tocar em produção, aponte para o emulador:
+
+```bash
+firebase emulators:start --only firestore   # em outro terminal
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=dindin-4e720 \
+  npm run migrate:legacy --workspace=apps/api -- --apply
+```
+
+Sem credencial, o script para com `migrateLegacyData.missingCredentials` e a
+instrução do que definir — em vez do stack do `google-auth`.
+
+Depois de aplicado em produção, o tratamento `LEGACY_AUTO_ID` em
+`dividend-sync-record.service.ts` pode ser removido.
 
 ## Moeda: BRL-only
 

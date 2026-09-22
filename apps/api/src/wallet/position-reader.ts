@@ -28,7 +28,7 @@ export async function getAllUserPositions(
 
   const positionsByWallet = await Promise.all(
     walletsSnapshot.docs.map((walletDoc) =>
-      walletDoc.ref.collection('positions').get(),
+      positionsCollection(userId, walletDoc.id).get(),
     ),
   );
 

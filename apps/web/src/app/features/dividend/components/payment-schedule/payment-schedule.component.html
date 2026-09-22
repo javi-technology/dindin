@@ -1,0 +1,162 @@
+<section data-testid="payment-schedule">
+  <h2 class="text-xl font-semibold text-gray-900 mb-1">Agenda de pagamentos</h2>
+  <p class="text-sm text-gray-500 mb-4" data-testid="schedule-scope-note">
+    Considera apenas os ativos das carteiras; o total da geladeira aparece no
+    card de projeção.
+  </p>
+
+  @if (schedule().upcoming.length > 0 || schedule().upcomingTotal > 0) {
+    <div class="mb-6" data-testid="schedule-upcoming">
+      <p class="text-sm font-medium text-gray-600 mb-3">
+        A receber: {{ formatCurrency(schedule().upcomingTotal) }}
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @for (day of schedule().upcoming; track day.date) {
+          <article
+            class="rounded-lg border border-gray-200 p-4"
+            data-testid="schedule-day"
+          >
+            <header
+              class="flex flex-wrap items-baseline justify-between gap-2 mb-3"
+            >
+              <p class="font-semibold text-gray-900">
+                {{ day.relativeLabel }}
+                <span class="font-normal text-gray-500">
+                  · {{ formatDate(day.date) }}
+                </span>
+              </p>
+              <p class="font-bold text-green-700">
+                {{ formatCurrency(day.total) }}
+              </p>
+            </header>
+            <ul class="space-y-2">
+              @for (item of day.items; track item.ticker) {
+                <li class="text-sm">
+                  <span class="font-medium text-gray-900">
+                    {{ item.ticker }}
+                  </span>
+                  <span class="block text-gray-600">
+                    <strong
+                      class="text-base text-gray-900"
+                      data-testid="schedule-dividend-per-share"
+                    >
+                      {{ formatCurrency(item.monthlyDividend) }}
+                    </strong>
+                    por cota × {{ item.quantity }} =
+                    {{ formatCurrency(item.monthlyIncome) }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </article>
+        }
+      </div>
+    </div>
+  }
+
+  @if (schedule().paid.length > 0 || schedule().paidTotal > 0) {
+    <div class="mb-6" data-testid="schedule-paid">
+      <p class="text-sm font-medium text-gray-600 mb-3">
+        Já pagos: {{ formatCurrency(schedule().paidTotal) }}
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @for (day of schedule().paid; track day.date) {
+          <article
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4"
+            data-testid="schedule-day"
+          >
+            <header
+              class="flex flex-wrap items-baseline justify-between gap-2 mb-3"
+            >
+              <p class="font-semibold text-gray-700">
+                {{ day.relativeLabel }}
+                <span class="font-normal text-gray-500">
+                  · {{ formatDate(day.date) }}
+                </span>
+              </p>
+              <p class="font-bold text-gray-700">
+                {{ formatCurrency(day.total) }}
+              </p>
+            </header>
+            <ul class="space-y-2">
+              @for (item of day.items; track item.ticker) {
+                <li class="text-sm text-gray-600">
+                  <span class="font-medium text-gray-800">
+                    {{ item.ticker }}
+                  </span>
+                  <span class="block">
+                    <strong
+                      class="text-base text-gray-800"
+                      data-testid="schedule-dividend-per-share"
+                    >
+                      {{ formatCurrency(item.monthlyDividend) }}
+                    </strong>
+                    por cota × {{ item.quantity }} =
+                    {{ formatCurrency(item.monthlyIncome) }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </article>
+        }
+      </div>
+    </div>
+  }
+
+  @if (schedule().withoutDate.length > 0) {
+    <div
+      class="rounded-lg border border-dashed border-gray-300 p-4"
+      data-testid="schedule-without-date"
+    >
+      <p class="text-sm font-medium text-gray-600 mb-2">
+        Sem data de pagamento anunciada
+      </p>
+      <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+        @for (item of schedule().withoutDate; track item.ticker) {
+          <li>
+            <span class="font-medium">{{ item.ticker }}</span>
+            ·
+            <span data-testid="schedule-dividend-per-share">
+              {{ formatCurrency(item.monthlyDividend) }}
+            </span>
+            por cota
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  @if (hiddenDateCount() > 0 || hiddenWithoutDateCount() > 0) {
+    <div
+      class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+      data-testid="schedule-paywall"
+    >
+      <h3 class="text-base font-semibold text-gray-900">
+        Agenda completa para assinantes
+      </h3>
+      <p class="mt-2 text-sm text-gray-700">
+        O plano gratuito mostra as 2 datas mais próximas de hoje. Os totais
+        acima já consideram todos os pagamentos.
+      </p>
+      <p class="mt-1 text-sm text-gray-700">
+        @if (hiddenDateCount() > 0) {
+          Mais {{ hiddenDateCount() }}
+          {{ hiddenDateCount() === 1 ? 'data' : 'datas' }} de pagamento
+          {{ hiddenWithoutDateCount() > 0 ? 'e' : 'bloqueadas.' }}
+        }
+        @if (hiddenWithoutDateCount() > 0) {
+          {{ hiddenDateCount() > 0 ? '' : 'Mais' }}
+          {{ hiddenWithoutDateCount() }}
+          {{ hiddenWithoutDateCount() === 1 ? 'ativo' : 'ativos' }}
+          sem data anunciada.
+        }
+      </p>
+      <a
+        routerLink="/assinatura"
+        class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+        data-testid="schedule-paywall-cta"
+        >Assinar</a
+      >
+    </div>
+  }
+</section>

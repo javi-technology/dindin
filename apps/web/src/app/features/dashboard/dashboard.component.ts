@@ -1,22 +1,19 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
-import { FridgeItem, PatrimonySnapshot, Position, Wallet } from 'dindin-models';
+import { catchError, of, switchMap } from 'rxjs';
+import { PatrimonySnapshot } from 'dindin-models';
+import type { TickerValue } from 'dindin-shared-types';
 import {
   LucideRefrigerator,
   LucideTrendingUp,
   LucideWallet,
 } from '@lucide/angular';
-import { WalletService } from '../../core/services/wallet.service';
-import { PositionService } from '../../core/services/position.service';
-import { FridgeService } from '../../core/services/fridge.service';
-import { DividendService } from '../../core/services/dividend.service';
+import { DashboardService } from '../../core/services/dashboard.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HealthService } from '../../core/services/health.service';
 import { PatrimonyService } from '../../core/services/patrimony.service';
 import { formatCurrency } from '../../shared/utils/format.util';
-import { aggregateMonthlyIncome } from '../../shared/utils/monthly-income.util';
 import { PatrimonyChartComponent } from '../../shared/components/charts/patrimony-chart/patrimony-chart.component';
 import { CompositionChartComponent } from '../../shared/components/charts/composition-chart/composition-chart.component';
 
@@ -34,17 +31,14 @@ import { CompositionChartComponent } from '../../shared/components/charts/compos
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
-  private readonly walletService = inject(WalletService);
-  private readonly positionService = inject(PositionService);
-  private readonly fridgeService = inject(FridgeService);
-  private readonly dividendService = inject(DividendService);
+  private readonly dashboardService = inject(DashboardService);
   private readonly authService = inject(AuthService);
   private readonly healthService = inject(HealthService);
   private readonly patrimonyService = inject(PatrimonyService);
   private readonly destroyRef = inject(DestroyRef);
 
   totalWallet = signal(0);
-  positions = signal<Position[]>([]);
+  composition = signal<TickerValue[]>([]);
   totalFridge = signal(0);
   totalDividends = signal(0);
   loading = signal(true);
@@ -99,30 +93,17 @@ export class DashboardComponent implements OnInit {
   }
 
   private loadSummary(): void {
-    this.walletService
-      .list()
-      .pipe(
-        switchMap((wallets) =>
-          forkJoin({
-            positions: this.walletPositions(wallets),
-            totalFridge: this.fridgeTotal(),
-            totalDividends: this.dividendsTotal(wallets),
-          }),
-        ),
-        takeUntilDestroyed(this.destroyRef),
-      )
+    // Uma requisição no lugar de 1 + carteiras + 1 + geladeiras + carteiras
+    // (issue #300). Patrimônio, geladeira, renda e composição vêm prontos.
+    this.dashboardService
+      .getSummary()
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ positions, totalFridge, totalDividends }) => {
-          this.positions.set(positions);
-          this.totalWallet.set(
-            positions.reduce(
-              (sum, position) =>
-                sum + position.quantity * this.positionPrice(position),
-              0,
-            ),
-          );
-          this.totalFridge.set(totalFridge);
-          this.totalDividends.set(totalDividends);
+        next: (summary) => {
+          this.totalWallet.set(summary.totalWallet);
+          this.totalFridge.set(summary.totalFridge);
+          this.totalDividends.set(summary.monthlyIncomeTotal);
+          this.composition.set(summary.composition);
           this.loading.set(false);
         },
         error: () => {
@@ -130,52 +111,5 @@ export class DashboardComponent implements OnInit {
           this.loading.set(false);
         },
       });
-  }
-
-  private walletPositions(wallets: Wallet[]): Observable<Position[]> {
-    return this.combine(
-      wallets.map((wallet) => this.positionService.list(wallet.id)),
-    );
-  }
-
-  private dividendsTotal(wallets: Wallet[]): Observable<number> {
-    if (wallets.length === 0) {
-      return of(0);
-    }
-
-    return forkJoin(
-      wallets.map((wallet) => this.dividendService.getMonthlyIncome(wallet.id)),
-    ).pipe(map((responses) => aggregateMonthlyIncome(responses).total));
-  }
-
-  private fridgeTotal(): Observable<number> {
-    return this.fridgeService.listFridges().pipe(
-      switchMap((fridges) =>
-        this.combine(
-          fridges.map((fridge) => this.fridgeService.listItems(fridge.id)),
-        ),
-      ),
-      map((items) =>
-        items.reduce(
-          (sum, item) => sum + item.quantity * this.itemPrice(item),
-          0,
-        ),
-      ),
-    );
-  }
-
-  private combine<T>(requests: Observable<T[]>[]): Observable<T[]> {
-    if (requests.length === 0) {
-      return of([]);
-    }
-    return forkJoin(requests).pipe(map((results) => results.flat()));
-  }
-
-  private positionPrice(position: Position): number {
-    return position.currentPrice ?? position.averagePrice;
-  }
-
-  private itemPrice(item: FridgeItem): number {
-    return item.currentPrice ?? item.transferredPrice;
   }
 }

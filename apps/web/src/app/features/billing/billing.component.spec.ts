@@ -371,4 +371,20 @@ describe('BillingComponent', () => {
       'Não foi possível abrir o portal de assinatura. Tente novamente.',
     );
   });
+
+  it('deve parar o polling de confirmação ao destruir o componente', async () => {
+    await setup(baseSubscription, { status: 'success' }, false);
+
+    fakeAsync(() => {
+      fixture.detectChanges();
+      tick(2000);
+
+      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+
+      fixture.destroy();
+      tick(10000);
+
+      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+    })();
+  });
 });

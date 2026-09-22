@@ -1,10 +1,20 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
+import {
+  descriptionField,
+  nameField,
+  nonNegativeNumberField,
+  parseBody,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 import {
   uid,
   fridgesCollection,
@@ -12,6 +22,7 @@ import {
   positionsCollection,
   walletsCollection,
 } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 /**
  * Resolve o `currentPrice` de cada item a partir da collection `quotes`
@@ -50,13 +61,13 @@ export const listFridges = asyncHandler(
 export const createFridge = asyncHandler(
   'createFridge',
   async (req: Request, res: Response) => {
-    const { name, description } = req.body as Partial<Fridge>;
-
-    if (!name) {
-      res.status(400).json({ error: 'Name is required' });
+    const parsed = parseBody(fridgeSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const { name, description } = parsed.data;
     const now = new Date().toISOString();
     const fridgeData: Omit<Fridge, 'id'> = {
       ownerId: uid(req),
@@ -74,11 +85,11 @@ export const createFridge = asyncHandler(
 export const getFridge = asyncHandler(
   'getFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const doc = await fridgesCollection(uid(req)).doc(fridgeId).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
@@ -89,19 +100,22 @@ export const getFridge = asyncHandler(
 export const updateFridge = asyncHandler(
   'updateFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
-    const { name, description } = req.body as Partial<
-      Pick<Fridge, 'name' | 'description'>
-    >;
+    const parsed = parseBody(updateFridgeSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
 
+    const { name, description } = parsed.data;
     const updatedAt = new Date().toISOString();
     const updates: Partial<Fridge> & { updatedAt: string } = { updatedAt };
 
@@ -118,12 +132,12 @@ export const updateFridge = asyncHandler(
 export const deleteFridge = asyncHandler(
   'deleteFridge',
   async (req: Request, res: Response) => {
-    const fridgeId = req.params.id;
+    const fridgeId = routeParam(req, 'id');
     const fridgeRef = fridgesCollection(uid(req)).doc(fridgeId);
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
+      res.status(404).json({ error: 'Geladeira não encontrada' });
       return;
     }
 
@@ -148,79 +162,35 @@ async function validateFridgeExists(
 ): Promise<boolean> {
   const fridgeDoc = await fridgesCollection(userId).doc(fridgeId).get();
   if (!fridgeDoc.exists) {
-    res.status(404).json({ error: 'Fridge not found' });
+    res.status(404).json({ error: 'Geladeira não encontrada' });
     return false;
   }
   return true;
 }
 
-function validateItemBody(
-  body: Partial<FridgeItem>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, transferredPrice, targetPrice } = body;
+const fridgeSchema = z.object({
+  name: nameField('Nome'),
+  description: descriptionField(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker is required and must be a non-empty string',
-      };
-    }
-  }
+const updateFridgeSchema = fridgeSchema.partial();
 
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantity is required and must be a positive number',
-      };
-    }
-  }
+const itemSchema = z.object({
+  ticker: tickerField(),
+  quantity: positiveNumberField('Quantidade'),
+  transferredPrice: nonNegativeNumberField('Preço de transferência'),
+  targetPrice: nonNegativeNumberField('Preço-alvo'),
+});
 
-  if (!allowPartial || transferredPrice !== undefined) {
-    if (
-      typeof transferredPrice !== 'number' ||
-      transferredPrice < 0 ||
-      !Number.isFinite(transferredPrice)
-    ) {
-      return {
-        valid: false,
-        error:
-          'Transferred price is required and must be a non-negative number',
-      };
-    }
-  }
-
-  if (!allowPartial || targetPrice !== undefined) {
-    if (
-      typeof targetPrice !== 'number' ||
-      targetPrice < 0 ||
-      !Number.isFinite(targetPrice)
-    ) {
-      return {
-        valid: false,
-        error: 'Target price is required and must be a non-negative number',
-      };
-    }
-  }
-
-  // currentPrice não é mais aceito no cadastro/atualização de itens: é
-  // resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
-  // valor enviado pelo cliente é silenciosamente ignorado por
-  // createItem/updateItem, então não é validado aqui.
-
-  return { valid: true };
-}
+// currentPrice não é aceito no cadastro/atualização de itens: é resolvido a
+// partir de `quotes/{ticker}` na leitura (issue #86). Um valor enviado pelo
+// cliente é ignorado.
+const updateItemSchema = itemSchema.partial();
 
 export const listItems = asyncHandler(
   'listItems',
   async (req: Request, res: Response) => {
-    const { fridgeId } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -236,19 +206,18 @@ export const listItems = asyncHandler(
 export const createItem = asyncHandler(
   'createItem',
   async (req: Request, res: Response) => {
-    const { fridgeId } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
-    const body = req.body as Partial<FridgeItem>;
-
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
 
-    const validation = validateItemBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(itemSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    const ticker = body.ticker!.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
       res.status(400).json({
         error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -262,9 +231,9 @@ export const createItem = asyncHandler(
     const itemData: Omit<FridgeItem, 'id'> = {
       fridgeId,
       ticker,
-      quantity: body.quantity!,
-      transferredPrice: body.transferredPrice!,
-      targetPrice: body.targetPrice!,
+      quantity: body.quantity,
+      transferredPrice: body.transferredPrice,
+      targetPrice: body.targetPrice,
       createdAt: now,
       updatedAt: now,
     };
@@ -277,7 +246,8 @@ export const createItem = asyncHandler(
 export const getItem = asyncHandler(
   'getItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -285,7 +255,7 @@ export const getItem = asyncHandler(
     const doc = await fridgeItemsCollection(userId, fridgeId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
@@ -298,7 +268,8 @@ export const getItem = asyncHandler(
 export const updateItem = asyncHandler(
   'updateItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -307,21 +278,19 @@ export const updateItem = asyncHandler(
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
-    const body = req.body as Partial<FridgeItem>;
-
-    const validation = validateItemBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updateItemSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    let ticker: string | undefined;
-    if (body.ticker !== undefined) {
-      ticker = body.ticker.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
+    if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
         res.status(400).json({
           error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -353,7 +322,8 @@ export const updateItem = asyncHandler(
 export const deleteItem = asyncHandler(
   'deleteItem',
   async (req: Request, res: Response) => {
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const userId = uid(req);
 
     if (!(await validateFridgeExists(userId, fridgeId, res))) return;
@@ -362,7 +332,7 @@ export const deleteItem = asyncHandler(
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item not found' });
+      res.status(404).json({ error: 'Item não encontrado' });
       return;
     }
 
@@ -375,45 +345,54 @@ export const unfreezeItem = asyncHandler(
   'unfreezeItem',
   async (req: Request, res: Response) => {
     const userId = uid(req);
-    const { fridgeId, id } = req.params;
+    const fridgeId = routeParam(req, 'fridgeId');
+    const id = routeParam(req, 'id');
     const { walletId } = req.body as { walletId?: unknown };
 
     if (!walletId || typeof walletId !== 'string') {
-      res.status(400).json({ error: 'walletId is required' });
+      res.status(400).json({ error: 'walletId é obrigatório' });
       return;
     }
 
     const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
-    const itemDoc = await itemRef.get();
-    if (!itemDoc.exists) {
-      res.status(404).json({ error: 'Fridge item not found' });
-      return;
-    }
-
     const walletRef = walletsCollection(userId).doc(walletId);
-    const walletDoc = await walletRef.get();
-    if (!walletDoc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
-      return;
-    }
-
-    const item = itemDoc.data() as FridgeItem;
-    const now = new Date().toISOString();
-    const positionData: Omit<Position, 'id'> = {
-      walletId,
-      ticker: item.ticker,
-      assetType: item.assetType ?? 'FII',
-      quantity: item.quantity,
-      averagePrice: item.transferredPrice,
-      inFridge: false,
-      createdAt: now,
-      updatedAt: now,
-    };
     const positionRef = positionsCollection(userId, walletId).doc();
-    const batch = getFirestore().batch();
-    batch.delete(itemRef);
-    batch.set(positionRef, positionData);
-    await batch.commit();
+
+    // O item é lido dentro da transação, não antes dela: `delete` de um
+    // documento que já sumiu não falha, então com a leitura fora duas
+    // chamadas simultâneas passavam pela checagem de existência e cada uma
+    // criava uma posição, duplicando a quantidade na carteira (issue #295).
+    const positionData = await getFirestore().runTransaction(
+      async (transaction) => {
+        const [itemDoc, walletDoc] = await Promise.all([
+          transaction.get(itemRef),
+          transaction.get(walletRef),
+        ]);
+
+        if (!itemDoc.exists)
+          throw HttpError.notFound('Item da geladeira não encontrado');
+        if (!walletDoc.exists)
+          throw HttpError.notFound('Carteira não encontrada');
+
+        const item = itemDoc.data() as FridgeItem;
+        const now = new Date().toISOString();
+        const data: Omit<Position, 'id'> = {
+          walletId,
+          ticker: item.ticker,
+          assetType: item.assetType ?? 'FII',
+          quantity: item.quantity,
+          averagePrice: item.transferredPrice,
+          inFridge: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        transaction.delete(itemRef);
+        transaction.set(positionRef, data);
+
+        return data;
+      },
+    );
 
     res.status(201).json({ id: positionRef.id, ...positionData });
   },

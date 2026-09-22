@@ -1,5 +1,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
+import { roundCurrency, validQuantity } from '../shared/numbers';
 import { Dividend } from 'dindin-models';
+import { dividendsCollection } from '../firestore/paths';
 import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
 
 /**
@@ -47,18 +49,6 @@ interface DividendSyncState {
 interface QuantitySnapshot {
   quantities: Record<string, number>; // uid → quantidade na data-com
   takenAt: string;
-}
-
-function validQuantity(quantity: unknown): number {
-  return typeof quantity === 'number' &&
-    Number.isFinite(quantity) &&
-    quantity > 0
-    ? quantity
-    : 0;
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 function monthOf(date: string): string {
@@ -296,14 +286,7 @@ export async function recordPaidDividends(
     for (let i = 0; i < dividends.length; i += BATCH_LIMIT) {
       const batch = firestore.batch();
       for (const { id, ...data } of dividends.slice(i, i + BATCH_LIMIT)) {
-        batch.set(
-          firestore
-            .collection('users')
-            .doc(data.userId)
-            .collection('dividends')
-            .doc(id),
-          data,
-        );
+        batch.set(dividendsCollection(data.userId).doc(id), data);
       }
       await batch.commit();
     }

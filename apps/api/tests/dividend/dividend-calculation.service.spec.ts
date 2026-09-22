@@ -1,4 +1,15 @@
 import { Dividend, Position } from 'dindin-models';
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   computeDividendYield,
   latestDividendByTicker,
@@ -97,7 +108,7 @@ describe('latestDividendByTickerMap', () => {
 
   it('deve ignorar provento mal formado', () => {
     const errorSpy = jest
-      .spyOn(console, 'error')
+      .spyOn(functionsLogger, 'error')
       .mockImplementation(() => undefined);
 
     const map = latestDividendByTickerMap([
@@ -179,11 +190,37 @@ describe('latestDividendByTicker', () => {
   });
 });
 
+describe('computeDividendYield – preço usado no valor investido', () => {
+  // O `currentPrice` do documento é resíduo da denormalização que a #86
+  // encerrou: ficou congelado no valor do dia em que o job parou de gravá-lo.
+  // A #326 remove o campo, e o yield passa a usar a cotação atual.
+  it('deve usar a cotação atual em vez do currentPrice gravado', () => {
+    const result = computeDividendYield(
+      [position({ quantity: 100, currentPrice: 999, averagePrice: 50 })],
+      [dividend({ amountPerShare: 1 })],
+      new Map([['HGLG11', 120]]),
+    );
+
+    expect(result.total.currentValue).toBe(12000);
+  });
+
+  it('deve cair para o preço médio quando não há cotação', () => {
+    const result = computeDividendYield(
+      [position({ quantity: 10, currentPrice: 999, averagePrice: 100 })],
+      [dividend({ amountPerShare: 1 })],
+      new Map(),
+    );
+
+    expect(result.total.currentValue).toBe(1000);
+  });
+});
+
 describe('computeDividendYield', () => {
   it('deve calcular yield anualizado por ticker e total', () => {
     const result = computeDividendYield(
-      [position({ quantity: 100, currentPrice: 120 })],
+      [position({ quantity: 100 })],
       [dividend({ amountPerShare: 1 })],
+      new Map([['HGLG11', 120]]),
     );
 
     // 1/cota × 100 cotas × 12 meses = 1200 ao ano sobre 12000 investidos = 10%
@@ -199,7 +236,7 @@ describe('computeDividendYield', () => {
 
   it('deve usar o preço médio quando não há cotação atual', () => {
     const result = computeDividendYield(
-      [position({ quantity: 10, averagePrice: 100, currentPrice: undefined })],
+      [position({ quantity: 10, averagePrice: 100 })],
       [dividend({ amountPerShare: 1 })],
     );
 
@@ -208,8 +245,9 @@ describe('computeDividendYield', () => {
 
   it('deve retornar yield zero para posição sem provento registrado', () => {
     const result = computeDividendYield(
-      [position({ quantity: 10, currentPrice: 100 })],
+      [position({ quantity: 10 })],
       [],
+      new Map([['HGLG11', 100]]),
     );
 
     expect(result.byTicker[0]).toEqual({
@@ -223,8 +261,9 @@ describe('computeDividendYield', () => {
   // Sem preço não há denominador: dividir por zero daria Infinity.
   it('deve retornar yield zero quando o valor investido é zero', () => {
     const result = computeDividendYield(
-      [position({ quantity: 10, averagePrice: 0, currentPrice: 0 })],
+      [position({ quantity: 10, averagePrice: 0 })],
       [dividend({ amountPerShare: 1 })],
+      new Map([['HGLG11', 0]]),
     );
 
     expect(result.byTicker[0].yield).toBe(0);
@@ -233,8 +272,9 @@ describe('computeDividendYield', () => {
 
   it('deve arredondar o yield em duas casas', () => {
     const result = computeDividendYield(
-      [position({ quantity: 3, currentPrice: 7 })],
+      [position({ quantity: 3 })],
       [dividend({ amountPerShare: 0.13 })],
+      new Map([['HGLG11', 7]]),
     );
 
     expect(result.byTicker[0].yield).toBe(22.29);
@@ -243,23 +283,17 @@ describe('computeDividendYield', () => {
   it('deve somar o total de várias posições e ordenar por ticker', () => {
     const result = computeDividendYield(
       [
-        position({
-          id: 'p1',
-          ticker: 'XPML11',
-          quantity: 10,
-          currentPrice: 100,
-        }),
-        position({
-          id: 'p2',
-          ticker: 'BTLG11',
-          quantity: 10,
-          currentPrice: 100,
-        }),
+        position({ id: 'p1', ticker: 'XPML11', quantity: 10 }),
+        position({ id: 'p2', ticker: 'BTLG11', quantity: 10 }),
       ],
       [
         dividend({ id: 'd1', ticker: 'XPML11', amountPerShare: 1 }),
         dividend({ id: 'd2', ticker: 'BTLG11', amountPerShare: 1 }),
       ],
+      new Map([
+        ['XPML11', 100],
+        ['BTLG11', 100],
+      ]),
     );
 
     expect(result.byTicker.map((item) => item.ticker)).toEqual([

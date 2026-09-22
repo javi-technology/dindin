@@ -4,9 +4,12 @@ import {
   fakeAsync,
   tick,
 } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { of, throwError, delay } from 'rxjs';
 import { SetupService } from '../../core/services/setup.service';
 import { WalletComponent } from './wallet.component';
+import { PositionFormComponent } from './components/position-form/position-form.component';
+import { MoveToFridgeFormComponent } from './components/move-to-fridge-form/move-to-fridge-form.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
@@ -15,6 +18,30 @@ import { DividendService } from '../../core/services/dividend.service';
 import { Wallet, Position, Asset, Fridge, FridgeItem } from 'dindin-models';
 
 describe('WalletComponent', () => {
+  /**
+   * O formulário virou subcomponente (#309): os testes que exercitam a
+   * gravação continuam aqui, mas passam pelo filho, como a tela faz.
+   */
+  function positionForm(): PositionFormComponent {
+    return fixture.debugElement.query(By.directive(PositionFormComponent))
+      .componentInstance as PositionFormComponent;
+  }
+
+  function openPositionForm(position: Position | null = null): void {
+    fixture.componentInstance.openForm(position);
+    fixture.detectChanges();
+  }
+
+  function moveToFridgeForm(): MoveToFridgeFormComponent {
+    return fixture.debugElement.query(By.directive(MoveToFridgeFormComponent))
+      .componentInstance as MoveToFridgeFormComponent;
+  }
+
+  function openMoveToFridge(position: Position): void {
+    fixture.componentInstance.openMoveToFridge(position);
+    fixture.detectChanges();
+  }
+
   let fixture: ComponentFixture<WalletComponent>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
   let positionServiceMock: jasmine.SpyObj<PositionService>;
@@ -599,7 +626,7 @@ describe('WalletComponent', () => {
     tick();
     fixture.detectChanges();
 
-    fixture.componentInstance.openForm();
+    openPositionForm();
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -690,14 +717,14 @@ describe('WalletComponent', () => {
     positionServiceMock.create.and.returnValue(of(newPosition));
     positionServiceMock.list.and.returnValue(of([...positions, newPosition]));
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openPositionForm();
+    positionForm().form.patchValue({
       ticker: 'MXRF11',
       assetType: 'FII',
       quantity: 15,
       averagePrice: '1,55',
     });
-    fixture.componentInstance.savePosition();
+    positionForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -724,14 +751,14 @@ describe('WalletComponent', () => {
     positionServiceMock.create.and.returnValue(of(newPosition));
     positionServiceMock.list.and.returnValue(of([...positions, newPosition]));
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openPositionForm();
+    positionForm().form.patchValue({
       ticker: 'MXRF11',
       assetType: 'FII',
       quantity: 15,
       averagePrice: 9.8,
     });
-    fixture.componentInstance.savePosition();
+    positionForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -776,14 +803,14 @@ describe('WalletComponent', () => {
       throwError(() => new Error('Server error')),
     );
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openPositionForm();
+    positionForm().form.patchValue({
       ticker: 'MXRF11',
       assetType: 'FII',
       quantity: 10,
       averagePrice: '9,80',
     });
-    fixture.componentInstance.savePosition();
+    positionForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -797,9 +824,9 @@ describe('WalletComponent', () => {
       throwError(() => new Error('Server error')),
     );
 
-    fixture.componentInstance.openForm(positions[0]);
+    openPositionForm(positions[0]);
     fixture.detectChanges();
-    fixture.componentInstance.savePosition();
+    positionForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -825,10 +852,12 @@ describe('WalletComponent', () => {
   }));
 
   it('deve fechar formulário ao pressionar Esc', () => {
-    fixture.componentInstance.openForm();
+    openPositionForm();
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.formVisible()).toBeFalse();
@@ -838,34 +867,32 @@ describe('WalletComponent', () => {
     fixture.componentInstance.deletePosition(positions[0]);
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.deleteConfirmPosition()).toBeNull();
   });
 
   it('deve rejeitar preço médio com formato inválido', () => {
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({ averagePrice: 'abc' });
-    fixture.componentInstance.form.get('averagePrice')?.markAsTouched();
+    openPositionForm();
+    positionForm().form.patchValue({ averagePrice: 'abc' });
+    positionForm().form.get('averagePrice')?.markAsTouched();
     fixture.detectChanges();
 
     expect(
-      fixture.componentInstance.form
-        .get('averagePrice')
-        ?.hasError('invalidDecimal'),
+      positionForm().form.get('averagePrice')?.hasError('invalidDecimal'),
     ).toBeTrue();
   });
 
   it('deve aceitar preço médio com vírgula como separador decimal', () => {
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({ averagePrice: '110,50' });
-    fixture.componentInstance.form.get('averagePrice')?.markAsTouched();
+    openPositionForm();
+    positionForm().form.patchValue({ averagePrice: '110,50' });
+    positionForm().form.get('averagePrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(
-      fixture.componentInstance.form.get('averagePrice')?.valid,
-    ).toBeTrue();
+    expect(positionForm().form.get('averagePrice')?.valid).toBeTrue();
   });
 
   describe('moveToFridge', () => {
@@ -893,7 +920,7 @@ describe('WalletComponent', () => {
     });
 
     it('deve listar geladeiras no select do modal', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
@@ -919,12 +946,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -949,12 +976,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -967,12 +994,12 @@ describe('WalletComponent', () => {
         throwError(() => new Error('Server error')),
       );
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -982,7 +1009,7 @@ describe('WalletComponent', () => {
     }));
 
     it('deve fechar modal ao clicar em Cancelar', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
       fixture.componentInstance.closeMoveToFridge();
@@ -992,10 +1019,12 @@ describe('WalletComponent', () => {
     });
 
     it('deve fechar modal ao pressionar Esc', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
-      fixture.componentInstance.onEscapeKey();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
       fixture.detectChanges();
 
       expect(fixture.componentInstance.moveToFridgePosition()).toBeNull();
@@ -1015,12 +1044,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '12,50',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -1046,8 +1075,8 @@ describe('WalletComponent', () => {
     };
 
     const editWith = (values: Record<string, string>): void => {
-      fixture.componentInstance.openForm(mxrf);
-      fixture.componentInstance.form.patchValue(values);
+      openPositionForm(mxrf);
+      positionForm().form.patchValue(values);
       fixture.detectChanges();
     };
 
@@ -1066,7 +1095,7 @@ describe('WalletComponent', () => {
 
     it('deve somar +N à quantidade atual e manter o preço médio', fakeAsync(() => {
       editWith({ quantity: '+27' });
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).toHaveBeenCalledWith(
@@ -1083,7 +1112,7 @@ describe('WalletComponent', () => {
 
     it('deve subtrair -N da quantidade atual sem alterar o preço médio', fakeAsync(() => {
       editWith({ quantity: '-10' });
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).toHaveBeenCalledWith(
@@ -1095,7 +1124,7 @@ describe('WalletComponent', () => {
 
     it('deve continuar aceitando o valor total', fakeAsync(() => {
       editWith({ quantity: '59' });
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).toHaveBeenCalledWith(
@@ -1137,11 +1166,9 @@ describe('WalletComponent', () => {
 
     it('deve recalcular o preço médio com o preço da compra', fakeAsync(() => {
       editWith({ quantity: '+27', purchasePrice: '9,45' });
-      expect(
-        parseFloat(fixture.componentInstance.form.value.averagePrice),
-      ).toBe(9.3);
+      expect(parseFloat(positionForm().form.value.averagePrice)).toBe(9.3);
 
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).toHaveBeenCalledWith(
@@ -1153,23 +1180,21 @@ describe('WalletComponent', () => {
 
     it('deve restaurar o preço médio ao limpar o preço da compra', () => {
       editWith({ quantity: '+27', purchasePrice: '9,45' });
-      fixture.componentInstance.form.patchValue({ purchasePrice: '' });
-      expect(fixture.componentInstance.form.value.averagePrice).toBe('9.18');
+      positionForm().form.patchValue({ purchasePrice: '' });
+      expect(positionForm().form.value.averagePrice).toBe('9.18');
     });
 
     it('deve restaurar o preço médio ao deixar de somar', () => {
       editWith({ quantity: '+27', purchasePrice: '9,45' });
-      fixture.componentInstance.form.patchValue({ quantity: '-10' });
-      expect(fixture.componentInstance.form.value.averagePrice).toBe('9.18');
+      positionForm().form.patchValue({ quantity: '-10' });
+      expect(positionForm().form.value.averagePrice).toBe('9.18');
     });
 
     it('não deve salvar quando o resultado não for maior que zero', fakeAsync(() => {
       editWith({ quantity: '-32' });
-      expect(
-        fixture.componentInstance.form.get('quantity')?.invalid,
-      ).toBeTrue();
+      expect(positionForm().form.get('quantity')?.invalid).toBeTrue();
 
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).not.toHaveBeenCalled();
@@ -1177,7 +1202,7 @@ describe('WalletComponent', () => {
 
     it('não deve salvar entrada inválida', fakeAsync(() => {
       editWith({ quantity: '+abc' });
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.update).not.toHaveBeenCalled();
@@ -1185,14 +1210,14 @@ describe('WalletComponent', () => {
 
     it('deve tratar +N como total na criação de posição', fakeAsync(() => {
       positionServiceMock.create.and.returnValue(of(mxrf));
-      fixture.componentInstance.openForm();
-      fixture.componentInstance.form.patchValue({
+      openPositionForm();
+      positionForm().form.patchValue({
         ticker: 'MXRF11',
         assetType: 'FII',
         quantity: '+15',
         purchasePrice: '9,80',
       });
-      fixture.componentInstance.savePosition();
+      positionForm().submit();
       tick();
 
       expect(positionServiceMock.create).toHaveBeenCalledWith('wallet-1', {
@@ -1204,11 +1229,9 @@ describe('WalletComponent', () => {
     }));
 
     it('deve rejeitar -N na criação de posição', () => {
-      fixture.componentInstance.openForm();
-      fixture.componentInstance.form.patchValue({ quantity: '-5' });
-      expect(
-        fixture.componentInstance.form.get('quantity')?.invalid,
-      ).toBeTrue();
+      openPositionForm();
+      positionForm().form.patchValue({ quantity: '-5' });
+      expect(positionForm().form.get('quantity')?.invalid).toBeTrue();
     });
   });
 
@@ -1473,10 +1496,8 @@ describe('WalletComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(fixture.componentInstance.sort()).toEqual({
-        column: 'total',
-        direction: 'desc',
-      });
+      // A tabela é um subcomponente (#309) e guarda a própria ordenação:
+      // trocar de carteira não a recria, então a escolha sobrevive.
       expect(header('total').getAttribute('aria-sort')).toBe('descending');
     });
   });

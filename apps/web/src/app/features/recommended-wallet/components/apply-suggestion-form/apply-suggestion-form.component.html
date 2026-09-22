@@ -1,0 +1,60 @@
+<p class="mb-4">
+  Lançar a compra de <strong>{{ target().ticker }}</strong> na carteira
+  <strong>{{ walletName() }}</strong
+  >.
+</p>
+<div class="grid grid-cols-2 gap-3">
+  <label class="text-sm text-gray-700">
+    Quantidade
+    <input
+      type="text"
+      inputmode="decimal"
+      class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+      data-testid="apply-quantity"
+      [value]="quantityValue()"
+      (input)="onInput('quantity', $event)"
+    />
+  </label>
+  <label class="text-sm text-gray-700">
+    Preço pago por cota
+    <input
+      type="text"
+      inputmode="decimal"
+      class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+      data-testid="apply-price"
+      [value]="priceValue()"
+      (input)="onInput('price', $event)"
+    />
+  </label>
+</div>
+@if (preview(); as preview) {
+  <dl class="mt-4 space-y-1 text-sm" data-testid="apply-preview">
+    <div class="flex justify-between gap-2">
+      <dt class="text-gray-500">Quantidade</dt>
+      <dd class="text-gray-900">
+        {{ preview.currentQuantity }} → {{ preview.newQuantity }}
+      </dd>
+    </div>
+    <div class="flex justify-between gap-2">
+      <dt class="text-gray-500">Preço médio</dt>
+      <dd class="text-gray-900">
+        {{
+          preview.currentAverage === null
+            ? '—'
+            : formatCurrency(preview.currentAverage)
+        }}
+        → {{ formatCurrency(preview.newAverage) }}
+      </dd>
+    </div>
+  </dl>
+}
+@if (positions() !== null && assetType() === null) {
+  <p class="mt-3 text-sm text-amber-700">
+    Ativo fora do catálogo: não é possível criar a posição.
+  </p>
+}
+@if (error(); as message) {
+  <p class="mt-3 text-sm text-red-700" role="alert" data-testid="apply-error">
+    {{ message }}
+  </p>
+}

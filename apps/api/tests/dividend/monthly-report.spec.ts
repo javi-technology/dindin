@@ -117,7 +117,7 @@ describe('GET /api/dividends/monthly-report', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({
-        error: 'Year must be an integer between 1900 and 2100',
+        error: 'Ano deve ser um inteiro entre 1900 e 2100',
       });
     },
   );
@@ -144,6 +144,6 @@ describe('GET /api/dividends/monthly-report', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: 'Internal server error' });
+    expect(response.body).toEqual({ error: 'Erro interno do servidor' });
   });
 });

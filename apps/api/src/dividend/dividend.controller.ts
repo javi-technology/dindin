@@ -1,19 +1,22 @@
 import { Request, Response } from 'express';
-import { Dividend, AssetType } from 'dindin-models';
+import { z } from 'zod';
+import type { Dividend } from 'dindin-models';
 import {
   buildMonthlyDividendReport,
-  isValidPaymentDate,
   MAX_REPORT_YEAR,
   MIN_REPORT_YEAR,
 } from './monthly-report.service';
-import { computeMonthlyIncome } from './monthly-income.service';
 import {
-  appToday,
+  computeConsolidatedMonthlyIncome,
+  computeMonthlyIncome,
+} from './monthly-income.service';
+import {
   computeScheduleTotals,
   limitMonthlyIncome,
 } from './monthly-income-limit.service';
 import { hasEntitlement } from '../billing/entitlement.service';
 import { asyncHandler } from '../middleware/async-handler';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { getAllUserPositions } from '../wallet/position-reader';
 import {
   computeDividendYield,
@@ -21,82 +24,27 @@ import {
 } from './dividend-calculation.service';
 import { uid, dividendsCollection } from '../firestore/paths';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { currentYear, todayAsUtcDate } from '../shared/date';
+import {
+  assetTypeField,
+  nonNegativeNumberField,
+  parseBody,
+  paymentDateField,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
+import { logError } from '../shared/logger';
+import { routeParam } from '../shared/route-params';
 
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
+const dividendSchema = z.object({
+  ticker: tickerField(),
+  amountPerShare: nonNegativeNumberField('Valor por cota'),
+  quantity: positiveNumberField('Quantidade'),
+  paymentDate: paymentDateField(),
+  assetType: assetTypeField(false).optional(),
+});
 
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
-
-function validateDividendBody(
-  body: Partial<Dividend>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, amountPerShare, quantity, paymentDate, assetType } = body;
-
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker is required and must be a non-empty string',
-      };
-    }
-  }
-
-  if (!allowPartial || amountPerShare !== undefined) {
-    if (
-      typeof amountPerShare !== 'number' ||
-      amountPerShare < 0 ||
-      !Number.isFinite(amountPerShare)
-    ) {
-      return {
-        valid: false,
-        error: 'Amount per share is required and must be a non-negative number',
-      };
-    }
-  }
-
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantity is required and must be a positive number',
-      };
-    }
-  }
-
-  if (!allowPartial || paymentDate !== undefined) {
-    if (
-      !isValidPaymentDate(
-        typeof paymentDate === 'string' ? paymentDate.trim() : paymentDate,
-      )
-    ) {
-      return {
-        valid: false,
-        error: 'Payment date is required and must be in YYYY-MM-DD format',
-      };
-    }
-  }
-
-  if (assetType !== undefined && !isValidAssetType(assetType)) {
-    return {
-      valid: false,
-      error: `Asset type must be one of: ${[...ASSET_TYPES].join(', ')}`,
-    };
-  }
-
-  return { valid: true };
-}
+const updateDividendSchema = dividendSchema.partial();
 
 export const listDividends = asyncHandler(
   'listDividends',
@@ -113,22 +61,21 @@ export const listDividends = asyncHandler(
 export const createDividend = asyncHandler(
   'createDividend',
   async (req: Request, res: Response) => {
-    const body = req.body as Partial<Dividend>;
-
-    const validation = validateDividendBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(dividendSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const body = parsed.data;
     const now = new Date().toISOString();
     const dividendData: Omit<Dividend, 'id'> = {
       userId: uid(req),
-      ticker: body.ticker!.trim().toUpperCase(),
-      amountPerShare: body.amountPerShare!,
-      quantity: body.quantity!,
-      totalAmount: body.amountPerShare! * body.quantity!,
-      paymentDate: body.paymentDate!.trim(),
+      ticker: body.ticker,
+      amountPerShare: body.amountPerShare,
+      quantity: body.quantity,
+      totalAmount: body.amountPerShare * body.quantity,
+      paymentDate: body.paymentDate,
       createdAt: now,
       updatedAt: now,
     };
@@ -145,11 +92,11 @@ export const createDividend = asyncHandler(
 export const getDividend = asyncHandler(
   'getDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 
@@ -160,35 +107,34 @@ export const getDividend = asyncHandler(
 export const updateDividend = asyncHandler(
   'updateDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 
-    const body = req.body as Partial<Dividend>;
-    const validation = validateDividendBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updateDividendSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
+
+    const body = parsed.data;
 
     const current = doc.data() as Dividend;
     const updates: Partial<Dividend> & { updatedAt: string } = {
       updatedAt: new Date().toISOString(),
     };
 
-    if (body.ticker !== undefined)
-      updates.ticker = body.ticker.trim().toUpperCase();
+    if (body.ticker !== undefined) updates.ticker = body.ticker;
     if (body.assetType !== undefined) updates.assetType = body.assetType;
     if (body.amountPerShare !== undefined)
       updates.amountPerShare = body.amountPerShare;
     if (body.quantity !== undefined) updates.quantity = body.quantity;
-    if (body.paymentDate !== undefined)
-      updates.paymentDate = body.paymentDate.trim();
+    if (body.paymentDate !== undefined) updates.paymentDate = body.paymentDate;
 
     if (body.amountPerShare !== undefined || body.quantity !== undefined) {
       const amountPerShare = body.amountPerShare ?? current.amountPerShare;
@@ -200,12 +146,11 @@ export const updateDividend = asyncHandler(
         typeof quantity !== 'number' ||
         !Number.isFinite(totalAmount)
       ) {
-        console.error('[updateDividend] documento corrompido:', {
+        logError('updateDividend.corruptedDocument', {
           uid: uid(req),
           dividendId: id,
-          current,
         });
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Erro interno do servidor' });
         return;
       }
 
@@ -250,7 +195,7 @@ export const getMonthlyDividendReport = asyncHandler(
   'getMonthlyDividendReport',
   async (req: Request, res: Response) => {
     const queryYear = req.query.year;
-    let year = new Date().getFullYear();
+    let year = currentYear();
 
     if (queryYear !== undefined) {
       const parsedYear =
@@ -262,7 +207,7 @@ export const getMonthlyDividendReport = asyncHandler(
       ) {
         res
           .status(400)
-          .json({ error: 'Year must be an integer between 1900 and 2100' });
+          .json({ error: 'Ano deve ser um inteiro entre 1900 e 2100' });
         return;
       }
       year = parsedYear;
@@ -282,11 +227,17 @@ export const getDividendYield = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = uid(req);
     const [positions, dividends] = await Promise.all([
-      getAllUserPositions(userId, req.params.walletId),
+      getAllUserPositions(userId, routeParam(req, 'walletId')),
       readDividends(userId),
     ]);
 
-    res.json(computeDividendYield(positions, dividends));
+    // A cotação atual entra no valor investido; o `currentPrice` gravado na
+    // posição é resíduo da #86 e sai do banco na #326.
+    const priceByTicker = await getQuotePricesByTicker(
+      positions.map((position) => position.ticker),
+    );
+
+    res.json(computeDividendYield(positions, dividends, priceByTicker));
   },
 );
 
@@ -302,7 +253,7 @@ export const getDividendYield = asyncHandler(
 export const getMonthlyIncome = asyncHandler(
   'getMonthlyIncome',
   async (req: Request, res: Response) => {
-    const { walletId } = req.params;
+    const walletId = routeParam(req, 'walletId');
     const userId = uid(req);
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
@@ -310,7 +261,56 @@ export const getMonthlyIncome = asyncHandler(
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
-    const today = appToday();
+    const today = todayAsUtcDate();
+    const scheduleTotals = computeScheduleTotals(byTicker, today);
+
+    if (entitled) {
+      res.json({
+        byTicker,
+        total,
+        totalFromFridge,
+        scheduleTotals,
+        limited: false,
+        hiddenTickers: [],
+        hiddenPaymentDates: [],
+        hiddenScheduleTickers: [],
+      });
+      return;
+    }
+
+    const limited = limitMonthlyIncome(byTicker, today);
+    res.json({
+      byTicker: limited.byTicker,
+      scheduleItems: limited.scheduleItems,
+      total,
+      totalFromFridge,
+      scheduleTotals,
+      limited: true,
+      hiddenTickers: limited.hiddenTickers,
+      hiddenPaymentDates: limited.hiddenPaymentDates,
+      hiddenScheduleTickers: limited.hiddenScheduleTickers,
+    });
+  },
+);
+
+/**
+ * Renda mensal de **todas** as carteiras (issue #300).
+ *
+ * O recorte gratuito é aplicado aqui, sobre o agregado: por carteira, duas
+ * carteiras mostrariam seis ativos a quem não assina. O front também não
+ * precisa mais adivinhar quanto da geladeira contar.
+ */
+export const getConsolidatedMonthlyIncome = asyncHandler(
+  'getConsolidatedMonthlyIncome',
+  async (req: Request, res: Response) => {
+    const userId = uid(req);
+    const user = (req as AuthRequest).user;
+    const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
+      computeConsolidatedMonthlyIncome(userId),
+      hasEntitlement(userId, 'projections', user?.admin === true),
+    ]);
+
+    const today = todayAsUtcDate();
     const scheduleTotals = computeScheduleTotals(byTicker, today);
 
     if (entitled) {
@@ -345,12 +345,12 @@ export const getMonthlyIncome = asyncHandler(
 export const deleteDividend = asyncHandler(
   'deleteDividend',
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = routeParam(req, 'id');
     const dividendRef = dividendsCollection(uid(req)).doc(id);
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Dividend not found' });
+      res.status(404).json({ error: 'Provento não encontrado' });
       return;
     }
 

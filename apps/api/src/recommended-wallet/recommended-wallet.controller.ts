@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
 import { uid } from '../firestore/paths';
 import { parseBbFileName } from './bb-pdf.parser';
 import { saveBbPdf } from './storage.service';
@@ -19,6 +20,7 @@ import {
   AppliedItemInput,
   recordAppliedItem,
 } from './suggestion-applied.service';
+import { routeParam } from '../shared/route-params';
 
 // O mapeamento de `error.statusCode` para status HTTP, antes repetido em seis
 // handlers deste arquivo, passou para o asyncHandler (issue #222): basta
@@ -61,7 +63,7 @@ export const compareRecommended = asyncHandler(
     res.json(
       await compareWithWallet(
         uid(req),
-        req.params.walletId,
+        routeParam(req, 'walletId'),
         monthQuery(req),
         selectedWallet,
       ),
@@ -96,9 +98,7 @@ export const importRecommended = asyncHandler(
       );
     } catch (error) {
       // Falha ao interpretar o PDF enviado é erro do cliente, não interno.
-      const inputError = error as Error & { statusCode?: number };
-      inputError.statusCode = 400;
-      throw inputError;
+      throw HttpError.badRequest((error as Error).message, { cause: error });
     }
 
     const sourceFile = await saveBbPdf(fileName, buffer);
@@ -111,7 +111,7 @@ export const importRecommended = asyncHandler(
 export const confirmRecommended = asyncHandler(
   'confirmRecommended',
   async (req: Request, res: Response) => {
-    res.json(await confirmRecommendedWallet(req.params.id));
+    res.json(await confirmRecommendedWallet(routeParam(req, 'id')));
   },
 );
 
@@ -192,7 +192,7 @@ export const applySuggestionItem = asyncHandler(
     res.json(
       await recordAppliedItem(
         uid(req),
-        req.params.id,
+        routeParam(req, 'id'),
         (req.body ?? {}) as AppliedItemInput,
       ),
     );

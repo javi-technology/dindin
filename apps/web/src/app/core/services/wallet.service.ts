@@ -2,12 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Wallet } from 'dindin-models';
+import type { CreateWalletRequest } from 'dindin-shared-types';
 
-export interface CreateWalletPayload {
-  name: string;
-  currency: string;
-  description?: string;
-}
+/** Contrato compartilhado com a API (issue #313). */
+export type CreateWalletPayload = CreateWalletRequest;
 
 @Injectable({
   providedIn: 'root',

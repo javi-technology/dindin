@@ -1,19 +1,22 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import {
+  positionsCollection,
+  recommendedWalletsCollection,
+} from '../firestore/paths';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
+import { currentMonth } from '../shared/date';
+import { HttpError } from '../shared/http-error';
+import {
   RecommendedWallet,
   RecommendedWalletAsset,
   RecommendedWalletComparison,
   RecommendedWalletComparisonItem,
-  Quote,
 } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
-
-function recommendedWalletsCollection() {
-  return getFirestore().collection('recommendedWallets');
-}
+import { logInfo } from '../shared/logger';
 
 export function recommendedWalletId(month: string): string {
   return `bb-fii_${month}`.toLowerCase();
@@ -50,9 +53,10 @@ export async function buildRecommendedWallet(
     ? (existingDoc.data() as RecommendedWallet)
     : undefined;
   if (existing && existing.revision >= parsedFile.revision) {
-    console.log(
-      `[buildRecommendedWallet] Ignorada ${sourceFile}: revisão ${parsedFile.revision} já processada`,
-    );
+    logInfo('buildRecommendedWallet.skipped', {
+      sourceFile,
+      revision: parsedFile.revision,
+    });
     return { ...existing, id: existing.id ?? id };
   }
 
@@ -97,9 +101,10 @@ export async function persistRecommendedWallet(
       createdAt: existing?.createdAt ?? wallet.createdAt,
     };
     transaction.set(docRef, persisted);
-    console.log(
-      `[persistRecommendedWallet] Importada ${wallet.id} revisão ${wallet.revision}`,
-    );
+    logInfo('persistRecommendedWallet.imported', {
+      walletId: wallet.id,
+      revision: wallet.revision,
+    });
     return persisted;
   });
 }
@@ -108,7 +113,7 @@ export async function importBbWallet(
   buffer: Buffer,
   sourceFile: string,
 ): Promise<RecommendedWallet> {
-  console.log(`[importBbWallet] Iniciando importação: ${sourceFile}`);
+  logInfo('importBbWallet.start', { sourceFile });
   const wallet = await buildRecommendedWallet(buffer, sourceFile);
   return persistRecommendedWallet(wallet);
 }
@@ -139,11 +144,7 @@ export async function confirmRecommendedWallet(
   const docRef = recommendedWalletsCollection().doc(id);
   const doc = await docRef.get();
   if (!doc.exists) {
-    const error = new Error('Carteira recomendada não encontrada') as Error & {
-      statusCode?: number;
-    };
-    error.statusCode = 404;
-    throw error;
+    throw HttpError.notFound('Carteira recomendada não encontrada');
   }
   const confirmedAt = new Date().toISOString();
   await docRef.update({
@@ -160,31 +161,14 @@ export async function confirmRecommendedWallet(
   } as RecommendedWallet;
 }
 
-function positionsCollection(userId: string, walletId: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(userId)
-    .collection('wallets')
-    .doc(walletId)
-    .collection('positions');
-}
-
-export function quotePriceByTicker(snapshot: {
-  docs: Array<{ id: string; data: () => unknown }>;
-}): Map<string, number> {
-  return new Map(
-    snapshot.docs.flatMap((doc) => {
-      const quote = doc.data() as Partial<Quote>;
-      return typeof quote.price === 'number' && Number.isFinite(quote.price)
-        ? [[doc.id.toUpperCase(), quote.price] as [string, number]]
-        : [];
-    }),
-  );
-}
-
-export async function getQuotePrices(): Promise<Map<string, number>> {
-  const snapshot = await getFirestore().collection('quotes').get();
-  return quotePriceByTicker(snapshot);
+/**
+ * Preços dos tickers informados. Recebia a coleção inteira; nas rotas o custo
+ * precisa acompanhar a carteira do usuário, não o catálogo (issue #299).
+ */
+export async function getQuotePrices(
+  tickers: string[],
+): Promise<Map<string, number>> {
+  return getQuotePricesByTicker(tickers);
 }
 
 export async function compareWithWallet(
@@ -195,18 +179,19 @@ export async function compareWithWallet(
 ): Promise<RecommendedWalletComparison> {
   const recommended = await getRecommendedWallet(month);
   if (!recommended) {
-    const error = new Error('Carteira recomendada não encontrada') as Error & {
-      statusCode?: number;
-    };
-    error.statusCode = 404;
-    throw error;
+    throw HttpError.notFound('Carteira recomendada não encontrada');
   }
 
-  const [positionsSnapshot, quotesSnapshot] = await Promise.all([
-    positionsCollection(userId, walletId).get(),
-    getFirestore().collection('quotes').get(),
+  const positionsSnapshot = await positionsCollection(userId, walletId).get();
+  const positionTickers = positionsSnapshot.docs.map(
+    (doc) => (doc.data() as { ticker?: string }).ticker ?? '',
+  );
+  // Os recomendados entram na busca porque a comparação mostra também o que
+  // o usuário ainda não tem na carteira.
+  const quotesByTicker = await getQuotePricesByTicker([
+    ...positionTickers,
+    ...recommended[wallet].map((asset) => asset.ticker),
   ]);
-  const quotesByTicker = quotePriceByTicker(quotesSnapshot);
   const positionsByTicker = new Map<
     string,
     { quantity: number; currentValue: number }
@@ -264,14 +249,9 @@ export async function compareWithWallet(
 }
 
 export async function syncBbWallet(): Promise<void> {
-  const currentMonth = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-  }).format(new Date());
-  const found = await fetchLatestBbPdf(currentMonth);
+  const found = await fetchLatestBbPdf(currentMonth());
   if (!found) {
-    console.log('[syncBbWallet] Nenhum PDF disponível');
+    logInfo('syncBbWallet.noPdf');
     return;
   }
   const sourceFile = `${BB_WALLET_PREFIX}${found.fileName}`;

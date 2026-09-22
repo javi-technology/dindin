@@ -1,8 +1,9 @@
 import { bbFileName } from './bb-pdf.parser';
-import { todayDateInBrazil } from '../patrimony/patrimony-snapshot.service';
+import { currentMonth } from '../shared/date';
+import { logInfo } from '../shared/logger';
 
 export async function fetchLatestBbPdf(
-  month = todayDateInBrazil().slice(0, 7),
+  month = currentMonth(),
 ): Promise<{ fileName: string; buffer: Buffer; revision: number } | null> {
   let latest:
     { fileName: string; buffer: Buffer; revision: number } | undefined;
@@ -20,7 +21,7 @@ export async function fetchLatestBbPdf(
     );
     if (response.status === 403) {
       if (!latest) {
-        console.log('[fetchLatestBbPdf] bloqueado pelo BB (403)');
+        logInfo('fetchLatestBbPdf.blocked', { status: 403 });
         return null;
       }
       break;

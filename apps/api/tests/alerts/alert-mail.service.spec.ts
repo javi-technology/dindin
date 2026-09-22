@@ -15,6 +15,17 @@ jest.mock('firebase-admin/auth', () => ({
   getAuth: jest.fn(() => ({ getUser: getUserMock })),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { Alert } from 'dindin-models';
 import { sendAlertEmails } from '../../src/alerts/alert-mail.service';
 
@@ -89,8 +100,8 @@ describe('AlertMailService', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     fetchMock.mockResolvedValue(okResponse());
     getUserMock.mockResolvedValue({ email: 'investidor@example.com' });
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -250,7 +261,7 @@ describe('AlertMailService', () => {
 
     expect(alertUpdate).not.toHaveBeenCalled();
     expect(sent).toBe(0);
-    expect(console.error).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
   });
 
   it('não deve vazar a chave do Resend no log de erro', async () => {
@@ -261,7 +272,7 @@ describe('AlertMailService', () => {
 
     await sendAlertEmails('user-1', [alert()]);
 
-    const logged = (console.error as jest.Mock).mock.calls
+    const logged = (functionsLogger.error as jest.Mock).mock.calls
       .flat()
       .map((entry) => JSON.stringify(entry))
       .join(' ');
@@ -277,7 +288,7 @@ describe('AlertMailService', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sent).toBe(0);
-    expect(console.error).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
   });
 
   it('deve pular o envio quando o usuário não tem e-mail no Auth', async () => {
@@ -288,7 +299,7 @@ describe('AlertMailService', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sent).toBe(0);
-    expect(console.warn).toHaveBeenCalled();
+    expect(functionsLogger.warn).toHaveBeenCalled();
   });
 
   it('deve pular o envio quando o usuário não existe mais no Auth', async () => {
@@ -338,6 +349,6 @@ describe('AlertMailService', () => {
     const sent = await sendAlertEmails('user-1', [alert()]);
 
     expect(sent).toBe(0);
-    expect(console.error).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
   });
 });

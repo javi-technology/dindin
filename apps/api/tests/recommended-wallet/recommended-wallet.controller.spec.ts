@@ -133,7 +133,7 @@ describe('recommended-wallet.controller', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: 'Internal server error' });
+    expect(response.body).toEqual({ error: 'Erro interno do servidor' });
   });
 
   it('deve importar PDF somente para usuário admin', async () => {

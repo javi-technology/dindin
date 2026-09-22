@@ -9,6 +9,7 @@ import {
   toStripeState,
 } from './entitlement.service';
 import { clearPendingCheckout } from './checkout-session.service';
+import { logWarn } from '../shared/logger';
 
 function customerIdOf(sub: Stripe.Subscription): string {
   return typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -43,21 +44,13 @@ async function upsert(
       typeof stored === 'number' &&
       stored > eventCreated
     ) {
-      console.warn(
-        '[billing.webhook] evento antigo ignorado',
-        uid,
-        eventCreated,
-      );
+      logWarn('billing.webhook.staleEvent', { uid, eventCreated });
       return;
     }
     // Concessão manual vigente tem precedência sobre a Stripe (#150): grava só
     // os ids e o estado guardado da Stripe, que vale quando ela terminar.
     if (current?.provider === 'manual' && isEntitled(current, 'ai')) {
-      console.warn(
-        '[billing.webhook] concessão manual vigente preservada',
-        uid,
-        eventCreated,
-      );
+      logWarn('billing.webhook.manualGrantKept', { uid, eventCreated });
       const providerFields: Partial<UserSubscription> = {
         providerCustomerId: mapped.providerCustomerId,
         providerSubscriptionId: mapped.providerSubscriptionId,
@@ -80,7 +73,7 @@ async function handleSubscriptionEvent(
 ): Promise<void> {
   const uid = await resolveUidWithCustomer(sub);
   if (!uid) {
-    console.warn('[billing.webhook] uid não encontrado para', sub.id);
+    logWarn('billing.webhook.uidNotFound', { subscriptionId: sub.id });
     return;
   }
   const mapped = mapSubscription(sub, customerIdOf(sub));
@@ -103,7 +96,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
       const uid =
         session.client_reference_id ?? (await resolveUidWithCustomer(sub));
       if (!uid) {
-        console.warn('[billing.webhook] uid não encontrado para', session.id);
+        logWarn('billing.webhook.uidNotFound', { sessionId: session.id });
         return;
       }
       await upsert(uid, mapSubscription(sub, customerIdOf(sub)), event.created);

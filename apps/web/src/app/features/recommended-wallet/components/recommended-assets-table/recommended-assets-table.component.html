@@ -1,0 +1,81 @@
+<div class="border-b border-gray-200 mb-5">
+  <div class="flex gap-5">
+    <button
+      type="button"
+      class="pb-3 text-sm font-medium border-b-2"
+      [class.text-blue-600]="tab() === 'renda'"
+      [class.border-blue-600]="tab() === 'renda'"
+      [class.text-gray-500]="tab() !== 'renda'"
+      [class.border-transparent]="tab() !== 'renda'"
+      data-testid="tab-renda"
+      (click)="selectTab('renda')"
+    >
+      Renda
+    </button>
+    <button
+      type="button"
+      class="pb-3 text-sm font-medium border-b-2"
+      [class.text-blue-600]="tab() === 'ganho'"
+      [class.border-blue-600]="tab() === 'ganho'"
+      [class.text-gray-500]="tab() !== 'ganho'"
+      [class.border-transparent]="tab() !== 'ganho'"
+      data-testid="tab-ganho"
+      (click)="selectTab('ganho')"
+    >
+      Ganho de Capital
+    </button>
+  </div>
+</div>
+
+@if (assets().length === 0) {
+  <p class="text-gray-500 mb-6" data-testid="empty-assets">
+    Nenhuma posição disponível nesta carteira.
+  </p>
+} @else {
+  <div class="overflow-x-auto mb-8">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">Ticker</th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Segmento
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">Peso</th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Fechamento
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            Catálogo
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (asset of assets(); track asset.ticker) {
+          <tr class="border-b border-gray-100">
+            <td class="py-3 px-4 font-medium text-gray-900">
+              {{ asset.ticker }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">{{ asset.segment }}</td>
+            <td class="py-3 px-4 text-gray-700">
+              {{ formatPercent(asset.weight) }}
+            </td>
+            <td class="py-3 px-4 text-gray-700">
+              {{ formatCurrency(asset.closePrice) }}
+            </td>
+            <td class="py-3 px-4">
+              @if (asset.inCatalog) {
+                <span class="text-green-700 text-sm">Disponível</span>
+              } @else {
+                <span
+                  class="inline-flex px-2 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium"
+                >
+                  fora do catálogo
+                </span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

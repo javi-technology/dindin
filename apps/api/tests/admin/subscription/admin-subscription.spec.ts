@@ -1,4 +1,15 @@
 import request from 'supertest';
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import { StripeSubscriptionState, UserSubscription } from 'dindin-shared-types';
 
 const verifyIdTokenMock = jest.fn();
@@ -119,7 +130,7 @@ describe('admin – assinaturas de usuários', () => {
       authUser(uid, `${uid}@dindin.app`),
     );
     listUsersMock.mockResolvedValue({ users: [], pageToken: undefined });
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
   });
 
   describe('permissões', () => {
@@ -365,7 +376,7 @@ describe('admin – assinaturas de usuários', () => {
         .set('Authorization', 'Bearer token');
 
       expect(response.status).toBe(500);
-      expect(console.error).toHaveBeenCalled();
+      expect(functionsLogger.error).toHaveBeenCalled();
     });
   });
 
@@ -623,7 +634,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await grant({ plan: 'basic', currentPeriodEnd: null });
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'User not found' });
+      expect(response.body).toEqual({ error: 'Usuário não encontrado' });
       expect(txSetMock).not.toHaveBeenCalled();
     });
   });
@@ -722,7 +733,9 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Manual subscription not found' });
+      expect(response.body).toEqual({
+        error: 'Assinatura manual não encontrada',
+      });
       expect(txUpdateMock).not.toHaveBeenCalled();
     });
 
@@ -730,7 +743,7 @@ describe('admin – assinaturas de usuários', () => {
       const response = await revoke();
 
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Subscription not found' });
+      expect(response.body).toEqual({ error: 'Assinatura não encontrada' });
       expect(txUpdateMock).not.toHaveBeenCalled();
     });
 

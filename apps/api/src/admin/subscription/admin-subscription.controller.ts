@@ -17,6 +17,7 @@ import {
   toStripeState,
 } from '../../billing/entitlement.service';
 import { asyncHandler } from '../../middleware/async-handler';
+import { routeParam } from '../../shared/route-params';
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
@@ -87,7 +88,7 @@ function parseGrantBody(
   | { plan: SubscriptionPlan; currentPeriodEnd: string | null } {
   const { plan, currentPeriodEnd } = body ?? {};
   if (!VALID_PLANS.includes(plan as SubscriptionPlan)) {
-    return { error: `plan must be one of: ${VALID_PLANS.join(', ')}` };
+    return { error: `plan deve ser um de: ${VALID_PLANS.join(', ')}` };
   }
   if (currentPeriodEnd === null) {
     return { plan: plan as SubscriptionPlan, currentPeriodEnd: null };
@@ -95,10 +96,10 @@ function parseGrantBody(
   const date =
     typeof currentPeriodEnd === 'string' ? new Date(currentPeriodEnd) : null;
   if (!date || Number.isNaN(date.getTime())) {
-    return { error: 'currentPeriodEnd must be an ISO date or null' };
+    return { error: 'currentPeriodEnd deve ser uma data ISO ou null' };
   }
   if (date.getTime() <= Date.now()) {
-    return { error: 'currentPeriodEnd must be in the future' };
+    return { error: 'currentPeriodEnd deve estar no futuro' };
   }
   return {
     plan: plan as SubscriptionPlan,
@@ -127,9 +128,9 @@ export const grantSubscription = asyncHandler(
       return;
     }
 
-    const user = await findAuthUser(req.params.uid);
+    const user = await findAuthUser(routeParam(req, 'uid'));
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'Usuário não encontrado' });
       return;
     }
 
@@ -168,7 +169,7 @@ export const grantSubscription = asyncHandler(
 
     if (!result) {
       res.status(409).json({
-        error: 'User already has an active Stripe subscription',
+        error: 'Usuário já tem assinatura ativa na Stripe',
         code: STRIPE_SUBSCRIPTION_CODE,
       });
       return;
@@ -182,14 +183,14 @@ export const grantSubscription = asyncHandler(
 export const revokeSubscription = asyncHandler(
   'revokeSubscription',
   async (req: Request, res: Response) => {
-    const { uid } = req.params;
+    const uid = routeParam(req, 'uid');
     const ref = subscriptionDoc(uid);
     // Leitura e gravação na mesma transação: o webhook pode ativar a Stripe
     // entre as duas e a revogação não pode cancelar essa assinatura.
     const result = await getFirestore().runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
       if (!snapshot.exists) {
-        return { status: 404, error: 'Subscription not found' } as const;
+        return { status: 404, error: 'Assinatura não encontrada' } as const;
       }
 
       const doc: UserSubscription = {
@@ -201,7 +202,10 @@ export const revokeSubscription = asyncHandler(
         return { status: 409 } as const;
       }
       if (current.provider !== 'manual') {
-        return { status: 404, error: 'Manual subscription not found' } as const;
+        return {
+          status: 404,
+          error: 'Assinatura manual não encontrada',
+        } as const;
       }
 
       const patch: Partial<UserSubscription> = {
@@ -216,7 +220,7 @@ export const revokeSubscription = asyncHandler(
 
     if (result.status === 409) {
       res.status(409).json({
-        error: 'Only manual subscriptions can be revoked by an admin',
+        error: 'Só assinatura manual pode ser revogada pelo admin',
         code: STRIPE_SUBSCRIPTION_CODE,
       });
       return;

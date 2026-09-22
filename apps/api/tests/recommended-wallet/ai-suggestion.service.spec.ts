@@ -9,9 +9,48 @@ jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
 }));
 
+/**
+ * Completa qualquer mock de Firestore com as capacidades que os testes de
+ * geração não descrevem: `runTransaction`, usado pela reserva de cota (issue
+ * #297), e `getAll`, usado pela busca de cotações por ticker (issue #299).
+ * As transações são serializadas, como o Firestore faz ao detectar conflito.
+ */
+function mockQuotaTransaction(firestore: any) {
+  if (!firestore) return firestore;
+
+  if (!firestore.getAll) {
+    firestore.getAll = jest.fn(async (...refs: { id: string }[]) =>
+      refs.map((ref) => ({ id: ref.id, exists: false, data: () => undefined })),
+    );
+  }
+
+  if (firestore.runTransaction) return firestore;
+
+  const counts = new Map<string, any>();
+  const transaction = {
+    get: jest.fn(async (ref: { id: string }) => ({
+      exists: counts.has(ref.id),
+      data: () => counts.get(ref.id),
+    })),
+    set: jest.fn((ref: { id: string }, data: any) => {
+      counts.set(ref.id, data);
+    }),
+  };
+
+  let queue: Promise<unknown> = Promise.resolve();
+  firestore.runTransaction = jest.fn((handler: any) => {
+    const result = queue.then(() => handler(transaction));
+    queue = result.catch(() => undefined);
+    return result;
+  });
+  firestore.quotaCounts = counts;
+
+  return firestore;
+}
+
 jest.mock('firebase-admin/firestore', () => ({
   ...jest.requireActual('firebase-admin/firestore'),
-  getFirestore: jest.fn(() => firestoreMock),
+  getFirestore: jest.fn(() => mockQuotaTransaction(firestoreMock)),
 }));
 
 jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
@@ -31,25 +70,40 @@ jest.mock('../../src/dividend/monthly-income.service', () => ({
     computeMonthlyIncomeMock(...args),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   buildSuggestionInput,
-  callOpenRouter,
-  checkDailyLimit,
+  releaseDailySuggestion,
+  reserveDailySuggestion,
   generateSuggestion,
   buildSuggestionHistory,
   previousMonths,
-  applySuggestedQuantities,
-  applyQualifiedInvestor,
-  applyFallbackAllocations,
-  redistributeUnspentAmounts,
   getSavedSuggestion,
-  parseSuggestionOutput,
   suggestionId,
 } from '../../src/recommended-wallet/ai-suggestion.service';
+import {
+  applyFallbackAllocations,
+  applyQualifiedInvestor,
+  applySuggestedQuantities,
+  redistributeUnspentAmounts,
+} from '../../src/recommended-wallet/ai-suggestion.allocation';
+import { parseSuggestionOutput } from '../../src/recommended-wallet/ai-suggestion.parser';
+import { callOpenRouter } from '../../src/recommended-wallet/openrouter.client';
 import {
   buildUserPrompt,
   SYSTEM_PROMPT,
 } from '../../src/recommended-wallet/ai-suggestion.prompt';
+import { today } from '../../src/shared/date';
 import {
   RecommendedWallet,
   RecommendedWalletComparison,
@@ -57,6 +111,79 @@ import {
 } from 'dindin-models';
 
 describe('ai-suggestion.service', () => {
+  /**
+   * Firestore mínimo com transação para a cota diária (issue #297): o
+   * contador vive num documento por dia e é reservado dentro da transação.
+   * As transações são serializadas, como o Firestore faz ao detectar
+   * conflito, para que o teste de concorrência seja determinístico.
+   */
+  function createUsageFirestore(
+    options: {
+      counts?: Record<string, { count: number }>;
+      suggestionDoc?: { get: jest.Mock; set: jest.Mock };
+      quotes?: Record<string, unknown>;
+    } = {},
+  ) {
+    const counts = new Map<string, { count: number; expiresAt?: unknown }>(
+      Object.entries(options.counts ?? {}),
+    );
+    const suggestionDoc = options.suggestionDoc ?? {
+      get: jest.fn().mockResolvedValue({ exists: false }),
+      set: jest.fn(),
+    };
+    const usageCollection = {
+      doc: jest.fn((day: string) => ({ id: day })),
+    };
+    const userDoc = {
+      collection: jest.fn((name: string) =>
+        name === 'aiSuggestionUsage'
+          ? usageCollection
+          : { doc: jest.fn(() => suggestionDoc) },
+      ),
+    };
+
+    const transaction = {
+      get: jest.fn(async (ref: { id: string }) => ({
+        exists: counts.has(ref.id),
+        data: () => counts.get(ref.id),
+      })),
+      set: jest.fn((ref: { id: string }, data: any) => {
+        counts.set(ref.id, data);
+      }),
+    };
+
+    let queue: Promise<unknown> = Promise.resolve();
+    const runTransaction = jest.fn((handler: any) => {
+      const result = queue.then(() => handler(transaction));
+      queue = result.catch(() => undefined);
+      return result;
+    });
+
+    // As cotações passaram a ser buscadas por ticker, com getAll (issue #299).
+    const quoteByTicker: Record<string, unknown> = options.quotes ?? {};
+
+    return {
+      firestore: {
+        collection: jest.fn((name: string) =>
+          name === 'quotes'
+            ? { doc: jest.fn((ticker: string) => ({ id: ticker })) }
+            : { doc: jest.fn(() => userDoc) },
+        ),
+        getAll: jest.fn(async (...refs: { id: string }[]) =>
+          refs.map((ref) => ({
+            id: ref.id,
+            exists: quoteByTicker[ref.id] !== undefined,
+            data: () => quoteByTicker[ref.id],
+          })),
+        ),
+        runTransaction,
+      },
+      counts,
+      suggestionDoc,
+      usageCollection,
+    };
+  }
+
   let consoleErrorSpy: jest.SpyInstance;
   let consoleWarnSpy: jest.SpyInstance;
   const comparison = {
@@ -106,10 +233,10 @@ describe('ai-suggestion.service', () => {
       monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
     });
     consoleErrorSpy = jest
-      .spyOn(console, 'error')
+      .spyOn(functionsLogger, 'error')
       .mockImplementation(() => undefined);
     consoleWarnSpy = jest
-      .spyOn(console, 'warn')
+      .spyOn(functionsLogger, 'warn')
       .mockImplementation(() => undefined);
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_MODEL;
@@ -758,7 +885,7 @@ describe('ai-suggestion.service', () => {
     ]);
     expect(result.items[0]).not.toHaveProperty('suggestedAmount');
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] compra em item extra convertida',
+      'parseSuggestionOutput.extraConverted',
       { ticker: 'XPML11' },
     );
   });
@@ -798,7 +925,7 @@ describe('ai-suggestion.service', () => {
       ]),
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] compras ajustadas ao total disponível',
+      'parseSuggestionOutput.amountsAdjusted',
       {
         amounts: [
           { ticker: 'HGLG11', from: 70, to: 58.33 },
@@ -1485,7 +1612,7 @@ describe('ai-suggestion.service', () => {
       parseSuggestionOutput('{invalido', new Map([['HGLG11', 'match']])),
     ).toThrow('Resposta inválida da IA');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[parseSuggestionOutput] resposta inválida',
+      'parseSuggestionOutput.invalidResponse',
       { reason: 'JSON inválido', snippet: '{invalido' },
     );
   });
@@ -1595,11 +1722,10 @@ describe('ai-suggestion.service', () => {
     expect(
       JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body),
     ).not.toHaveProperty('response_format');
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[callOpenRouter] OpenRouter respondeu',
-      400,
-      'response_format não suportado',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('callOpenRouter.badResponse', {
+      status: 400,
+      responseBody: 'response_format não suportado',
+    });
   });
 
   it('deve retornar 502 quando a tentativa e o retry falharem', async () => {
@@ -1622,11 +1748,10 @@ describe('ai-suggestion.service', () => {
       message: 'Falha ao consultar o provedor de IA',
     });
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[callOpenRouter] OpenRouter respondeu',
-      422,
-      'segundo erro',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('callOpenRouter.badResponse', {
+      status: 422,
+      responseBody: 'segundo erro',
+    });
   });
 
   it('deve converter falha do provedor em erro 502', async () => {
@@ -1640,18 +1765,139 @@ describe('ai-suggestion.service', () => {
     });
   });
 
-  it('deve limitar cinco gerações no mesmo dia', async () => {
-    const query = { where: jest.fn().mockReturnThis(), get: jest.fn() };
-    query.get.mockResolvedValue({ size: 5 });
-    firestoreMock = {
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({ collection: jest.fn(() => query) })),
-      })),
-    };
+  describe('cota diária (issue #297)', () => {
+    // 17/09 às 22h em Brasília ainda é 17/09; em UTC já é 18/09, e o limite
+    // reiniciava às 21h para o usuário.
+    const lateNight = new Date('2026-09-18T01:00:00Z');
 
-    await expect(checkDailyLimit('user-1')).rejects.toMatchObject({
-      statusCode: 429,
-      message: 'Limite diário de sugestões atingido',
+    it('deve reservar a cota no contador do dia em Brasília', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      const day = await reserveDailySuggestion('user-1', lateNight);
+
+      expect(day).toBe('2026-09-17');
+      expect(store.counts.get('2026-09-17')?.count).toBe(1);
+    });
+
+    it('deve gravar expiresAt para o TTL limpar o contador', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await reserveDailySuggestion('user-1', lateNight);
+
+      expect(store.counts.get('2026-09-17')).toEqual(
+        expect.objectContaining({ expiresAt: expect.any(Date) }),
+      );
+    });
+
+    it('deve recusar a reserva quando o dia já atingiu o limite', async () => {
+      const store = createUsageFirestore({
+        counts: { '2026-09-17': { count: 5 } },
+      });
+      firestoreMock = store.firestore;
+
+      await expect(
+        reserveDailySuggestion('user-1', lateNight),
+      ).rejects.toMatchObject({
+        statusCode: 429,
+        message: 'Limite diário de sugestões atingido',
+      });
+      expect(store.counts.get('2026-09-17')?.count).toBe(5);
+    });
+
+    // A checagem antiga lia o uso, chamava o provedor (até 120 s) e só então
+    // gravava: seis requisições paralelas passavam todas pela checagem.
+    it('deve respeitar o limite com reservas concorrentes', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 6 }, () =>
+          reserveDailySuggestion('user-1', lateNight),
+        ),
+      );
+
+      const granted = results.filter(
+        (result) => result.status === 'fulfilled',
+      ).length;
+      expect(granted).toBe(5);
+      expect(store.counts.get('2026-09-17')?.count).toBe(5);
+      expect(
+        results.filter((result) => result.status === 'rejected'),
+      ).toHaveLength(1);
+    });
+
+    it('deve devolver a cota reservada', async () => {
+      const store = createUsageFirestore({
+        counts: { '2026-09-17': { count: 3 } },
+      });
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.get('2026-09-17')?.count).toBe(2);
+    });
+
+    it('não deve deixar o contador negativo ao devolver cota inexistente', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.get('2026-09-17')?.count ?? 0).toBe(0);
+    });
+
+    // Um contador criado pela devolução ficaria sem `expiresAt` e o TTL nunca
+    // o apagaria — um documento permanente por usuário e dia.
+    it('não deve criar contador ao devolver cota de um dia sem uso', async () => {
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await releaseDailySuggestion('user-1', '2026-09-17');
+
+      expect(store.counts.has('2026-09-17')).toBe(false);
+    });
+
+    // A devolução é uma segunda transação no mesmo documento disputado; se
+    // ela falhar, quem precisa chegar ao cliente é a falha do provedor, com
+    // o 502 e a mensagem de tela — não um 500 genérico.
+    it('deve preservar o erro do provedor quando a devolução da cota falha', async () => {
+      process.env.OPENROUTER_API_KEY = 'secret';
+      compareWithWalletMock.mockResolvedValue(comparison);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
+      const store = createUsageFirestore();
+      let calls = 0;
+      store.firestore.runTransaction = jest.fn(async (handler: any) => {
+        calls += 1;
+        if (calls > 1) throw new Error('Firestore unavailable');
+        return handler({
+          get: async () => ({ exists: false, data: () => undefined }),
+          set: jest.fn(),
+        });
+      });
+      firestoreMock = store.firestore;
+
+      await expect(
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        message: 'Falha ao consultar o provedor de IA',
+      });
+    });
+
+    it('deve devolver a cota quando o provedor de IA falha', async () => {
+      process.env.OPENROUTER_API_KEY = 'secret';
+      compareWithWalletMock.mockResolvedValue(comparison);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
+      const store = createUsageFirestore();
+      firestoreMock = store.firestore;
+
+      await expect(
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+      ).rejects.toMatchObject({ statusCode: 502 });
+
+      expect(store.counts.get(today())?.count ?? 0).toBe(0);
     });
   });
 
@@ -1681,45 +1927,10 @@ describe('ai-suggestion.service', () => {
         ],
       }),
     });
-    let usageCount = 0;
-    const usageDoc = {
-      set: jest.fn().mockImplementation(async () => {
-        usageCount += 1;
-      }),
-    };
-    const usageQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockImplementation(async () => ({ size: usageCount })),
-      doc: jest.fn(() => usageDoc),
-    };
-    const suggestionDoc = {
-      get: jest.fn().mockResolvedValue({ exists: false }),
-      set: jest.fn(),
-    };
-    const userDoc = {
-      collection: jest.fn((name: string) =>
-        name === 'aiSuggestionUsage'
-          ? usageQuery
-          : { doc: jest.fn(() => suggestionDoc) },
-      ),
-    };
-    firestoreMock = {
-      collection: jest.fn((name: string) => {
-        if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
-        }
-        return { doc: jest.fn(() => userDoc) };
-      }),
-    };
+    const store = createUsageFirestore({
+      quotes: { HGLG11: { monthlyDividend: 1.25 } },
+    });
+    firestoreMock = store.firestore;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
@@ -1731,14 +1942,83 @@ describe('ai-suggestion.service', () => {
       statusCode: 429,
       message: 'Limite diário de sugestões atingido',
     });
-    expect(usageQuery.get).toHaveBeenCalledTimes(6);
-    expect(usageDoc.set).toHaveBeenCalledTimes(5);
-    expect(usageDoc.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        suggestionId: 'wallet-1_2026-09_renda',
-        createdAt: expect.any(String),
+    expect(store.counts.get(today())?.count).toBe(5);
+  });
+
+  // `computeMonthlyIncome` só conhece os tickers que o usuário já tem. Os
+  // recomendados que faltam na carteira (`status: 'missing'`) são justamente
+  // os que a IA deve avaliar comprar, e chegavam ao prompt com
+  // `monthlyDividend=indisponível` (issue #299).
+  it('deve informar o provento dos recomendados que o usuário ainda não tem', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue({
+      ...comparison,
+      recommended: {
+        ...comparison.recommended,
+        renda: [
+          ...comparison.recommended.renda,
+          {
+            ticker: 'KNCR11',
+            segment: 'Recebíveis',
+            weight: 0.3,
+            closePrice: 100,
+          },
+        ],
+      },
+      items: [
+        ...comparison.items,
+        {
+          ticker: 'KNCR11',
+          recommendedWeight: 0.3,
+          currentWeight: 0,
+          quantity: 0,
+          currentValue: 0,
+          status: 'missing',
+        },
+      ],
+    });
+    // O usuário só tem HGLG11: o provento de KNCR11 não vem daqui.
+    computeMonthlyIncomeMock.mockResolvedValue({
+      byTicker: [],
+      total: 2.5,
+      totalFromFridge: 0,
+      monthlyDividendByTicker: new Map([['HGLG11', 1.25]]),
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Resumo',
+                items: [
+                  {
+                    ticker: 'KNCR11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Entrar no ativo.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
       }),
+    });
+    const store = createUsageFirestore({
+      quotes: { KNCR11: { price: 100, monthlyDividend: 0.95 } },
+    });
+    firestoreMock = store.firestore;
+
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+
+    const [saved] = store.suggestionDoc.set.mock.calls[0];
+    const item = saved.input.items.find(
+      (entry: { ticker: string }) => entry.ticker === 'KNCR11',
     );
+    expect(item.monthlyDividend).toBe(0.95);
   });
 
   it('deve retornar a sugestão salva sem consultar a IA', async () => {
@@ -1836,16 +2116,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({
@@ -2003,9 +2274,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({ docs: [] }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn((id?: string) => ({
@@ -2080,30 +2349,9 @@ describe('ai-suggestion.service', () => {
         ],
       }),
     });
-    const suggestionDoc = {
-      get: jest.fn().mockResolvedValue({ exists: false }),
-      set: jest.fn(),
-    };
-    const usageDoc = { set: jest.fn() };
-    const usageQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ size: 0 }),
-      doc: jest.fn(() => usageDoc),
-    };
-    const userDoc = {
-      collection: jest.fn((name: string) =>
-        name === 'aiSuggestionUsage'
-          ? usageQuery
-          : { doc: jest.fn(() => suggestionDoc) },
-      ),
-    };
-    firestoreMock = {
-      collection: jest.fn((name: string) =>
-        name === 'quotes'
-          ? { get: jest.fn().mockResolvedValue({ docs: [] }) }
-          : { doc: jest.fn(() => userDoc) },
-      ),
-    };
+    const store = createUsageFirestore();
+    const { suggestionDoc } = store;
+    firestoreMock = store.firestore;
 
     await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
 
@@ -2172,16 +2420,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({
@@ -2273,16 +2512,7 @@ describe('ai-suggestion.service', () => {
     firestoreMock = {
       collection: jest.fn((name: string) => {
         if (name === 'quotes') {
-          return {
-            get: jest.fn().mockResolvedValue({
-              docs: [
-                {
-                  id: 'HGLG11',
-                  data: () => ({ monthlyDividend: 1.25 }),
-                },
-              ],
-            }),
-          };
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
         }
         return {
           doc: jest.fn(() => ({

@@ -1,27 +1,27 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { Position, AssetType, FridgeItem } from 'dindin-models';
+import type { FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-history.service';
+import { getQuotePricesByTicker } from '../quotes/quote-prices';
 import { asyncHandler } from '../middleware/async-handler';
+import { HttpError } from '../shared/http-error';
+import {
+  assetTypeField,
+  nonNegativeNumberField,
+  parseBody,
+  positiveNumberField,
+  tickerField,
+} from '../shared/validation';
 import {
   uid,
+  fridgeItemsCollection,
   positionsCollection,
   fridgesCollection,
+  walletsCollection,
 } from '../firestore/paths';
-
-const ASSET_TYPES = new Set<AssetType>([
-  'FII',
-  'STOCK',
-  'ETF',
-  'REIT',
-  'OTHER',
-]);
-
-function isValidAssetType(value: unknown): value is AssetType {
-  return typeof value === 'string' && ASSET_TYPES.has(value as AssetType);
-}
+import { routeParam } from '../shared/route-params';
 
 /**
  * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
@@ -44,88 +44,24 @@ async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
   }));
 }
 
-function validatePositionBody(
-  body: Partial<Position>,
-  allowPartial = false,
-): { valid: false; error: string } | { valid: true } {
-  const { ticker, quantity, averagePrice, assetType } = body;
+const positionSchema = z.object({
+  ticker: tickerField(),
+  quantity: positiveNumberField('Quantidade'),
+  averagePrice: nonNegativeNumberField('Preço médio'),
+  assetType: assetTypeField(),
+  inFridge: z.boolean({ error: 'inFridge deve ser booleano' }).optional(),
+  // `null` remove o preço-alvo gravado.
+  targetPrice: nonNegativeNumberField('Preço-alvo').nullish(),
+});
 
-  if (!allowPartial || ticker !== undefined) {
-    if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
-      return {
-        valid: false,
-        error: 'Ticker is required and must be a non-empty string',
-      };
-    }
-  }
-
-  if (!allowPartial || quantity !== undefined) {
-    if (
-      typeof quantity !== 'number' ||
-      quantity <= 0 ||
-      !Number.isFinite(quantity)
-    ) {
-      return {
-        valid: false,
-        error: 'Quantity is required and must be a positive number',
-      };
-    }
-  }
-
-  if (!allowPartial || averagePrice !== undefined) {
-    if (
-      typeof averagePrice !== 'number' ||
-      averagePrice < 0 ||
-      !Number.isFinite(averagePrice)
-    ) {
-      return {
-        valid: false,
-        error: 'Average price is required and must be a non-negative number',
-      };
-    }
-  }
-
-  if (!allowPartial || assetType !== undefined) {
-    if (!isValidAssetType(assetType)) {
-      return {
-        valid: false,
-        error: `Asset type is required and must be one of: ${[...ASSET_TYPES].join(', ')}`,
-      };
-    }
-  }
-
-  // currentPrice não é mais aceito no cadastro/atualização de posições:
-  // é resolvido a partir de `quotes/{ticker}` na leitura (issue #86). Um
-  // valor enviado pelo cliente é silenciosamente ignorado por
-  // createPosition/updatePosition, então não é validado aqui.
-
-  if (body.inFridge !== undefined && typeof body.inFridge !== 'boolean') {
-    return {
-      valid: false,
-      error: 'inFridge must be a boolean',
-    };
-  }
-
-  if (
-    body.targetPrice !== undefined &&
-    body.targetPrice !== null &&
-    (typeof body.targetPrice !== 'number' ||
-      body.targetPrice < 0 ||
-      !Number.isFinite(body.targetPrice))
-  ) {
-    return {
-      valid: false,
-      error: 'Target price must be a non-negative number',
-    };
-  }
-
-  return { valid: true };
-}
+// currentPrice não é aceito no cadastro/atualização: é resolvido a partir de
+// `quotes/{ticker}` na leitura (issue #86). Um valor enviado é ignorado.
+const updatePositionSchema = positionSchema.partial();
 
 export const listPositions = asyncHandler(
   'listPositions',
   async (req: Request, res: Response) => {
-    const walletId = req.params.walletId;
+    const walletId = routeParam(req, 'walletId');
     const snapshot = await positionsCollection(uid(req), walletId).get();
     const positions = snapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as Position,
@@ -137,16 +73,28 @@ export const listPositions = asyncHandler(
 export const createPosition = asyncHandler(
   'createPosition',
   async (req: Request, res: Response) => {
-    const walletId = req.params.walletId;
-    const body = req.body as Partial<Position>;
-
-    const validation = validatePositionBody(body);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const userId = uid(req);
+    const walletId = routeParam(req, 'walletId');
+    const parsed = parseBody(positionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    const ticker = body.ticker!.trim().toUpperCase();
+    const body = parsed.data;
+
+    // Sem esta checagem a posição nasce órfã sob uma carteira inexistente:
+    // a API não a alcança, porque navega a partir das carteiras, mas o
+    // registro automático de proventos a encontra pelo collection group e
+    // lança provento de um ativo que o usuário não vê (issue #296). É a
+    // mesma verificação que `createItem` já faz com a geladeira.
+    const walletDoc = await walletsCollection(userId).doc(walletId).get();
+    if (!walletDoc.exists) {
+      res.status(404).json({ error: 'Carteira não encontrada' });
+      return;
+    }
+
+    const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
       res.status(400).json({
         error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -160,19 +108,19 @@ export const createPosition = asyncHandler(
     const positionData: Omit<Position, 'id'> = {
       walletId,
       ticker,
-      assetType: body.assetType!,
-      quantity: body.quantity!,
-      averagePrice: body.averagePrice!,
+      assetType: body.assetType,
+      quantity: body.quantity,
+      averagePrice: body.averagePrice,
       inFridge: body.inFridge ?? false,
       createdAt: now,
       updatedAt: now,
     };
 
-    if (body.targetPrice !== undefined) {
+    if (body.targetPrice !== undefined && body.targetPrice !== null) {
       positionData.targetPrice = body.targetPrice;
     }
 
-    const docRef = await positionsCollection(uid(req), walletId).add(
+    const docRef = await positionsCollection(userId, walletId).add(
       positionData,
     );
     res.status(201).json({ id: docRef.id, ...positionData });
@@ -182,11 +130,12 @@ export const createPosition = asyncHandler(
 export const getPosition = asyncHandler(
   'getPosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -199,25 +148,25 @@ export const getPosition = asyncHandler(
 export const updatePosition = asyncHandler(
   'updatePosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
-    const body = req.body as Partial<Position>;
-    const validation = validatePositionBody(body, true);
-    if (!validation.valid) {
-      res.status(400).json({ error: validation.error });
+    const parsed = parseBody(updatePositionSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    let ticker: string | undefined;
-    if (body.ticker !== undefined) {
-      ticker = body.ticker.trim().toUpperCase();
+    const body = parsed.data;
+    const ticker = body.ticker;
+    if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
         res.status(400).json({
           error: 'Ticker não encontrado no catálogo de ativos suportados',
@@ -257,12 +206,13 @@ export const updatePosition = asyncHandler(
 export const deletePosition = asyncHandler(
   'deletePosition',
   async (req: Request, res: Response) => {
-    const { walletId, id } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const id = routeParam(req, 'id');
     const positionRef = positionsCollection(uid(req), walletId).doc(id);
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Position not found' });
+      res.status(404).json({ error: 'Posição não encontrada' });
       return;
     }
 
@@ -275,7 +225,8 @@ export const moveToFridge = asyncHandler(
   'moveToFridge',
   async (req: Request, res: Response) => {
     const userId = uid(req);
-    const { walletId, id: positionId } = req.params;
+    const walletId = routeParam(req, 'walletId');
+    const positionId = routeParam(req, 'id');
     const { fridgeId, targetPrice } = req.body as {
       fridgeId?: string;
       targetPrice?: number;
@@ -283,7 +234,7 @@ export const moveToFridge = asyncHandler(
 
     // Validação dos campos obrigatórios
     if (!fridgeId || typeof fridgeId !== 'string') {
-      res.status(400).json({ error: 'fridgeId is required' });
+      res.status(400).json({ error: 'fridgeId é obrigatório' });
       return;
     }
 
@@ -295,53 +246,53 @@ export const moveToFridge = asyncHandler(
       !Number.isFinite(targetPrice)
     ) {
       res.status(400).json({
-        error: 'targetPrice is required and must be a non-negative number',
+        error: 'targetPrice é obrigatório e deve ser um número não negativo',
       });
       return;
     }
 
-    // Verifica se a posição existe
     const positionRef = positionsCollection(userId, walletId).doc(positionId);
-    const positionDoc = await positionRef.get();
-
-    if (!positionDoc.exists) {
-      res.status(404).json({ error: 'Position not found' });
-      return;
-    }
-
-    const positionData = positionDoc.data() as Position;
-
-    // Verifica se a geladeira existe
     const fridgeRef = fridgesCollection(userId).doc(fridgeId);
-    const fridgeDoc = await fridgeRef.get();
+    const fridgeItemRef = fridgeItemsCollection(userId, fridgeId).doc();
 
-    if (!fridgeDoc.exists) {
-      res.status(404).json({ error: 'Fridge not found' });
-      return;
-    }
+    // A posição é lida dentro da transação, não antes dela: `delete` de um
+    // documento que já sumiu não falha, então com a leitura fora duas
+    // chamadas simultâneas passavam pela checagem de existência e cada uma
+    // criava um item, duplicando a quantidade na geladeira (issue #295).
+    const fridgeItemData = await getFirestore().runTransaction(
+      async (transaction) => {
+        const [positionDoc, fridgeDoc] = await Promise.all([
+          transaction.get(positionRef),
+          transaction.get(fridgeRef),
+        ]);
 
-    const now = new Date().toISOString();
-    const fridgeItemRef = fridgeRef.collection('fridgeItems').doc();
+        if (!positionDoc.exists)
+          throw HttpError.notFound('Posição não encontrada');
+        if (!fridgeDoc.exists)
+          throw HttpError.notFound('Geladeira não encontrada');
 
-    const fridgeItemData: Omit<FridgeItem, 'id'> = {
-      fridgeId,
-      ticker: positionData.ticker,
-      quantity: positionData.quantity,
-      transferredPrice: positionData.averagePrice,
-      targetPrice,
-      assetType: positionData.assetType,
-      createdAt: now,
-      updatedAt: now,
-    };
+        const positionData = positionDoc.data() as Position;
+        const now = new Date().toISOString();
 
-    // currentPrice não é mais carregado da posição: passa a ser resolvido
-    // a partir da collection `quotes` no momento da leitura (issue #86).
+        // currentPrice não é mais carregado da posição: passa a ser
+        // resolvido a partir da collection `quotes` na leitura (issue #86).
+        const data: Omit<FridgeItem, 'id'> = {
+          fridgeId,
+          ticker: positionData.ticker,
+          quantity: positionData.quantity,
+          transferredPrice: positionData.averagePrice,
+          targetPrice,
+          assetType: positionData.assetType,
+          createdAt: now,
+          updatedAt: now,
+        };
 
-    // Operação atômica: remove posição e cria item na geladeira
-    const batch = getFirestore().batch();
-    batch.delete(positionRef);
-    batch.set(fridgeItemRef, fridgeItemData);
-    await batch.commit();
+        transaction.delete(positionRef);
+        transaction.set(fridgeItemRef, data);
+
+        return data;
+      },
+    );
 
     res.status(201).json({ id: fridgeItemRef.id, ...fridgeItemData });
   },

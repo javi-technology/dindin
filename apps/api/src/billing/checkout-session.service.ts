@@ -9,6 +9,7 @@ import {
   resolveSubscription,
   subscriptionDoc,
 } from './entitlement.service';
+import { logWarn } from '../shared/logger';
 
 /** Checkout Session aberta para o usuário — interno ao backend (#155). */
 export interface PendingCheckout {
@@ -137,12 +138,11 @@ async function expirePendingSession(
     } catch {
       // mantém a reserva: não dá para afirmar que a sessão foi encerrada
     }
-    console.warn(
-      '[billing.checkout] não foi possível expirar sessão pendente',
+    logWarn('billing.checkout.expireFailed', {
       uid,
       sessionId,
-      (error as Error).message,
-    );
+      message: (error as Error).message,
+    });
     return false;
   }
 }

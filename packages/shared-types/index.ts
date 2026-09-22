@@ -1,3 +1,5 @@
+import type { AssetType } from 'dindin-models';
+
 // Tipos compartilhados entre web e api serão adicionados aqui.
 
 export interface HealthResponse {
@@ -5,13 +7,10 @@ export interface HealthResponse {
   project: string;
 }
 
-/** Tipos de ativo suportados em um provento */
-export type DividendAssetType = 'FII' | 'STOCK' | 'ETF' | 'REIT' | 'OTHER';
-
 /** Payload para criação/edição de um provento */
 export interface DividendCreateRequest {
   ticker: string;
-  assetType?: DividendAssetType;
+  assetType?: AssetType;
   amountPerShare: number;
   quantity: number;
   paymentDate: string; // YYYY-MM-DD
@@ -120,4 +119,173 @@ export interface AdminUser {
 export interface GrantSubscriptionRequest {
   plan: SubscriptionPlan;
   currentPeriodEnd: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Contratos de carteira, posição, geladeira e proventos (issue #313)
+//
+// Viviam redeclarados à mão nos serviços do frontend, enquanto a API mantinha
+// interfaces próprias para as mesmas respostas. Um campo renomeado de um lado
+// só aparecia em produção; agora a divergência quebra a compilação.
+// ---------------------------------------------------------------------------
+
+/** Corpo de criação de carteira. */
+export interface CreateWalletRequest {
+  name: string;
+  currency: string; // BRL-only por decisão de produto (#266)
+  description?: string;
+}
+
+export type UpdateWalletRequest = Partial<CreateWalletRequest>;
+
+/** Corpo de criação de posição. */
+export interface CreatePositionRequest {
+  ticker: string;
+  assetType: AssetType;
+  quantity: number;
+  averagePrice: number;
+  inFridge?: boolean;
+  targetPrice?: number;
+}
+
+/** Na atualização, `targetPrice: null` remove o preço-alvo gravado. */
+export type UpdatePositionRequest = Partial<
+  Omit<CreatePositionRequest, 'targetPrice'>
+> & {
+  targetPrice?: number | null;
+};
+
+export interface MoveToFridgeRequest {
+  fridgeId: string;
+  targetPrice: number;
+}
+
+export interface CreateFridgeRequest {
+  name: string;
+  description?: string;
+}
+
+export type UpdateFridgeRequest = Partial<CreateFridgeRequest>;
+
+export interface CreateFridgeItemRequest {
+  ticker: string;
+  quantity: number;
+  transferredPrice: number;
+  targetPrice: number;
+}
+
+export type UpdateFridgeItemRequest = Partial<CreateFridgeItemRequest>;
+
+export interface UnfreezeItemRequest {
+  walletId: string;
+}
+
+export interface ApplySuggestionItemRequest {
+  ticker: string;
+  fallbackFor?: string;
+  quantity: number;
+  price: number;
+}
+
+/** Projeção de renda de um ativo, pelo último provento informado (#290). */
+export interface MonthlyIncomeItem {
+  ticker: string;
+  quantity: number;
+  monthlyDividend: number;
+  monthlyIncome: number;
+  paymentDate?: string; // YYYY-MM-DD
+}
+
+/** Totais da agenda, calculados sobre todos os ativos da carteira. */
+export interface ScheduleTotals {
+  upcomingTotal: number;
+  paidTotal: number;
+}
+
+export interface MonthlyIncomeResponse {
+  byTicker: MonthlyIncomeItem[];
+  total: number;
+  totalFromFridge: number;
+  /** Recorte gratuito aplicado pela API (#262). */
+  limited?: boolean;
+  /** Ativos das datas de pagamento liberadas; ausente quando não há recorte. */
+  scheduleItems?: MonthlyIncomeItem[];
+  scheduleTotals?: ScheduleTotals;
+  /** Tickers omitidos em `byTicker` pelo recorte gratuito. */
+  hiddenTickers?: string[];
+  /** Datas de pagamento omitidas na agenda pelo recorte gratuito. */
+  hiddenPaymentDates?: string[];
+  /** Tickers sem data anunciada omitidos da agenda pelo recorte gratuito. */
+  hiddenScheduleTickers?: string[];
+}
+
+export interface TickerDividendYield {
+  ticker: string;
+  annualIncome: number;
+  currentValue: number;
+  yield: number;
+}
+
+export interface DividendYieldResponse {
+  byTicker: TickerDividendYield[];
+  total: {
+    annualIncome: number;
+    currentValue: number;
+    yield: number;
+  };
+}
+
+export interface TickerTotal {
+  ticker: string;
+  total: number;
+}
+
+export interface MonthlyDividendReportMonth {
+  month: string;
+  total: number;
+  byTicker: TickerTotal[];
+}
+
+export interface MonthlyDividendReport {
+  year: number;
+  months: MonthlyDividendReportMonth[];
+  byTicker: TickerTotal[];
+  total: number;
+  availableYears: number[];
+}
+
+/** Provento mensal de um ticker; `date` é `YYYY-MM`. */
+export interface DividendHistoryEntry {
+  date: string;
+  monthlyDividend: number;
+}
+
+export interface DividendHistoryResponse {
+  ticker: string;
+  history: DividendHistoryEntry[];
+}
+
+export interface DividendHistoryBatchResponse {
+  byTicker: Record<string, DividendHistoryEntry[]>;
+}
+
+/** Valor consolidado de um ticker, para a composição da carteira. */
+export interface TickerValue {
+  ticker: string;
+  value: number;
+}
+
+/**
+ * Resumo do dashboard (issue #300). Antes a tela montava esses números com
+ * uma requisição por carteira e uma por geladeira, e ainda reaplicava regra
+ * de negócio no cliente.
+ */
+export interface DashboardSummaryResponse {
+  totalWallet: number;
+  totalFridge: number;
+  total: number;
+  /** Renda mensal projetada, já com a geladeira contada uma única vez. */
+  monthlyIncomeTotal: number;
+  /** Composição consolidada por ticker, em ordem decrescente de valor. */
+  composition: TickerValue[];
 }

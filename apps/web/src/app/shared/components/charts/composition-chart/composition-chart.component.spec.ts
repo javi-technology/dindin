@@ -1,21 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Position } from 'dindin-models';
+import type { TickerValue } from 'dindin-shared-types';
 import { CompositionChartComponent } from './composition-chart.component';
 
+// A composição passou a chegar pronta da API (issue #300): o gráfico recebe
+// valor por ticker, em vez de posições, e não refaz a soma no cliente.
 describe('CompositionChartComponent', () => {
   let fixture: ComponentFixture<CompositionChartComponent>;
 
-  const position = (overrides: Partial<Position>): Position => ({
-    id: 'pos-1',
-    walletId: 'w1',
-    ticker: 'HGLG11',
-    assetType: 'FII',
-    quantity: 10,
-    averagePrice: 100,
-    inFridge: false,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...overrides,
+  const item = (ticker: string, value: number): TickerValue => ({
+    ticker,
+    value,
   });
 
   beforeEach(async () => {
@@ -25,8 +19,8 @@ describe('CompositionChartComponent', () => {
     fixture = TestBed.createComponent(CompositionChartComponent);
   });
 
-  it('deve exibir estado vazio sem posições', () => {
-    fixture.componentRef.setInput('positions', []);
+  it('deve exibir estado vazio sem ativos', () => {
+    fixture.componentRef.setInput('items', []);
     fixture.detectChanges();
 
     expect(
@@ -37,16 +31,10 @@ describe('CompositionChartComponent', () => {
     ).toBeFalsy();
   });
 
-  it('deve calcular percentuais com base no valor de cada posição', () => {
-    fixture.componentRef.setInput('positions', [
-      position({ ticker: 'HGLG11', quantity: 10, averagePrice: 100 }),
-      position({
-        id: 'pos-2',
-        ticker: 'PETR4',
-        quantity: 10,
-        averagePrice: 10,
-        currentPrice: 30,
-      }),
+  it('deve calcular percentuais com base no valor de cada ativo', () => {
+    fixture.componentRef.setInput('items', [
+      item('HGLG11', 1000),
+      item('PETR4', 300),
     ]);
     fixture.detectChanges();
 
@@ -56,10 +44,10 @@ describe('CompositionChartComponent', () => {
     expect(slices[1].percent).toBeCloseTo(23.08, 2);
   });
 
-  it('deve agrupar posições do mesmo ticker em carteiras diferentes', () => {
-    fixture.componentRef.setInput('positions', [
-      position({ walletId: 'w1', quantity: 10, averagePrice: 10 }),
-      position({ id: 'pos-2', walletId: 'w2', quantity: 10, averagePrice: 10 }),
+  it('deve ignorar ativo sem valor', () => {
+    fixture.componentRef.setInput('items', [
+      item('HGLG11', 200),
+      item('ZERO11', 0),
     ]);
     fixture.detectChanges();
 
@@ -70,10 +58,10 @@ describe('CompositionChartComponent', () => {
   });
 
   it('deve renderizar uma fatia e um item de legenda por ticker', () => {
-    fixture.componentRef.setInput('positions', [
-      position({ ticker: 'HGLG11' }),
-      position({ id: 'pos-2', ticker: 'PETR4' }),
-      position({ id: 'pos-3', ticker: 'IVVB11' }),
+    fixture.componentRef.setInput('items', [
+      item('HGLG11', 1000),
+      item('PETR4', 1000),
+      item('IVVB11', 1000),
     ]);
     fixture.detectChanges();
 
@@ -94,14 +82,9 @@ describe('CompositionChartComponent', () => {
 
   it('deve agrupar fatias excedentes em "Outros"', () => {
     fixture.componentRef.setInput(
-      'positions',
+      'items',
       Array.from({ length: 12 }, (_, index) =>
-        position({
-          id: `pos-${index}`,
-          ticker: `TICK${index}`,
-          quantity: 1,
-          averagePrice: 100 - index,
-        }),
+        item(`TICK${index}`, 100 - index),
       ),
     );
     fixture.detectChanges();

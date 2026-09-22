@@ -2,22 +2,18 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
+import type {
+  CreateFridgeItemRequest,
+  CreateFridgeRequest,
+  UpdateFridgeItemRequest,
+  UpdateFridgeRequest,
+} from 'dindin-shared-types';
 
-export interface CreateFridgePayload {
-  name: string;
-  description?: string;
-}
-
-export type UpdateFridgePayload = Partial<CreateFridgePayload>;
-
-export interface CreateFridgeItemPayload {
-  ticker: string;
-  quantity: number;
-  transferredPrice: number;
-  targetPrice: number;
-}
-
-export type UpdateFridgeItemPayload = Partial<CreateFridgeItemPayload>;
+// Contratos compartilhados com a API (issue #313).
+export type CreateFridgePayload = CreateFridgeRequest;
+export type UpdateFridgePayload = UpdateFridgeRequest;
+export type CreateFridgeItemPayload = CreateFridgeItemRequest;
+export type UpdateFridgeItemPayload = UpdateFridgeItemRequest;
 
 @Injectable({
   providedIn: 'root',

@@ -34,11 +34,36 @@ trigger: always_on
   `role="dialog"`, `aria-modal`, fechamento por `Esc` e clique no fundo, foco
   preso enquanto aberto e devolvido ao gatilho ao fechar. Não reimplementar o
   markup do modal na feature.
+- Para **modal de formulário**, usar `shared/components/modal`
+  (`<app-modal>`), que traz as mesmas garantias e projeta o formulário com
+  `<ng-content>`. A feature informa `title`, `testId` e, quando precisar,
+  `maxWidth`, e reage a `(closed)`. O rodapé com os botões pertence ao
+  formulário projetado, porque só ele sabe quando o envio é válido.
+- Com o modal compartilhado, a feature **não** declara `@HostListener` de
+  `Escape`: quem escuta o teclado é o modal.
+
+## Erros da API
+
+- Falha de negócio é sinalizada com **`HttpError`** (`apps/api/src/shared/http-error.ts`),
+  nunca com `Object.assign(new Error(...), { statusCode })` à mão: use as
+  fábricas `badRequest`, `notFound`, `conflict`, `tooManyRequests`,
+  `badGateway` e `internal`.
+- `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não.
+- **Mensagens de erro sempre em português (pt-BR)**. Ficam em inglês apenas o
+  `statusText` do HTTP e códigos de contrato, como `code: 'SUBSCRIPTION_REQUIRED'`.
 
 ## Logs
 
-- Erros no backend logados de forma clara (ex: `console.error` no catch dos controllers).
-- Em produção, considerar logger estruturado.
+- Usar o **logger estruturado** (`apps/api/src/shared/logger.ts`): `logInfo`,
+  `logWarn` e `logError`, com um nome de evento (`'updateAllQuotes.done'`) e
+  campos em objeto. Nada de `console.log`/`console.error` com texto
+  interpolado — o Cloud Logging publica os campos como `jsonPayload`, que é
+  filtrável por rota, status ou uid.
+- **Nunca logar o corpo da requisição**: o logger descarta a chave `body`, e o
+  que trafega nas rotas é dado financeiro do usuário. Método, rota e uid
+  bastam para localizar a falha.
+- Toda resposta é registrada pelo middleware de requisições, inclusive as sem
+  corpo (204, 401).
 
 ## Subscriptions em Componentes
 

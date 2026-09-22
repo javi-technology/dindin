@@ -9,12 +9,22 @@ jest.mock('firebase-admin/firestore', () => ({
   getFirestore: jest.fn(() => firestoreMock),
 }));
 
+jest.mock('firebase-functions/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  write: jest.fn(),
+}));
+
+import * as functionsLogger from 'firebase-functions/logger';
+
 import {
   computeUserPatrimony,
   listPatrimonySnapshots,
   saveAllPatrimonySnapshots,
   savePatrimonySnapshot,
-  todayDateInBrazil,
 } from '../../src/patrimony/patrimony-snapshot.service';
 
 function firestoreDocument(
@@ -36,16 +46,13 @@ function userDataFirestore(options: {
       docs: options.positions ?? [],
     }),
   };
+  // A navegação passou a sair de `positionsCollection(uid, walletId)` em vez
+  // de `walletDoc.ref.collection('positions')` — mesmo caminho, montado pelo
+  // módulo de paths (issue #302).
   const walletsCollection = {
+    doc: jest.fn(() => ({ collection: jest.fn(() => positionsCollection) })),
     get: jest.fn().mockResolvedValue({
-      docs: [
-        {
-          id: 'wallet-1',
-          ref: {
-            collection: jest.fn(() => positionsCollection),
-          },
-        },
-      ],
+      docs: [{ id: 'wallet-1' }],
     }),
   };
   const itemsCollection = {
@@ -54,15 +61,9 @@ function userDataFirestore(options: {
     }),
   };
   const fridgesCollection = {
+    doc: jest.fn(() => ({ collection: jest.fn(() => itemsCollection) })),
     get: jest.fn().mockResolvedValue({
-      docs: [
-        {
-          id: 'fridge-1',
-          ref: {
-            collection: jest.fn(() => itemsCollection),
-          },
-        },
-      ],
+      docs: [{ id: 'fridge-1', data: () => ({ name: 'Geladeira Principal' }) }],
     }),
   };
   const snapshotsCollection = {
@@ -103,15 +104,6 @@ function userDataFirestore(options: {
 describe('PatrimonySnapshotService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('deve calcular a data no fuso horário de São Paulo', () => {
-    expect(todayDateInBrazil(new Date('2026-09-02T23:30:00Z'))).toBe(
-      '2026-09-02',
-    );
-    expect(todayDateInBrazil(new Date('2026-09-02T02:30:00Z'))).toBe(
-      '2026-09-01',
-    );
   });
 
   it('deve usar cotação atual e fallback de preço médio ou transferido', async () => {
@@ -272,8 +264,8 @@ describe('PatrimonySnapshotService', () => {
         throw new Error(`Coleção inesperada: ${name}`);
       }),
     };
-    jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'error').mockImplementation(() => undefined);
+    jest.spyOn(functionsLogger, 'log').mockImplementation(() => undefined);
 
     await expect(saveAllPatrimonySnapshots()).rejects.toThrow(
       '[saveAllPatrimonySnapshots] 1 de 2 snapshot(s) falharam',
@@ -284,7 +276,7 @@ describe('PatrimonySnapshotService', () => {
     expect(set).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1' }),
     );
-    expect(console.error).toHaveBeenCalled();
-    expect(console.log).toHaveBeenCalled();
+    expect(functionsLogger.error).toHaveBeenCalled();
+    expect(functionsLogger.info).toHaveBeenCalled();
   });
 });

@@ -87,7 +87,7 @@
 
     @if (!loading() && !error()) {
       <app-composition-chart
-        [positions]="positions()"
+        [items]="composition()"
         class="block mb-6"
       ></app-composition-chart>
     }

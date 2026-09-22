@@ -91,7 +91,7 @@ function abandonedCheckoutDoc() {
   });
 }
 
-const FORBIDDEN = { error: 'Forbidden', code: 'SUBSCRIPTION_REQUIRED' };
+const FORBIDDEN = { error: 'Acesso negado', code: 'SUBSCRIPTION_REQUIRED' };
 
 function getSuggestionRequest() {
   return request(app)

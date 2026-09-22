@@ -1,4 +1,4 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import { subscriptionDocument } from '../firestore/paths';
 import {
   Entitlement,
   PublicSubscription,
@@ -18,11 +18,7 @@ export const NO_SUBSCRIPTION: UserSubscription = {
 };
 
 export function subscriptionDoc(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('billing')
-    .doc('subscription');
+  return subscriptionDocument(uid);
 }
 
 export async function getSubscription(uid: string): Promise<UserSubscription> {

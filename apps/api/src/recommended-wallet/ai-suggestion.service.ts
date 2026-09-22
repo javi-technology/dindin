@@ -1,20 +1,44 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import { listQualifiedInvestorTickers } from '../assets/asset.service';
+import { computeMonthlyIncome } from '../dividend/monthly-income.service';
+import {
+  aiSuggestionUsageCollection,
+  aiSuggestionsCollection,
+} from '../firestore/paths';
+import { getQuotesByTicker } from '../quotes/quote-prices';
+import { today } from '../shared/date';
+import { HttpError } from '../shared/http-error';
+import { logError } from '../shared/logger';
+import { validPrice } from '../shared/numbers';
+import { SYSTEM_PROMPT, buildUserPrompt } from './ai-suggestion.prompt';
+import {
+  compareWithWallet,
+  getRecommendedWallet,
+} from './recommended-wallet.service';
 import {
   AiSuggestion,
-  AiSuggestionItem,
   AiSuggestionTab,
   RecommendedWallet,
   RecommendedWalletComparison,
   RecommendedWalletComparisonItem,
 } from 'dindin-models';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
-  compareWithWallet,
-  getQuotePrices,
-  getRecommendedWallet,
-} from './recommended-wallet.service';
-import { listQualifiedInvestorTickers } from '../assets/asset.service';
-import { buildUserPrompt, SYSTEM_PROMPT } from './ai-suggestion.prompt';
-import { computeMonthlyIncome } from '../dividend/monthly-income.service';
+  applyFallbackAllocations,
+  applyQualifiedInvestor,
+  applySuggestedQuantities,
+  redistributeUnspentAmounts,
+} from './ai-suggestion.allocation';
+import { isTab, parseSuggestionOutput } from './ai-suggestion.parser';
+import { callOpenRouter } from './openrouter.client';
+
+/**
+ * Orquestração da sugestão da IA (issue #306).
+ *
+ * Monta a entrada a partir da carteira recomendada e da carteira do usuário,
+ * controla a cota diária, chama o cliente da OpenRouter, passa a resposta
+ * pelo parser e pelas regras de alocação, e persiste o resultado. As quatro
+ * responsabilidades que antes viviam aqui estão em módulos próprios.
+ */
 
 export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
@@ -45,46 +69,7 @@ export interface AiSuggestionInput {
   history: AiSuggestionHistoryMonth[];
 }
 
-const DEFAULT_DISCLAIMER = 'Este conteúdo não é recomendação de investimento.';
-export const OPENROUTER_TIMEOUT_MS = 120_000;
 export const DAILY_SUGGESTION_LIMIT = 5;
-
-type StatusError = Error & { statusCode?: number; expose?: boolean };
-
-/**
- * `expose: true` libera a mensagem para o cliente mesmo em 5xx. Só vale para
- * texto escrito para a tela; detalhe interno ("OPENROUTER_API_KEY não
- * configurada") não recebe a marca e sai como mensagem genérica.
- */
-function createError(
-  message: string,
-  statusCode: number,
-  { expose }: { expose?: boolean } = {},
-): StatusError {
-  return Object.assign(
-    new Error(message),
-    { statusCode },
-    expose === undefined ? {} : { expose },
-  );
-}
-
-function suggestionsCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestions');
-}
-
-function usageCollection(uid: string) {
-  return getFirestore()
-    .collection('users')
-    .doc(uid)
-    .collection('aiSuggestionUsage');
-}
-
-function isTab(value: unknown): value is AiSuggestionTab {
-  return value === 'renda' || value === 'ganho';
-}
 
 export function previousMonths(month: string, count = 3): string[] {
   const [year, monthNumber] = month.split('-').map(Number);
@@ -162,660 +147,77 @@ export function buildSuggestionInput(
   };
 }
 
-export function applySuggestedQuantities(
-  items: AiSuggestionItem[],
-  priceByTicker: Map<string, number>,
-): AiSuggestionItem[] {
-  return items.map((item) => {
-    const suggestedAmount = item.suggestedAmount;
-    const price = priceByTicker.get(item.ticker.toUpperCase());
-    if (
-      typeof suggestedAmount !== 'number' ||
-      !Number.isFinite(suggestedAmount) ||
-      suggestedAmount <= 0 ||
-      typeof price !== 'number' ||
-      !Number.isFinite(price) ||
-      price <= 0
-    ) {
-      return item;
+/**
+ * Dias que o contador de uso sobrevive antes do TTL do Firestore apagá-lo.
+ * Só o dia corrente importa para o limite; a margem existe para inspecionar
+ * consumo recente. A política de TTL é configurada no campo `expiresAt` da
+ * collection `aiSuggestionUsage` (ver README).
+ */
+const USAGE_RETENTION_DAYS = 30;
+
+/**
+ * Reserva uma geração do dia e devolve o dia reservado (issue #297).
+ *
+ * A reserva acontece **antes** da chamada ao provedor, numa transação. Antes,
+ * o uso era contado no início e gravado só depois da resposta da OpenRouter,
+ * que leva até 120 s: requisições paralelas liam todas o mesmo total e
+ * passavam juntas pelo limite, sem teto real de custo.
+ *
+ * O contador vive num documento por dia, no fuso do produto. Com o dia do
+ * servidor (UTC), o limite reiniciava às 21h em Brasília.
+ */
+export async function reserveDailySuggestion(
+  uid: string,
+  now: Date = new Date(),
+): Promise<string> {
+  const day = today(now);
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
+
+  await getFirestore().runTransaction(async (transaction) => {
+    const document = await transaction.get(reference);
+    const count = (document.data()?.count as number | undefined) ?? 0;
+
+    if (count >= DAILY_SUGGESTION_LIMIT) {
+      throw HttpError.tooManyRequests('Limite diário de sugestões atingido');
     }
-    return {
-      ...item,
-      referencePrice: price,
-      suggestedQuantity: Math.floor(suggestedAmount / price),
-    };
+
+    transaction.set(reference, {
+      count: count + 1,
+      updatedAt: now.toISOString(),
+      expiresAt: new Date(
+        now.getTime() + USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+      ),
+    });
   });
+
+  return day;
 }
 
-export function redistributeUnspentAmounts(
-  items: AiSuggestionItem[],
-  priceByTicker: Map<string, number>,
-  totalAvailable: number,
-  qualifiedTickers: Set<string>,
-  allowed: Map<string, RecommendedWalletComparisonItem['status']>,
-): AiSuggestionItem[] {
-  const normalizedQualifiedTickers = new Set(
-    [...qualifiedTickers].map((ticker) => ticker.toUpperCase()),
-  );
-  const roundAmount = (amount: number) => Math.round(amount * 100) / 100;
-  const states = items
-    .map((item, index) => {
-      if (item.action !== 'buy') return null;
-      const ticker = item.ticker.toUpperCase();
-      const price = priceByTicker.get(ticker);
-      const hasKnownPrice =
-        typeof price === 'number' && Number.isFinite(price) && price > 0;
-      const isQualified = normalizedQualifiedTickers.has(ticker);
-      const status = allowed.get(ticker);
-      const quantity =
-        typeof item.suggestedQuantity === 'number' &&
-        Number.isFinite(item.suggestedQuantity) &&
-        item.suggestedQuantity >= 0
-          ? item.suggestedQuantity
-          : 0;
-      if (!hasKnownPrice || isQualified || status === 'extra') {
-        return {
-          kind: 'fixed' as const,
-          amount:
-            status !== 'extra' &&
-            typeof item.suggestedAmount === 'number' &&
-            Number.isFinite(item.suggestedAmount)
-              ? item.suggestedAmount
-              : 0,
-        };
-      }
-      return {
-        kind: 'eligible' as const,
-        index,
-        item,
-        price,
-        quantity,
-        originalQuantity: quantity,
-      };
-    })
-    .filter(
-      (
-        state,
-      ): state is
-        | { kind: 'fixed'; amount: number }
-        | {
-            kind: 'eligible';
-            index: number;
-            item: AiSuggestionItem;
-            price: number;
-            quantity: number;
-            originalQuantity: number;
-          } => state !== null,
+/**
+ * Devolve uma cota reservada que não virou sugestão — falha do provedor, por
+ * exemplo. Sem isso, um 502 consumiria a cota do usuário.
+ */
+export async function releaseDailySuggestion(
+  uid: string,
+  day: string,
+): Promise<void> {
+  const reference = aiSuggestionUsageCollection(uid).doc(day);
+
+  await getFirestore().runTransaction(async (transaction) => {
+    const document = await transaction.get(reference);
+
+    // Sem contador não há o que devolver. Criar o documento aqui gravaria um
+    // `{ count: 0 }` sem `expiresAt`, que o TTL nunca apagaria.
+    if (!document.exists) return;
+
+    const count = (document.data()?.count as number | undefined) ?? 0;
+
+    transaction.set(
+      reference,
+      { ...document.data(), count: Math.max(0, count - 1) },
+      { merge: true },
     );
-  const fixedSpent = states
-    .filter(
-      (state): state is { kind: 'fixed'; amount: number } =>
-        state.kind === 'fixed',
-    )
-    .reduce((total, state) => total + state.amount, 0);
-  const eligibleStates = states.filter(
-    (
-      state,
-    ): state is {
-      kind: 'eligible';
-      index: number;
-      item: AiSuggestionItem;
-      price: number;
-      quantity: number;
-      originalQuantity: number;
-    } => state.kind === 'eligible',
-  );
-  const eligibleSpent = eligibleStates.reduce(
-    (total, state) => total + state.quantity * state.price,
-    0,
-  );
-  let pool = roundAmount(totalAvailable - fixedSpent - eligibleSpent);
-  if (pool <= 0) return items;
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const orderedStates = [...eligibleStates].sort(
-      (a, b) =>
-        Number(a.quantity > 0) - Number(b.quantity > 0) ||
-        a.item.priority - b.item.priority ||
-        a.index - b.index,
-    );
-    for (const state of orderedStates) {
-      if (pool + 1e-9 < state.price) continue;
-      state.quantity += 1;
-      pool = roundAmount(pool - state.price);
-      changed = true;
-    }
-  }
-
-  const updatedByIndex = new Map<number, AiSuggestionItem>();
-  for (const state of eligibleStates) {
-    if (state.quantity > 0) {
-      const quantityIncreased = state.quantity > state.originalQuantity;
-      updatedByIndex.set(state.index, {
-        ...state.item,
-        suggestedAmount: roundAmount(state.quantity * state.price),
-        suggestedQuantity: state.quantity,
-        referencePrice: state.price,
-        ...(quantityIncreased
-          ? {
-              rationale: `${state.item.rationale} Recebe cotas adicionais com o saldo realocado de ativos sem cota inteira.`,
-            }
-          : {}),
-      });
-    } else {
-      const {
-        suggestedAmount: _suggestedAmount,
-        suggestedQuantity: _suggestedQuantity,
-        referencePrice: _referencePrice,
-        ...withoutQuantities
-      } = state.item;
-      updatedByIndex.set(state.index, {
-        ...withoutQuantities,
-        action: 'hold',
-        rationale: `${state.item.rationale} Valor realocado para outros ativos por não completar 1 cota.`,
-      });
-    }
-  }
-  return items.map((item, index) => updatedByIndex.get(index) ?? item);
-}
-
-export function applyQualifiedInvestor(
-  items: AiSuggestionItem[],
-  qualifiedTickers: Set<string>,
-): AiSuggestionItem[] {
-  return items.map((item) => {
-    const { qualifiedInvestor: _qualifiedInvestor, ...withoutFlag } = item;
-    return qualifiedTickers.has(item.ticker.toUpperCase())
-      ? { ...withoutFlag, qualifiedInvestor: true }
-      : withoutFlag;
   });
-}
-
-function isValidItem(value: unknown): value is AiSuggestionItem {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Record<string, unknown>;
-  const priority =
-    typeof item.priority === 'string' ? Number(item.priority) : item.priority;
-  if (typeof item.priority === 'string') item.priority = priority;
-  if (item.suggestedAmount === null) delete item.suggestedAmount;
-  if (Array.isArray(item.fallbackAllocations)) {
-    const fallbackAllocations = item.fallbackAllocations.filter(
-      (allocation) => {
-        if (!allocation || typeof allocation !== 'object') return false;
-        const candidate = allocation as Record<string, unknown>;
-        return (
-          typeof candidate.ticker === 'string' &&
-          candidate.ticker.length > 0 &&
-          typeof candidate.amount === 'number' &&
-          Number.isFinite(candidate.amount) &&
-          candidate.amount > 0
-        );
-      },
-    );
-    if (fallbackAllocations.length > 0) {
-      item.fallbackAllocations = fallbackAllocations;
-    } else {
-      delete item.fallbackAllocations;
-    }
-  } else if (item.fallbackAllocations !== undefined) {
-    delete item.fallbackAllocations;
-  }
-  return (
-    typeof item.ticker === 'string' &&
-    item.ticker.length > 0 &&
-    (item.action === 'buy' ||
-      item.action === 'hold' ||
-      item.action === 'reduce') &&
-    typeof priority === 'number' &&
-    Number.isInteger(priority) &&
-    priority >= 1 &&
-    typeof item.rationale === 'string' &&
-    (item.suggestedAmount === undefined ||
-      (typeof item.suggestedAmount === 'number' &&
-        Number.isFinite(item.suggestedAmount) &&
-        item.suggestedAmount >= 0))
-  );
-}
-
-export function parseSuggestionOutput(
-  raw: string,
-  allowed: Map<string, RecommendedWalletComparisonItem['status']>,
-  totalAvailable?: number,
-): { summary: string; items: AiSuggestionItem[]; disclaimer: string } {
-  try {
-    const trimmed = raw.trim();
-    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(fenced?.[1] ?? trimmed);
-    } catch {
-      throw new Error('JSON inválido');
-    }
-    if (!parsed || typeof parsed !== 'object') {
-      throw new Error('Resposta não é um objeto');
-    }
-    const data = parsed as Record<string, unknown>;
-    if (typeof data.summary !== 'string') {
-      throw new Error('Resumo ausente ou inválido');
-    }
-    if (!Array.isArray(data.items)) {
-      throw new Error('Itens ausentes ou inválidos');
-    }
-    const validItems = (data.items as unknown[]).filter(isValidItem);
-    if (validItems.length === 0) {
-      throw new Error('Nenhum item válido');
-    }
-    const normalizedAllowed = new Map(
-      [...allowed.entries()].map(([ticker, status]) => [
-        ticker.toUpperCase(),
-        status,
-      ]),
-    );
-    const items = validItems
-      .filter((item) => normalizedAllowed.has(item.ticker.toUpperCase()))
-      .sort((a, b) => a.priority - b.priority);
-    if (items.length === 0) {
-      throw new Error('Nenhum item permitido');
-    }
-    let normalizedItems = items.map((item) => {
-      const fallbackAllocations = item.fallbackAllocations
-        ?.filter((allocation) => {
-          const ticker = allocation.ticker.toUpperCase();
-          return (
-            normalizedAllowed.has(ticker) &&
-            normalizedAllowed.get(ticker) !== 'extra' &&
-            ticker !== item.ticker.toUpperCase()
-          );
-        })
-        .map((allocation) => ({
-          ...allocation,
-          ticker: allocation.ticker,
-        }));
-      let normalizedItem: AiSuggestionItem;
-      if (fallbackAllocations?.length) {
-        normalizedItem = { ...item, fallbackAllocations };
-      } else {
-        const {
-          fallbackAllocations: _fallbackAllocations,
-          ...withoutFallback
-        } = item;
-        normalizedItem = withoutFallback;
-      }
-      if (
-        normalizedAllowed.get(item.ticker.toUpperCase()) === 'extra' &&
-        item.action === 'buy'
-      ) {
-        const { suggestedAmount: _suggestedAmount, ...itemWithoutAmount } =
-          normalizedItem;
-        console.warn(
-          '[parseSuggestionOutput] compra em item extra convertida',
-          {
-            ticker: item.ticker,
-          },
-        );
-        return { ...itemWithoutAmount, action: 'hold' as const };
-      }
-      return normalizedItem;
-    });
-    if (totalAvailable !== undefined) {
-      const buyTotal = normalizedItems
-        .filter((item) => item.action === 'buy')
-        .reduce((total, item) => total + (item.suggestedAmount ?? 0), 0);
-      if (buyTotal > totalAvailable * 1.01) {
-        const ratio = buyTotal === 0 ? 0 : totalAvailable / buyTotal;
-        const amounts = normalizedItems
-          .filter(
-            (item) =>
-              item.action === 'buy' && typeof item.suggestedAmount === 'number',
-          )
-          .map((item) => {
-            const suggestedAmount = item.suggestedAmount as number;
-            const normalizedAmount =
-              Math.round(suggestedAmount * ratio * 100) / 100;
-            return {
-              ticker: item.ticker,
-              from: suggestedAmount,
-              to: normalizedAmount,
-            };
-          });
-        console.warn(
-          '[parseSuggestionOutput] compras ajustadas ao total disponível',
-          { amounts },
-        );
-        normalizedItems = normalizedItems.map((item) => {
-          if (
-            item.action !== 'buy' ||
-            typeof item.suggestedAmount !== 'number'
-          ) {
-            return item;
-          }
-          return {
-            ...item,
-            suggestedAmount:
-              Math.round(item.suggestedAmount * ratio * 100) / 100,
-            ...(item.fallbackAllocations?.length
-              ? {
-                  fallbackAllocations: item.fallbackAllocations.map(
-                    (allocation) => ({
-                      ...allocation,
-                      amount: Math.round(allocation.amount * ratio * 100) / 100,
-                    }),
-                  ),
-                }
-              : {}),
-          };
-        });
-      }
-    }
-    return {
-      summary: data.summary,
-      items: normalizedItems,
-      disclaimer:
-        typeof data.disclaimer === 'string'
-          ? data.disclaimer
-          : DEFAULT_DISCLAIMER,
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.error('[parseSuggestionOutput] resposta inválida', {
-      reason,
-      snippet: raw.slice(0, 500),
-    });
-    throw new Error('Resposta inválida da IA');
-  }
-}
-
-export function applyFallbackAllocations(
-  items: AiSuggestionItem[],
-  qualifiedTickers: Set<string>,
-  comparisonItems: RecommendedWalletComparisonItem[],
-  priceByTicker: Map<string, number>,
-): AiSuggestionItem[] {
-  const normalizedQualifiedTickers = new Set(
-    [...qualifiedTickers].map((ticker) => ticker.toUpperCase()),
-  );
-  const comparisonByTicker = new Map(
-    comparisonItems.map((comparisonItem) => [
-      comparisonItem.ticker.toUpperCase(),
-      comparisonItem,
-    ]),
-  );
-  const roundAmount = (amount: number): number =>
-    Math.round(amount * 100) / 100;
-  const withQuantities = (
-    allocations: Array<{ ticker: string; amount: number }>,
-  ) =>
-    allocations.map((allocation) => {
-      const ticker = allocation.ticker.toUpperCase();
-      const price = priceByTicker.get(ticker);
-      if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
-        return { ticker, amount: allocation.amount };
-      }
-      return {
-        ticker,
-        amount: allocation.amount,
-        referencePrice: price,
-        suggestedQuantity: Math.floor(allocation.amount / price),
-      };
-    });
-  const normalizeAmounts = (
-    allocations: Array<{ ticker: string; amount: number }>,
-    total: number,
-  ) => {
-    if (allocations.length === 0) return allocations;
-    const sum = allocations.reduce(
-      (allocationTotal, allocation) => allocationTotal + allocation.amount,
-      0,
-    );
-    if (sum === 0) return allocations;
-    const normalized = allocations.map((allocation) => ({
-      ticker: allocation.ticker,
-      amount: roundAmount((allocation.amount / sum) * total),
-    }));
-    const difference = roundAmount(
-      total -
-        normalized.reduce((value, allocation) => value + allocation.amount, 0),
-    );
-    if (difference !== 0) {
-      normalized[normalized.length - 1].amount = roundAmount(
-        normalized[normalized.length - 1].amount + difference,
-      );
-    }
-    return normalized;
-  };
-  const getCandidates = (ticker: string) =>
-    comparisonItems.filter((comparisonItem) => {
-      const candidateTicker = comparisonItem.ticker.toUpperCase();
-      return (
-        comparisonItem.status !== 'extra' &&
-        !normalizedQualifiedTickers.has(candidateTicker) &&
-        candidateTicker !== ticker
-      );
-    });
-
-  return items.map((item) => {
-    const ticker = item.ticker.toUpperCase();
-    const isQualified = normalizedQualifiedTickers.has(ticker);
-    const suggestedAmount = item.suggestedAmount;
-    if (
-      !isQualified ||
-      item.action !== 'buy' ||
-      typeof suggestedAmount !== 'number' ||
-      !Number.isFinite(suggestedAmount) ||
-      suggestedAmount <= 0
-    ) {
-      const { fallbackAllocations: _fallbackAllocations, ...withoutFallback } =
-        item;
-      return withoutFallback;
-    }
-
-    const validAllocations = (item.fallbackAllocations ?? [])
-      .filter(
-        (allocation) =>
-          typeof allocation.ticker === 'string' &&
-          allocation.ticker.length > 0 &&
-          typeof allocation.amount === 'number' &&
-          Number.isFinite(allocation.amount) &&
-          allocation.amount > 0,
-      )
-      .map((allocation) => ({
-        ticker: allocation.ticker.toUpperCase(),
-        amount: allocation.amount,
-      }))
-      .filter((allocation) => {
-        const comparisonItem = comparisonByTicker.get(allocation.ticker);
-        return (
-          comparisonItem !== undefined &&
-          comparisonItem.status !== 'extra' &&
-          !normalizedQualifiedTickers.has(allocation.ticker) &&
-          allocation.ticker !== ticker
-        );
-      });
-    const allocationTotal = validAllocations.reduce(
-      (total, allocation) => total + allocation.amount,
-      0,
-    );
-    const candidates = getCandidates(ticker);
-    let allocations = validAllocations;
-    if (allocationTotal === 0) {
-      if (candidates.length === 0) {
-        const {
-          fallbackAllocations: _fallbackAllocations,
-          ...withoutFallback
-        } = item;
-        return withoutFallback;
-      }
-      const weights = candidates.map((candidate) =>
-        typeof candidate.recommendedWeight === 'number' &&
-        Number.isFinite(candidate.recommendedWeight) &&
-        candidate.recommendedWeight > 0
-          ? candidate.recommendedWeight
-          : 0,
-      );
-      const weightTotal = weights.reduce((total, weight) => total + weight, 0);
-      allocations = candidates.map((candidate, index) => ({
-        ticker: candidate.ticker.toUpperCase(),
-        amount:
-          weightTotal > 0
-            ? roundAmount((suggestedAmount * weights[index]) / weightTotal)
-            : roundAmount(suggestedAmount / candidates.length),
-      }));
-      allocations = normalizeAmounts(allocations, suggestedAmount);
-    } else if (
-      Math.abs(allocationTotal - suggestedAmount) >
-      suggestedAmount * 0.01
-    ) {
-      allocations = normalizeAmounts(validAllocations, suggestedAmount);
-    }
-    while (allocations.length > 0) {
-      const affordableAllocations = allocations.filter((allocation) => {
-        const price = priceByTicker.get(allocation.ticker);
-        return !(
-          typeof price === 'number' &&
-          Number.isFinite(price) &&
-          price > 0 &&
-          Math.floor(allocation.amount / price) === 0
-        );
-      });
-      if (affordableAllocations.length === allocations.length) break;
-      allocations = normalizeAmounts(affordableAllocations, suggestedAmount);
-    }
-    if (allocations.length === 0) {
-      const cheapestCandidate = candidates
-        .map((candidate) => {
-          const candidateTicker = candidate.ticker.toUpperCase();
-          const price = priceByTicker.get(candidateTicker);
-          return { ticker: candidateTicker, price };
-        })
-        .filter(
-          (candidate): candidate is { ticker: string; price: number } =>
-            typeof candidate.price === 'number' &&
-            Number.isFinite(candidate.price) &&
-            candidate.price > 0,
-        )
-        .sort((a, b) => a.price - b.price)[0];
-      if (
-        !cheapestCandidate ||
-        Math.floor(suggestedAmount / cheapestCandidate.price) === 0
-      ) {
-        const {
-          fallbackAllocations: _fallbackAllocations,
-          ...withoutFallback
-        } = item;
-        return withoutFallback;
-      }
-      allocations = [
-        { ticker: cheapestCandidate.ticker, amount: suggestedAmount },
-      ];
-    }
-    return {
-      ...item,
-      fallbackAllocations: withQuantities(allocations),
-    };
-  });
-}
-
-export async function callOpenRouter(
-  system: string,
-  user: string,
-): Promise<{ content: string; model: string }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw createError('OPENROUTER_API_KEY não configurada', 500);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
-  const requestBody = {
-    model: process.env.OPENROUTER_MODEL ?? 'openai/gpt-5.6-luna',
-    temperature: 0.2,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  };
-  const request = (body: object) =>
-    fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  const logResponseError = async (response: Response): Promise<void> => {
-    const body =
-      typeof response.text === 'function' ? await response.text() : '';
-    const safeBody = body.split(apiKey).join('[redacted]').slice(0, 500);
-    console.error(
-      '[callOpenRouter] OpenRouter respondeu',
-      response.status,
-      safeBody,
-    );
-  };
-  try {
-    let response = await request(requestBody);
-    if (!response.ok) {
-      await logResponseError(response);
-      const { response_format: _responseFormat, ...retryBody } = requestBody;
-      response = await request(retryBody);
-      if (!response.ok) {
-        await logResponseError(response);
-        throw createError('Falha ao consultar o provedor de IA', 502, {
-          expose: true,
-        });
-      }
-    }
-    const data: unknown = await response.json();
-    if (
-      !data ||
-      typeof data !== 'object' ||
-      typeof (data as { model?: unknown }).model !== 'string' ||
-      !Array.isArray((data as { choices?: unknown }).choices) ||
-      typeof (data as { choices: Array<{ message?: { content?: unknown } }> })
-        .choices[0]?.message?.content !== 'string'
-    ) {
-      const serialized = JSON.stringify(data) ?? String(data);
-      console.error(
-        '[callOpenRouter] resposta inesperada',
-        serialized.slice(0, 500),
-      );
-      throw createError('Falha ao consultar o provedor de IA', 502, {
-        expose: true,
-      });
-    }
-    const result = data as {
-      model: string;
-      choices: Array<{ message: { content: string } }>;
-    };
-    return { content: result.choices[0].message.content, model: result.model };
-  } catch (error) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      (error as StatusError).statusCode === 502
-    ) {
-      throw error;
-    }
-    console.error('[callOpenRouter] falha', error);
-    throw createError('Falha ao consultar o provedor de IA', 502, {
-      expose: true,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-export async function checkDailyLimit(uid: string): Promise<void> {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const snapshot = await usageCollection(uid)
-    .where('createdAt', '>=', startOfToday.toISOString())
-    .get();
-  if (snapshot.size >= DAILY_SUGGESTION_LIMIT) {
-    throw createError('Limite diário de sugestões atingido', 429);
-  }
 }
 
 export function suggestionId(
@@ -833,7 +235,7 @@ export async function getSavedSuggestion(
   tab: AiSuggestionTab,
 ): Promise<AiSuggestion | null> {
   const id = suggestionId(walletId, month, tab);
-  const doc = await suggestionsCollection(uid).doc(id).get();
+  const doc = await aiSuggestionsCollection(uid).doc(id).get();
   if (!doc.exists) return null;
   const { input: _input, ...data } = doc.data() as AiSuggestion & {
     input?: AiSuggestionInput;
@@ -849,7 +251,7 @@ export async function generateSuggestion(
   force: boolean,
   contribution?: number,
 ): Promise<AiSuggestion> {
-  if (!isTab(tab)) throw createError('Aba inválida', 400);
+  if (!isTab(tab)) throw HttpError.badRequest('Aba inválida');
   const comparison = await compareWithWallet(uid, walletId, month, tab);
   const historyMonths = previousMonths(comparison.recommended.month);
   const historyWallets = (
@@ -874,16 +276,90 @@ export async function generateSuggestion(
   ) {
     return saved;
   }
-  await checkDailyLimit(uid);
-  const [income, quotePrices, qualifiedTickers] = await Promise.all([
+  // A cota é reservada antes de qualquer chamada ao provedor e devolvida se
+  // a geração não chegar ao fim (issue #297).
+  const reservedDay = await reserveDailySuggestion(uid);
+  try {
+    return await buildAndSaveSuggestion({
+      uid,
+      walletId,
+      month,
+      tab,
+      comparison,
+      availableHistoryMonths,
+      history,
+      contribution,
+      saved,
+    });
+  } catch (error) {
+    // A devolução é uma segunda transação no mesmo documento disputado. Se
+    // ela falhar, quem precisa chegar ao cliente é o erro original — uma
+    // falha aqui vira log, não um 500 genérico por cima do 502 do provedor.
+    await releaseDailySuggestion(uid, reservedDay).catch((releaseError) =>
+      logError('generateSuggestion.quotaReleaseFailed', {
+        uid,
+        day: reservedDay,
+        message: (releaseError as Error).message,
+      }),
+    );
+    throw error;
+  }
+}
+
+interface BuildSuggestionArgs {
+  uid: string;
+  walletId: string;
+  month: string;
+  tab: AiSuggestionTab;
+  comparison: RecommendedWalletComparison;
+  availableHistoryMonths: string[];
+  history: AiSuggestionHistoryMonth[];
+  contribution?: number;
+  saved: AiSuggestion | null;
+}
+
+/** Monta, consulta a IA e persiste a sugestão, com a cota já reservada. */
+async function buildAndSaveSuggestion({
+  uid,
+  walletId,
+  month,
+  tab,
+  comparison,
+  availableHistoryMonths,
+  history,
+  contribution,
+  saved,
+}: BuildSuggestionArgs): Promise<AiSuggestion> {
+  // Só os tickers em jogo: os da comparação (posições do usuário) e os da
+  // carteira recomendada do mês (issue #299). A mesma leitura serve para
+  // preço e provento — `computeMonthlyIncome` só conhece o que o usuário já
+  // tem, e os recomendados que faltam na carteira são justamente os que a IA
+  // precisa avaliar.
+  const tickersInPlay = [
+    ...comparison.items.map((item) => item.ticker),
+    ...comparison.recommended[tab].map((asset) => asset.ticker),
+  ];
+  const [income, quotes, qualifiedTickers] = await Promise.all([
     computeMonthlyIncome(uid, walletId),
-    getQuotePrices(),
+    getQuotesByTicker(tickersInPlay),
     listQualifiedInvestorTickers(),
   ]);
+
+  const quotePrices = new Map<string, number>();
+  const monthlyDividendByTicker = new Map(income.monthlyDividendByTicker);
+  for (const [ticker, quote] of quotes) {
+    const price = validPrice(quote.price);
+    if (price !== undefined) quotePrices.set(ticker, price);
+
+    const monthlyDividend = validPrice(quote.monthlyDividend);
+    if (monthlyDividend !== undefined && !monthlyDividendByTicker.has(ticker)) {
+      monthlyDividendByTicker.set(ticker, monthlyDividend);
+    }
+  }
   const input = buildSuggestionInput(
     comparison,
     tab,
-    income.monthlyDividendByTicker,
+    monthlyDividendByTicker,
     contribution,
     history,
     income.total,
@@ -947,9 +423,8 @@ export async function generateSuggestion(
       ? { appliedItems: saved.appliedItems }
       : {}),
   };
-  await suggestionsCollection(uid)
+  await aiSuggestionsCollection(uid)
     .doc(id)
     .set({ ...suggestion, input });
-  await usageCollection(uid).doc().set({ createdAt, suggestionId: id });
   return suggestion;
 }

@@ -1,22 +1,15 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { Alert, FridgeItem, Quote } from 'dindin-models';
-import {
-  alertsCollection,
-  fridgeItemsCollection,
-  fridgesCollection,
-} from '../firestore/paths';
+import { Alert } from 'dindin-models';
+import { alertsCollection, usersCollection } from '../firestore/paths';
+import { loadAllQuotePrices } from '../quotes/quote-prices';
+import { validPositivePrice } from '../shared/numbers';
+import { getAllUserFridgeItemsWithFridge } from '../wallet/fridge-reader';
 import { sendAlertEmails } from './alert-mail.service';
+import { logError, logInfo } from '../shared/logger';
 
 const BATCH_SIZE = 10;
 
 /** Preço por ticker (em caixa alta) das cotações atuais. */
 export type QuotePrices = Map<string, number>;
-
-function validPrice(price: unknown): number | undefined {
-  return typeof price === 'number' && Number.isFinite(price) && price > 0
-    ? price
-    : undefined;
-}
 
 export function alertId(fridgeId: string, ticker: string): string {
   return `${fridgeId}_${ticker.toUpperCase()}`;
@@ -27,51 +20,15 @@ export function alertId(fridgeId: string, ticker: string): string {
  * `updateQuotesScheduled`, então a coleção inteira é o conjunto relevante e
  * uma leitura por execução evita o N+1 de buscar `quotes/{ticker}` por item
  * (mesmo motivo da issue #221).
+ *
+ * `positiveOnly`: com cotação zero, qualquer preço-alvo pareceria atingido e
+ * o usuário receberia e-mail de alerta indevido.
  */
 export async function loadQuotePrices(): Promise<QuotePrices> {
-  const snapshot = await getFirestore().collection('quotes').get();
-  const prices: QuotePrices = new Map();
-
-  for (const doc of snapshot.docs) {
-    const price = validPrice((doc.data() as Quote).price);
-    if (price !== undefined) {
-      prices.set(doc.id.toUpperCase(), price);
-    }
-  }
-
-  return prices;
+  return loadAllQuotePrices({ positiveOnly: true });
 }
 
-type FridgeItemWithFridge = {
-  item: FridgeItem;
-  fridgeId: string;
-  fridgeName: string;
-};
-
-async function fetchFridgeItems(
-  userId: string,
-): Promise<FridgeItemWithFridge[]> {
-  const fridgesSnapshot = await fridgesCollection(userId).get();
-  const items: FridgeItemWithFridge[] = [];
-
-  for (const fridgeDoc of fridgesSnapshot.docs) {
-    const fridgeName = (fridgeDoc.data() as { name?: string }).name ?? '';
-    const itemsSnapshot = await fridgeItemsCollection(
-      userId,
-      fridgeDoc.id,
-    ).get();
-
-    for (const itemDoc of itemsSnapshot.docs) {
-      items.push({
-        item: { id: itemDoc.id, ...itemDoc.data() } as FridgeItem,
-        fridgeId: fridgeDoc.id,
-        fridgeName,
-      });
-    }
-  }
-
-  return items;
-}
+const fetchFridgeItems = getAllUserFridgeItemsWithFridge;
 
 export interface TargetPriceCheckResult {
   /** Alertas criados nesta execução. */
@@ -123,7 +80,7 @@ export async function checkUserTargetPrices(
   for (const { item, fridgeId, fridgeName } of fridgeItems) {
     const ticker =
       typeof item.ticker === 'string' ? item.ticker.toUpperCase() : '';
-    const targetPrice = validPrice(item.targetPrice);
+    const targetPrice = validPositivePrice(item.targetPrice);
     const currentPrice = ticker ? prices.get(ticker) : undefined;
 
     if (!ticker || targetPrice === undefined) continue;
@@ -179,7 +136,7 @@ export async function checkUserTargetPrices(
 export async function checkAllTargetPrices(now = new Date()): Promise<void> {
   const [quotePrices, userDocuments] = await Promise.all([
     loadQuotePrices(),
-    getFirestore().collection('users').listDocuments(),
+    usersCollection().listDocuments(),
   ]);
 
   let created = 0;
@@ -206,10 +163,10 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
         }
       } else {
         failed += 1;
-        console.error(
-          `[checkAllTargetPrices] Erro ao verificar ${batch[index].id}:`,
-          { message: (result.reason as Error).message },
-        );
+        logError('checkAllTargetPrices.userFailed', {
+          uid: batch[index].id,
+          message: (result.reason as Error).message,
+        });
       }
     });
   }
@@ -222,13 +179,12 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
       notified += await sendAlertEmails(userId, alerts, now);
     } catch (error) {
       failed += 1;
-      console.error(`[checkAllTargetPrices] Erro ao notificar ${userId}:`, {
+      logError('checkAllTargetPrices.notifyFailed', {
+        uid: userId,
         message: (error as Error).message,
       });
     }
   }
 
-  console.log(
-    `[checkAllTargetPrices] Concluído. ${created} alerta(s) criado(s), ${notified} aviso(s) enviado(s), ${failed} falha(s).`,
-  );
+  logInfo('checkAllTargetPrices.done', { created, notified, failed });
 }

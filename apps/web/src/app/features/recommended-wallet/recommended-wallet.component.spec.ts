@@ -20,6 +20,19 @@ import { PositionService } from '../../core/services/position.service';
 import { AssetService } from '../../core/services/asset.service';
 
 describe('RecommendedWalletComponent', () => {
+  /**
+   * O painel de sugestão virou subcomponente (#310): a geração passa a ser
+   * pedida pelo botão, como o usuário faz.
+   */
+  function clickGenerate(): void {
+    (
+      fixture.nativeElement.querySelector(
+        '[data-testid="generate-suggestion-button"]',
+      ) as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+  }
+
   let fixture: ComponentFixture<RecommendedWalletComponent>;
   let serviceMock: jasmine.SpyObj<RecommendedWalletService>;
   let walletServiceMock: jasmine.SpyObj<WalletService>;
@@ -300,7 +313,7 @@ describe('RecommendedWalletComponent', () => {
     serviceMock.generateSuggestion.and.returnValue(pending);
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
 
     expect(fixture.componentInstance.suggestionLoading()).toBeTrue();
     fixture.detectChanges();
@@ -319,7 +332,7 @@ describe('RecommendedWalletComponent', () => {
     serviceMock.generateSuggestion.and.returnValue(pending);
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
     fixture.componentInstance.selectTab('ganho');
 
     pending.next({} as AiSuggestion);
@@ -331,7 +344,7 @@ describe('RecommendedWalletComponent', () => {
   it('deve renderizar itens da sugestão com seus badges', () => {
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
     fixture.detectChanges();
 
     const card = fixture.nativeElement.querySelector(
@@ -363,7 +376,7 @@ describe('RecommendedWalletComponent', () => {
   it('deve sinalizar quando o valor não alcança uma cota', () => {
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
     fixture.detectChanges();
 
     const item = Array.from(
@@ -390,7 +403,7 @@ describe('RecommendedWalletComponent', () => {
     input.value = '1.500,50';
     input.dispatchEvent(new Event('input'));
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
 
     expect(serviceMock.generateSuggestion).toHaveBeenCalledWith(
       'wallet-1',
@@ -409,11 +422,12 @@ describe('RecommendedWalletComponent', () => {
     input.value = '-1';
     input.dispatchEvent(new Event('input'));
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
 
-    expect(fixture.componentInstance.suggestionError()).toBe(
-      'Informe um valor de aporte válido.',
-    );
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-error"]')
+        .textContent,
+    ).toContain('Informe um valor de aporte válido.');
     expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
   });
 
@@ -423,7 +437,7 @@ describe('RecommendedWalletComponent', () => {
     );
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
+    clickGenerate();
 
     expect(fixture.componentInstance.suggestionError()).toBe(
       'Não foi possível gerar a sugestão. Tente novamente.',
@@ -469,12 +483,18 @@ describe('RecommendedWalletComponent', () => {
     ).not.toBeNull();
   });
 
-  it('não deve gerar sugestão quando não há acesso à IA', () => {
+  it('não deve oferecer a geração quando não há acesso à IA', () => {
     billingServiceMock.hasAi.set(false);
     fixture.detectChanges();
 
-    fixture.componentInstance.generateSuggestion();
-
+    expect(
+      fixture.nativeElement.querySelector(
+        '[data-testid="generate-suggestion-button"]',
+      ),
+    ).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="ai-paywall"]'),
+    ).not.toBeNull();
     expect(serviceMock.generateSuggestion).not.toHaveBeenCalled();
   });
 
@@ -764,5 +784,60 @@ describe('RecommendedWalletComponent', () => {
 
       expect(modal()).toBeNull();
     });
+  });
+
+  // Regressão: a validação do aporte mora no painel (#310), mas o erro é do
+  // contexto carteira/mês/aba. Sem isso ele sobrevive à troca e fica sobre uma
+  // sugestão que nada tem a ver com ele.
+  it('deve limpar o erro de aporte inválido ao trocar de carteira', () => {
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[data-testid="contribution-input"]',
+    ) as HTMLInputElement;
+    input.value = 'abc';
+    input.dispatchEvent(new Event('input'));
+
+    clickGenerate();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-error"]')
+        .textContent,
+    ).toContain('Informe um valor de aporte válido.');
+
+    fixture.componentInstance.selectWallet('wallet-2');
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="suggestion-error"]'),
+    ).toBeNull();
+  });
+
+  // Sair da tela com uma requisição em voo deixava a resposta escrever em
+  // signals de um componente já destruído (#353).
+  it('não deve aplicar a lista que chega depois de destruir o componente', () => {
+    const pendente = new Subject<RecommendedWallet[]>();
+    serviceMock.list.and.returnValue(pendente.asObservable());
+
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.recommendedWallets()).toEqual([]);
+
+    fixture.destroy();
+    pendente.next([wallet]);
+
+    expect(component.recommendedWallets()).toEqual([]);
+  });
+
+  it('não deve aplicar as carteiras do usuário que chegam depois de destruir', () => {
+    const pendente = new Subject<Wallet[]>();
+    walletServiceMock.list.and.returnValue(pendente.asObservable());
+
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    fixture.destroy();
+    pendente.next([userWallet]);
+
+    expect(component.wallets()).toEqual([]);
   });
 });

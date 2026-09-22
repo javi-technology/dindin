@@ -1,27 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Position, AssetType, FridgeItem } from 'dindin-models';
+import { Position, FridgeItem } from 'dindin-models';
+import type {
+  CreatePositionRequest,
+  MoveToFridgeRequest,
+  UpdatePositionRequest,
+} from 'dindin-shared-types';
 
-export interface CreatePositionPayload {
-  ticker: string;
-  assetType: AssetType;
-  quantity: number;
-  averagePrice: number;
-  inFridge?: boolean;
-  targetPrice?: number;
-}
-
-export type UpdatePositionPayload = Partial<
-  Omit<CreatePositionPayload, 'targetPrice'>
-> & {
-  targetPrice?: number | null;
-};
-
-export interface MoveToFridgePayload {
-  fridgeId: string;
-  targetPrice: number;
-}
+// Contratos compartilhados com a API (issue #313). Os nomes locais seguem
+// para não mexer nas features que já os importam daqui.
+export type CreatePositionPayload = CreatePositionRequest;
+export type UpdatePositionPayload = UpdatePositionRequest;
+export type MoveToFridgePayload = MoveToFridgeRequest;
 
 @Injectable({
   providedIn: 'root',

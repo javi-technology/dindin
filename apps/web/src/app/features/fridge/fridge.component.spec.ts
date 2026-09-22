@@ -4,15 +4,31 @@ import {
   fakeAsync,
   tick,
 } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { By } from '@angular/platform-browser';
+import { Subject, of, throwError } from 'rxjs';
 import { SetupService } from '../../core/services/setup.service';
 import { FridgeComponent } from './fridge.component';
+import { FridgeItemFormComponent } from './components/fridge-item-form/fridge-item-form.component';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
 
 describe('FridgeComponent', () => {
+  /**
+   * Formulário e descongelamento viraram subcomponentes (#312): os testes que
+   * exercitam a gravação continuam aqui, mas passam pelo filho.
+   */
+  function itemForm(): FridgeItemFormComponent {
+    return fixture.debugElement.query(By.directive(FridgeItemFormComponent))
+      .componentInstance as FridgeItemFormComponent;
+  }
+
+  function openItemForm(item: FridgeItem | null = null): void {
+    fixture.componentInstance.openForm(item);
+    fixture.detectChanges();
+  }
+
   let fixture: ComponentFixture<FridgeComponent>;
   let fridgeServiceMock: jasmine.SpyObj<FridgeService>;
   let assetServiceMock: jasmine.SpyObj<AssetService>;
@@ -221,7 +237,7 @@ describe('FridgeComponent', () => {
     tick();
     fixture.detectChanges();
 
-    fixture.componentInstance.openForm();
+    openItemForm();
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
@@ -311,14 +327,14 @@ describe('FridgeComponent', () => {
     fridgeServiceMock.createItem.and.returnValue(of(newItem));
     fridgeServiceMock.listItems.and.returnValue(of([...items, newItem]));
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openItemForm();
+    itemForm().form.patchValue({
       ticker: 'MXRF11',
       quantity: 15,
       transferredPrice: '1,55',
       targetPrice: '2,00',
     });
-    fixture.componentInstance.saveItem();
+    itemForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -345,14 +361,14 @@ describe('FridgeComponent', () => {
     fridgeServiceMock.createItem.and.returnValue(of(newItem));
     fridgeServiceMock.listItems.and.returnValue(of([...items, newItem]));
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openItemForm();
+    itemForm().form.patchValue({
       ticker: 'MXRF11',
       quantity: 15,
       transferredPrice: '9,80',
       targetPrice: '12,00',
     });
-    fixture.componentInstance.saveItem();
+    itemForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -372,9 +388,9 @@ describe('FridgeComponent', () => {
       of([{ ...items[0], targetPrice: 130 }, items[1]]),
     );
 
-    fixture.componentInstance.openForm(items[0]);
-    fixture.componentInstance.form.patchValue({ targetPrice: '130,00' });
-    fixture.componentInstance.saveItem();
+    openItemForm(items[0]);
+    itemForm().form.patchValue({ targetPrice: '130,00' });
+    itemForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -509,14 +525,14 @@ describe('FridgeComponent', () => {
       throwError(() => new Error('Server error')),
     );
 
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({
+    openItemForm();
+    itemForm().form.patchValue({
       ticker: 'MXRF11',
       quantity: 10,
       transferredPrice: '9,80',
       targetPrice: '12,00',
     });
-    fixture.componentInstance.saveItem();
+    itemForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -530,9 +546,9 @@ describe('FridgeComponent', () => {
       throwError(() => new Error('Server error')),
     );
 
-    fixture.componentInstance.openForm(items[0]);
+    openItemForm(items[0]);
     fixture.detectChanges();
-    fixture.componentInstance.saveItem();
+    itemForm().submit();
     tick();
     fixture.detectChanges();
 
@@ -558,10 +574,12 @@ describe('FridgeComponent', () => {
   }));
 
   it('deve fechar formulário ao pressionar Esc', () => {
-    fixture.componentInstance.openForm();
+    openItemForm();
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.formVisible()).toBeFalse();
@@ -571,33 +589,62 @@ describe('FridgeComponent', () => {
     fixture.componentInstance.deleteItem(items[0]);
     fixture.detectChanges();
 
-    fixture.componentInstance.onEscapeKey();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(fixture.componentInstance.deleteConfirmItem()).toBeNull();
   });
 
   it('deve rejeitar preço com formato inválido', () => {
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({ transferredPrice: 'abc' });
-    fixture.componentInstance.form.get('transferredPrice')?.markAsTouched();
+    openItemForm();
+    itemForm().form.patchValue({ transferredPrice: 'abc' });
+    itemForm().form.get('transferredPrice')?.markAsTouched();
     fixture.detectChanges();
 
     expect(
-      fixture.componentInstance.form
-        .get('transferredPrice')
-        ?.hasError('invalidDecimal'),
+      itemForm().form.get('transferredPrice')?.hasError('invalidDecimal'),
     ).toBeTrue();
   });
 
   it('deve aceitar preço com vírgula como separador decimal', () => {
-    fixture.componentInstance.openForm();
-    fixture.componentInstance.form.patchValue({ transferredPrice: '110,50' });
-    fixture.componentInstance.form.get('transferredPrice')?.markAsTouched();
+    openItemForm();
+    itemForm().form.patchValue({ transferredPrice: '110,50' });
+    itemForm().form.get('transferredPrice')?.markAsTouched();
     fixture.detectChanges();
 
-    expect(
-      fixture.componentInstance.form.get('transferredPrice')?.valid,
-    ).toBeTrue();
+    expect(itemForm().form.get('transferredPrice')?.valid).toBeTrue();
+  });
+
+  it('deve descartar a resposta antiga ao trocar de geladeira antes dela chegar', () => {
+    const secondFridge: Fridge = {
+      ...fridges[0],
+      id: 'fridge-2',
+      name: 'Geladeira Secundária',
+    };
+    const firstItems$ = new Subject<FridgeItem[]>();
+    const secondItems$ = new Subject<FridgeItem[]>();
+    const secondItems: FridgeItem[] = [
+      { ...items[0], id: 'item-3', fridgeId: 'fridge-2', ticker: 'MXRF11' },
+    ];
+
+    fridgeServiceMock.listFridges.and.returnValue(
+      of([fridges[0], secondFridge]),
+    );
+    fridgeServiceMock.listItems.and.returnValues(firstItems$, secondItems$);
+
+    fixture = TestBed.createComponent(FridgeComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectFridge(secondFridge);
+
+    // A resposta da segunda geladeira chega antes da primeira.
+    secondItems$.next(secondItems);
+    firstItems$.next(items);
+
+    expect(fixture.componentInstance.items().map((item) => item.id)).toEqual([
+      'item-3',
+    ]);
   });
 });

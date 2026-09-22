@@ -32,7 +32,7 @@ describe('AuthMiddleware', () => {
     await authMiddleware(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Não autorizado' });
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -42,7 +42,7 @@ describe('AuthMiddleware', () => {
     await authMiddleware(req, res as Response, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Não autorizado' });
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -54,7 +54,7 @@ describe('AuthMiddleware', () => {
 
     expect(verifyIdTokenMock).toHaveBeenCalledWith('token-invalido');
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Não autorizado' });
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe('AuthMiddleware', () => {
       adminAuthMiddleware(req as AuthenticatedRequest, res as Response, next);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Acesso negado' });
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -114,7 +114,7 @@ describe('AuthMiddleware', () => {
       adminAuthMiddleware(req as AuthenticatedRequest, res as Response, next);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Acesso negado' });
       expect(next).not.toHaveBeenCalled();
     });
   });

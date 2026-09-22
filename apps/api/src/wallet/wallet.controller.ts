@@ -1,19 +1,28 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { Wallet } from 'dindin-models';
+import {
+  currencyField,
+  descriptionField,
+  nameField,
+  parseBody,
+} from '../shared/validation';
 import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { uid, walletsCollection } from '../firestore/paths';
+import { routeParam } from '../shared/route-params';
 
 // O DinDin é BRL-only por decisão de produto (issue #266, herdada da #105):
 // projeção de proventos, patrimônio e totais consolidados somam valores sem
 // conversão de câmbio. Aceitar outra moeda gravaria uma carteira que todos os
 // cálculos do app tratariam como se fosse em reais.
-const SUPPORTED_CURRENCY = 'BRL';
+const createWalletSchema = z.object({
+  name: nameField('Nome'),
+  description: descriptionField(),
+  currency: currencyField(),
+});
 
-/** Mensagem de erro de moeda não suportada. */
-function unsupportedCurrencyError(currency: string): string {
-  return `Currency '${currency}' is not supported. Accepted value: ${SUPPORTED_CURRENCY}`;
-}
+const updateWalletSchema = createWalletSchema.partial();
 
 export const listWallets = asyncHandler(
   'listWallets',
@@ -27,18 +36,13 @@ export const listWallets = asyncHandler(
 export const createWallet = asyncHandler(
   'createWallet',
   async (req: Request, res: Response) => {
-    const { name, description, currency } = req.body as Partial<Wallet>;
-
-    if (!name || !currency) {
-      res.status(400).json({ error: 'Name and currency are required' });
+    const parsed = parseBody(createWalletSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
-    if (currency !== SUPPORTED_CURRENCY) {
-      res.status(400).json({ error: unsupportedCurrencyError(currency) });
-      return;
-    }
-
+    const { name, description, currency } = parsed.data;
     const now = new Date().toISOString();
     const walletData: Omit<Wallet, 'id'> = {
       ownerId: uid(req),
@@ -57,10 +61,12 @@ export const createWallet = asyncHandler(
 export const getWallet = asyncHandler(
   'getWallet',
   async (req: Request, res: Response) => {
-    const doc = await walletsCollection(uid(req)).doc(req.params.id).get();
+    const doc = await walletsCollection(uid(req))
+      .doc(routeParam(req, 'id'))
+      .get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
@@ -71,24 +77,22 @@ export const getWallet = asyncHandler(
 export const updateWallet = asyncHandler(
   'updateWallet',
   async (req: Request, res: Response) => {
-    const walletId = req.params.id;
+    const walletId = routeParam(req, 'id');
     const walletRef = walletsCollection(uid(req)).doc(walletId);
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
-    const { name, description, currency } = req.body as Partial<
-      Pick<Wallet, 'name' | 'description' | 'currency'>
-    >;
-
-    if (currency !== undefined && currency !== SUPPORTED_CURRENCY) {
-      res.status(400).json({ error: unsupportedCurrencyError(currency) });
+    const parsed = parseBody(updateWalletSchema, req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
 
+    const { name, description, currency } = parsed.data;
     const updates: Partial<Wallet> & { updatedAt: string } = {
       updatedAt: new Date().toISOString(),
     };
@@ -107,11 +111,11 @@ export const updateWallet = asyncHandler(
 export const deleteWallet = asyncHandler(
   'deleteWallet',
   async (req: Request, res: Response) => {
-    const walletRef = walletsCollection(uid(req)).doc(req.params.id);
+    const walletRef = walletsCollection(uid(req)).doc(routeParam(req, 'id'));
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Wallet not found' });
+      res.status(404).json({ error: 'Carteira não encontrada' });
       return;
     }
 
