@@ -15,10 +15,13 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { ModalComponent } from '../../shared/components/modal/modal.component';
 import { PositionsTableComponent } from './components/positions-table/positions-table.component';
 import {
+  PositionFormComponent,
+  PositionFormValue,
+} from './components/position-form/position-form.component';
+import {
   FormBuilder,
   FormGroup,
   ReactiveFormsModule,
-  ValidatorFn,
   Validators,
 } from '@angular/forms';
 import { WalletService } from '../../core/services/wallet.service';
@@ -31,16 +34,12 @@ import {
   DividendYieldResponse,
   MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
-import { Wallet, Position, AssetType, Asset, Fridge } from 'dindin-models';
+import { Wallet, Position, Asset, Fridge } from 'dindin-models';
 import {
   decimalValidator,
   formatCurrency,
   parseDecimal,
 } from '../../shared/utils/format.util';
-import {
-  resolveQuantity,
-  weightedAveragePrice,
-} from '../../shared/utils/position-quantity.util';
 import { LucideWallet, LucidePlus } from '@lucide/angular';
 
 @Component({
@@ -54,6 +53,7 @@ import { LucideWallet, LucidePlus } from '@lucide/angular';
     ConfirmDialogComponent,
     ModalComponent,
     PositionsTableComponent,
+    PositionFormComponent,
   ],
   templateUrl: './wallet.component.html',
 })
@@ -97,19 +97,6 @@ export class WalletComponent implements OnInit {
     targetPrice: ['0', [Validators.required, decimalValidator()]],
   });
 
-  /** Quantidade e preço médio da posição ao abrir o formulário. */
-  private originalQuantity = 0;
-  private originalAveragePrice = '0';
-  private averagePriceRecalculated = false;
-
-  form: FormGroup = this.fb.group({
-    ticker: ['', [Validators.required]],
-    assetType: ['FII', [Validators.required]],
-    quantity: ['0', [Validators.required, this.quantityValidator()]],
-    averagePrice: ['0', [Validators.required, decimalValidator()]],
-    purchasePrice: ['', [decimalValidator()]],
-  });
-
   constructor() {
     this.walletToLoad$
       .pipe(
@@ -120,12 +107,6 @@ export class WalletComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    merge(
-      this.form.controls['quantity'].valueChanges,
-      this.form.controls['purchasePrice'].valueChanges,
-    )
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.syncAveragePrice());
     this.loadWallets();
     this.loadFridges();
     this.loadAssets();
@@ -257,79 +238,6 @@ export class WalletComponent implements OnInit {
     this.editingPosition.set(position);
     this.formVisible.set(true);
     this.formError.set(null);
-    this.originalQuantity = position?.quantity ?? 0;
-    this.originalAveragePrice = String(position?.averagePrice ?? 0);
-    this.averagePriceRecalculated = false;
-
-    this.form.reset({
-      ticker: position?.ticker ?? '',
-      assetType: position?.assetType ?? 'FII',
-      purchasePrice: '',
-      quantity: String(this.originalQuantity),
-      averagePrice: this.originalAveragePrice,
-    });
-  }
-
-  /** Indica se a quantidade digitada é uma compra (`+N`). */
-  isAddingQuantity(): boolean {
-    return this.quantityText().startsWith('+');
-  }
-
-  /** Total resultante quando a quantidade é informada como variação. */
-  quantityPreview(): string | null {
-    if (!/^[+-]/.test(this.quantityText())) return null;
-    const resolved = resolveQuantity(
-      this.quantityText(),
-      this.originalQuantity,
-    );
-    return resolved
-      ? `Total: ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(resolved.quantity)}`
-      : null;
-  }
-
-  private quantityText(): string {
-    return String(this.form.controls['quantity'].value ?? '').trim();
-  }
-
-  private quantityValidator(): ValidatorFn {
-    return (control) =>
-      resolveQuantity(control.value, this.originalQuantity)
-        ? null
-        : { invalidQuantity: true };
-  }
-
-  /** Recalcula o preço médio em compras (`+N`) com preço da compra informado. */
-  private syncAveragePrice(): void {
-    const purchasePriceControl = this.form.controls['purchasePrice'];
-    const averagePriceControl = this.form.controls['averagePrice'];
-
-    if (!this.isAddingQuantity() && purchasePriceControl.value) {
-      purchasePriceControl.setValue('', { emitEvent: false });
-    }
-
-    const resolved = resolveQuantity(
-      this.quantityText(),
-      this.originalQuantity,
-    );
-    const purchasePrice = parseDecimal(purchasePriceControl.value);
-
-    if (
-      resolved?.mode === 'add' &&
-      purchasePrice !== null &&
-      purchasePrice >= 0
-    ) {
-      const averagePrice = weightedAveragePrice(
-        this.originalQuantity,
-        parseDecimal(this.originalAveragePrice) ?? 0,
-        resolved.quantity - this.originalQuantity,
-        purchasePrice,
-      );
-      averagePriceControl.setValue(averagePrice.toFixed(2));
-      this.averagePriceRecalculated = true;
-    } else if (this.averagePriceRecalculated) {
-      averagePriceControl.setValue(this.originalAveragePrice);
-      this.averagePriceRecalculated = false;
-    }
   }
 
   closeForm(): void {
@@ -337,12 +245,8 @@ export class WalletComponent implements OnInit {
     this.editingPosition.set(null);
   }
 
-  savePosition(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
+  /** Recebe o payload já validado pelo formulário e decide criar ou editar. */
+  savePosition(payload: PositionFormValue): void {
     const wallet = this.selectedWallet();
     if (!wallet) {
       this.formError.set(
@@ -351,68 +255,24 @@ export class WalletComponent implements OnInit {
       return;
     }
 
-    const ticker = this.form.value.ticker as string;
-    const quantity = resolveQuantity(
-      this.form.value.quantity,
-      this.originalQuantity,
-    )?.quantity;
-    const averagePrice = this.parseDecimal(this.form.value.averagePrice);
-
-    if (
-      !ticker ||
-      quantity === undefined ||
-      averagePrice === null ||
-      averagePrice < 0
-    ) {
-      this.formError.set('Preencha todos os campos obrigatórios corretamente.');
-      this.form.markAllAsTouched();
-      return;
-    }
-
-    const payload: {
-      ticker: string;
-      assetType: AssetType;
-      quantity: number;
-      averagePrice: number;
-    } = {
-      ticker: ticker.trim().toUpperCase(),
-      assetType: this.form.value.assetType,
-      quantity,
-      averagePrice,
-    };
-
     const editing = this.editingPosition();
-    if (editing) {
-      this.positionService
-        .update(wallet.id, editing.id, payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            this.closeForm();
-            this.loadPositions(wallet.id);
-          },
-          error: () => {
-            this.formError.set(
-              'Erro ao atualizar posição. Verifique os dados e tente novamente.',
-            );
-          },
-        });
-    } else {
-      this.positionService
-        .create(wallet.id, payload)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            this.closeForm();
-            this.loadPositions(wallet.id);
-          },
-          error: () => {
-            this.formError.set(
-              'Erro ao criar posição. Verifique os dados e tente novamente.',
-            );
-          },
-        });
-    }
+    const request$ = editing
+      ? this.positionService.update(wallet.id, editing.id, payload)
+      : this.positionService.create(wallet.id, payload);
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.closeForm();
+        this.loadPositions(wallet.id);
+      },
+      error: () => {
+        this.formError.set(
+          editing
+            ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'
+            : 'Erro ao criar posição. Verifique os dados e tente novamente.',
+        );
+      },
+    });
   }
 
   deletePosition(position: Position): void {
