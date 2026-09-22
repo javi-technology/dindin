@@ -40,7 +40,6 @@ import {
   MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
 import { Wallet, Position, Asset, Fridge } from 'dindin-models';
-import { formatCurrency, parseDecimal } from '../../shared/utils/format.util';
 import { LucideWallet, LucidePlus } from '@lucide/angular';
 
 @Component({
@@ -325,11 +324,5 @@ export class WalletComponent implements OnInit {
           );
         },
       });
-  }
-
-  formatCurrency = formatCurrency;
-
-  private parseDecimal(value: string | number | null): number | null {
-    return parseDecimal(value);
   }
 }
