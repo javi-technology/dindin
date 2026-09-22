@@ -8,7 +8,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { User } from '@angular/fire/auth';
+import { User } from 'firebase/auth';
 import { ReplaySubject } from 'rxjs';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService } from '../services/auth.service';

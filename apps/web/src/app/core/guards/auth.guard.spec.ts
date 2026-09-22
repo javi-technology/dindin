@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, UrlTree } from '@angular/router';
-import { Auth, User } from '@angular/fire/auth';
+import { User } from 'firebase/auth';
+import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 import { authGuard } from './auth.guard';
 import { SetupService } from '../services/setup.service';
 
@@ -23,7 +24,7 @@ describe('authGuard', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: Auth, useValue: authMock },
+        { provide: FIREBASE_AUTH, useValue: authMock },
         { provide: Router, useValue: routerMock },
         { provide: SetupService, useValue: setupServiceMock },
       ],

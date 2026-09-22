@@ -1,21 +1,20 @@
 import { Injectable, inject } from '@angular/core';
 import {
-  Auth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  authState,
   GoogleAuthProvider,
   signInWithPopup,
   User,
-} from '@angular/fire/auth';
+} from 'firebase/auth';
+import { FIREBASE_AUTH, authState } from '../firebase/firebase-auth';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  private readonly auth = inject(Auth);
+  private readonly auth = inject(FIREBASE_AUTH);
 
   user$ = authState(this.auth);
   user = toSignal(this.user$, { initialValue: null as User | null });

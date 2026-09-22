@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
-import { Auth } from '@angular/fire/auth';
+import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -15,7 +15,7 @@ describe('AuthService', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [AuthService, { provide: Auth, useValue: authMock }],
+      providers: [AuthService, { provide: FIREBASE_AUTH, useValue: authMock }],
     });
     service = TestBed.inject(AuthService);
   });

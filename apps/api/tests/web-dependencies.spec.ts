@@ -4,9 +4,8 @@ import { join } from 'path';
 // ---------------------------------------------------------------------------
 // Testes de versões do frontend (issue #143)
 // Angular 19 está fora de suporte e acumula alertas high/medium sem patch.
-// Garante que apps/web esteja no Angular 20, com @angular/fire compatível,
-// sem o @angular/fire 19 (que arrastava firebase-tools 13 para produção) e
-// com TypeScript na faixa exigida pelo Angular 20.
+// Garante que apps/web esteja no Angular 20 e com TypeScript na faixa que ele
+// exige. O @angular/fire saiu na #364 e o teste agora impede que ele volte.
 // ---------------------------------------------------------------------------
 
 describe('apps/web/package.json – versões do Angular', () => {
@@ -30,9 +29,15 @@ describe('apps/web/package.json – versões do Angular', () => {
     },
   );
 
-  it('deve declarar @angular/core e @angular/fire', () => {
+  it('deve declarar @angular/core', () => {
     expect(deps['@angular/core']).toBeDefined();
-    expect(deps['@angular/fire']).toBeDefined();
+  });
+
+  // O @angular/fire saiu na #364: não tinha versão estável para o Angular 21+
+  // e prendia o SDK `firebase` numa faixa antiga. O front passou a usar o SDK
+  // direto, então o pacote não pode voltar sem uma decisão explícita.
+  it('não deve declarar @angular/fire', () => {
+    expect(deps['@angular/fire']).toBeUndefined();
   });
 
   it('deve usar TypeScript >= 5.8', () => {
