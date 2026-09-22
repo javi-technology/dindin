@@ -7,8 +7,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, of, shareReplay, switchMap } from 'rxjs';
 import {
@@ -18,17 +16,9 @@ import {
   MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
 import { WalletService } from '../../core/services/wallet.service';
-import {
-  formatCurrency,
-  formatDate,
-  formatMonth,
-  formatPercent,
-} from '../../shared/utils/format.util';
 import { buildMonthlySeries } from '../../shared/utils/monthly-series.util';
 import { buildTickerConcentration } from '../../shared/utils/ticker-concentration.util';
 import { buildPaymentSchedule } from '../../shared/utils/payment-schedule.util';
-import { BarChartComponent } from '../../shared/components/charts/bar-chart/bar-chart.component';
-import { SparklineComponent } from '../../shared/components/charts/sparkline/sparkline.component';
 import { DividendKpisComponent } from './components/dividend-kpis/dividend-kpis.component';
 import { PaymentScheduleComponent } from './components/payment-schedule/payment-schedule.component';
 import {
@@ -48,10 +38,6 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
-    RouterLink,
-    BarChartComponent,
-    SparklineComponent,
     DividendKpisComponent,
     PaymentScheduleComponent,
     TickerProjectionComponent,
@@ -263,9 +249,4 @@ export class DividendComponent implements OnInit {
     this.selectedYear.set(year);
     this.loadReport(year);
   }
-
-  formatMonth = formatMonth;
-  formatCurrency = formatCurrency;
-  formatDate = formatDate;
-  formatPercent = formatPercent;
 }
