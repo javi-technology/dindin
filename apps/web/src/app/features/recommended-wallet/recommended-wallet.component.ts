@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   OnInit,
@@ -19,6 +20,11 @@ import {
   ApplyRequest,
   GenerateRequest,
 } from './components/ai-suggestion-panel/ai-suggestion-panel.component';
+import {
+  RecommendedAssetsTableComponent,
+  WalletTab,
+} from './components/recommended-assets-table/recommended-assets-table.component';
+import { WalletComparisonComponent } from './components/wallet-comparison/wallet-comparison.component';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Subject, forkJoin, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -47,11 +53,10 @@ import {
   LucideX,
 } from '@lucide/angular';
 
-type WalletTab = 'renda' | 'ganho';
-
 @Component({
   selector: 'app-recommended-wallet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterLink,
@@ -64,6 +69,8 @@ type WalletTab = 'renda' | 'ganho';
     ConfirmDialogComponent,
     ApplySuggestionFormComponent,
     AiSuggestionPanelComponent,
+    RecommendedAssetsTableComponent,
+    WalletComparisonComponent,
   ],
   templateUrl: './recommended-wallet.component.html',
 })
@@ -257,14 +264,6 @@ export class RecommendedWalletComponent implements OnInit {
 
   statusLabel(status: RecommendedWallet['status']): string {
     return status === 'confirmed' ? 'Confirmada' : 'Aguardando revisão';
-  }
-
-  comparisonStatusLabel(
-    status: RecommendedWalletComparison['items'][number]['status'],
-  ): string {
-    if (status === 'match') return 'Recomendado e possuído';
-    if (status === 'missing') return 'Falta comprar';
-    return 'Fora da recomendação';
   }
 
   formatCurrency(value: number): string {
