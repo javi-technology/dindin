@@ -128,16 +128,16 @@ Regras:
 
 ### Estrutura de Testes
 
-| Camada   | Ferramenta                | Localização                   |
-| -------- | ------------------------- | ----------------------------- |
-| API      | Jest                      | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Karma + Jasmine (ng test) | `apps/web/src/**/*.spec.ts`   |
+| Camada   | Ferramenta | Localização                   |
+| -------- | ---------- | ----------------------------- |
+| API      | Jest       | `apps/api/tests/**/*.spec.ts` |
+| Frontend | Vitest     | `apps/web/src/**/*.spec.ts`   |
 
-### Regras de Teste Frontend
+### Frontend: testes unitários browserless
 
-- Os testes unitários do frontend devem ser **browserless**.
-- O projeto usa Karma + Jasmine com **ChromeHeadless** (`apps/web/karma.conf.js`).
-- Evite dependências de APIs de navegador (`window`, `document`) fora do necessário.
+- **Os testes unitários do frontend DEVEM rodar em modo browserless.** Não há exceção: um teste que exija janela de navegador não entra no projeto.
+- Vitest rodando em Node.js com **jsdom** — rápidos, determinísticos e compatíveis com CI sem interface gráfica.
+- Evitar dependências de APIs de navegador (`window`, `document`, `setTimeout` reais) quando não forem essenciais.
 - Prefira mockar serviços e inputs/outputs em vez de disparar eventos de DOM real.
 - Não adicione dependências de browsers reais na configuração de testes.
 

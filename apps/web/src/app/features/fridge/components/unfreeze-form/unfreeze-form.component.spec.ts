@@ -103,7 +103,7 @@ describe('UnfreezeFormComponent', () => {
     );
     expect(
       (element('button[type="submit"]') as HTMLButtonElement).disabled,
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('não deve emitir sem carteira escolhida', () => {

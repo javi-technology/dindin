@@ -194,7 +194,7 @@ jobs:
         run: npm run web:build
 
       - name: Test Web
-        run: npm run test --workspace=apps/web -- --watch=false --browsers=ChromeHeadless --no-progress
+        run: npm run test --workspace=apps/web -- --watch=false --no-progress
 
       # Sobe o artefato compilado do Angular para ser reutilizado pelo deploy,
       # evitando rebuild desnecessário. Executado apenas em push na main.

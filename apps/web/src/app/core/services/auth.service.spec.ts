@@ -4,7 +4,7 @@ import { FIREBASE_AUTH } from '../firebase/firebase-auth';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let getIdTokenResultSpy: jasmine.Spy;
+  let getIdTokenResultSpy: any;
 
   beforeEach(() => {
     getIdTokenResultSpy = jasmine.createSpy('getIdTokenResult');
@@ -31,7 +31,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
     expect(getIdTokenResultSpy).toHaveBeenCalledWith(true);
   });
 
@@ -40,7 +40,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeFalse();
+    expect(result).toBe(false);
   });
 
   it('isAdmin deve retornar false quando não há usuário logado', async () => {
@@ -49,7 +49,7 @@ describe('AuthService', () => {
 
     const result = await service.isAdmin();
 
-    expect(result).toBeFalse();
+    expect(result).toBe(false);
     expect(getIdTokenResultSpy).not.toHaveBeenCalled();
   });
 });

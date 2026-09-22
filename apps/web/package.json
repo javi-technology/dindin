@@ -7,7 +7,7 @@
     "build": "ng build",
     "lint": "eslint src",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test --watch=false --browsers ChromeHeadless"
+    "test": "vitest run"
   },
   "private": true,
   "dependencies": {
@@ -27,20 +27,18 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.7.2",
+    "@analogjs/vitest-angular": "^2.7.2",
     "@angular/build": "^22.1.8",
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.7",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/jasmine": "~5.1.0",
+    "@vitest/coverage-v8": "^4.0.8",
     "angular-eslint": "^22.5.0",
-    "jasmine-core": "~5.6.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.2.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.3.0",
+    "jsdom": "^26.0.0",
     "postcss": "^8.5.16",
     "tailwindcss": "^4.3.3",
-    "typescript": "~6.0"
+    "typescript": "~6.0",
+    "vitest": "^4.0.8"
   }
 }

@@ -43,7 +43,7 @@ describe('BillingComponent', () => {
     entitlements: [],
   };
 
-  async function setup(
+  function setup(
     subscription: PublicSubscription,
     queryParams: Record<string, string> = {},
     autoDetect = true,
@@ -61,7 +61,7 @@ describe('BillingComponent', () => {
       openPortal: jasmine.createSpy('openPortal').and.returnValue(of()),
     };
 
-    await TestBed.configureTestingModule({
+    TestBed.configureTestingModule({
       imports: [BillingComponent],
       providers: [
         provideRouter([]),
@@ -73,7 +73,7 @@ describe('BillingComponent', () => {
           },
         },
       ],
-    }).compileComponents();
+    });
 
     fixture = TestBed.createComponent(BillingComponent);
     if (autoDetect) {
@@ -86,7 +86,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir os planos quando não há assinatura', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
 
     const plans = fixture.nativeElement.querySelector(
       '[data-testid="plans-section"]',
@@ -104,7 +104,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve listar os benefícios do plano', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
 
     const benefits = fixture.nativeElement.querySelector(
       '[data-testid="plan-benefits"]',
@@ -117,7 +117,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir nota de cancelamento quando a assinatura foi encerrada', async () => {
-    await setup({ ...baseSubscription, status: 'canceled' });
+    setup({ ...baseSubscription, status: 'canceled' });
 
     expect(
       fixture.nativeElement.querySelector('[data-testid="plans-section"]'),
@@ -129,7 +129,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir a seção ativa com intervalo e próxima cobrança', async () => {
-    await setup({
+    setup({
       status: 'active',
       plan: 'basic',
       interval: 'month',
@@ -148,7 +148,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir portal e próxima cobrança quando a Stripe volta a valer após a concessão manual', async () => {
-    await setup({
+    setup({
       status: 'active',
       plan: 'basic',
       interval: null,
@@ -176,7 +176,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir período de teste quando em trialing', async () => {
-    await setup({
+    setup({
       status: 'trialing',
       plan: 'basic',
       interval: 'year',
@@ -192,7 +192,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir aviso quando o cancelamento está agendado', async () => {
-    await setup({
+    setup({
       status: 'active',
       plan: 'basic',
       interval: 'month',
@@ -207,7 +207,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir seção de pagamento pendente com botão de regularização', async () => {
-    await setup({ ...baseSubscription, status: 'past_due' });
+    setup({ ...baseSubscription, status: 'past_due' });
 
     const section = fixture.nativeElement.querySelector(
       '[data-testid="past-due-section"]',
@@ -219,7 +219,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve iniciar checkout anual ao clicar em Assinar', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
 
     fixture.nativeElement
       .querySelector('[data-testid="subscribe-year-button"]')
@@ -229,7 +229,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve abrir o portal ao clicar em Gerenciar assinatura', async () => {
-    await setup({
+    setup({
       status: 'active',
       plan: 'basic',
       interval: 'month',
@@ -244,7 +244,7 @@ describe('BillingComponent', () => {
     expect(billingServiceMock.openPortal).toHaveBeenCalled();
   });
 
-  it('deve confirmar a assinatura via polling ao voltar do checkout', async () => {
+  it('deve confirmar a assinatura via polling ao voltar do checkout', fakeAsync(() => {
     const subscribed: MeResponse = {
       ...me,
       subscription: {
@@ -254,58 +254,54 @@ describe('BillingComponent', () => {
         interval: 'month',
       },
     };
-    await setup(baseSubscription, { status: 'success' }, false);
+    setup(baseSubscription, { status: 'success' }, false);
     billingServiceMock.loadMe.and.returnValues(
       of({ ...me, subscription: baseSubscription }),
       of(subscribed),
     );
 
-    fakeAsync(() => {
-      fixture.detectChanges();
+    fixture.detectChanges();
 
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="info-message"]')
-          .textContent,
-      ).toContain('Confirmando sua assinatura');
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="success-message"]'),
-      ).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="info-message"]')
+        .textContent,
+    ).toContain('Confirmando sua assinatura');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="success-message"]'),
+    ).toBeNull();
 
-      tick(2000);
-      fixture.detectChanges();
+    tick(2000);
+    fixture.detectChanges();
 
-      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="success-message"]')
-          .textContent,
-      ).toContain('Assinatura confirmada!');
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="info-message"]'),
-      ).toBeNull();
-    })();
-  });
+    expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="success-message"]')
+        .textContent,
+    ).toContain('Assinatura confirmada!');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="info-message"]'),
+    ).toBeNull();
+  }));
 
-  it('deve avisar para atualizar a página se a confirmação não chegar', async () => {
-    await setup(baseSubscription, { status: 'success' }, false);
+  it('deve avisar para atualizar a página se a confirmação não chegar', fakeAsync(() => {
+    setup(baseSubscription, { status: 'success' }, false);
 
-    fakeAsync(() => {
-      fixture.detectChanges();
-      tick(12000);
-      fixture.detectChanges();
+    fixture.detectChanges();
+    tick(12000);
+    fixture.detectChanges();
 
-      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(6);
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="info-message"]')
-          .textContent,
-      ).toContain('Pagamento recebido');
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="success-message"]'),
-      ).toBeNull();
-    })();
-  });
+    expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(6);
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="info-message"]')
+        .textContent,
+    ).toContain('Pagamento recebido');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="success-message"]'),
+    ).toBeNull();
+  }));
 
   it('deve exibir mensagem informativa ao cancelar o checkout', async () => {
-    await setup(baseSubscription, { status: 'cancel' });
+    setup(baseSubscription, { status: 'cancel' });
 
     expect(
       fixture.nativeElement.querySelector('[data-testid="info-message"]')
@@ -314,7 +310,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir loading antes de carregar a assinatura', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
     billingServiceMock.loaded.set(false);
     fixture.detectChanges();
 
@@ -327,7 +323,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve recarregar /api/me quando o checkout retornar 409', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
     billingServiceMock.startCheckout.and.returnValue(
       throwError(() => ({ status: 409 })),
     );
@@ -340,7 +336,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir erro quando o checkout falhar', async () => {
-    await setup(baseSubscription);
+    setup(baseSubscription);
     billingServiceMock.startCheckout.and.returnValue(
       throwError(() => ({ status: 500 })),
     );
@@ -354,7 +350,7 @@ describe('BillingComponent', () => {
   });
 
   it('deve exibir erro quando o portal falhar', async () => {
-    await setup({
+    setup({
       status: 'active',
       plan: 'basic',
       interval: 'month',
@@ -372,19 +368,17 @@ describe('BillingComponent', () => {
     );
   });
 
-  it('deve parar o polling de confirmação ao destruir o componente', async () => {
-    await setup(baseSubscription, { status: 'success' }, false);
+  it('deve parar o polling de confirmação ao destruir o componente', fakeAsync(() => {
+    setup(baseSubscription, { status: 'success' }, false);
 
-    fakeAsync(() => {
-      fixture.detectChanges();
-      tick(2000);
+    fixture.detectChanges();
+    tick(2000);
 
-      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+    expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
 
-      fixture.destroy();
-      tick(10000);
+    fixture.destroy();
+    tick(10000);
 
-      expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
-    })();
-  });
+    expect(billingServiceMock.loadMe).toHaveBeenCalledTimes(2);
+  }));
 });

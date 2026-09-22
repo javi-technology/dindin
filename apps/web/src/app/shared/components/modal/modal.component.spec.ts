@@ -120,7 +120,7 @@ describe('ModalComponent', () => {
       );
       fixture.detectChanges();
 
-      expect(dialog().contains(document.activeElement)).toBeTrue();
+      expect(dialog().contains(document.activeElement)).toBe(true);
     });
   });
 

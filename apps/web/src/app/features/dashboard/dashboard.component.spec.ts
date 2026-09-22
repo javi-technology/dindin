@@ -17,7 +17,7 @@ import { PatrimonyService } from '../../core/services/patrimony.service';
 describe('DashboardComponent', () => {
   let fixture: ComponentFixture<DashboardComponent>;
   let dashboardServiceMock: jasmine.SpyObj<DashboardService>;
-  let authServiceMock: { isAdmin: jasmine.Spy };
+  let authServiceMock: { isAdmin: any };
   let healthServiceMock: jasmine.SpyObj<HealthService>;
   let patrimonyServiceMock: jasmine.SpyObj<PatrimonyService>;
 
@@ -198,7 +198,7 @@ describe('DashboardComponent', () => {
 
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.backendOnline()).toBeFalse();
+    expect(fixture.componentInstance.backendOnline()).toBe(false);
     expect(
       fixture.nativeElement.querySelector('[data-testid="backend-status"]')
         .textContent,

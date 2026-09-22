@@ -6,8 +6,8 @@ import { adminGuard } from './admin.guard';
 import { AuthService } from '../services/auth.service';
 
 describe('adminGuard', () => {
-  let authMock: { authStateReady: jasmine.Spy; currentUser: User | null };
-  let authServiceMock: { isAdmin: jasmine.Spy };
+  let authMock: { authStateReady: any; currentUser: User | null };
+  let authServiceMock: { isAdmin: any };
   let routerMock: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('adminGuard', () => {
       adminGuard({} as never, {} as never),
     );
 
-    expect(result).toBeTrue();
+    expect(result).toBe(true);
     expect(routerMock.parseUrl).not.toHaveBeenCalled();
   });
 

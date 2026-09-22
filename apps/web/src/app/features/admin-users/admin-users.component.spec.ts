@@ -327,7 +327,7 @@ describe('AdminUsersComponent', () => {
 
   describe('modal de revogação', () => {
     it('deve pedir confirmação em modal customizado', () => {
-      const confirmSpy = spyOn(window, 'confirm');
+      const confirmSpy = vi.spyOn(window, 'confirm');
       component.openRevoke(manual);
       fixture.detectChanges();
 

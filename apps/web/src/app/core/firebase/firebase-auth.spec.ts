@@ -52,9 +52,9 @@ describe('authState', () => {
   it('deve cancelar o listener ao encerrar a assinatura', () => {
     const assinatura = authState(auth).subscribe();
 
-    expect(desinscrito).toBeFalse();
+    expect(desinscrito).toBe(false);
     assinatura.unsubscribe();
 
-    expect(desinscrito).toBeTrue();
+    expect(desinscrito).toBe(true);
   });
 });
