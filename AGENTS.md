@@ -50,7 +50,7 @@ Use `rtk` antes de comandos de shell sempre que disponível (por exemplo,
     `[Feature] - ...` e label `enhancement`.
 - `custom.md` é vazio e não deve ser usado. Labels complementares somam-se à
   label do template, nunca a substituem.
-- O corpo usa apenas estas seções, nesta ordem, com bullets simples: 
+- O corpo usa apenas estas seções, nesta ordem, com bullets simples:
 
   ```markdown
   **Contexto:**
@@ -69,6 +69,7 @@ Use `rtk` antes de comandos de shell sempre que disponível (por exemplo,
   Não use checkboxes, sub-bullets, tabelas, títulos extras ou seções extras.
   Contexto descreve o problema; DOR deixa o trabalho pronto para começar; DOD
   contém um critério de aceite por bullet.
+
 - Adicione a issue ao projeto e preencha `Estimate` (1, 2, 3, 5 ou 8), `Size`
   (XS, S, M, L ou XL) e `Priority` (P0–P3). Sem esses campos, a issue não está
   pronta.
@@ -81,15 +82,15 @@ Use `rtk` antes de comandos de shell sempre que disponível (por exemplo,
 - Reconfirme IDs com `gh project field-list 4 --owner javi-technology` antes de
   editar o projeto. Os IDs atuais são:
 
-  | Referência | Id |
-  | --- | --- |
-  | project_id | `PVT_kwDODUNtT84Bc4Zk` |
-  | status_id | `PVTSSF_lADODUNtT84Bc4ZkzhXd-0o` |
-  | Backlog | `f75ad846` |
-  | Ready | `61e4505c` |
-  | In progress | `47fc9ee4` |
-  | In review | `df73e18b` |
-  | Done | `98236657` |
+  | Referência  | Id                               |
+  | ----------- | -------------------------------- |
+  | project_id  | `PVT_kwDODUNtT84Bc4Zk`           |
+  | status_id   | `PVTSSF_lADODUNtT84Bc4ZkzhXd-0o` |
+  | Backlog     | `f75ad846`                       |
+  | Ready       | `61e4505c`                       |
+  | In progress | `47fc9ee4`                       |
+  | In review   | `df73e18b`                       |
+  | Done        | `98236657`                       |
 
 ### TDD estrito
 
@@ -115,10 +116,10 @@ que o necessário. Mantenha os testes junto à camada que validam.
 
 ## Testes
 
-| Camada | Ferramenta | Localização |
-| --- | --- | --- |
-| API | Jest | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Karma + Jasmine | `apps/web/src/**/*.spec.ts` |
+| Camada   | Ferramenta      | Localização                   |
+| -------- | --------------- | ----------------------------- |
+| API      | Jest            | `apps/api/tests/**/*.spec.ts` |
+| Frontend | Karma + Jasmine | `apps/web/src/**/*.spec.ts`   |
 
 - Testes unitários do frontend sempre devem ser browserless, usando
   ChromeHeadless e `singleRun: true` em `apps/web/karma.conf.js`.
