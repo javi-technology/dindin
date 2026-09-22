@@ -17,20 +17,12 @@ import {
   FridgeItemFormValue,
 } from './components/fridge-item-form/fridge-item-form.component';
 import { UnfreezeFormComponent } from './components/unfreeze-form/unfreeze-form.component';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { SetupService } from '../../core/services/setup.service';
 import { Asset, Fridge, FridgeItem, Wallet } from 'dindin-models';
-import { formatCurrency, parseDecimal } from '../../shared/utils/format.util';
-import {
-  LucideRefrigerator,
-  LucidePlus,
-  LucidePencil,
-  LucideTrash2,
-  LucideFlame,
-} from '@lucide/angular';
+import { LucideRefrigerator, LucidePlus } from '@lucide/angular';
 
 @Component({
   selector: 'app-fridge',
@@ -38,12 +30,8 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
     LucideRefrigerator,
     LucidePlus,
-    LucidePencil,
-    LucideTrash2,
-    LucideFlame,
     ConfirmDialogComponent,
     ModalComponent,
     FridgeItemsTableComponent,
@@ -57,7 +45,6 @@ export class FridgeComponent implements OnInit {
   private readonly assetService = inject(AssetService);
   private readonly walletService = inject(WalletService);
   private readonly setupService = inject(SetupService);
-  private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
 
   /**
@@ -292,11 +279,5 @@ export class FridgeComponent implements OnInit {
         },
         error: () => this.unfreezeError.set('Erro ao descongelar item.'),
       });
-  }
-
-  formatCurrency = formatCurrency;
-
-  private parseDecimal(value: string | number | null): number | null {
-    return parseDecimal(value);
   }
 }
