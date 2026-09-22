@@ -9,6 +9,7 @@ import { of, throwError, delay } from 'rxjs';
 import { SetupService } from '../../core/services/setup.service';
 import { WalletComponent } from './wallet.component';
 import { PositionFormComponent } from './components/position-form/position-form.component';
+import { MoveToFridgeFormComponent } from './components/move-to-fridge-form/move-to-fridge-form.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
@@ -28,6 +29,16 @@ describe('WalletComponent', () => {
 
   function openPositionForm(position: Position | null = null): void {
     fixture.componentInstance.openForm(position);
+    fixture.detectChanges();
+  }
+
+  function moveToFridgeForm(): MoveToFridgeFormComponent {
+    return fixture.debugElement.query(By.directive(MoveToFridgeFormComponent))
+      .componentInstance as MoveToFridgeFormComponent;
+  }
+
+  function openMoveToFridge(position: Position): void {
+    fixture.componentInstance.openMoveToFridge(position);
     fixture.detectChanges();
   }
 
@@ -909,7 +920,7 @@ describe('WalletComponent', () => {
     });
 
     it('deve listar geladeiras no select do modal', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
@@ -935,12 +946,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -965,12 +976,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -983,12 +994,12 @@ describe('WalletComponent', () => {
         throwError(() => new Error('Server error')),
       );
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '120',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 
@@ -998,7 +1009,7 @@ describe('WalletComponent', () => {
     }));
 
     it('deve fechar modal ao clicar em Cancelar', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
       fixture.componentInstance.closeMoveToFridge();
@@ -1008,7 +1019,7 @@ describe('WalletComponent', () => {
     });
 
     it('deve fechar modal ao pressionar Esc', () => {
-      fixture.componentInstance.openMoveToFridge(positions[0]);
+      openMoveToFridge(positions[0]);
       fixture.detectChanges();
 
       document.dispatchEvent(
@@ -1033,12 +1044,12 @@ describe('WalletComponent', () => {
       positionServiceMock.moveToFridge.and.returnValue(of(fridgeItem));
       positionServiceMock.list.and.returnValue(of(positions.slice(1)));
 
-      fixture.componentInstance.openMoveToFridge(positions[0]);
-      fixture.componentInstance.moveToFridgeForm.patchValue({
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
         fridgeId: 'fridge-1',
         targetPrice: '12,50',
       });
-      fixture.componentInstance.confirmMoveToFridge();
+      moveToFridgeForm().submit();
       tick();
       fixture.detectChanges();
 

@@ -1,4 +1,11 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import {
   EMPTY,
   Observable,
@@ -19,11 +26,9 @@ import {
   PositionFormValue,
 } from './components/position-form/position-form.component';
 import {
-  FormBuilder,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+  MoveToFridgeFormComponent,
+  MoveToFridgeValue,
+} from './components/move-to-fridge-form/move-to-fridge-form.component';
 import { WalletService } from '../../core/services/wallet.service';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
@@ -35,25 +40,22 @@ import {
   MonthlyIncomeResponse,
 } from '../../core/services/dividend.service';
 import { Wallet, Position, Asset, Fridge } from 'dindin-models';
-import {
-  decimalValidator,
-  formatCurrency,
-  parseDecimal,
-} from '../../shared/utils/format.util';
+import { formatCurrency, parseDecimal } from '../../shared/utils/format.util';
 import { LucideWallet, LucidePlus } from '@lucide/angular';
 
 @Component({
   selector: 'app-wallet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
     LucideWallet,
     LucidePlus,
     ConfirmDialogComponent,
     ModalComponent,
     PositionsTableComponent,
     PositionFormComponent,
+    MoveToFridgeFormComponent,
   ],
   templateUrl: './wallet.component.html',
 })
@@ -64,7 +66,6 @@ export class WalletComponent implements OnInit {
   private readonly assetService = inject(AssetService);
   private readonly dividendService = inject(DividendService);
   private readonly setupService = inject(SetupService);
-  private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   /**
    * Carteira a carregar. O switchMap sobre este Subject cancela a requisição
@@ -91,11 +92,6 @@ export class WalletComponent implements OnInit {
   fridges = signal<Fridge[]>([]);
   moveToFridgePosition = signal<Position | null>(null);
   moveToFridgeError = signal<string | null>(null);
-
-  moveToFridgeForm: FormGroup = this.fb.group({
-    fridgeId: ['', [Validators.required]],
-    targetPrice: ['0', [Validators.required, decimalValidator()]],
-  });
 
   constructor() {
     this.walletToLoad$
@@ -303,10 +299,6 @@ export class WalletComponent implements OnInit {
   openMoveToFridge(position: Position): void {
     this.moveToFridgePosition.set(position);
     this.moveToFridgeError.set(null);
-    this.moveToFridgeForm.reset({
-      fridgeId: this.fridges().length > 0 ? this.fridges()[0].id : '',
-      targetPrice: '0',
-    });
   }
 
   closeMoveToFridge(): void {
@@ -314,28 +306,13 @@ export class WalletComponent implements OnInit {
     this.moveToFridgeError.set(null);
   }
 
-  confirmMoveToFridge(): void {
-    if (this.moveToFridgeForm.invalid) {
-      this.moveToFridgeForm.markAllAsTouched();
-      return;
-    }
-
+  confirmMoveToFridge(payload: MoveToFridgeValue): void {
     const position = this.moveToFridgePosition();
     const wallet = this.selectedWallet();
     if (!position || !wallet) return;
 
-    const fridgeId = this.moveToFridgeForm.value.fridgeId as string;
-    const targetPrice = this.parseDecimal(
-      this.moveToFridgeForm.value.targetPrice,
-    );
-
-    if (!fridgeId || targetPrice === null || targetPrice < 0) {
-      this.moveToFridgeError.set('Preencha todos os campos corretamente.');
-      return;
-    }
-
     this.positionService
-      .moveToFridge(wallet.id, position.id, { fridgeId, targetPrice })
+      .moveToFridge(wallet.id, position.id, payload)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
