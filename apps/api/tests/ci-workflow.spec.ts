@@ -97,4 +97,24 @@ describe('.github/workflows/ci-cd.yml', () => {
   it('deve exigir os testes da API antes do deploy', () => {
     expect(jobBlock('deploy')).toMatch(/needs:[\s\S]*- build-and-test-api/);
   });
+
+  // #322: a chave JSON de longa duração no secret dá acesso ao projeto até
+  // ser revogada à mão. O Workload Identity Federation troca por um token
+  // efêmero, emitido pelo próprio GitHub e trocado no GCP.
+  it('deve autenticar por Workload Identity Federation, sem chave estática', () => {
+    const deploy = jobBlock('deploy');
+
+    expect(deploy).toContain('workload_identity_provider');
+    expect(deploy).toContain('service_account');
+    expect(deploy).not.toContain('credentials_json');
+  });
+
+  // O token OIDC só é emitido para o job se a permissão estiver declarada.
+  it('deve conceder id-token: write ao job de deploy', () => {
+    expect(jobBlock('deploy')).toMatch(/permissions:[\s\S]*id-token: write/);
+  });
+
+  it('não deve mais referenciar o secret da service account', () => {
+    expect(workflow).not.toContain('FIREBASE_SERVICE_ACCOUNT');
+  });
 });
