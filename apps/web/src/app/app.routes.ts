@@ -2,49 +2,65 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 import { loginGuard } from './core/guards/login.guard';
-import { LoginComponent } from './features/login/login.component';
-import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { WalletComponent } from './features/wallet/wallet.component';
-import { FridgeComponent } from './features/fridge/fridge.component';
-import { DividendComponent } from './features/dividend/dividend.component';
-import { RecommendedWalletComponent } from './features/recommended-wallet/recommended-wallet.component';
-import { BillingComponent } from './features/billing/billing.component';
 
+// Toda rota carrega o componente sob demanda (issue #258): com `component:` e
+// import estático, abrir só a carteira ainda baixava geladeira, proventos,
+// carteira recomendada e assinatura junto. Os guards seguem importados aqui
+// porque precisam ser avaliados antes de decidir se vale buscar a tela.
 export const routes: Routes = [
   {
     path: 'login',
     canActivate: [loginGuard],
-    component: LoginComponent,
+    loadComponent: () =>
+      import('./features/login/login.component').then((m) => m.LoginComponent),
   },
   {
     path: '',
     canActivate: [authGuard],
-    component: DashboardComponent,
+    loadComponent: () =>
+      import('./features/dashboard/dashboard.component').then(
+        (m) => m.DashboardComponent,
+      ),
   },
   {
     path: 'carteira',
     canActivate: [authGuard],
-    component: WalletComponent,
+    loadComponent: () =>
+      import('./features/wallet/wallet.component').then(
+        (m) => m.WalletComponent,
+      ),
   },
   {
     path: 'geladeira',
     canActivate: [authGuard],
-    component: FridgeComponent,
+    loadComponent: () =>
+      import('./features/fridge/fridge.component').then(
+        (m) => m.FridgeComponent,
+      ),
   },
   {
     path: 'provento',
     canActivate: [authGuard],
-    component: DividendComponent,
+    loadComponent: () =>
+      import('./features/dividend/dividend.component').then(
+        (m) => m.DividendComponent,
+      ),
   },
   {
     path: 'carteira-recomendada',
     canActivate: [authGuard],
-    component: RecommendedWalletComponent,
+    loadComponent: () =>
+      import('./features/recommended-wallet/recommended-wallet.component').then(
+        (m) => m.RecommendedWalletComponent,
+      ),
   },
   {
     path: 'assinatura',
     canActivate: [authGuard],
-    component: BillingComponent,
+    loadComponent: () =>
+      import('./features/billing/billing.component').then(
+        (m) => m.BillingComponent,
+      ),
   },
   {
     path: 'admin/assets',
