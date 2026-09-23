@@ -11,6 +11,7 @@ jest.mock('firebase-admin/firestore', () => ({
 
 import {
   saveQuoteHistory,
+  saveReconciledPrice,
   getQuoteHistory,
 } from '../../src/quotes/quote-history.service';
 
@@ -310,6 +311,137 @@ describe('QuoteHistoryService', () => {
           Date.parse('2026-09-23T21:31:00Z'),
         );
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Gravação só do preço (issue #389)
+  //
+  // A reconciliação noturna corrige o fechamento e nada mais. Passando pelo
+  // `saveQuoteHistory` ela reescrevia também o documento mensal de proventos,
+  // com `updatedAt` novo a cada noite: escrita sem fato novo, num registro que
+  // só deveria mudar quando um provento é anunciado.
+  // -------------------------------------------------------------------------
+  describe('saveReconciledPrice', () => {
+    interface Mocks {
+      quoteSet: jest.Mock;
+      historySet: jest.Mock;
+      subcolecoes: string[];
+    }
+
+    function mockFirestore(): Mocks {
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const historySet = jest.fn().mockResolvedValue(undefined);
+      const subcolecoes: string[] = [];
+
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        collection: jest.fn((nome: string) => {
+          subcolecoes.push(nome);
+          return { doc: jest.fn(() => ({ set: historySet })) };
+        }),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      return { quoteSet, historySet, subcolecoes };
+    }
+
+    const guardada = {
+      ticker: 'TRXF11',
+      price: 73.99,
+      monthlyDividend: 0.7,
+      dividendPaymentDate: '2026-09-15',
+      annualDividend: 8.4,
+      updatedAt: '2026-09-23T21:40:00Z',
+      quotedAt: '2026-09-23T21:31:00Z',
+      source: 'brapi',
+    };
+
+    it('não deve escrever no histórico mensal de proventos', async () => {
+      const { subcolecoes } = mockFirestore();
+
+      await saveReconciledPrice(
+        'TRXF11',
+        73.9,
+        guardada,
+        '2026-09-24T00:05:00Z',
+      );
+
+      expect(subcolecoes).toEqual(['history']);
+      expect(subcolecoes).not.toContain('dividendHistory');
+    });
+
+    it('deve gravar o preço novo e o horário de apuração', async () => {
+      const { quoteSet } = mockFirestore();
+
+      await saveReconciledPrice(
+        'TRXF11',
+        73.9,
+        guardada,
+        '2026-09-24T00:05:00Z',
+      );
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ticker: 'TRXF11',
+          price: 73.9,
+          quotedAt: '2026-09-24T00:05:00Z',
+        }),
+      );
+    });
+
+    it('deve preservar os campos de provento já gravados', async () => {
+      const { quoteSet } = mockFirestore();
+
+      await saveReconciledPrice(
+        'TRXF11',
+        73.9,
+        guardada,
+        '2026-09-24T00:05:00Z',
+      );
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monthlyDividend: 0.7,
+          dividendPaymentDate: '2026-09-15',
+          annualDividend: 8.4,
+        }),
+      );
+    });
+
+    it('deve registrar o preço corrigido no histórico de preços', async () => {
+      const { historySet } = mockFirestore();
+
+      await saveReconciledPrice(
+        'TRXF11',
+        73.9,
+        guardada,
+        '2026-09-24T00:05:00Z',
+      );
+
+      expect(historySet).toHaveBeenCalledWith(
+        expect.objectContaining({ price: 73.9, source: 'brapi' }),
+      );
+    });
+
+    it('deve manter updatedAt como o horário da escrita', async () => {
+      const { quoteSet } = mockFirestore();
+
+      await saveReconciledPrice(
+        'TRXF11',
+        73.9,
+        guardada,
+        '2026-09-24T00:05:00Z',
+      );
+
+      const salvo = quoteSet.mock.calls[0][0];
+      expect(salvo.updatedAt).not.toBe(guardada.updatedAt);
+      expect(Date.parse(salvo.updatedAt)).toBeGreaterThan(
+        Date.parse(guardada.updatedAt),
+      );
     });
   });
 

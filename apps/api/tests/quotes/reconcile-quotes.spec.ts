@@ -1,5 +1,6 @@
 const mockFetchQuotes = jest.fn();
 const mockSaveQuoteHistory = jest.fn();
+const mockSaveReconciledPrice = jest.fn();
 const mockListActiveAssetTickers = jest.fn();
 const mockGetQuotesByTicker = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
@@ -15,6 +16,7 @@ jest.mock('../../src/quotes/dividend-fetch.service', () => ({
 
 jest.mock('../../src/quotes/quote-history.service', () => ({
   saveQuoteHistory: mockSaveQuoteHistory,
+  saveReconciledPrice: mockSaveReconciledPrice,
 }));
 
 jest.mock('../../src/quotes/quote-prices', () => ({
@@ -152,6 +154,26 @@ describe('reconcileClosingQuotes', () => {
 
       expect(mockRecordPaidDividends).not.toHaveBeenCalled();
       expect(mockFetchMonthlyDividends).not.toHaveBeenCalled();
+    });
+
+    // `saveQuoteHistory` regrava o documento mensal de proventos junto com o
+    // preço. Usá-lo aqui reescreveria esse registro toda noite, com
+    // `updatedAt` novo e nenhum provento novo por trás.
+    it('deve gravar pelo caminho que não toca no histórico de proventos', async () => {
+      mockGetQuotesByTicker.mockResolvedValue(
+        storedQuote(73.99, '2026-09-23T21:31:00Z'),
+      );
+      mockFetchQuotes.mockResolvedValue(fetched(73.9, '2026-09-23T23:05:00Z'));
+
+      await reconcileClosingQuotes();
+
+      expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        expect.objectContaining({ price: 73.99 }),
+        '2026-09-23T23:05:00Z',
+      );
     });
 
     it('não deve consultar a Brapi sem ativos no catálogo', async () => {
