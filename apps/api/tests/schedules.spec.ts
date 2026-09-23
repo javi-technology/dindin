@@ -113,6 +113,33 @@ describe('Cloud Functions agendadas', () => {
     });
   });
 
+  // Reconciliação noturna do fechamento (issue #389): volta depois da cadeia
+  // diária, quando a Brapi já teve tempo de consolidar o preço, e ainda antes
+  // da meia-noite, para corrigir o pregão do próprio dia.
+  describe('reconcileQuotesScheduled', () => {
+    const RECONCILE = '30 23 * * *';
+    const options = () => findScheduleBySchedule(RECONCILE);
+
+    it('deve rodar 1x ao dia no fuso de São Paulo', () => {
+      expect(options().timeZone).toBe('America/Sao_Paulo');
+    });
+
+    it('deve rodar depois de toda a cadeia diária e antes da meia-noite', () => {
+      for (const schedule of Object.values(DAILY_CHAIN)) {
+        expect(minutesOfDay(RECONCILE)).toBeGreaterThan(minutesOfDay(schedule));
+      }
+      expect(minutesOfDay(RECONCILE)).toBeLessThan(24 * 60);
+    });
+
+    it('deve ter retry configurado para falhas', () => {
+      expect(options().retryCount).toBe(3);
+    });
+
+    it('deve vincular o segredo BRAPI_API_KEY', () => {
+      expect(options().secrets).toEqual(['BRAPI_API_KEY']);
+    });
+  });
+
   it('não deve manter os agendamentos diários de madrugada', () => {
     const schedules = mockOnSchedule.mock.calls.map(
       (args) => (args[0] as ScheduleOptions).schedule,
