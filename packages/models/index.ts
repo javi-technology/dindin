@@ -79,6 +79,13 @@ export interface Position {
   quantity: number;
   averagePrice: number; // preço médio de compra (BRL)
   currentPrice?: number; // último preço conhecido
+  /**
+   * ISO-8601 — quando o `currentPrice` foi apurado na fonte (issue #390).
+   *
+   * Resolvido na leitura a partir de `quotes/{ticker}`, como o `currentPrice`;
+   * ausente enquanto a cotação for anterior à #387.
+   */
+  currentPriceQuotedAt?: string;
   /** Indica se a posição está na geladeira (acompanhamento para venda). */
   inFridge: boolean;
   /** Preço-alvo para venda quando na geladeira. */
@@ -108,6 +115,8 @@ export interface FridgeItem {
   transferredPrice: number; // preço de transferência (quando saiu da carteira)
   targetPrice: number; // preço-alvo para voltar à carteira
   currentPrice?: number;
+  /** ISO-8601 — quando o `currentPrice` foi apurado na fonte (issue #390). */
+  currentPriceQuotedAt?: string;
   assetType?: AssetType;
   notes?: string;
   createdAt: string;

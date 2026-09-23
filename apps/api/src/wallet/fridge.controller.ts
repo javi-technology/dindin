@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getFirestore } from 'firebase-admin/firestore';
 import { Fridge, FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-prices';
+import { getCurrentPricesByTicker } from '../quotes/quote-prices';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
@@ -30,17 +30,22 @@ import { routeParam } from '../shared/route-params';
  * gravado em cada item pelo job agendado (ver issue #86).
  */
 async function withCurrentPrices(items: FridgeItem[]): Promise<FridgeItem[]> {
-  const priceByTicker = await getQuotePricesByTicker(
+  const quoteByTicker = await getCurrentPricesByTicker(
     items.map((item) => item.ticker),
   );
 
   // Sempre sobrescreve currentPrice com o valor resolvido de `quotes` (ou
   // undefined, removido do JSON de resposta), mesmo que o documento ainda
-  // tenha um valor antigo denormalizado no Firestore.
-  return items.map((item) => ({
-    ...item,
-    currentPrice: priceByTicker.get(item.ticker),
-  }));
+  // tenha um valor antigo denormalizado no Firestore. O horário de apuração
+  // acompanha o preço (#390) e some junto quando não há cotação.
+  return items.map((item) => {
+    const quote = quoteByTicker.get(item.ticker);
+    return {
+      ...item,
+      currentPrice: quote?.price,
+      currentPriceQuotedAt: quote?.quotedAt,
+    };
+  });
 }
 
 /* ---------- Fridge CRUD ---------- */

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import type { FridgeItem, Position } from 'dindin-models';
 import { assetExists } from '../assets/asset.service';
-import { getQuotePricesByTicker } from '../quotes/quote-prices';
+import { getCurrentPricesByTicker } from '../quotes/quote-prices';
 import { asyncHandler } from '../middleware/async-handler';
 import { HttpError } from '../shared/http-error';
 import {
@@ -31,17 +31,22 @@ import { routeParam } from '../shared/route-params';
  * cotação (ver issue #86).
  */
 async function withCurrentPrices(positions: Position[]): Promise<Position[]> {
-  const priceByTicker = await getQuotePricesByTicker(
+  const quoteByTicker = await getCurrentPricesByTicker(
     positions.map((position) => position.ticker),
   );
 
   // Sempre sobrescreve currentPrice com o valor resolvido de `quotes` (ou
   // undefined, removido do JSON de resposta), mesmo que o documento ainda
-  // tenha um valor antigo denormalizado no Firestore.
-  return positions.map((position) => ({
-    ...position,
-    currentPrice: priceByTicker.get(position.ticker),
-  }));
+  // tenha um valor antigo denormalizado no Firestore. O horário de apuração
+  // acompanha o preço (#390) e some junto quando não há cotação.
+  return positions.map((position) => {
+    const quote = quoteByTicker.get(position.ticker);
+    return {
+      ...position,
+      currentPrice: quote?.price,
+      currentPriceQuotedAt: quote?.quotedAt,
+    };
+  });
 }
 
 const positionSchema = z.object({

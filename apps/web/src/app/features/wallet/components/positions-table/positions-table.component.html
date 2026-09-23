@@ -65,6 +65,13 @@
                 {{ position.currentPrice > position.averagePrice ? '▲' : '▼' }}
               </span>
             }
+            @if (formatQuotedAt(position.currentPriceQuotedAt); as apurada) {
+              <span
+                [attr.data-testid]="'cotacao-apurada-' + i"
+                class="block text-xs text-gray-500"
+                >{{ apurada }}</span
+              >
+            }
           </td>
           <td class="py-3 px-4 text-gray-700">
             {{ formatCurrency(totalPosition(position)) }}
