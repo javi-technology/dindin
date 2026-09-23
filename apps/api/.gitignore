@@ -2,3 +2,6 @@ lib/
 node_modules/
 .firebase/
 *.log
+
+# Relatório de cobertura gerado por `npm run test:coverage` (issue #323).
+coverage/

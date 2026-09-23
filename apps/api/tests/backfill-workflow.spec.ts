@@ -34,9 +34,17 @@ describe('.github/workflows/backfill-dividend-history.yml', () => {
     expect(workflow).toMatch(/required: false/);
   });
 
-  it('deve autenticar com a mesma service account do deploy', () => {
+  // Migrado junto com o deploy na #322: o secret da chave estática foi
+  // removido do repositório, então este workflow precisa da mesma federação
+  // para continuar rodando.
+  it('deve autenticar por Workload Identity Federation, como o deploy', () => {
     expect(workflow).toContain('google-github-actions/auth');
-    expect(workflow).toContain('secrets.FIREBASE_SERVICE_ACCOUNT');
+    expect(workflow).toContain('workload_identity_provider');
+    expect(workflow).not.toContain('FIREBASE_SERVICE_ACCOUNT');
+  });
+
+  it('deve conceder id-token: write', () => {
+    expect(workflow).toMatch(/permissions:[\s\S]*id-token: write/);
   });
 
   it('deve restringir o GITHUB_TOKEN a contents: read', () => {

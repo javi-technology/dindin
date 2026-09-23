@@ -15,7 +15,8 @@
     "seed:assets": "npm run build && node lib/scripts/seed-assets.js",
     "set:admin-claim": "npm run build && node lib/scripts/set-admin-claim.js",
     "backfill:dividend-history": "npm run build && node lib/scripts/backfill-dividend-history.js",
-    "migrate:legacy": "npm run build && node lib/scripts/migrate-legacy-data.js"
+    "migrate:legacy": "npm run build && node lib/scripts/migrate-legacy-data.js",
+    "test:coverage": "firebase emulators:exec --only firestore --project dindin-test 'NODE_OPTIONS=--experimental-vm-modules jest --coverage'"
   },
   "engines": {
     "node": "22"
@@ -36,7 +37,6 @@
     "@types/supertest": "^7.2.1",
     "jest": "^30.4.2",
     "supertest": "^7.2.2",
-    "ts-jest": "^29.4.12",
-    "typescript": "^5.6.0"
+    "ts-jest": "^29.4.12"
   }
 }

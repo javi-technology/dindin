@@ -123,6 +123,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # A formatação não era verificada em lugar nenhum e dependia de
+      # disciplina manual (issue #323). O job lint já é exigido pelo deploy.
+      - name: Verificar formatação
+        run: npm run format:check
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -152,7 +157,15 @@ jobs:
         run: npm run api:build
 
       - name: Test API
-        run: npm run test --workspace=apps/api
+        run: npm run test:coverage --workspace=apps/api
+
+      - name: Upload API coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-api
+          path: apps/api/coverage
+          retention-days: 7
 
       # Sobe o artefato compilado da API para ser reutilizado pelo deploy,
       # evitando rebuild desnecessário. Executado apenas em push na main.
@@ -194,7 +207,15 @@ jobs:
         run: npm run web:build
 
       - name: Test Web
-        run: npm run test --workspace=apps/web
+        run: npm run test:coverage --workspace=apps/web
+
+      - name: Upload Web coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-web
+          path: apps/web/coverage
+          retention-days: 7
 
       # Sobe o artefato compilado do Angular para ser reutilizado pelo deploy,
       # evitando rebuild desnecessário. Executado apenas em push na main.
@@ -219,9 +240,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
-    # Necessário para publicar a tag da versão.
     permissions:
+      # Necessário para publicar a tag da versão.
       contents: write
+      # Necessário para o GitHub emitir o token OIDC da federação (#322).
+      id-token: write
 
     steps:
       - name: Checkout
@@ -248,10 +271,18 @@ jobs:
           name: web-dist
           path: apps/web/dist/dindin-web
 
+      # Workload Identity Federation (issue #322): o GitHub emite um token
+      # OIDC para este job e o GCP o troca por credencial de curta duração.
+      # Não há chave estática no repositório — uma chave vazada daria acesso
+      # ao projeto até ser revogada à mão.
+      #
+      # `vars.WIF_PROVIDER` e `vars.WIF_SERVICE_ACCOUNT` são variáveis, não
+      # secrets: identificam recursos do projeto e não são credenciais.
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       # Variáveis de ambiente não sensíveis das Functions (ex.: limite de
       # tickers por requisição na Brapi, ids dos Prices da Stripe) são
@@ -267,10 +298,25 @@ jobs:
           APP_BASE_URL=${{ vars.APP_BASE_URL }}
           EOF
 
-      # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
-      # gerenciados separadamente para evitar alterações acidentais de segurança.
-      - name: Deploy to Firebase
+      - name: Deploy Hosting e Functions
         run: npx firebase deploy --only hosting,functions --project dindin-4e720 --force
+
+      # Regras e índices entram no deploy desde a issue #321: publicá-los à
+      # mão deixava produção divergir do que está versionado e testado — e o
+      # índice de collectionGroup de `dividends` é obrigatório para o registro
+      # automático de proventos.
+      #
+      # O risco de alteração acidental de segurança, que antes justificava
+      # mantê-los de fora, é coberto pelos testes de regras: o job
+      # `build-and-test-api` roda `firestore.rules.spec.ts` contra o emulador e
+      # o deploy depende dele, então uma regra frouxa não chega a produção.
+      #
+      # Passo separado e **sem `--force`** de propósito: a flag faz o CLI
+      # apagar, sem perguntar, índices que existam no projeto e não no
+      # `firestore.indexes.json`. Sem ela, em modo não interativo, ele apenas
+      # avisa e mantém — apagar índice continua sendo ato deliberado.
+      - name: Deploy regras e índices
+        run: npx firebase deploy --only firestore:rules,firestore:indexes,storage --project dindin-4e720
 
       # Registra a versão publicada como tag, servindo de base para o
       # cálculo da próxima versão.

@@ -21,6 +21,8 @@ on:
 # Permissão mínima do GITHUB_TOKEN: o job não escreve no repositório.
 permissions:
   contents: read
+  # Necessário para o GitHub emitir o token OIDC da federação (#322).
+  id-token: write
 
 jobs:
   backfill:
@@ -43,10 +45,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Workload Identity Federation (issue #322): o GitHub emite um token
+      # OIDC para este job e o GCP o troca por credencial de curta duração.
+      # Não há chave estática no repositório — uma chave vazada daria acesso
+      # ao projeto até ser revogada à mão.
+      #
+      # `vars.WIF_PROVIDER` e `vars.WIF_SERVICE_ACCOUNT` são variáveis, não
+      # secrets: identificam recursos do projeto e não são credenciais.
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       - name: Executar backfill
         env:
