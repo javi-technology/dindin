@@ -554,4 +554,57 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       consoleWarnSpy.mockRestore();
     });
   });
+  // Horário de apuração da cotação (issue #387): repassado à gravação e
+  // registrado no log, para medir no Cloud Logging quando a Brapi consolida
+  // o fechamento de cada pregão.
+  describe('horário de apuração da cotação', () => {
+    it('deve repassar o horário de apuração da Brapi para a gravação', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'TRXF11', assetType: 'FII' },
+      ]);
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['TRXF11', { price: 73.9, updatedAt: '2026-09-23T21:31:00Z' }],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        undefined,
+        'brapi',
+        undefined,
+        undefined,
+        '2026-09-23T21:31:00Z',
+      );
+    });
+
+    it('deve registrar o horário de apuração no log do ticker atualizado', async () => {
+      const infoSpy = jest
+        .spyOn(functionsLogger, 'info')
+        .mockImplementation(() => {});
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'TRXF11', assetType: 'FII' },
+      ]);
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['TRXF11', { price: 73.9, updatedAt: '2026-09-23T21:31:00Z' }],
+        ]),
+      );
+
+      await updateAllQuotes();
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        'updateAllQuotes.tickerUpdated',
+        expect.objectContaining({
+          ticker: 'TRXF11',
+          quotedAt: '2026-09-23T21:31:00Z',
+        }),
+      );
+
+      infoSpy.mockRestore();
+    });
+  });
 });

@@ -239,6 +239,78 @@ describe('QuoteHistoryService', () => {
         }),
       );
     });
+
+    // Horário de apuração da cotação na fonte (issue #387). Sem ele não há
+    // como distinguir atraso da Brapi de falha nossa: `updatedAt` só diz
+    // quando *nós* escrevemos.
+    describe('horário de apuração da fonte', () => {
+      function mockQuoteDoc() {
+        const quoteSet = jest.fn().mockResolvedValue(undefined);
+        const quoteDoc = jest.fn(() => ({
+          set: quoteSet,
+          collection: jest.fn(() => ({
+            doc: jest.fn(() => ({
+              set: jest.fn().mockResolvedValue(undefined),
+            })),
+          })),
+        }));
+
+        firestoreMock = {
+          collection: jest.fn(() => ({ doc: quoteDoc })),
+        };
+
+        return quoteSet;
+      }
+
+      it('deve gravar o horário de apuração informado pela fonte', async () => {
+        const quoteSet = mockQuoteDoc();
+
+        await saveQuoteHistory(
+          'TRXF11',
+          73.9,
+          0.7,
+          'brapi',
+          '2026-09-15',
+          8.4,
+          '2026-09-23T21:31:00Z',
+        );
+
+        expect(quoteSet).toHaveBeenCalledWith(
+          expect.objectContaining({ quotedAt: '2026-09-23T21:31:00Z' }),
+        );
+      });
+
+      it('deve gravar sem o campo quando a fonte não informa o horário', async () => {
+        const quoteSet = mockQuoteDoc();
+
+        await saveQuoteHistory('TRXF11', 73.9, 0.7);
+
+        expect(quoteSet).toHaveBeenCalledWith(
+          expect.not.objectContaining({ quotedAt: expect.anything() }),
+        );
+      });
+
+      it('deve manter updatedAt como o horário da escrita, não o da apuração', async () => {
+        const quoteSet = mockQuoteDoc();
+
+        await saveQuoteHistory(
+          'TRXF11',
+          73.9,
+          0.7,
+          'brapi',
+          undefined,
+          undefined,
+          '2026-09-23T21:31:00Z',
+        );
+
+        const saved = quoteSet.mock.calls[0][0];
+        expect(saved.quotedAt).toBe('2026-09-23T21:31:00Z');
+        expect(saved.updatedAt).not.toBe('2026-09-23T21:31:00Z');
+        expect(Date.parse(saved.updatedAt)).toBeGreaterThan(
+          Date.parse('2026-09-23T21:31:00Z'),
+        );
+      });
+    });
   });
 
   describe('getQuoteHistory', () => {
