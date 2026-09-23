@@ -224,6 +224,27 @@ describe('PositionFormComponent', () => {
       expect(element('[data-testid="quantity-preview"]')).toBeNull();
     });
 
+    // O que o template deriva vem do control, não de um espelho mantido à mão
+    // (#362): escrever direto no control precisa mover o total e o campo de
+    // preço da compra junto.
+    it('deve acompanhar escrita feita direto no control', () => {
+      setup(mxrf);
+
+      component.form.controls['quantity'].setValue('+27');
+      fixture.detectChanges();
+
+      expect(
+        element('[data-testid="quantity-preview"]')?.textContent,
+      ).toContain('Total: 59');
+      expect(element('input#purchasePrice')).not.toBeNull();
+
+      component.form.controls['quantity'].setValue('59');
+      fixture.detectChanges();
+
+      expect(element('[data-testid="quantity-preview"]')).toBeNull();
+      expect(element('input#purchasePrice')).toBeNull();
+    });
+
     it('deve recusar variação que zere ou negative a quantidade', () => {
       setup(mxrf);
       patch({ quantity: '-32' });
