@@ -6,6 +6,7 @@ import {
   parseBrlNumber,
   parseDecimal,
   formatDate,
+  formatQuotedAt,
 } from './format.util';
 
 describe('format.util', () => {
@@ -129,5 +130,31 @@ describe('formatDate', () => {
   it('deve retornar travessão quando não houver data', () => {
     expect(formatDate(undefined)).toBe('—');
     expect(formatDate('')).toBe('—');
+  });
+});
+
+// A data de apuração da cotação (issue #390) é o que permite ler um preço
+// de fechamento do dia anterior como dado correto, e não como erro.
+describe('formatQuotedAt', () => {
+  it('deve rotular a data de apuração como fechamento, em pt-BR', () => {
+    expect(formatQuotedAt('2026-09-23T21:31:00Z')).toBe(
+      'Fechamento de 23/09/2026',
+    );
+  });
+
+  it('deve usar o dia no fuso de São Paulo, não o do UTC', () => {
+    // 2026-09-24T02:00:00Z é 23:00 do dia 23 em São Paulo.
+    expect(formatQuotedAt('2026-09-24T02:00:00Z')).toBe(
+      'Fechamento de 23/09/2026',
+    );
+  });
+
+  it('deve devolver null sem horário de apuração', () => {
+    expect(formatQuotedAt(undefined)).toBeNull();
+    expect(formatQuotedAt('')).toBeNull();
+  });
+
+  it('deve devolver null quando a data é inválida', () => {
+    expect(formatQuotedAt('não é data')).toBeNull();
   });
 });

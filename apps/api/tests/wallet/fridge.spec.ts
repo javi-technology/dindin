@@ -51,9 +51,21 @@ function createFridgeItemSnapshot(item: FridgeItem) {
  * `baseItem.currentPrice`, o que preserva o comportamento dos testes
  * existentes que comparam o corpo da resposta com o fixture completo.
  */
+/**
+ * Cotação do stub: só o preço, ou preço com o horário de apuração da fonte
+ * (`quotedAt`, issue #387), que a leitura repassa para a tela (#390).
+ */
+type QuoteStub = number | { price: number; quotedAt?: string };
+
+function quoteDoc(ticker: string, quote: QuoteStub) {
+  return typeof quote === 'number'
+    ? { ticker, price: quote }
+    : { ticker, ...quote };
+}
+
 function createCatalogStubs(
   activeTickers: string[] = ['HGLG11'],
-  pricesByTicker: Record<string, number> = { HGLG11: 100.0 },
+  pricesByTicker: Record<string, QuoteStub> = { HGLG11: 100.0 },
 ) {
   const assetsCollection = {
     doc: jest.fn((ticker: string) => ({
@@ -78,7 +90,7 @@ function createCatalogStubs(
           ? {
               id: ref.id,
               exists: true,
-              data: () => ({ ticker: ref.id, price: pricesByTicker[ref.id] }),
+              data: () => quoteDoc(ref.id, pricesByTicker[ref.id]),
             }
           : { id: ref.id, exists: false, data: () => undefined },
       ),
@@ -764,6 +776,42 @@ describe('FridgeItem CRUD', () => {
 
       expect(response.status).toBe(200);
       expect(response.body[0].currentPrice).toBe(150.75);
+    });
+
+    // A tela mostra quando o preço foi apurado (#390): sem isso, o
+    // fechamento do dia anterior parece dado errado.
+    it('deve devolver o horário de apuração da cotação junto do preço', async () => {
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [baseItem],
+        createCatalogStubs(['HGLG11'], {
+          HGLG11: { price: 150.75, quotedAt: '2026-09-23T21:31:00Z' },
+        }),
+      );
+
+      const response = await request(app)
+        .get('/api/fridges/fridge-1/items')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body[0].currentPriceQuotedAt).toBe(
+        '2026-09-23T21:31:00Z',
+      );
+    });
+
+    it('deve omitir o horário de apuração quando a cotação não o tem', async () => {
+      firestoreMock = createFirestoreMock(
+        [baseFridge],
+        [baseItem],
+        createCatalogStubs(['HGLG11'], { HGLG11: 150.75 }),
+      );
+
+      const response = await request(app)
+        .get('/api/fridges/fridge-1/items')
+        .set('Authorization', authHeader);
+
+      expect(response.status).toBe(200);
+      expect(response.body[0]).not.toHaveProperty('currentPriceQuotedAt');
     });
   });
 

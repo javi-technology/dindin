@@ -327,3 +327,40 @@ describe('models – Quote', () => {
     expect(quote.quotedAt).toBeUndefined();
   });
 });
+
+describe('models – horário de apuração do preço atual', () => {
+  it('deve aceitar o horário de apuração junto do preço atual da posição', () => {
+    const position: Position = {
+      id: 'pos-1',
+      walletId: 'wallet-1',
+      ticker: 'TRXF11',
+      assetType: 'FII',
+      quantity: 100,
+      averagePrice: 70,
+      currentPrice: 73.9,
+      currentPriceQuotedAt: '2026-09-23T21:31:00Z',
+      inFridge: false,
+      createdAt: '2026-09-23T00:00:00Z',
+      updatedAt: '2026-09-23T00:00:00Z',
+    };
+
+    expect(position.currentPriceQuotedAt).toBeDefined();
+  });
+
+  it('deve aceitar o horário de apuração junto do preço atual do item da geladeira', () => {
+    const item: FridgeItem = {
+      id: 'item-1',
+      fridgeId: 'fridge-1',
+      ticker: 'TRXF11',
+      quantity: 100,
+      transferredPrice: 70,
+      targetPrice: 80,
+      currentPrice: 73.9,
+      currentPriceQuotedAt: '2026-09-23T21:31:00Z',
+      createdAt: '2026-09-23T00:00:00Z',
+      updatedAt: '2026-09-23T00:00:00Z',
+    };
+
+    expect(item.currentPriceQuotedAt).toBeDefined();
+  });
+});
