@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // ---------------------------------------------------------------------------
-// Sincronia entre os guias de diretrizes (issue #321)
+// Sincronia entre os guias de diretrizes (issues #321 e #322)
 //
 // O repositório mantém quatro guias com as mesmas regras, um por agente. A
 // seção de deploy nasceu só no CLAUDE.md e no AGENTS.md: quem seguia o
@@ -28,6 +28,11 @@ const REGRAS_DE_DEPLOY = [
   // regra de `git push --force-with-lease`.
   'roda **sem `--force`**',
   'apps/api/tests/rules/',
+  // Issue #322: sem essas duas variáveis e sem `id-token: write` o deploy não
+  // autentica, e a chave JSON de longa duração deixou de existir.
+  'Workload Identity Federation',
+  '`id-token: write`',
+  'docs/deploy-workload-identity.md',
 ];
 
 describe('guias de diretrizes', () => {
