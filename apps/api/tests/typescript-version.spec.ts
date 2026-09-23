@@ -51,7 +51,13 @@ describe('versão do TypeScript no monorepo', () => {
     const resolvida = (workspace: string): string =>
       JSON.parse(
         readFileSync(
-          join(repoRoot, workspace, 'node_modules', 'typescript', 'package.json'),
+          join(
+            repoRoot,
+            workspace,
+            'node_modules',
+            'typescript',
+            'package.json',
+          ),
           'utf-8',
         ),
       ).version;
