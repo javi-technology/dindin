@@ -123,6 +123,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # A formatação não era verificada em lugar nenhum e dependia de
+      # disciplina manual (issue #323). O job lint já é exigido pelo deploy.
+      - name: Verificar formatação
+        run: npm run format:check
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -152,7 +157,15 @@ jobs:
         run: npm run api:build
 
       - name: Test API
-        run: npm run test --workspace=apps/api
+        run: npm run test:coverage --workspace=apps/api
+
+      - name: Upload API coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-api
+          path: apps/api/coverage
+          retention-days: 7
 
       # Sobe o artefato compilado da API para ser reutilizado pelo deploy,
       # evitando rebuild desnecessário. Executado apenas em push na main.
@@ -194,7 +207,15 @@ jobs:
         run: npm run web:build
 
       - name: Test Web
-        run: npm run test --workspace=apps/web
+        run: npm run test:coverage --workspace=apps/web
+
+      - name: Upload Web coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-web
+          path: apps/web/coverage
+          retention-days: 7
 
       # Sobe o artefato compilado do Angular para ser reutilizado pelo deploy,
       # evitando rebuild desnecessário. Executado apenas em push na main.

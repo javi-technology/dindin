@@ -44,4 +44,25 @@ describe('.github/workflows/ci-cd.yml', () => {
 
     expect(deploy).toMatch(/needs:[\s\S]*- audit/);
   });
+
+  // #323: a formatação não era verificada em lugar nenhum e dependia de
+  // disciplina manual — já houve arquivo desformatado entrando na develop.
+  it('deve verificar a formatação no job lint', () => {
+    expect(jobBlock('lint')).toContain('npm run format:check');
+  });
+
+  it('deve exigir o lint antes do deploy', () => {
+    expect(jobBlock('deploy')).toMatch(/needs:[\s\S]*- lint/);
+  });
+
+  it('deve gerar cobertura nos dois jobs de teste', () => {
+    expect(jobBlock('build-and-test-api')).toContain('test:coverage');
+    expect(jobBlock('build-and-test-web')).toContain('test:coverage');
+  });
+
+  it('deve publicar a cobertura dos dois jobs como artefato', () => {
+    for (const job of ['build-and-test-api', 'build-and-test-web']) {
+      expect(jobBlock(job)).toMatch(/upload-artifact[\s\S]*coverage/);
+    }
+  });
 });

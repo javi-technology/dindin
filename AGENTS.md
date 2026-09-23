@@ -247,8 +247,9 @@ Regras:
   (angular-eslint, incluindo regras de template `.html`).
 - **Não há hook de pre-commit**: rodar `npm run format` e `npm run lint`
   manualmente antes de cada commit.
-- O job `lint` do CI bloqueia o deploy. A formatação **não** é verificada no CI,
-  então depende de rodar o Prettier antes do commit.
+- O job `lint` do CI bloqueia o deploy e verifica **também a formatação**, com
+  `npm run format:check` (issue #323): um arquivo fora do padrão reprova o
+  pipeline, então rodar o Prettier antes do commit deixou de ser opcional.
 
 ### Locale Brasileiro em Campos Numéricos
 
