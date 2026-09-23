@@ -1,59 +1,36 @@
-# DindinWeb
+# DinDin — Frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.27.
+Aplicação Angular 22 com Tailwind CSS 4 do DinDin. As diretrizes do projeto
+estão no [`CLAUDE.md`](../../CLAUDE.md), na raiz do monorepo — este README cobre
+só o que é específico deste workspace.
 
-## Development server
+## Estrutura
 
-To start a local development server, run:
-
-```bash
-ng serve
+```
+src/app/
+  core/      # serviços, guards e interceptors de uso geral
+  features/  # uma pasta por tela (wallet, fridge, billing, admin-*)
+  shared/    # componentes reutilizáveis (modal, confirm-dialog) e utilitários
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Comandos
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Rode da raiz do monorepo:
 
 ```bash
-ng generate component component-name
+npm run web:serve                            # servidor de desenvolvimento
+npm run build --workspace=apps/web           # build de produção
+npm run test --workspace=apps/web            # testes (Vitest + jsdom)
+npm run test:coverage --workspace=apps/web   # testes com cobertura
+npm run lint                                 # ESLint (inclui templates .html)
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+O app conversa com a API pelo prefixo `/api`. Para rodar com backend local, use
+`firebase emulators:start` na raiz: o Hosting sobe em `:5002` e faz o rewrite
+para as Functions em `:5001`.
 
-```bash
-ng generate --help
-```
+## Testes
 
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Os testes unitários rodam **sem navegador**, em Node com jsdom — um teste que
+exija janela real não entra no projeto. Prefira mockar serviços e inputs de
+componente a disparar eventos de DOM.

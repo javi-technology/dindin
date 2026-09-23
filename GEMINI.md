@@ -1,6 +1,8 @@
 # DinDin — Diretrizes do Projeto
 
-> Fonte das regras: `.github/copilot-instructions.md` e `.devin/rules/`. Ao alterar uma regra aqui, mantenha esses arquivos sincronizados.
+> **Arquivo gerado.** A fonte é o `CLAUDE.md`; edite lá e rode
+> `npm run docs:rules`. Alteração feita direto aqui é perdida na próxima
+> geração e reprovada pela suíte.
 
 ## Idioma
 
@@ -26,14 +28,15 @@ packages/
 ```bash
 npm install                                    # instalar dependências
 firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
-npm run api:build --workspace=apps/api         # build da API
+npm run api:build                              # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
-npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run test --workspace=apps/web              # testes do frontend (Vitest)
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
-firebase deploy                               # deploy completo
+npm run docs:rules                             # regerar os guias a partir deste arquivo
+firebase deploy                                # deploy completo
 ```
 
 ## Fluxo de Trabalho Obrigatório
