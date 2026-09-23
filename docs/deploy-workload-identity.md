@@ -13,10 +13,10 @@ Os workflows `ci-cd.yml` e `backfill-dividend-history.yml` usam duas variáveis 
 repositório — **variáveis, não secrets**, porque identificam recursos e não são
 credenciais:
 
-| Variável              | Conteúdo                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `WIF_PROVIDER`        | `projects/<NUMERO>/locations/global/workloadIdentityPools/github/providers/github-actions` |
-| `WIF_SERVICE_ACCOUNT` | E-mail da service account usada no deploy                                                  |
+| Variável              | Conteúdo                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `WIF_PROVIDER`        | `projects/<NUMERO>/locations/global/workloadIdentityPools/github-actions/providers/github-actions` |
+| `WIF_SERVICE_ACCOUNT` | E-mail da service account usada no deploy                                                          |
 
 Ambos os jobs declaram `id-token: write`, sem o que o GitHub não emite o token.
 
@@ -43,7 +43,7 @@ gcloud services enable iamcredentials.googleapis.com sts.googleapis.com \
 ### 3. Criar o pool
 
 ```bash
-gcloud iam workload-identity-pools create github \
+gcloud iam workload-identity-pools create github-actions \
   --project dindin-4e720 --location global \
   --display-name 'GitHub Actions'
 ```
@@ -56,7 +56,7 @@ repositório do GitHub** poderia trocar um token por credencial deste projeto.
 ```bash
 gcloud iam workload-identity-pools providers create-oidc github-actions \
   --project dindin-4e720 --location global \
-  --workload-identity-pool github \
+  --workload-identity-pool github-actions \
   --display-name 'GitHub Actions' \
   --issuer-uri 'https://token.actions.githubusercontent.com' \
   --attribute-mapping 'google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner' \
@@ -77,14 +77,14 @@ E autorize só as execuções deste repositório a assumi-la:
 gcloud iam service-accounts add-iam-policy-binding <SERVICE_ACCOUNT_EMAIL> \
   --project dindin-4e720 \
   --role roles/iam.workloadIdentityUser \
-  --member 'principalSet://iam.googleapis.com/projects/<NUMERO>/locations/global/workloadIdentityPools/github/attribute.repository/javi-technology/dindin'
+  --member 'principalSet://iam.googleapis.com/projects/<NUMERO>/locations/global/workloadIdentityPools/github-actions/attribute.repository/javi-technology/dindin'
 ```
 
 ### 6. Publicar as variáveis no repositório
 
 ```bash
 gh variable set WIF_PROVIDER --repo javi-technology/dindin \
-  --body 'projects/<NUMERO>/locations/global/workloadIdentityPools/github/providers/github-actions'
+  --body 'projects/<NUMERO>/locations/global/workloadIdentityPools/github-actions/providers/github-actions'
 
 gh variable set WIF_SERVICE_ACCOUNT --repo javi-technology/dindin \
   --body '<SERVICE_ACCOUNT_EMAIL>'
