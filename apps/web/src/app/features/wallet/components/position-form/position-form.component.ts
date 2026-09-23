@@ -9,7 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
   FormGroup,
@@ -17,7 +17,7 @@ import {
   ValidatorFn,
   Validators,
 } from '@angular/forms';
-import { merge } from 'rxjs';
+import { map, merge } from 'rxjs';
 import { Asset, AssetType, Position } from 'dindin-models';
 import {
   decimalValidator,
@@ -100,20 +100,27 @@ export class PositionFormComponent implements OnInit {
       this.form.controls['purchasePrice'].valueChanges,
     )
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.quantityValue.set(this.quantityText());
-        this.syncAveragePrice();
-      });
-
-    this.quantityValue.set(this.quantityText());
+      .subscribe(() => this.syncAveragePrice());
   }
 
   /**
-   * Quantidade digitada, espelhada em signal. O que o template deriva dela
-   * precisa acompanhar mudanças programáticas do form, que com `OnPush` não
-   * disparam detecção de mudança sozinhas.
+   * Quantidade digitada, derivada do próprio control (issue #362).
+   *
+   * O que o template deriva daqui precisa acompanhar mudança programática do
+   * form, que com `OnPush` não dispara detecção de mudança sozinha. Derivar de
+   * `valueChanges` deixa uma fonte só — antes o valor era espelhado à mão em
+   * dois pontos, e bastava esquecer um para o preview congelar.
+   *
+   * Em troca, toda escrita em `quantity` precisa emitir: `valueChanges` não
+   * emite com `{ emitEvent: false }`, e uma escrita silenciosa deixaria o
+   * campo de preço da compra e o total de `+N` parados.
    */
-  private readonly quantityValue = signal('0');
+  private readonly quantityValue = toSignal(
+    this.form.controls['quantity'].valueChanges.pipe(
+      map(() => this.quantityText()),
+    ),
+    { initialValue: '0' },
+  );
 
   /** Indica se a quantidade digitada é uma compra (`+N`). */
   readonly isAddingQuantity = computed(() =>

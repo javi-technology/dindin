@@ -245,8 +245,9 @@ Regras:
   (angular-eslint, incluindo regras de template `.html`).
 - **Não há hook de pre-commit**: rodar `npm run format` e `npm run lint`
   manualmente antes de cada commit.
-- O job `lint` do CI bloqueia o deploy. A formatação **não** é verificada no CI,
-  então depende de rodar o Prettier antes do commit.
+- O job `lint` do CI bloqueia o deploy e verifica **também a formatação**, com
+  `npm run format:check` (issue #323): um arquivo fora do padrão reprova o
+  pipeline, então rodar o Prettier antes do commit deixou de ser opcional.
 
 ### Locale Brasileiro em Campos Numéricos
 
@@ -306,6 +307,28 @@ Regras:
   bastam para localizar a falha.
 - Toda resposta é registrada pelo middleware de requisições, inclusive as sem
   corpo (204, 401).
+
+## Deploy
+
+- O deploy roda no CI, em push na `main`, depois de `audit`, `lint` e as duas
+  suítes passarem. Não há deploy manual de rotina.
+- São publicados **Hosting, Functions, regras e índices do Firestore e regras
+  do Storage** (issue #321). Antes, regras e índices eram publicados à mão, e
+  produção podia divergir do que está versionado e testado.
+- O passo que publica regras e índices roda **sem `--force`** de propósito: com
+  a flag, o firebase-tools apaga sem perguntar os índices que existam no
+  projeto e não no `firestore.indexes.json`. Sem ela, em modo não interativo,
+  ele apenas avisa — então remover índice continua sendo ato deliberado, feito
+  à mão.
+- Alterar `firestore.rules` exige atualizar `apps/api/tests/rules/` na mesma
+  mudança: o deploy depende desse job, e é ele que impede uma regra frouxa de
+  chegar a produção.
+- A autenticação no GCP é por **Workload Identity Federation** (issue #322): o
+  GitHub emite um token OIDC por execução e o GCP o troca por credencial de
+  curta duração, no lugar da chave JSON de longa duração que ficava no secret
+  `FIREBASE_SERVICE_ACCOUNT`. Os jobs precisam de `id-token: write` e das
+  variáveis `WIF_PROVIDER` e `WIF_SERVICE_ACCOUNT`. A configuração no GCP está
+  em `docs/deploy-workload-identity.md`.
 
 ## Segurança
 
