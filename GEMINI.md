@@ -308,6 +308,22 @@ Regras:
 - Toda resposta é registrada pelo middleware de requisições, inclusive as sem
   corpo (204, 401).
 
+## Deploy
+
+- O deploy roda no CI, em push na `main`, depois de `audit`, `lint` e as duas
+  suítes passarem. Não há deploy manual de rotina.
+- São publicados **Hosting, Functions, regras e índices do Firestore e regras
+  do Storage** (issue #321). Antes, regras e índices eram publicados à mão, e
+  produção podia divergir do que está versionado e testado.
+- O passo que publica regras e índices roda **sem `--force`** de propósito: com
+  a flag, o firebase-tools apaga sem perguntar os índices que existam no
+  projeto e não no `firestore.indexes.json`. Sem ela, em modo não interativo,
+  ele apenas avisa — então remover índice continua sendo ato deliberado, feito
+  à mão.
+- Alterar `firestore.rules` exige atualizar `apps/api/tests/rules/` na mesma
+  mudança: o deploy depende desse job, e é ele que impede uma regra frouxa de
+  chegar a produção.
+
 ## Segurança
 
 - Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
