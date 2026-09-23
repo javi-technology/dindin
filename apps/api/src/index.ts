@@ -62,6 +62,7 @@ import {
   updateDividend,
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
+import { reconcileClosingQuotes } from './quotes/reconcile-quotes.handler';
 import { setupDefaults } from './me/setup.controller';
 import {
   getDividendHistory,
@@ -458,6 +459,28 @@ export const checkTargetPricesScheduled = onSchedule(
   },
   async () => {
     await checkAllTargetPrices();
+  },
+);
+
+// Reconciliação noturna do preço de fechamento, às 23:30 (issue #389).
+//
+// Mesmo depois de atrasar a cadeia diária para depois do after-market (#388),
+// a Brapi pode continuar servindo o último negócio do pregão contínuo por
+// horas. Este job volta no fim do dia e corrige só o preço — sem registrar
+// proventos nem tirar a foto de data-com —, e antes da meia-noite, para que a
+// correção caia no histórico do próprio pregão.
+export const reconcileQuotesScheduled = onSchedule(
+  {
+    schedule: '30 23 * * *',
+    timeZone: 'America/Sao_Paulo',
+    retryCount: 3,
+    secrets: ['BRAPI_API_KEY'],
+    // Só preços, sem o fan-out de proventos do job diário, mas ainda uma
+    // escrita por ticker corrigido: os 60s padrão não bastam.
+    timeoutSeconds: 180,
+  },
+  async () => {
+    await reconcileClosingQuotes();
   },
 );
 
