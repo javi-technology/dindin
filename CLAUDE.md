@@ -323,6 +323,12 @@ Regras:
 - Alterar `firestore.rules` exige atualizar `apps/api/tests/rules/` na mesma
   mudança: o deploy depende desse job, e é ele que impede uma regra frouxa de
   chegar a produção.
+- A autenticação no GCP é por **Workload Identity Federation** (issue #322): o
+  GitHub emite um token OIDC por execução e o GCP o troca por credencial de
+  curta duração, no lugar da chave JSON de longa duração que ficava no secret
+  `FIREBASE_SERVICE_ACCOUNT`. Os jobs precisam de `id-token: write` e das
+  variáveis `WIF_PROVIDER` e `WIF_SERVICE_ACCOUNT`. A configuração no GCP está
+  em `docs/deploy-workload-identity.md`.
 
 ## Segurança
 
