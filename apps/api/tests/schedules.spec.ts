@@ -28,9 +28,12 @@ function minutesOfDay(schedule: string): number {
   return Number(hour) * 60 + Number(minute);
 }
 
-// Fim do after-market da B3 (19:00), no horário de verão dos EUA — o pregão
-// contínuo vai até 18:00 e o after-market até 19:00.
-const AFTER_MARKET_END = 19 * 60;
+// Fim da última fase do pregão da B3. Na grade vigente desde março de 2026 o
+// pregão regular vai até 17:00, o after-market das 17:30 às 18:00 e as fases
+// de cancelamento de ofertas se encerram às 18:45 — depois disso nada mais
+// altera o fechamento do dia.
+// https://www.b3.com.br/pt_br/solucoes/plataformas/puma-trading-system/para-participantes-e-traders/horario-de-negociacao/acoes/
+const FIM_DAS_FASES_DO_PREGAO = 18 * 60 + 45;
 
 // A cadeia diária: cotações → snapshot patrimonial → preço-alvo (issue #388).
 // Os dois últimos consomem o preço gravado pelo primeiro, então mover um
@@ -45,7 +48,7 @@ describe('Cloud Functions agendadas', () => {
   describe('updateQuotesScheduled', () => {
     const options = () => findScheduleBySchedule(DAILY_CHAIN.quotes);
 
-    it('deve rodar 1x ao dia após o encerramento do after-market, no fuso de São Paulo', () => {
+    it('deve rodar 1x ao dia após o encerramento do pregão, no fuso de São Paulo', () => {
       expect(options().timeZone).toBe('America/Sao_Paulo');
     });
 
@@ -93,10 +96,10 @@ describe('Cloud Functions agendadas', () => {
   // Os três horários se movem em bloco: atrasar só a cotação faria os outros
   // dois usarem o preço do dia anterior (issue #388).
   describe('cadeia diária de cotações, patrimônio e preço-alvo', () => {
-    it('deve rodar toda a cadeia depois do encerramento do after-market', () => {
+    it('deve rodar toda a cadeia depois da última fase do pregão', () => {
       for (const schedule of Object.values(DAILY_CHAIN)) {
         findScheduleBySchedule(schedule);
-        expect(minutesOfDay(schedule)).toBeGreaterThan(AFTER_MARKET_END);
+        expect(minutesOfDay(schedule)).toBeGreaterThan(FIM_DAS_FASES_DO_PREGAO);
       }
     });
 
@@ -118,7 +121,7 @@ describe('Cloud Functions agendadas', () => {
     expect(schedules).not.toContain('0 1 * * *');
   });
 
-  it('não deve manter os horários anteriores, dentro do after-market', () => {
+  it('não deve manter os horários anteriores, dentro do pregão', () => {
     const schedules = mockOnSchedule.mock.calls.map(
       (args) => (args[0] as ScheduleOptions).schedule,
     );

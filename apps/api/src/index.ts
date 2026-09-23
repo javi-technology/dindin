@@ -395,12 +395,13 @@ export const api = onRequest(
   app,
 );
 
-// Cloud Function agendada para atualizar cotações 1x ao dia, às 19:30, meia
-// hora depois do encerramento do after-market (o pregão contínuo vai até 18:00
-// e o after-market até 19:00, no horário de verão dos EUA). Às 18:30, horário
-// anterior, a Brapi ainda servia o último negócio do pregão contínuo em vez do
-// preço do leilão de fechamento — o carimbo da cotação vinha praticamente
-// colado no horário do job (issue #388).
+// Cloud Function agendada para atualizar cotações 1x ao dia, às 19:30, depois
+// que todas as fases do pregão se encerraram: na grade vigente desde março de
+// 2026 o pregão regular vai até 17:00, o after-market das 17:30 às 18:00 e o
+// cancelamento de ofertas até 18:45. Às 18:30, horário anterior, a Brapi ainda
+// servia o último negócio do pregão contínuo em vez do preço do leilão de
+// fechamento — o carimbo da cotação vinha praticamente colado no horário do
+// job (issue #388).
 // Os três agendamentos diários abaixo formam uma cadeia — cotações, snapshot
 // patrimonial e preço-alvo — e se movem em bloco: os dois últimos leem o preço
 // gravado pelo primeiro.
