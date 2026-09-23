@@ -62,6 +62,27 @@ describe('fonte única das regras', () => {
     });
   });
 
+  // O rtk injeta e mantém o próprio bloco no guia do Copilot, em inglês. Copiar
+  // também a seção RTK do CLAUDE.md deixaria a mesma instrução duas vezes no
+  // arquivo, e o `--check` aceitaria a duplicação para sempre.
+  describe('bloco do rtk no guia do Copilot', () => {
+    const copilot = (): string => conteudo('.github/copilot-instructions.md');
+
+    it('deve preservar o bloco injetado pelo rtk', () => {
+      expect(copilot()).toContain('<!-- rtk-instructions');
+    });
+
+    it('não deve repetir a seção RTK vinda da fonte', () => {
+      expect(copilot()).not.toContain('## RTK');
+    });
+  });
+
+  it('deve manter a seção RTK nos guias sem bloco injetado', () => {
+    for (const guia of ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']) {
+      expect(conteudo(guia)).toContain('## RTK');
+    }
+  });
+
   it('deve estar em dia com a fonte', () => {
     // O próprio gerador confere: o que `--check` reprova é exatamente o que um
     // `npm run docs:rules` produziria de diferente.
