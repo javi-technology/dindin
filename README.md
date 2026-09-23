@@ -308,8 +308,9 @@ qualquer `currency` diferente de `BRL`. Multimoeda está fora da v1.
 
 ## Alertas de preço-alvo da geladeira
 
-Todo dia às 19:15 (após a atualização de cotações das 18:30 e o snapshot
-patrimonial das 19:00), a function `checkTargetPricesScheduled` compara a
+Todo dia às 20:15 (após a atualização de cotações das 19:30 e o snapshot
+patrimonial das 20:00, já depois do encerramento do after-market), a function
+`checkTargetPricesScheduled` compara a
 cotação atual de cada item da geladeira com o `targetPrice` definido pelo
 usuário e grava um alerta em `users/{uid}/alerts/{fridgeId}_{ticker}`.
 

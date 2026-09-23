@@ -395,8 +395,15 @@ export const api = onRequest(
   app,
 );
 
-// Cloud Function agendada para atualizar cotações 1x ao dia, às 18:30, após o
-// fechamento da B3 (o pregão pode ir até ~18h fora do horário de verão dos EUA).
+// Cloud Function agendada para atualizar cotações 1x ao dia, às 19:30, meia
+// hora depois do encerramento do after-market (o pregão contínuo vai até 18:00
+// e o after-market até 19:00, no horário de verão dos EUA). Às 18:30, horário
+// anterior, a Brapi ainda servia o último negócio do pregão contínuo em vez do
+// preço do leilão de fechamento — o carimbo da cotação vinha praticamente
+// colado no horário do job (issue #388).
+// Os três agendamentos diários abaixo formam uma cadeia — cotações, snapshot
+// patrimonial e preço-alvo — e se movem em bloco: os dois últimos leem o preço
+// gravado pelo primeiro.
 // Ver issues #10, #22, #192 e #212 — busca cotações via Brapi (fonte única)
 // e salva em `quotes/{ticker}` + histórico.
 // O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
@@ -404,7 +411,7 @@ export const api = onRequest(
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
   {
-    schedule: '30 18 * * *',
+    schedule: '30 19 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['BRAPI_API_KEY'],
@@ -418,11 +425,12 @@ export const updateQuotesScheduled = onSchedule(
   },
 );
 
-// Snapshot diário do patrimônio, 30 min após a atualização de cotações,
-// para registrar o patrimônio com a data e os preços do pregão do dia
+// Snapshot diário do patrimônio, 30 min após a atualização de cotações
+// (19:30 → 20:00), para registrar o patrimônio com a data e os preços já
+// consolidados do pregão do dia (issue #388).
 export const savePatrimonySnapshotsScheduled = onSchedule(
   {
-    schedule: '0 19 * * *',
+    schedule: '0 20 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
   },
@@ -432,12 +440,13 @@ export const savePatrimonySnapshotsScheduled = onSchedule(
 );
 
 // Verificação diária de preço-alvo da geladeira, 15 min após o snapshot
-// patrimonial, para comparar com as cotações já atualizadas do dia (issue #118).
+// patrimonial (20:00 → 20:15), para comparar com as cotações do dia já
+// consolidadas depois do after-market (issues #118 e #388).
 // O aviso por e-mail usa a API do Resend (issue #265); configurar o segredo com:
 //   firebase functions:secrets:set RESEND_API_KEY
 export const checkTargetPricesScheduled = onSchedule(
   {
-    schedule: '15 19 * * *',
+    schedule: '15 20 * * *',
     timeZone: 'America/Sao_Paulo',
     retryCount: 3,
     secrets: ['RESEND_API_KEY'],
