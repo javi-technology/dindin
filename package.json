@@ -7,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "docs:rules": "node scripts/sync-rules.mjs",
+    "docs:rules:check": "node scripts/sync-rules.mjs --check",
     "web:build": "npm run build --workspace=apps/web",
     "web:serve": "npm run start --workspace=apps/web",
     "api:build": "npm run build --workspace=apps/api",
