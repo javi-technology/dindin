@@ -60,7 +60,7 @@ describe('reconcileClosingQuotes', () => {
       { ticker: 'TRXF11', assetType: 'FII' },
     ]);
     mockGetQuotesByTicker.mockResolvedValue(new Map());
-    mockSaveQuoteHistory.mockResolvedValue(undefined);
+    mockSaveReconciledPrice.mockResolvedValue(undefined);
   });
 
   function storedQuote(price: number, quotedAt?: string) {
@@ -92,9 +92,8 @@ describe('reconcileClosingQuotes', () => {
 
       await reconcileClosingQuotes();
 
-      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(1);
-      const [ticker, price, , , , , quotedAt] =
-        mockSaveQuoteHistory.mock.calls[0];
+      expect(mockSaveReconciledPrice).toHaveBeenCalledTimes(1);
+      const [ticker, price, , quotedAt] = mockSaveReconciledPrice.mock.calls[0];
       expect(ticker).toBe('TRXF11');
       expect(price).toBe(73.9);
       expect(quotedAt).toBe('2026-09-23T23:05:00Z');
@@ -108,7 +107,7 @@ describe('reconcileClosingQuotes', () => {
 
       await reconcileClosingQuotes();
 
-      expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
+      expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
     });
 
     it('não deve sobrescrever um fechamento por um dado em cache mais antigo', async () => {
@@ -119,7 +118,7 @@ describe('reconcileClosingQuotes', () => {
 
       await reconcileClosingQuotes();
 
-      expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
+      expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
     });
 
     it('não deve sobrescrever quando a fonte não informa o horário de apuração', async () => {
@@ -130,7 +129,7 @@ describe('reconcileClosingQuotes', () => {
 
       await reconcileClosingQuotes();
 
-      expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
+      expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
     });
 
     it('deve gravar quando a cotação guardada não tem horário de apuração', async () => {
@@ -139,7 +138,7 @@ describe('reconcileClosingQuotes', () => {
 
       await reconcileClosingQuotes();
 
-      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(1);
+      expect(mockSaveReconciledPrice).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -173,6 +172,7 @@ describe('reconcileClosingQuotes', () => {
         73.9,
         expect.objectContaining({ price: 73.99 }),
         '2026-09-23T23:05:00Z',
+        'brapi',
       );
     });
 
@@ -229,7 +229,7 @@ describe('reconcileClosingQuotes', () => {
           ['HGLG11', { price: 165.5, quotedAt: '2026-09-23T23:05:00Z' }],
         ]),
       );
-      mockSaveQuoteHistory.mockImplementation(async (ticker: string) => {
+      mockSaveReconciledPrice.mockImplementation(async (ticker: string) => {
         if (ticker === 'TRXF11') throw new Error('Firestore indisponível');
       });
       const errorSpy = jest
@@ -238,7 +238,7 @@ describe('reconcileClosingQuotes', () => {
 
       await expect(reconcileClosingQuotes()).resolves.toBeUndefined();
 
-      expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(2);
+      expect(mockSaveReconciledPrice).toHaveBeenCalledTimes(2);
       expect(errorSpy).toHaveBeenCalledWith(
         'reconcileQuotes.tickerFailed',
         expect.objectContaining({ ticker: 'TRXF11' }),
@@ -254,7 +254,7 @@ describe('reconcileClosingQuotes', () => {
       mockFetchQuotes.mockRejectedValue(new Error('Brapi API error'));
 
       await expect(reconcileClosingQuotes()).rejects.toThrow('Brapi API error');
-      expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
+      expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
     });

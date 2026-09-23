@@ -68,6 +68,55 @@ export async function saveQuoteHistory(
 }
 
 /**
+ * Grava um preço reconciliado (issue #389), sem tocar em proventos.
+ *
+ * O `saveQuoteHistory` regrava, junto com o preço, o documento mensal de
+ * proventos — que só deveria mudar quando um provento novo é anunciado. A
+ * reconciliação noturna roda todo dia e corrige apenas o fechamento, então
+ * passar por lá reescreveria aquele registro (e o seu `updatedAt`) sem
+ * nenhum fato novo por trás.
+ *
+ * Os campos de provento vêm da cotação já gravada e são repassados como
+ * estão: relê-los custaria a consulta à agenda que este job existe para
+ * evitar.
+ */
+export async function saveReconciledPrice(
+  ticker: string,
+  price: number,
+  stored: Quote | undefined,
+  quotedAt: string | undefined,
+  source = 'brapi',
+): Promise<void> {
+  const now = new Date().toISOString();
+  const monthlyDividend = stored?.monthlyDividend ?? 0;
+
+  const quoteData: Quote = {
+    ticker,
+    price,
+    monthlyDividend,
+    ...(stored?.dividendPaymentDate && {
+      dividendPaymentDate: stored.dividendPaymentDate,
+    }),
+    ...(stored?.annualDividend !== undefined && {
+      annualDividend: stored.annualDividend,
+    }),
+    updatedAt: now,
+    ...(quotedAt && { quotedAt }),
+    source,
+  };
+
+  const historyData: QuoteHistory = {
+    date: today(),
+    price,
+    monthlyDividend,
+    source,
+  };
+
+  await quotesCollection().doc(ticker).set(quoteData);
+  await historyCollection(ticker).doc(historyDocId()).set(historyData);
+}
+
+/**
  * Registra o provento por cota no mês do **pagamento**, sobrescrevendo o
  * documento a cada execução do job.
  *

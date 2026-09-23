@@ -1,6 +1,6 @@
 import { QuoteResult } from './brapi.service';
 import { fetchCatalogQuotes } from './catalog-quotes';
-import { saveQuoteHistory } from './quote-history.service';
+import { saveReconciledPrice } from './quote-history.service';
 import { getQuotesByTicker } from './quote-prices';
 import { listActiveAssetTickers } from '../assets/asset.service';
 import { logError, logInfo } from '../shared/logger';
@@ -36,17 +36,15 @@ async function reconcileTicker(
   if (!isNewerQuote(quote, stored)) return false;
 
   try {
-    // Os proventos guardados são repassados como estão: a reconciliação
-    // corrige preço, e reler a agenda de proventos traria de volta o custo
-    // que este job existe para evitar.
-    await saveQuoteHistory(
+    // Caminho dedicado, que não passa pelo histórico mensal de proventos: a
+    // reconciliação corrige preço, e regravar aquele registro toda noite o
+    // marcaria como atualizado sem nenhum provento novo por trás.
+    await saveReconciledPrice(
       ticker,
       quote.price,
-      stored?.monthlyDividend,
-      QUOTE_SOURCE,
-      stored?.dividendPaymentDate,
-      stored?.annualDividend,
+      stored,
       quote.quotedAt,
+      QUOTE_SOURCE,
     );
     logInfo('reconcileQuotes.priceReconciled', {
       ticker,
