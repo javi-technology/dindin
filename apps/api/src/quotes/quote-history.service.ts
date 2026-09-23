@@ -18,6 +18,7 @@ export async function saveQuoteHistory(
   source = 'brapi',
   dividendPaymentDate?: string,
   annualDividend?: number,
+  quotedAt?: string,
 ): Promise<void> {
   const now = new Date().toISOString();
   const date = today();
@@ -44,6 +45,7 @@ export async function saveQuoteHistory(
       annualDividend: resolvedAnnualDividend,
     }),
     updatedAt: now,
+    ...(quotedAt && { quotedAt }),
     source,
   };
 

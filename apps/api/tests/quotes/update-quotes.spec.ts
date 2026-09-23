@@ -66,8 +66,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
 
@@ -81,8 +81,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -102,8 +102,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -123,6 +123,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -131,6 +132,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -138,7 +140,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -163,6 +165,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         '2026-07-14',
         10.8,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -171,8 +174,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -210,8 +213,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -257,8 +260,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -286,8 +289,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -306,6 +309,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         '2026-07-14',
         undefined,
+        '2026-07-15T18:00:00Z',
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -314,6 +318,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -321,8 +326,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(new Map());
@@ -336,6 +341,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -348,9 +354,9 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(assets);
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['PETR4', { price: 48.92, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['BOVA11', { price: 182.55, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['PETR4', { price: 48.92, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['BOVA11', { price: 182.55, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
 
@@ -372,7 +378,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
 
@@ -393,7 +399,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       ]);
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -410,6 +416,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -417,8 +424,8 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
-          ['MXRF11', { price: 10.32, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
+          ['MXRF11', { price: 10.32, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockResolvedValue(
@@ -440,6 +447,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
     });
 
@@ -450,7 +458,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       mockListActiveAssetTickers.mockResolvedValue(mockAssets());
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['HGLG11', { price: 165.5, updatedAt: '2026-07-15T18:00:00Z' }],
+          ['HGLG11', { price: 165.5, quotedAt: '2026-07-15T18:00:00Z' }],
         ]),
       );
       mockFetchMonthlyDividends.mockRejectedValue(
@@ -470,6 +478,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'brapi',
         undefined,
         undefined,
+        '2026-07-15T18:00:00Z',
       );
 
       consoleErrorSpy.mockRestore();
@@ -488,7 +497,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         new Map(
           tickers.map((ticker, i) => [
             ticker,
-            { price: 10 + i, updatedAt: '2026-07-15T18:00:00Z' },
+            { price: 10 + i, quotedAt: '2026-07-15T18:00:00Z' },
           ]),
         ),
       );
@@ -512,6 +521,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           'brapi',
           undefined,
           undefined,
+          '2026-07-15T18:00:00Z',
         );
       }
     });
@@ -564,7 +574,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       ]);
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['TRXF11', { price: 73.9, updatedAt: '2026-09-23T21:31:00Z' }],
+          ['TRXF11', { price: 73.9, quotedAt: '2026-09-23T21:31:00Z' }],
         ]),
       );
 
@@ -590,7 +600,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       ]);
       mockFetchQuotes.mockResolvedValue(
         new Map([
-          ['TRXF11', { price: 73.9, updatedAt: '2026-09-23T21:31:00Z' }],
+          ['TRXF11', { price: 73.9, quotedAt: '2026-09-23T21:31:00Z' }],
         ]),
       );
 

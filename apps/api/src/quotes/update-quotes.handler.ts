@@ -52,10 +52,14 @@ async function processTickerQuote(
       QUOTE_SOURCE,
       dividend?.paymentDate,
       dividend?.annualDividend,
+      quote.quotedAt,
     );
     logInfo('updateAllQuotes.tickerUpdated', {
       ticker,
       price: quote.price,
+      // Horário de apuração na fonte (#387): é o que permite medir no Cloud
+      // Logging a que horas a Brapi consolida o fechamento de cada pregão.
+      quotedAt: quote.quotedAt,
       source: QUOTE_SOURCE,
     });
   } catch (error) {

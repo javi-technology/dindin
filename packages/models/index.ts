@@ -136,7 +136,15 @@ export interface Quote {
   monthlyDividend: number; // último provento/rendimento por cota/ação
   dividendPaymentDate?: string; // YYYY-MM-DD — data de pagamento do provento
   annualDividend?: number; // soma dos proventos pagos nos últimos 12 meses
-  updatedAt: string; // ISO-8601
+  updatedAt: string; // ISO-8601 — quando *nós* gravamos a cotação
+  /**
+   * ISO-8601 — quando a cotação foi apurada na fonte (issue #387).
+   *
+   * Distinto de `updatedAt`: é o que permite saber se o preço é o fechamento
+   * consolidado ou o último negócio do pregão contínuo, e separar atraso da
+   * fonte de falha nossa. Ausente nas cotações gravadas antes da #387.
+   */
+  quotedAt?: string;
   source: string; // ex: "brapi"
 }
 
