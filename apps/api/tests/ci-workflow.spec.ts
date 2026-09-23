@@ -78,6 +78,20 @@ describe('.github/workflows/ci-cd.yml', () => {
     }
   });
 
+  // `--force` faz o firebase-tools apagar, sem perguntar, índices que existem
+  // no projeto e não estão no `firestore.indexes.json` — um índice criado pelo
+  // link de erro do console sumiria no deploy seguinte, derrubando a consulta
+  // que dependia dele. Sem a flag e em modo não interativo, o CLI apenas
+  // avisa e mantém.
+  it('não deve usar --force ao publicar regras e índices', () => {
+    const passo = /firebase deploy --only [^\n]*firestore:indexes[^\n]*/.exec(
+      jobBlock('deploy'),
+    );
+
+    expect(passo).not.toBeNull();
+    expect(passo![0]).not.toContain('--force');
+  });
+
   // O deploy só pode publicar regras depois que os testes de regras passarem,
   // e eles rodam no job da API.
   it('deve exigir os testes da API antes do deploy', () => {

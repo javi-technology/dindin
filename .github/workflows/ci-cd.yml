@@ -288,10 +288,25 @@ jobs:
           APP_BASE_URL=${{ vars.APP_BASE_URL }}
           EOF
 
-      # Deploy apenas de Hosting e Functions; Firestore rules/indexes são
-      # gerenciados separadamente para evitar alterações acidentais de segurança.
-      - name: Deploy to Firebase
+      - name: Deploy Hosting e Functions
         run: npx firebase deploy --only hosting,functions --project dindin-4e720 --force
+
+      # Regras e índices entram no deploy desde a issue #321: publicá-los à
+      # mão deixava produção divergir do que está versionado e testado — e o
+      # índice de collectionGroup de `dividends` é obrigatório para o registro
+      # automático de proventos.
+      #
+      # O risco de alteração acidental de segurança, que antes justificava
+      # mantê-los de fora, é coberto pelos testes de regras: o job
+      # `build-and-test-api` roda `firestore.rules.spec.ts` contra o emulador e
+      # o deploy depende dele, então uma regra frouxa não chega a produção.
+      #
+      # Passo separado e **sem `--force`** de propósito: a flag faz o CLI
+      # apagar, sem perguntar, índices que existam no projeto e não no
+      # `firestore.indexes.json`. Sem ela, em modo não interativo, ele apenas
+      # avisa e mantém — apagar índice continua sendo ato deliberado.
+      - name: Deploy regras e índices
+        run: npx firebase deploy --only firestore:rules,firestore:indexes,storage --project dindin-4e720
 
       # Registra a versão publicada como tag, servindo de base para o
       # cálculo da próxima versão.
