@@ -65,4 +65,22 @@ describe('.github/workflows/ci-cd.yml', () => {
       expect(jobBlock(job)).toMatch(/upload-artifact[\s\S]*coverage/);
     }
   });
+
+  // #321: regras e índices eram publicados à mão, então produção podia
+  // divergir do que está versionado e testado. O índice de collectionGroup de
+  // `dividends` é obrigatório para o registro automático de proventos, e as
+  // regras são a barreira de segurança do banco.
+  it('deve publicar regras e índices do Firestore e do Storage', () => {
+    const deploy = jobBlock('deploy');
+
+    for (const alvo of ['firestore:rules', 'firestore:indexes', 'storage']) {
+      expect(deploy).toContain(alvo);
+    }
+  });
+
+  // O deploy só pode publicar regras depois que os testes de regras passarem,
+  // e eles rodam no job da API.
+  it('deve exigir os testes da API antes do deploy', () => {
+    expect(jobBlock('deploy')).toMatch(/needs:[\s\S]*- build-and-test-api/);
+  });
 });
