@@ -1,8 +1,8 @@
 # DinDin — Diretrizes do Projeto
 
-> Orientações para agentes que trabalham neste repositório. Consolidado a partir de `CLAUDE.md` e `GEMINI.md`; mantenha as diretrizes dos três arquivos sincronizadas.
-
-> Fonte das regras: `.github/copilot-instructions.md` e `.devin/rules/`. Ao alterar uma regra aqui, mantenha esses arquivos sincronizados.
+> **Arquivo gerado.** A fonte é o `CLAUDE.md`; edite lá e rode
+> `npm run docs:rules`. Alteração feita direto aqui é perdida na próxima
+> geração e reprovada pela suíte.
 
 ## Idioma
 
@@ -35,6 +35,7 @@ npm run test --workspace=apps/web              # testes do frontend (Vitest)
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
+npm run docs:rules                             # regerar os guias a partir deste arquivo
 firebase deploy                                # deploy completo
 ```
 

@@ -1,6 +1,8 @@
 # DinDin — Diretrizes do Projeto
 
-> Fonte das regras: `.github/copilot-instructions.md` e `.devin/rules/`. Ao alterar uma regra aqui, mantenha esses arquivos sincronizados.
+> **Fonte primária das regras do projeto.** `AGENTS.md`, `GEMINI.md` e
+> `.github/copilot-instructions.md` são gerados a partir deste arquivo: altere a
+> regra aqui e rode `npm run docs:rules`. A suíte reprova guia fora de dia.
 
 ## Idioma
 
@@ -29,10 +31,11 @@ firebase emulators:start                       # emuladores (Hosting :5002, Func
 npm run api:build                              # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
-npm run test --workspace=apps/web              # testes do frontend (Karma)
+npm run test --workspace=apps/web              # testes do frontend (Vitest)
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
+npm run docs:rules                             # regerar os guias a partir deste arquivo
 firebase deploy                                # deploy completo
 ```
 

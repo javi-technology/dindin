@@ -26,7 +26,7 @@ const conteudo = (arquivo: string): string =>
 describe('fonte única das regras', () => {
   describe('CLAUDE.md', () => {
     it('deve se declarar a fonte primária', () => {
-      expect(conteudo('CLAUDE.md')).toContain('fonte primária');
+      expect(conteudo('CLAUDE.md')).toMatch(/fonte primária/i);
     });
 
     it('não deve apontar para `.devin/rules/`, que não existe', () => {
@@ -35,15 +35,24 @@ describe('fonte única das regras', () => {
   });
 
   it('nenhum arquivo versionado deve citar `.devin`', () => {
-    const encontrados = execFileSync(
-      'git',
-      ['grep', '-l', '--', '.devin'],
-      { cwd: repoRoot, encoding: 'utf-8' },
-      // `git grep` sai com 1 quando não encontra nada, e é esse o caso
-      // esperado: o catch devolve string vazia.
-    ).trim();
+    let saida = '';
+    try {
+      saida = execFileSync('git', ['grep', '-l', '--', '.devin'], {
+        cwd: repoRoot,
+        encoding: 'utf-8',
+      });
+    } catch {
+      // `git grep` sai com 1 quando não encontra nada — o caso esperado.
+    }
 
-    expect(encontrados).toBe('');
+    // Este arquivo nomeia o caminho proibido para poder procurá-lo.
+    const encontrados = saida
+      .split('\n')
+      .filter(
+        (linha) => linha && !linha.endsWith('guias-sincronizados.spec.ts'),
+      );
+
+    expect(encontrados).toEqual([]);
   });
 
   describe.each(GERADOS)('%s', (arquivo) => {
@@ -57,7 +66,7 @@ describe('fonte única das regras', () => {
     // O próprio gerador confere: o que `--check` reprova é exatamente o que um
     // `npm run docs:rules` produziria de diferente.
     expect(() =>
-      execFileSync('node', ['scripts/sync-rules.js', '--check'], {
+      execFileSync('node', ['scripts/sync-rules.mjs', '--check'], {
         cwd: repoRoot,
         encoding: 'utf-8',
       }),
@@ -67,7 +76,7 @@ describe('fonte única das regras', () => {
   it('deve expor o gerador como script do npm', () => {
     const pkg = JSON.parse(conteudo('package.json'));
 
-    expect(pkg.scripts['docs:rules']).toContain('scripts/sync-rules.js');
+    expect(pkg.scripts['docs:rules']).toContain('scripts/sync-rules.mjs');
   });
 });
 

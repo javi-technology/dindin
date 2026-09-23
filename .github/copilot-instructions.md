@@ -1,15 +1,50 @@
 # DinDin — Diretrizes do Projeto
 
+> **Arquivo gerado.** A fonte é o `CLAUDE.md`; edite lá e rode
+> `npm run docs:rules`. Alteração feita direto aqui é perdida na próxima
+> geração e reprovada pela suíte.
+
+## Idioma
+
+- **Sempre responder em português do Brasil (pt-BR)**: interações, explicações, comentários, descrições de PR e mensagens de commit.
+
 ## Visão Geral
 
 Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+
+### Estrutura do Repositório
+
+```
+apps/
+  api/    # Cloud Functions (Express + TypeScript) — regras de negócio e APIs; src/ e tests/
+  web/    # Angular + Tailwind — src/app/{core,features,shared}/
+packages/
+  models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
+  shared-types/  # Tipos TypeScript compartilhados entre frontend e backend
+```
+
+## Comandos
+
+```bash
+npm install                                    # instalar dependências
+firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
+npm run api:build                              # build da API
+npm run build --workspace=apps/web             # build do frontend
+npm run test --workspace=apps/api              # testes da API (Jest)
+npm run test --workspace=apps/web              # testes do frontend (Vitest)
+npm run lint                                   # análise estática (ESLint)
+npm run format                                 # formatar com Prettier
+npm run format:check                           # verificar formatação
+npm run docs:rules                             # regerar os guias a partir deste arquivo
+firebase deploy                                # deploy completo
+```
 
 ## Fluxo de Trabalho Obrigatório
 
 ### Vínculo com Issues
 
 - **Toda implementação deve estar vinculada a uma issue do GitHub Projects** (https://github.com/orgs/javi-technology/projects/4).
-- Antes de iniciar qualquer trabalho, verificar se existe issue aberta. Se não existir, criar.
+- Antes de iniciar qualquer trabalho, verificar se existe issue aberta (`gh issue list`). Se não existir, criar.
 - Nenhum commit sem o número da issue correspondente.
 
 #### Template obrigatório
@@ -124,9 +159,17 @@ Regras:
 
 - Nunca escrever código de produção antes de ter um teste falhando.
 - Nunca escrever mais código do que o necessário para o teste passar.
-- Testes mantidos junto ao código que testam (co-location).
+- Testes mantidos junto ao código que testam, conforme a localização de cada camada (tabela abaixo).
 
-### Estrutura de Testes
+### Fluxo Completo de Tarefa
+
+1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
+2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
+3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
+4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
+5. Merge após revisão
+
+## Testes
 
 | Camada   | Ferramenta | Localização                   |
 | -------- | ---------- | ----------------------------- |
@@ -138,8 +181,8 @@ Regras:
 - **Os testes unitários do frontend DEVEM rodar em modo browserless.** Não há exceção: um teste que exija janela de navegador não entra no projeto.
 - Vitest rodando em Node.js com **jsdom** — rápidos, determinísticos e compatíveis com CI sem interface gráfica.
 - Evitar dependências de APIs de navegador (`window`, `document`, `setTimeout` reais) quando não forem essenciais.
-- Prefira mockar serviços e inputs/outputs em vez de disparar eventos de DOM real.
-- Não adicione dependências de browsers reais na configuração de testes.
+- Preferir mockar serviços e inputs/outputs de componentes em vez de disparar eventos reais do DOM.
+- Não adicionar browsers reais (Chrome, Firefox, Safari) na configuração de testes.
 
 ## Git e Branches
 
@@ -186,42 +229,10 @@ fix(#15): corrige cálculo de total da carteira
 
 Regras:
 
-- Descrição em português, no imperativo ("adiciona", "corrige", "remove").
+- Descrição **sempre em português (pt-BR)**, no imperativo ("adiciona", "corrige", "remove").
 - Máximo 72 caracteres na primeira linha. Sem ponto final.
 - Commits atômicos: um commit por mudança lógica.
-- Nunca commitar com testes falhando.- **IMPORTANTE**: Sempre gerar mensagens de commit em Português (pt-BR).
-
-### Fluxo Completo de Tarefa
-
-1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
-3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
-5. Merge após revisão
-
-## Comandos
-
-```bash
-npm install                                    # instalar dependências
-firebase emulators:start                       # emuladores (Hosting :5002, Functions :5001, Firestore :8080, Auth :9099)
-npm run api:build --workspace=apps/api         # build da API
-npm run build --workspace=apps/web             # build do frontend
-npm run test --workspace=apps/api              # testes da API (Jest)
-npm run test --workspace=apps/web              # testes do frontend (Karma)
-npm run lint                                  # análise estática (ESLint)
-npm run format                                # formatar com Prettier
-npm run format:check                          # verificar formatação
-firebase deploy                               # deploy completo
-```
-
-## Estrutura do Repositório
-
-Monorepo estruturado da seguinte forma:
-
-- `apps/api`: Cloud Functions (Express + TypeScript) - Regras de negócio e APIs.
-- `apps/web`: Aplicação Frontend (Angular + Tailwind CSS).
-- `packages/models`: Modelos de dados Firestore.
-- `packages/shared-types`: Tipos TypeScript compartilhados entre frontend e backend.
+- Nunca commitar com testes falhando.
 
 ## Padrões de UX e Código
 
@@ -256,7 +267,7 @@ Monorepo estruturado da seguinte forma:
   chegar), usar `switchMap` sobre um `Subject` do parâmetro, não um `Subject` de
   abort manual. Cancelamento e destruição são preocupações diferentes.
 
-## Confirmação de Ações Destrutivas
+### Confirmação de Ações Destrutivas
 
 - **Não usar** `window.confirm`, `window.alert` ou `window.prompt` nativos.
 - Sempre usar **modal customizado** para confirmação de exclusão ou ações destrutivas.
@@ -322,6 +333,32 @@ Monorepo estruturado da seguinte forma:
   variáveis `WIF_PROVIDER` e `WIF_SERVICE_ACCOUNT`. A configuração no GCP está
   em `docs/deploy-workload-identity.md`.
 
+## Segurança
+
+- Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
+
+## RTK — Token-Optimized CLI
+
+**rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
+
+Sempre prefixar comandos de shell com `rtk`:
+
+```bash
+# Em vez de:              Use:
+git status                 rtk git status
+git log -10                rtk git log -10
+npm run test               rtk npm run test
+```
+
+Comandos meta (usar diretamente):
+
+```bash
+rtk gain              # dashboard de economia de tokens
+rtk gain --history    # histórico de economia por comando
+rtk discover          # encontrar oportunidades perdidas de uso do rtk
+rtk proxy <cmd>       # rodar sem filtragem, mas registrar uso
+```
+
 <!-- rtk-instructions v2 -->
 
 # RTK — Token-Optimized CLI
@@ -351,9 +388,3 @@ rtk proxy <cmd>       # Run raw (no filtering) but track usage
 ```
 
 <!-- /rtk-instructions -->
-
-## Idioma do Agente
-
-- **Sempre responder em português do Brasil (pt-BR)**.
-- **Mensagens de Commit**: Devem ser sempre em português, no imperativo (ex: "adiciona", "corrige", "ajusta").
-- Todas as interações, explicações e comentários devem ser feitos neste idioma.
