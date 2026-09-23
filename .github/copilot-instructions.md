@@ -337,28 +337,6 @@ Regras:
 
 - Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
 
-## RTK — Token-Optimized CLI
-
-**rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
-
-Sempre prefixar comandos de shell com `rtk`:
-
-```bash
-# Em vez de:              Use:
-git status                 rtk git status
-git log -10                rtk git log -10
-npm run test               rtk npm run test
-```
-
-Comandos meta (usar diretamente):
-
-```bash
-rtk gain              # dashboard de economia de tokens
-rtk gain --history    # histórico de economia por comando
-rtk discover          # encontrar oportunidades perdidas de uso do rtk
-rtk proxy <cmd>       # rodar sem filtragem, mas registrar uso
-```
-
 <!-- rtk-instructions v2 -->
 
 # RTK — Token-Optimized CLI

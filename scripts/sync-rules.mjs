@@ -94,8 +94,32 @@ function blocoRtkExistente(arquivo) {
   return `\n\n${atual.slice(inicio, fim + RTK_FECHA.length).trim()}`;
 }
 
+/**
+ * Remove uma seção de nível 2 do corpo, da sua linha até a próxima seção.
+ */
+function semSecao(corpo, titulo) {
+  const inicio = corpo.indexOf(`\n## ${titulo}`);
+
+  if (inicio === -1) {
+    return corpo;
+  }
+
+  const resto = corpo.slice(inicio + 1);
+  const proxima = resto.indexOf('\n## ', 1);
+
+  return proxima === -1
+    ? corpo.slice(0, inicio)
+    : `${corpo.slice(0, inicio)}\n${resto.slice(proxima + 1)}`;
+}
+
 function conteudoEsperado(destino, corpo) {
-  return `${destino.cabecalho}\n\n${corpo}${blocoRtkExistente(destino.arquivo)}\n`;
+  const rtk = blocoRtkExistente(destino.arquivo);
+
+  // Onde o rtk já injeta o próprio bloco, a seção RTK da fonte sairia repetida
+  // — a mesma instrução duas vezes, em português e em inglês.
+  const corpoFinal = rtk ? semSecao(corpo, 'RTK') : corpo;
+
+  return `${destino.cabecalho}\n\n${corpoFinal.trimEnd()}${rtk}\n`;
 }
 
 function main() {
