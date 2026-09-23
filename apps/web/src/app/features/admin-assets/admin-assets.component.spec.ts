@@ -46,6 +46,20 @@ describe('AdminAssetsComponent', () => {
     fixture = TestBed.createComponent(AdminAssetsComponent);
   });
 
+  // Com a estratégia `class` do @tailwindcss/forms, um checkbox sem
+  // `form-checkbox` volta ao estilo nativo do navegador e as classes de cor e
+  // de foco ao lado dela não têm efeito nenhum (issue #208).
+  it('deve marcar o checkbox de investidor qualificado com form-checkbox', () => {
+    fixture.detectChanges();
+
+    const checkbox = (fixture.nativeElement as HTMLElement).querySelector(
+      'input[formControlName="qualifiedInvestor"]',
+    ) as HTMLInputElement;
+
+    expect(checkbox).toBeTruthy();
+    expect(checkbox.classList).toContain('form-checkbox');
+  });
+
   it('deve criar o componente', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance).toBeTruthy();
