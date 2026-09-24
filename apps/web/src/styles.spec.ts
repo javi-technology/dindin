@@ -43,9 +43,12 @@ const dark = declarations(
 const roles = [
   'surface',
   'surface-elevated',
+  'surface-sunken',
   'text-primary',
   'text-secondary',
+  'text-muted',
   'action',
+  'action-hover',
   'on-action',
   'accent',
   'border',
@@ -55,6 +58,54 @@ const roles = [
   'warning',
   'danger',
   'positive',
+  'brand-soft',
+  'brand-ink',
+  'info-soft',
+  'info-ink',
+  'warning-soft',
+  'warning-ink',
+  'danger-soft',
+  'danger-ink',
+  'positive-soft',
+  'positive-ink',
+];
+
+/*
+  As razões de contraste do WCAG 2.1. Ficam no teste, e não numa tabela da
+  documentação, porque uma tabela envelhece em silêncio: aqui, trocar um passo
+  de token por um mais claro reprova a suíte na hora.
+*/
+function luminance(hex: string): number {
+  const channels = [1, 3, 5].map((start) => {
+    const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : Math.pow((value + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrast(foreground: string, background: string): number {
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort(
+    (a, b) => b - a,
+  );
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function pair(
+  theme: Record<string, string>,
+  foreground: string,
+  background: string,
+): number {
+  return contrast(
+    resolve(theme[`--dindin-${foreground}`]),
+    resolve(theme[`--dindin-${background}`]),
+  );
+}
+
+const themes: [string, Record<string, string>][] = [
+  ['claro', light],
+  ['escuro', dark],
 ];
 
 function resolve(value: string): string {
@@ -158,6 +209,60 @@ describe('paleta Verde-Jade e Creme', () => {
   it('usa borda clara o bastante para a borda informativa do escuro', () => {
     expect(resolve(dark['--dindin-border-strong'])).toBe('#696964');
   });
+
+  it.each(themes)(
+    'mantém o texto acima de 4,5:1 no tema %s',
+    (_name, theme) => {
+      for (const surface of ['surface', 'surface-elevated', 'surface-sunken']) {
+        for (const text of ['text-primary', 'text-secondary', 'text-muted']) {
+          expect(
+            pair(theme, text, surface),
+            `${text} sobre ${surface}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      expect(pair(theme, 'on-action', 'action')).toBeGreaterThanOrEqual(4.5);
+      expect(pair(theme, 'on-action', 'action-hover')).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    },
+  );
+
+  it.each(themes)(
+    'mantém texto sobre o tom suave acima de 4,5:1 no tema %s',
+    (_name, theme) => {
+      for (const role of ['brand', 'info', 'warning', 'danger', 'positive']) {
+        expect(
+          pair(theme, `${role}-ink`, `${role}-soft`),
+          `${role}-ink sobre ${role}-soft`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          pair(theme, `${role}-ink`, 'surface'),
+          `${role}-ink sobre surface`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  it.each(themes)(
+    'mantém borda e ícone informativos acima de 3:1 no tema %s',
+    (_name, theme) => {
+      for (const role of [
+        'border-strong',
+        'focus',
+        'action',
+        'info',
+        'warning',
+        'danger',
+        'positive',
+      ]) {
+        expect(
+          pair(theme, role, 'surface'),
+          `${role} sobre surface`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+    },
+  );
 
   it('documenta cada papel da paleta', () => {
     for (const role of roles) {
