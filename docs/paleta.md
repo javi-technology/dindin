@@ -1,0 +1,125 @@
+# Paleta Verde-Jade e Creme
+
+Fonte única das cores do app: `apps/web/src/styles.css`. As telas consomem os
+**tokens semânticos por papel** (`bg-surface`, `text-text-primary`,
+`bg-action`…), nunca o passo da escala (`bg-jade-700`). Usar o passo direto
+fixa o tema claro na marcação e obriga a revisitar o arquivo quando o modo
+escuro entrar.
+
+A identidade é **#00BB77 (Verde-Jade)** como primária e **#FDFBD4 (Creme)**
+como secundária. Duas medições condicionam todo o resto:
+
+- #00BB77 sobre branco dá **2,51:1** — reprova AA para texto (4,5:1) e para
+  elemento gráfico (3:1). Por isso a ação primária no claro usa o jade
+  escurecido, não o puro.
+- #FDFBD4 sobre branco dá **1,05:1** — o creme é cor de superfície e de acento,
+  nunca de ação.
+
+## Escalas
+
+As escalas não mudam de valor entre os temas. O que muda é o passo para onde
+cada papel aponta.
+
+### `jade` — matiz 158,6°, ancorada em #00BB77 no passo 500
+
+| Passo | Valor     |
+| ----- | --------- |
+| 50    | `#E4FFEE` |
+| 100   | `#CFF9DF` |
+| 300   | `#7DDFAA` |
+| 400   | `#4ACF8F` |
+| 500   | `#00BB77` |
+| 600   | `#009F65` |
+| 700   | `#008654` |
+| 900   | `#005634` |
+
+`jade-ink` (`#0B2E22`) fica fora da escala de propósito: é o texto sobre a ação
+primária no escuro, um par de contraste e não um passo de luminosidade.
+
+### `creme` — matiz 104,9°, ancorada em #FDFBD4 no passo 50
+
+| Passo | Valor     |
+| ----- | --------- |
+| 50    | `#FDFBD4` |
+| 300   | `#E2DC8E` |
+| 600   | `#948B05` |
+| 700   | `#7B7301` |
+| 900   | `#4F4A00` |
+
+### `neutral` — derivada do creme, matiz 104,9° com croma quase nulo
+
+Substitui o `neutral` padrão do Tailwind, para o cinza do app não brigar com a
+marca. Os passos 800 a 975 são as superfícies do tema escuro.
+
+| Passo | Valor     | Uso previsto                             |
+| ----- | --------- | ---------------------------------------- |
+| 50    | `#FBFAF4` | superfície do tema claro                 |
+| 100   | `#F4F3EB` | superfície sutil, faixa de tabela        |
+| 200   | `#E7E7E1` | borda decorativa (claro), texto (escuro) |
+| 300   | `#D2D2CC` | borda decorativa mais marcada            |
+| 400   | `#ABABA5` | texto secundário do tema escuro          |
+| 500   | `#888883` | borda informativa do tema claro          |
+| 600   | `#696964` | borda informativa do tema escuro         |
+| 700   | `#52524D` | texto secundário do tema claro           |
+| 800   | `#3A3935` | borda decorativa do tema escuro          |
+| 850   | `#2C2C27` | superfície escura de terceiro nível      |
+| 900   | `#1F1E1A` | superfície elevada do tema escuro        |
+| 950   | `#141410` | texto primário do tema claro             |
+| 975   | `#12120E` | superfície base do tema escuro           |
+
+### Semânticas
+
+| Escala     | Passo do claro | Passo do escuro |
+| ---------- | -------------- | --------------- |
+| `info`     | 600 `#0388A4`  | 400 `#28BDE0`   |
+| `warning`  | 600 `#9F7100`  | 400 `#D7A035`   |
+| `danger`   | 600 `#C04442`  | 400 `#F8837C`   |
+| `positive` | 700 `#167425`  | 400 `#70C174`   |
+
+`positive` é um verde distinto do jade de propósito: um botão primário e um
+número em alta não podem disputar a mesma cor na tela.
+
+## Tokens semânticos por papel
+
+O que as telas usam. Cada um aponta para um passo no claro e para outro no
+escuro, redefinido sob `prefers-color-scheme: dark`.
+
+| Papel              | Claro          | Escuro         | Contraste                           |
+| ------------------ | -------------- | -------------- | ----------------------------------- |
+| `surface`          | `neutral-50`   | `neutral-975`  | fundo da página                     |
+| `surface-elevated` | `#FFFFFF`      | `neutral-900`  | cartão, modal, cabeçalho fixo       |
+| `text-primary`     | `neutral-950`  | `neutral-200`  | 17,6:1 no claro / 14,0:1 no escuro  |
+| `text-secondary`   | `neutral-700`  | `neutral-400`  | 7,6:1 no claro / 8,1:1 no escuro    |
+| `action`           | `jade-700`     | `jade-500`     | ver abaixo                          |
+| `on-action`        | `#FFFFFF`      | `jade-ink`     | 4,63:1 no claro / 5,86:1 no escuro  |
+| `accent`           | `creme-700`    | `creme-50`     | acento de marca, não corpo de texto |
+| `border`           | `neutral-200`  | `neutral-800`  | borda decorativa                    |
+| `border-strong`    | `neutral-500`  | `neutral-600`  | 3,6:1 no claro / 3,0:1 no escuro    |
+| `focus`            | `jade-700`     | `jade-400`     | 4,63:1 no claro / 9,49:1 no escuro  |
+| `info`             | `info-600`     | `info-400`     | 4,5:1 sobre a superfície do tema    |
+| `warning`          | `warning-600`  | `warning-400`  | 4,5:1 sobre a superfície do tema    |
+| `danger`           | `danger-600`   | `danger-400`   | 4,5:1 sobre a superfície do tema    |
+| `positive`         | `positive-700` | `positive-400` | 4,5:1 sobre a superfície do tema    |
+
+### Por que a ação inverte entre os temas
+
+No claro, `jade-700` #008654 com texto branco dá **4,63:1**. No escuro,
+`jade-700` contra a superfície #12120E cai para **3,60:1** e o botão some — por
+isso o escuro usa `jade-500` #00BB77 com texto `jade-ink` #0B2E22, que dá
+**5,86:1**.
+
+O creme faz o caminho inverso: fundo no claro, acento no escuro. Como corpo de
+texto no escuro ele chega a 17,8:1, e esse excesso de contraste cansa a leitura.
+
+### Armadilha das bordas no escuro
+
+Uma borda que carrega informação só atinge 3:1 contra a superfície escura a
+partir de `#696964` — bem mais claro do que a intuição sugere. Borda apenas
+decorativa pode usar `neutral-800` `#3A3935`.
+
+## Limites a respeitar
+
+- Texto sobre fundo: **4,5:1** nos dois temas.
+- Borda e ícone informativos: **3:1** nos dois temas.
+- Valorização e desvalorização usam `positive` e `danger`, nunca o token da
+  marca.

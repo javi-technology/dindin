@@ -11,6 +11,139 @@
 }
 
 /*
+  Paleta Verde-Jade e Creme (issue #391). As escalas são a matéria-prima; as
+  telas não as consomem direto. Quem elas consomem é a camada semântica logo
+  abaixo, porque só ela sabe qual passo cada papel usa em cada tema.
+
+  `jade` nasce ancorada em #00bb77 no passo 500 e `creme` em #fdfbd4 no passo
+  50: os dois valores da identidade. Os demais passos variam a luminosidade em
+  OKLCH preservando a matiz — 158,6° no jade, 104,9° no creme. Os neutros saem
+  da mesma matiz do creme com croma quase nulo, para o cinza do app não brigar
+  com a marca, e por isso substituem o `neutral` padrão do Tailwind.
+
+  Ver `docs/paleta.md` para o uso de cada token e as razões de contraste.
+*/
+@theme {
+  --color-jade-50: #e4ffee;
+  --color-jade-100: #cff9df;
+  --color-jade-300: #7ddfaa;
+  --color-jade-400: #4acf8f;
+  --color-jade-500: #00bb77;
+  --color-jade-600: #009f65;
+  --color-jade-700: #008654;
+  --color-jade-900: #005634;
+
+  --color-creme-50: #fdfbd4;
+  --color-creme-300: #e2dc8e;
+  --color-creme-600: #948b05;
+  --color-creme-700: #7b7301;
+  --color-creme-900: #4f4a00;
+
+  --color-neutral-50: #fbfaf4;
+  --color-neutral-100: #f4f3eb;
+  --color-neutral-200: #e7e7e1;
+  --color-neutral-300: #d2d2cc;
+  --color-neutral-400: #ababa5;
+  --color-neutral-500: #888883;
+  --color-neutral-600: #696964;
+  --color-neutral-700: #52524d;
+  --color-neutral-800: #3a3935;
+  --color-neutral-850: #2c2c27;
+  --color-neutral-900: #1f1e1a;
+  --color-neutral-950: #141410;
+  --color-neutral-975: #12120e;
+
+  --color-info-400: #28bde0;
+  --color-info-600: #0388a4;
+  --color-warning-400: #d7a035;
+  --color-warning-600: #9f7100;
+  --color-danger-400: #f8837c;
+  --color-danger-600: #c04442;
+  --color-positive-400: #70c174;
+  --color-positive-700: #167425;
+
+  /*
+    Texto sobre a ação primária no escuro. Fica fora da escala jade de
+    propósito: é um par de contraste, não um passo de luminosidade.
+  */
+  --color-jade-ink: #0b2e22;
+}
+
+/*
+  Camada semântica: um token por papel, que é o que a marcação das telas usa.
+  `@theme inline` importa porque mantém a utilitária apontando para a variável
+  em vez de resolver o valor na hora da compilação — sem isso, a troca de tema
+  abaixo não chegaria às classes já geradas.
+*/
+@theme inline {
+  --color-surface: var(--dindin-surface);
+  --color-surface-elevated: var(--dindin-surface-elevated);
+  --color-text-primary: var(--dindin-text-primary);
+  --color-text-secondary: var(--dindin-text-secondary);
+  --color-action: var(--dindin-action);
+  --color-on-action: var(--dindin-on-action);
+  --color-accent: var(--dindin-accent);
+  --color-border: var(--dindin-border);
+  --color-border-strong: var(--dindin-border-strong);
+  --color-focus: var(--dindin-focus);
+  --color-info: var(--dindin-info);
+  --color-warning: var(--dindin-warning);
+  --color-danger: var(--dindin-danger);
+  --color-positive: var(--dindin-positive);
+}
+
+/*
+  Tema claro. O creme é superfície, nunca ação: #fdfbd4 sobre branco dá 1,05:1.
+  A ação primária usa o jade escurecido com texto branco (4,63:1), porque o
+  jade puro sobre branco dá 2,51:1 e reprovaria AA.
+*/
+:root {
+  --dindin-surface: var(--color-neutral-50);
+  --dindin-surface-elevated: #ffffff;
+  --dindin-text-primary: var(--color-neutral-950);
+  --dindin-text-secondary: var(--color-neutral-700);
+  --dindin-action: var(--color-jade-700);
+  --dindin-on-action: #ffffff;
+  --dindin-accent: var(--color-creme-700);
+  --dindin-border: var(--color-neutral-200);
+  --dindin-border-strong: var(--color-neutral-500);
+  --dindin-focus: var(--color-jade-700);
+  --dindin-info: var(--color-info-600);
+  --dindin-warning: var(--color-warning-600);
+  --dindin-danger: var(--color-danger-600);
+  --dindin-positive: var(--color-positive-700);
+}
+
+/*
+  Tema escuro. Os papéis das duas cores da marca se invertem: o jade clareia
+  para virar ação (jade-700 contra a superfície escura cai para 3,60:1) e o
+  creme deixa de ser fundo para virar acento. As superfícies são neutros
+  quentes, não preto, porque preto puro com cor saturada por cima provoca
+  halation.
+
+  As escalas não mudam de valor entre os temas; muda só o passo para onde
+  cada papel aponta.
+*/
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dindin-surface: var(--color-neutral-975);
+    --dindin-surface-elevated: var(--color-neutral-900);
+    --dindin-text-primary: var(--color-neutral-200);
+    --dindin-text-secondary: var(--color-neutral-400);
+    --dindin-action: var(--color-jade-500);
+    --dindin-on-action: var(--color-jade-ink);
+    --dindin-accent: var(--color-creme-50);
+    --dindin-border: var(--color-neutral-800);
+    --dindin-border-strong: var(--color-neutral-600);
+    --dindin-focus: var(--color-jade-400);
+    --dindin-info: var(--color-info-400);
+    --dindin-warning: var(--color-warning-400);
+    --dindin-danger: var(--color-danger-400);
+    --dindin-positive: var(--color-positive-400);
+  }
+}
+
+/*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
   looks the same as it did with Tailwind CSS v3.
