@@ -169,6 +169,41 @@ decorativa pode usar `neutral-800` `#3A3935`.
 | número em alta / em baixa              | `text-positive` / `text-danger` |
 | badge, faixa de aviso, erro            | `bg-<x>-soft text-<x>-ink`      |
 
+## Gráficos
+
+A série categórica dos gráficos fica em
+`apps/web/src/app/shared/components/charts/chart-palette.ts`, e aponta para os
+tokens `chart-1` a `chart-8`, mais `chart-other` para a fatia "Outros". Um
+gráfico novo pega a cor de lá; não inventa a própria.
+
+| Token         | Claro          | Escuro         |
+| ------------- | -------------- | -------------- |
+| `chart-1`     | `jade-700`     | `jade-500`     |
+| `chart-2`     | `jade-300`     | `jade-100`     |
+| `chart-3`     | `danger-800`   | `danger-600`   |
+| `chart-4`     | `info-400`     | `info-400`     |
+| `chart-5`     | `creme-700`    | `warning-600`  |
+| `chart-6`     | `positive-400` | `positive-400` |
+| `chart-7`     | `info-600`     | `info-600`     |
+| `chart-8`     | `warning-400`  | `creme-300`    |
+| `chart-other` | `neutral-500`  | `neutral-500`  |
+
+A ordem é o que importa: séries vizinhas se distinguem por **luminosidade**, e
+não por matiz, para continuarem legíveis em impressão em tons de cinza e para
+quem tem baixa visão de cor. A suíte exige ao menos 1,5:1 entre séries vizinhas
+e entre cada série e a superfície, nos dois temas.
+
+Alta e baixa em gráfico usam `positive` e `danger`, os mesmos tokens das
+tabelas. Grade, eixo, linha e área usam os tokens de papel (`stroke-border`,
+`stroke-action`, `fill-brand-soft`).
+
+## E-mail
+
+Cliente de e-mail não lê o CSS do app, então lá a cor vai em hexadecimal
+literal, em `apps/api/src/alerts/alert-mail.service.ts`. São os valores do tema
+claro, porque o fundo da mensagem é o branco do cliente: texto `#141410`
+(18,9:1), texto de apoio `#52524D` (7,7:1) e link `#008654` (4,63:1).
+
 ## Limites a respeitar
 
 - Texto sobre fundo: **4,5:1** nos dois temas.

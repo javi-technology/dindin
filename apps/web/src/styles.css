@@ -119,6 +119,22 @@
   --color-overlay: var(--dindin-overlay);
 
   /*
+    Série categórica dos gráficos (issue #393). A ordem é o que importa: as
+    séries vizinhas se distinguem por luminosidade, não por matiz, para
+    continuarem legíveis em impressão em tons de cinza e para quem tem baixa
+    visão de cor. `chart-other` é a fatia que agrupa o restante.
+  */
+  --color-chart-1: var(--dindin-chart-1);
+  --color-chart-2: var(--dindin-chart-2);
+  --color-chart-3: var(--dindin-chart-3);
+  --color-chart-4: var(--dindin-chart-4);
+  --color-chart-5: var(--dindin-chart-5);
+  --color-chart-6: var(--dindin-chart-6);
+  --color-chart-7: var(--dindin-chart-7);
+  --color-chart-8: var(--dindin-chart-8);
+  --color-chart-other: var(--dindin-chart-other);
+
+  /*
     Os pares `-soft`/`-ink` (issue #392) atendem badge, faixa de aviso e
     mensagem de erro, que precisam de fundo tingido com texto legível por
     cima. O passo `-ink` também passa dos 4,5:1 sobre a superfície comum, para
@@ -162,6 +178,15 @@
   --dindin-on-danger: #ffffff;
   --dindin-positive: var(--color-positive-700);
   --dindin-overlay: rgb(20 20 16 / 0.5);
+  --dindin-chart-1: var(--color-jade-700);
+  --dindin-chart-2: var(--color-jade-300);
+  --dindin-chart-3: var(--color-danger-800);
+  --dindin-chart-4: var(--color-info-400);
+  --dindin-chart-5: var(--color-creme-700);
+  --dindin-chart-6: var(--color-positive-400);
+  --dindin-chart-7: var(--color-info-600);
+  --dindin-chart-8: var(--color-warning-400);
+  --dindin-chart-other: var(--color-neutral-500);
   --dindin-brand-soft: var(--color-jade-50);
   --dindin-brand-ink: var(--color-jade-900);
   --dindin-info-soft: var(--color-info-50);
@@ -206,6 +231,15 @@
     --dindin-on-danger: var(--color-neutral-950);
     --dindin-positive: var(--color-positive-400);
     --dindin-overlay: rgb(5 5 3 / 0.7);
+    --dindin-chart-1: var(--color-jade-500);
+    --dindin-chart-2: var(--color-jade-100);
+    --dindin-chart-3: var(--color-danger-600);
+    --dindin-chart-4: var(--color-info-400);
+    --dindin-chart-5: var(--color-warning-600);
+    --dindin-chart-6: var(--color-positive-400);
+    --dindin-chart-7: var(--color-info-600);
+    --dindin-chart-8: var(--color-creme-300);
+    --dindin-chart-other: var(--color-neutral-500);
     --dindin-brand-soft: var(--color-jade-950);
     --dindin-brand-ink: var(--color-jade-300);
     --dindin-info-soft: var(--color-info-950);

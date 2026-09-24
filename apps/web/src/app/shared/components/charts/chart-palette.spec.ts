@@ -46,6 +46,7 @@ function declarations(body: string): Record<string, string> {
 }
 
 const scales = declarations(bodyOf('@theme {'));
+const semanticLayer = declarations(bodyOf('@theme inline'));
 const light = declarations(bodyOf(':root'));
 const dark = declarations(
   bodyOf(':root', bodyOf('@media (prefers-color-scheme: dark)')),
@@ -71,7 +72,7 @@ function resolveToken(token: string, theme: Record<string, string>): string {
   const reference = token.match(/^var\((--[\w-]+)\)$/);
   if (!reference) return token.toLowerCase();
   const next =
-    theme[reference[1]] ?? scales[reference[1]] ?? light[reference[1]];
+    theme[reference[1]] ?? semanticLayer[reference[1]] ?? scales[reference[1]];
   expect(next, `token ${reference[1]} não existe`).toBeDefined();
   return resolveToken(next, theme);
 }
@@ -152,7 +153,10 @@ describe('série categórica dos gráficos', () => {
       if (file.endsWith('chart-palette.ts')) continue;
       const lines = readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, index) => {
-        for (const match of line.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) {
+        // Só hexadecimal de cor: 6 ou 8 dígitos. `#393` é referência de issue.
+        for (const match of line.matchAll(
+          /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6})\b/g,
+        )) {
           offenders.push(
             `${relative(CHARTS_DIR, file)}:${index + 1} ${match[0]}`,
           );

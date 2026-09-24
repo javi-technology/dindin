@@ -20,7 +20,7 @@
           x2="580"
           [attr.y1]="tick.y"
           [attr.y2]="tick.y"
-          stroke="#e5e7eb"
+          class="stroke-border"
           stroke-width="1"
         />
         <text
@@ -33,11 +33,15 @@
         </text>
       }
 
-      <path [attr.d]="areaPath()" fill="#dbeafe" data-testid="patrimony-area" />
+      <path
+        [attr.d]="areaPath()"
+        class="fill-brand-soft"
+        data-testid="patrimony-area"
+      />
       <polyline
         [attr.points]="linePath()"
         fill="none"
-        stroke="#2563eb"
+        class="stroke-action"
         stroke-width="3"
         stroke-linecap="round"
         stroke-linejoin="round"
@@ -47,7 +51,7 @@
           [attr.cx]="point.x"
           [attr.cy]="point.y"
           r="4"
-          [attr.fill]="last ? '#1d4ed8' : '#2563eb'"
+          [class]="last ? 'fill-action-hover' : 'fill-action'"
         />
       }
       <text
