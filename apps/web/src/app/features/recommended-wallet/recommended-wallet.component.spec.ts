@@ -385,7 +385,7 @@ describe('RecommendedWalletComponent', () => {
     const badge = item?.querySelector('span');
 
     expect(item!.textContent).toContain('Aguardar');
-    expect(badge?.classList.contains('bg-green-100')).toBe(false);
+    expect(badge?.classList.contains('bg-positive-soft')).toBe(false);
     expect(item!.textContent).toContain(
       'Valor insuficiente para 1 cota (R$\u00a096,44); aguarde acumular ou redistribua.',
     );

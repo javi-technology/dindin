@@ -301,7 +301,7 @@ describe('FridgeComponent', () => {
     fixture.detectChanges();
 
     const confirmButton = compiled.querySelector(
-      '[data-testid="delete-confirm-modal"] button.bg-red-600',
+      '[data-testid="delete-confirm-modal"] button.bg-danger',
     ) as HTMLButtonElement;
     confirmButton.click();
     tick();
@@ -479,7 +479,7 @@ describe('FridgeComponent', () => {
     fixture.detectChanges();
     (
       compiled.querySelector(
-        '[data-testid="unfreeze-modal"] button.bg-emerald-600',
+        '[data-testid="unfreeze-modal"] button.bg-action',
       ) as HTMLButtonElement
     ).click();
     tick();
@@ -509,7 +509,7 @@ describe('FridgeComponent', () => {
     fixture.detectChanges();
     (
       compiled.querySelector(
-        '[data-testid="unfreeze-modal"] button.bg-emerald-600',
+        '[data-testid="unfreeze-modal"] button.bg-action',
       ) as HTMLButtonElement
     ).click();
     tick();

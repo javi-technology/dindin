@@ -147,7 +147,7 @@ describe('ConfirmDialogComponent', () => {
     it('deve usar vermelho na variante destrutiva', () => {
       const confirm = element('[data-testid="confirm-dialog-confirm"]');
 
-      expect(confirm?.className).toContain('bg-red-600');
+      expect(confirm?.className).toContain('bg-danger');
     });
 
     it('deve usar verde na variante primária', () => {
@@ -156,7 +156,7 @@ describe('ConfirmDialogComponent', () => {
 
       const confirm = element('[data-testid="confirm-dialog-confirm"]');
 
-      expect(confirm?.className).toContain('bg-green-600');
+      expect(confirm?.className).toContain('bg-action');
     });
   });
 });

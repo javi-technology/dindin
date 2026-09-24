@@ -690,7 +690,7 @@ describe('WalletComponent', () => {
     fixture.detectChanges();
 
     const confirmButton = compiled.querySelector(
-      '[data-testid="delete-confirm-modal"] button.bg-red-600',
+      '[data-testid="delete-confirm-modal"] button.bg-danger',
     ) as HTMLButtonElement;
     confirmButton.click();
     tick();

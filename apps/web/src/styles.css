@@ -32,6 +32,7 @@
   --color-jade-600: #009f65;
   --color-jade-700: #008654;
   --color-jade-900: #005634;
+  --color-jade-950: #0a2a1f;
 
   --color-creme-50: #fdfbd4;
   --color-creme-300: #e2dc8e;
@@ -44,6 +45,7 @@
   --color-neutral-200: #e7e7e1;
   --color-neutral-300: #d2d2cc;
   --color-neutral-400: #ababa5;
+  --color-neutral-450: #9a9a94;
   --color-neutral-500: #888883;
   --color-neutral-600: #696964;
   --color-neutral-700: #52524d;
@@ -53,14 +55,27 @@
   --color-neutral-950: #141410;
   --color-neutral-975: #12120e;
 
+  --color-info-50: #e3f5fa;
   --color-info-400: #28bde0;
   --color-info-600: #0388a4;
+  --color-info-800: #045a6d;
+  --color-info-950: #0d2a31;
+  --color-warning-50: #f9efd8;
   --color-warning-400: #d7a035;
   --color-warning-600: #9f7100;
+  --color-warning-800: #6e4e00;
+  --color-warning-950: #2e2410;
+  --color-danger-50: #fdecec;
+  --color-danger-300: #fbb0ab;
   --color-danger-400: #f8837c;
   --color-danger-600: #c04442;
+  --color-danger-800: #8e2e2c;
+  --color-danger-950: #331a19;
+  --color-positive-50: #e6f4e8;
   --color-positive-400: #70c174;
   --color-positive-700: #167425;
+  --color-positive-900: #10561c;
+  --color-positive-950: #16261a;
 
   /*
     Texto sobre a ação primária no escuro. Fica fora da escala jade de
@@ -78,9 +93,12 @@
 @theme inline {
   --color-surface: var(--dindin-surface);
   --color-surface-elevated: var(--dindin-surface-elevated);
+  --color-surface-sunken: var(--dindin-surface-sunken);
   --color-text-primary: var(--dindin-text-primary);
   --color-text-secondary: var(--dindin-text-secondary);
+  --color-text-muted: var(--dindin-text-muted);
   --color-action: var(--dindin-action);
+  --color-action-hover: var(--dindin-action-hover);
   --color-on-action: var(--dindin-on-action);
   --color-accent: var(--dindin-accent);
   --color-border: var(--dindin-border);
@@ -89,7 +107,33 @@
   --color-info: var(--dindin-info);
   --color-warning: var(--dindin-warning);
   --color-danger: var(--dindin-danger);
+  --color-danger-hover: var(--dindin-danger-hover);
+  --color-on-danger: var(--dindin-on-danger);
   --color-positive: var(--dindin-positive);
+
+  /*
+    Véu do modal. É um token porque a opacidade sobre preto puro que serve ao
+    tema claro deixa o escuro lavado: no escuro o véu precisa ser mais opaco
+    para separar o modal da superfície, que já é escura.
+  */
+  --color-overlay: var(--dindin-overlay);
+
+  /*
+    Os pares `-soft`/`-ink` (issue #392) atendem badge, faixa de aviso e
+    mensagem de erro, que precisam de fundo tingido com texto legível por
+    cima. O passo `-ink` também passa dos 4,5:1 sobre a superfície comum, para
+    o mesmo token servir ao texto dentro e fora do tom suave.
+  */
+  --color-brand-soft: var(--dindin-brand-soft);
+  --color-brand-ink: var(--dindin-brand-ink);
+  --color-info-soft: var(--dindin-info-soft);
+  --color-info-ink: var(--dindin-info-ink);
+  --color-warning-soft: var(--dindin-warning-soft);
+  --color-warning-ink: var(--dindin-warning-ink);
+  --color-danger-soft: var(--dindin-danger-soft);
+  --color-danger-ink: var(--dindin-danger-ink);
+  --color-positive-soft: var(--dindin-positive-soft);
+  --color-positive-ink: var(--dindin-positive-ink);
 }
 
 /*
@@ -100,9 +144,12 @@
 :root {
   --dindin-surface: var(--color-neutral-50);
   --dindin-surface-elevated: #ffffff;
+  --dindin-surface-sunken: var(--color-neutral-100);
   --dindin-text-primary: var(--color-neutral-950);
   --dindin-text-secondary: var(--color-neutral-700);
+  --dindin-text-muted: var(--color-neutral-600);
   --dindin-action: var(--color-jade-700);
+  --dindin-action-hover: var(--color-jade-900);
   --dindin-on-action: #ffffff;
   --dindin-accent: var(--color-creme-700);
   --dindin-border: var(--color-neutral-200);
@@ -111,7 +158,20 @@
   --dindin-info: var(--color-info-600);
   --dindin-warning: var(--color-warning-600);
   --dindin-danger: var(--color-danger-600);
+  --dindin-danger-hover: var(--color-danger-800);
+  --dindin-on-danger: #ffffff;
   --dindin-positive: var(--color-positive-700);
+  --dindin-overlay: rgb(20 20 16 / 0.5);
+  --dindin-brand-soft: var(--color-jade-50);
+  --dindin-brand-ink: var(--color-jade-900);
+  --dindin-info-soft: var(--color-info-50);
+  --dindin-info-ink: var(--color-info-800);
+  --dindin-warning-soft: var(--color-warning-50);
+  --dindin-warning-ink: var(--color-warning-800);
+  --dindin-danger-soft: var(--color-danger-50);
+  --dindin-danger-ink: var(--color-danger-800);
+  --dindin-positive-soft: var(--color-positive-50);
+  --dindin-positive-ink: var(--color-positive-900);
 }
 
 /*
@@ -128,9 +188,12 @@
   :root {
     --dindin-surface: var(--color-neutral-975);
     --dindin-surface-elevated: var(--color-neutral-900);
+    --dindin-surface-sunken: var(--color-neutral-850);
     --dindin-text-primary: var(--color-neutral-200);
     --dindin-text-secondary: var(--color-neutral-400);
+    --dindin-text-muted: var(--color-neutral-450);
     --dindin-action: var(--color-jade-500);
+    --dindin-action-hover: var(--color-jade-400);
     --dindin-on-action: var(--color-jade-ink);
     --dindin-accent: var(--color-creme-50);
     --dindin-border: var(--color-neutral-800);
@@ -139,7 +202,20 @@
     --dindin-info: var(--color-info-400);
     --dindin-warning: var(--color-warning-400);
     --dindin-danger: var(--color-danger-400);
+    --dindin-danger-hover: var(--color-danger-300);
+    --dindin-on-danger: var(--color-neutral-950);
     --dindin-positive: var(--color-positive-400);
+    --dindin-overlay: rgb(5 5 3 / 0.7);
+    --dindin-brand-soft: var(--color-jade-950);
+    --dindin-brand-ink: var(--color-jade-300);
+    --dindin-info-soft: var(--color-info-950);
+    --dindin-info-ink: var(--color-info-400);
+    --dindin-warning-soft: var(--color-warning-950);
+    --dindin-warning-ink: var(--color-warning-400);
+    --dindin-danger-soft: var(--color-danger-950);
+    --dindin-danger-ink: var(--color-danger-400);
+    --dindin-positive-soft: var(--color-positive-950);
+    --dindin-positive-ink: var(--color-positive-400);
   }
 }
 
@@ -157,7 +233,7 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--dindin-border, currentcolor);
   }
 }
 
@@ -173,6 +249,6 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-gray-400);
+    color: var(--dindin-text-muted);
   }
 }

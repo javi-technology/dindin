@@ -1,8 +1,8 @@
 <div class="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
-  <label class="text-sm text-gray-700">
+  <label class="text-sm text-text-secondary">
     Comparar com carteira
     <select
-      class="block mt-1 border border-gray-300 rounded-lg px-3 py-2"
+      class="block mt-1 border border-border-strong rounded-lg px-3 py-2"
       [value]="selectedWalletId() ?? ''"
       (change)="onWalletChange($event)"
       data-testid="wallet-select"
@@ -16,61 +16,61 @@
 
 @if (comparison(); as diff) {
   @if (diff.items.length === 0) {
-    <p class="text-gray-500" data-testid="empty-comparison">
+    <p class="text-text-muted" data-testid="empty-comparison">
       Nenhuma posição para comparar.
     </p>
   } @else {
     <div class="overflow-x-auto">
       <table class="w-full text-left border-collapse">
         <thead>
-          <tr class="border-b border-gray-200">
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+          <tr class="border-b border-border">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Ticker
             </th>
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Status
             </th>
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Peso recomendado
             </th>
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Peso atual
             </th>
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Quantidade
             </th>
-            <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+            <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
               Valor atual
             </th>
           </tr>
         </thead>
         <tbody>
           @for (item of diff.items; track item.ticker) {
-            <tr class="border-b border-gray-100">
-              <td class="py-3 px-4 font-medium text-gray-900">
+            <tr class="border-b border-border">
+              <td class="py-3 px-4 font-medium text-text-primary">
                 {{ item.ticker }}
               </td>
-              <td class="py-3 px-4 text-sm text-gray-700">
+              <td class="py-3 px-4 text-sm text-text-secondary">
                 {{ statusLabel(item.status) }}
               </td>
-              <td class="py-3 px-4 text-sm text-gray-700">
+              <td class="py-3 px-4 text-sm text-text-secondary">
                 {{
                   item.recommendedWeight === null
                     ? '—'
                     : formatWeight(item.recommendedWeight)
                 }}
               </td>
-              <td class="py-3 px-4 text-sm text-gray-700">
+              <td class="py-3 px-4 text-sm text-text-secondary">
                 {{
                   item.currentWeight === null
                     ? '—'
                     : formatWeight(item.currentWeight)
                 }}
               </td>
-              <td class="py-3 px-4 text-sm text-gray-700">
+              <td class="py-3 px-4 text-sm text-text-secondary">
                 {{ item.quantity }}
               </td>
-              <td class="py-3 px-4 text-sm text-gray-700">
+              <td class="py-3 px-4 text-sm text-text-secondary">
                 {{ formatCurrency(item.currentValue) }}
               </td>
             </tr>
@@ -78,7 +78,7 @@
         </tbody>
       </table>
     </div>
-    <p class="text-right font-semibold text-gray-900 mt-4">
+    <p class="text-right font-semibold text-text-primary mt-4">
       Total: {{ formatCurrency(diff.totalValue) }}
     </p>
   }

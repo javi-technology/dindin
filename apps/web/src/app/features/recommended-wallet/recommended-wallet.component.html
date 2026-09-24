@@ -1,27 +1,27 @@
-<main class="min-h-screen bg-gray-50 p-6">
+<main class="min-h-screen bg-surface p-6">
   <div class="max-w-6xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-lg p-6">
+    <div class="bg-surface-elevated rounded-2xl shadow-lg p-6">
       <div
         class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6"
       >
         <div>
           <a
             routerLink="/"
-            class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 mb-3"
+            class="inline-flex items-center text-sm font-medium text-action hover:text-brand-ink mb-3"
           >
             <svg lucideArrowLeft [size]="16" class="mr-1"></svg>
             Voltar
           </a>
-          <h1 class="text-2xl font-bold text-gray-900">
+          <h1 class="text-2xl font-bold text-text-primary">
             Carteira recomendada BB (FIIs)
           </h1>
         </div>
 
         @if (recommendedWallets().length > 0) {
-          <label class="text-sm text-gray-700">
+          <label class="text-sm text-text-secondary">
             Mês
             <select
-              class="block mt-1 border border-gray-300 rounded-lg px-3 py-2"
+              class="block mt-1 border border-border-strong rounded-lg px-3 py-2"
               [value]="selectedMonth()"
               (change)="selectMonth($any($event.target).value)"
               data-testid="month-select"
@@ -35,12 +35,12 @@
       </div>
 
       @if (loading()) {
-        <p class="text-gray-600" data-testid="loading">Carregando...</p>
+        <p class="text-text-secondary" data-testid="loading">Carregando...</p>
       }
 
       @if (error()) {
         <div
-          class="bg-red-50 text-red-800 rounded-lg p-4 mb-4"
+          class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-4"
           data-testid="error-message"
         >
           {{ error() }}
@@ -49,7 +49,7 @@
 
       @if (successMessage()) {
         <div
-          class="bg-green-50 text-green-800 rounded-lg p-4 mb-4"
+          class="bg-positive-soft text-positive-ink rounded-lg p-4 mb-4"
           data-testid="success-message"
         >
           {{ successMessage() }}
@@ -57,7 +57,7 @@
       }
 
       @if (!loading() && !recommendedWallet()) {
-        <p class="text-gray-500" data-testid="empty-wallet">
+        <p class="text-text-muted" data-testid="empty-wallet">
           Nenhuma carteira recomendada disponível.
         </p>
       }
@@ -66,17 +66,17 @@
         <div
           class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5"
         >
-          <div class="text-sm text-gray-600">
+          <div class="text-sm text-text-secondary">
             <span>Revisão {{ wallet.revision }}</span>
             <span class="mx-2">•</span>
             <span>Publicada em {{ wallet.publishedAt }}</span>
           </div>
           <span
             class="inline-flex self-start items-center px-3 py-1 rounded-full text-xs font-medium"
-            [class.bg-amber-100]="wallet.status === 'pending_review'"
-            [class.text-amber-800]="wallet.status === 'pending_review'"
-            [class.bg-green-100]="wallet.status === 'confirmed'"
-            [class.text-green-800]="wallet.status === 'confirmed'"
+            [class.bg-warning-soft]="wallet.status === 'pending_review'"
+            [class.text-warning-ink]="wallet.status === 'pending_review'"
+            [class.bg-positive-soft]="wallet.status === 'confirmed'"
+            [class.text-positive-ink]="wallet.status === 'confirmed'"
             data-testid="wallet-status"
           >
             {{ statusLabel(wallet.status) }}
@@ -89,7 +89,7 @@
           (tabChange)="selectTab($event)"
         />
 
-        <section class="border-t border-gray-200 pt-5">
+        <section class="border-t border-border pt-5">
           <app-wallet-comparison
             [wallets]="wallets()"
             [selectedWalletId]="selectedWalletId()"
@@ -110,11 +110,11 @@
         </section>
 
         @if (isAdmin()) {
-          <section class="border-t border-gray-200 mt-6 pt-5">
+          <section class="border-t border-border mt-6 pt-5">
             <div class="flex flex-wrap gap-3 items-center">
               <button
                 type="button"
-                class="inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                class="inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 [disabled]="wallet.status === 'confirmed'"
                 (click)="openConfirmModal()"
                 data-testid="confirm-button"
@@ -123,7 +123,7 @@
                 Confirmar carteira
               </button>
               <label
-                class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
+                class="inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
               >
                 <svg lucideUpload [size]="18" class="mr-2"></svg>
                 Importar PDF

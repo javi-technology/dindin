@@ -82,7 +82,7 @@ describe('AppComponent', () => {
       '[data-testid="main-nav"] a[href="/carteira"]',
     ) as HTMLAnchorElement;
 
-    expect(active.classList).toContain('text-blue-600!');
+    expect(active.classList).toContain('text-action!');
   });
 
   it('não deve exibir navegação quando não autenticado', () => {

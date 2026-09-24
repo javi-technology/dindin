@@ -76,6 +76,25 @@ marca. Os passos 800 a 975 são as superfícies do tema escuro.
 | `danger`   | 600 `#C04442`  | 400 `#F8837C`   |
 | `positive` | 700 `#167425`  | 400 `#70C174`   |
 
+Cada semântica tem ainda um tom de fundo e um de texto, para badge, faixa de
+aviso e mensagem de erro:
+
+| Escala     | Fundo claro  | Texto claro   | Fundo escuro  | Texto escuro |
+| ---------- | ------------ | ------------- | ------------- | ------------ |
+| `info`     | 50 `#E3F5FA` | 800 `#045A6D` | 950 `#0D2A31` | 400          |
+| `warning`  | 50 `#F9EFD8` | 800 `#6E4E00` | 950 `#2E2410` | 400          |
+| `danger`   | 50 `#FDECEC` | 800 `#8E2E2C` | 950 `#331A19` | 400          |
+| `positive` | 50 `#E6F4E8` | 900 `#10561C` | 950 `#16261A` | 400          |
+| `jade`     | 50 `#E4FFEE` | 900 `#005634` | 950 `#0A2A1F` | 300          |
+
+`danger` tem ainda o passo 300 `#FBB0AB`, o hover do botão destrutivo no tema
+escuro — onde o hover precisa clarear, não escurecer.
+
+Os passos 600/700 das semânticas ficam entre 4,0:1 e 5,6:1 sobre a superfície
+clara: servem a ícone, borda e realce (limite de 3:1), não a texto corrido. O
+texto usa o par `-ink`, que passa dos 4,5:1 tanto sobre o tom suave quanto
+sobre a superfície comum.
+
 `positive` é um verde distinto do jade de propósito: um botão primário e um
 número em alta não podem disputar a mesma cor na tela.
 
@@ -84,22 +103,38 @@ número em alta não podem disputar a mesma cor na tela.
 O que as telas usam. Cada um aponta para um passo no claro e para outro no
 escuro, redefinido sob `prefers-color-scheme: dark`.
 
-| Papel              | Claro          | Escuro         | Contraste                           |
+| Papel              | Claro          | Escuro         | Uso e contraste                     |
 | ------------------ | -------------- | -------------- | ----------------------------------- |
 | `surface`          | `neutral-50`   | `neutral-975`  | fundo da página                     |
 | `surface-elevated` | `#FFFFFF`      | `neutral-900`  | cartão, modal, cabeçalho fixo       |
+| `surface-sunken`   | `neutral-100`  | `neutral-850`  | cabeçalho de tabela, área rebaixada |
 | `text-primary`     | `neutral-950`  | `neutral-200`  | 17,6:1 no claro / 14,0:1 no escuro  |
 | `text-secondary`   | `neutral-700`  | `neutral-400`  | 7,6:1 no claro / 8,1:1 no escuro    |
+| `text-muted`       | `neutral-600`  | `neutral-450`  | 5,3:1 no claro / 6,7:1 no escuro    |
 | `action`           | `jade-700`     | `jade-500`     | ver abaixo                          |
+| `action-hover`     | `jade-900`     | `jade-400`     | hover e active da ação primária     |
 | `on-action`        | `#FFFFFF`      | `jade-ink`     | 4,63:1 no claro / 5,86:1 no escuro  |
 | `accent`           | `creme-700`    | `creme-50`     | acento de marca, não corpo de texto |
 | `border`           | `neutral-200`  | `neutral-800`  | borda decorativa                    |
-| `border-strong`    | `neutral-500`  | `neutral-600`  | 3,6:1 no claro / 3,0:1 no escuro    |
-| `focus`            | `jade-700`     | `jade-400`     | 4,63:1 no claro / 9,49:1 no escuro  |
-| `info`             | `info-600`     | `info-400`     | 4,5:1 sobre a superfície do tema    |
-| `warning`          | `warning-600`  | `warning-400`  | 4,5:1 sobre a superfície do tema    |
-| `danger`           | `danger-600`   | `danger-400`   | 4,5:1 sobre a superfície do tema    |
-| `positive`         | `positive-700` | `positive-400` | 4,5:1 sobre a superfície do tema    |
+| `border-strong`    | `neutral-500`  | `neutral-600`  | 3,4:1 no claro / 3,5:1 no escuro    |
+| `focus`            | `jade-700`     | `jade-400`     | 4,46:1 no claro / 9,57:1 no escuro  |
+| `info`             | `info-600`     | `info-400`     | ícone e borda, ao menos 3:1         |
+| `warning`          | `warning-600`  | `warning-400`  | ícone e borda, ao menos 3:1         |
+| `danger`           | `danger-600`   | `danger-400`   | ícone, borda e valor em baixa       |
+| `danger-hover`     | `danger-800`   | `danger-300`   | hover do botão destrutivo           |
+| `on-danger`        | `#FFFFFF`      | `neutral-950`  | 5,1:1 no claro / 7,5:1 no escuro    |
+| `overlay`          | `#141410` 50%  | `#050503` 70%  | véu do modal                        |
+| `positive`         | `positive-700` | `positive-400` | ícone, borda e valor em alta        |
+| `brand-soft`       | `jade-50`      | `jade-950`     | fundo de badge da marca             |
+| `brand-ink`        | `jade-900`     | `jade-300`     | texto sobre `brand-soft`            |
+| `info-soft`        | `info-50`      | `info-950`     | fundo de faixa informativa          |
+| `info-ink`         | `info-800`     | `info-400`     | texto sobre `info-soft`             |
+| `warning-soft`     | `warning-50`   | `warning-950`  | fundo de faixa de aviso             |
+| `warning-ink`      | `warning-800`  | `warning-400`  | texto sobre `warning-soft`          |
+| `danger-soft`      | `danger-50`    | `danger-950`   | fundo de mensagem de erro           |
+| `danger-ink`       | `danger-800`   | `danger-400`   | texto sobre `danger-soft`           |
+| `positive-soft`    | `positive-50`  | `positive-950` | fundo de badge de valorização       |
+| `positive-ink`     | `positive-900` | `positive-400` | texto sobre `positive-soft`         |
 
 ### Por que a ação inverte entre os temas
 
@@ -116,6 +151,23 @@ texto no escuro ele chega a 17,8:1, e esse excesso de contraste cansa a leitura.
 Uma borda que carrega informação só atinge 3:1 contra a superfície escura a
 partir de `#696964` — bem mais claro do que a intuição sugere. Borda apenas
 decorativa pode usar `neutral-800` `#3A3935`.
+
+## Como escolher o token
+
+| O elemento é…                          | Token                           |
+| -------------------------------------- | ------------------------------- |
+| fundo da página                        | `bg-surface`                    |
+| cartão, modal, linha de tabela         | `bg-surface-elevated`           |
+| cabeçalho de tabela, área rebaixada    | `bg-surface-sunken`             |
+| título, valor em destaque              | `text-text-primary`             |
+| texto corrido, rótulo                  | `text-text-secondary`           |
+| legenda, texto de apoio, ícone neutro  | `text-text-muted`               |
+| botão primário                         | `bg-action text-on-action`      |
+| borda de campo, divisor com informação | `border-border-strong`          |
+| divisor apenas decorativo              | `border-border`                 |
+| anel de foco                           | `ring-focus`                    |
+| número em alta / em baixa              | `text-positive` / `text-danger` |
+| badge, faixa de aviso, erro            | `bg-<x>-soft text-<x>-ink`      |
 
 ## Limites a respeitar
 

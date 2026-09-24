@@ -1,5 +1,5 @@
 @if (!hasData()) {
-  <p data-testid="bar-chart-empty" class="text-gray-600">
+  <p data-testid="bar-chart-empty" class="text-text-secondary">
     Nenhum dado para exibir no período.
   </p>
 } @else {
@@ -23,7 +23,7 @@
         [attr.x]="verticalLeft - 7"
         [attr.y]="tick.position + 4"
         text-anchor="end"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
       >
         {{ tick.label }}
       </text>
@@ -46,7 +46,7 @@
         [attr.x]="bar.labelX"
         [attr.y]="bar.labelY"
         [attr.text-anchor]="isHorizontal() ? 'end' : 'middle'"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
         data-testid="bar-label"
       >
         {{ bar.label }}
@@ -55,7 +55,7 @@
         <text
           [attr.x]="bar.valueX"
           [attr.y]="bar.labelY"
-          class="fill-gray-700 text-[10px]"
+          class="fill-text-secondary text-[10px]"
           data-testid="bar-value"
         >
           {{ bar.valueLabel ?? formatCompactCurrency(bar.value) }}
