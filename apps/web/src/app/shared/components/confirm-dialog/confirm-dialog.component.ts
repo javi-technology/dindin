@@ -37,31 +37,31 @@ import {
     -->
     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      class="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
       data-testid="confirm-dialog-backdrop"
       (click)="onBackdropClick($event)"
     >
       <div
         #dialog
-        class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
+        class="bg-surface-elevated rounded-2xl shadow-xl w-full max-w-sm p-6"
         role="dialog"
         aria-modal="true"
         [attr.aria-labelledby]="titleId"
         [attr.data-testid]="testId()"
         tabindex="-1"
       >
-        <h2 [id]="titleId" class="text-xl font-bold text-gray-900 mb-2">
+        <h2 [id]="titleId" class="text-xl font-bold text-text-primary mb-2">
           {{ title() }}
         </h2>
 
-        <div class="text-gray-600 mb-6">
+        <div class="text-text-secondary mb-6">
           <ng-content />
         </div>
 
         <div class="flex justify-end gap-3">
           <button
             type="button"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:bg-surface-sunken"
             data-testid="confirm-dialog-cancel"
             (click)="cancel()"
           >
@@ -69,7 +69,7 @@ import {
           </button>
           <button
             type="button"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+            class="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
             [class]="confirmClasses()"
             [disabled]="confirmDisabled()"
             data-testid="confirm-dialog-confirm"
@@ -113,8 +113,8 @@ export class ConfirmDialogComponent implements AfterViewInit, OnDestroy {
 
   protected confirmClasses(): string {
     return this.variant() === 'danger'
-      ? 'bg-red-600 hover:bg-red-700'
-      : 'bg-green-600 hover:bg-green-700';
+      ? 'bg-danger hover:bg-danger-hover text-on-danger'
+      : 'bg-action hover:bg-action-hover text-on-action';
   }
 
   ngAfterViewInit(): void {

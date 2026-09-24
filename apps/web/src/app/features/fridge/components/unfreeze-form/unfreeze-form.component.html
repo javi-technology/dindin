@@ -1,4 +1,4 @@
-<p class="text-gray-600 mb-6">
+<p class="text-text-secondary mb-6">
   Mover
   <strong>{{ item().ticker }}</strong> da geladeira para a carteira:
 </p>
@@ -7,18 +7,18 @@
   @if (wallets().length > 0) {
     <select
       formControlName="walletId"
-      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+      class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
     >
       @for (wallet of wallets(); track wallet.id) {
         <option [value]="wallet.id">{{ wallet.name }}</option>
       }
     </select>
   } @else {
-    <p class="text-gray-500 text-sm">Nenhuma carteira disponível.</p>
+    <p class="text-text-muted text-sm">Nenhuma carteira disponível.</p>
   }
 
   @if (error()) {
-    <p class="text-red-600 text-sm" data-testid="unfreeze-error">
+    <p class="text-danger text-sm" data-testid="unfreeze-error">
       {{ error() }}
     </p>
   }
@@ -26,7 +26,7 @@
   <div class="flex justify-end gap-3">
     <button
       type="button"
-      class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-text-secondary bg-surface-sunken hover:bg-border rounded-lg transition-colors"
       data-testid="btn-cancelar-descongelar"
       (click)="close()"
     >
@@ -34,7 +34,7 @@
     </button>
     <button
       type="submit"
-      class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 text-sm font-medium text-on-action bg-action hover:bg-action-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       [disabled]="wallets().length === 0 || form.invalid"
     >
       Descongelar

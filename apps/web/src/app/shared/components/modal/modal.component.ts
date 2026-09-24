@@ -37,13 +37,13 @@ import {
     -->
     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <div
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      class="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
       data-testid="modal-backdrop"
       (click)="onBackdropClick($event)"
     >
       <div
         #dialog
-        class="bg-white rounded-2xl shadow-xl w-full p-6"
+        class="bg-surface-elevated rounded-2xl shadow-xl w-full p-6"
         [class]="widthClass()"
         role="dialog"
         aria-modal="true"
@@ -52,12 +52,12 @@ import {
         tabindex="-1"
       >
         <div class="flex items-start justify-between gap-4 mb-4">
-          <h2 [id]="titleId" class="text-xl font-bold text-gray-900">
+          <h2 [id]="titleId" class="text-xl font-bold text-text-primary">
             {{ title() }}
           </h2>
           <button
             type="button"
-            class="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            class="text-text-muted hover:text-text-secondary text-2xl leading-none"
             aria-label="Fechar"
             data-testid="modal-close"
             (click)="close()"

@@ -1,5 +1,5 @@
 @if (!hasData()) {
-  <p data-testid="bar-chart-empty" class="text-gray-600">
+  <p data-testid="bar-chart-empty" class="text-text-secondary">
     Nenhum dado para exibir no período.
   </p>
 } @else {
@@ -16,14 +16,14 @@
         [attr.x2]="verticalRight"
         [attr.y1]="tick.position"
         [attr.y2]="tick.position"
-        stroke="#e5e7eb"
+        class="stroke-border"
         stroke-width="1"
       />
       <text
         [attr.x]="verticalLeft - 7"
         [attr.y]="tick.position + 4"
         text-anchor="end"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
       >
         {{ tick.label }}
       </text>
@@ -35,7 +35,7 @@
         [attr.y]="bar.y"
         [attr.width]="bar.width"
         [attr.height]="bar.height"
-        [attr.fill]="bar.highlight ? '#1d4ed8' : '#2563eb'"
+        [class]="bar.highlight ? 'fill-action-hover' : 'fill-action'"
         [attr.data-highlight]="bar.highlight ? 'true' : null"
         rx="3"
         data-testid="bar"
@@ -46,7 +46,7 @@
         [attr.x]="bar.labelX"
         [attr.y]="bar.labelY"
         [attr.text-anchor]="isHorizontal() ? 'end' : 'middle'"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
         data-testid="bar-label"
       >
         {{ bar.label }}
@@ -55,7 +55,7 @@
         <text
           [attr.x]="bar.valueX"
           [attr.y]="bar.labelY"
-          class="fill-gray-700 text-[10px]"
+          class="fill-text-secondary text-[10px]"
           data-testid="bar-value"
         >
           {{ bar.valueLabel ?? formatCompactCurrency(bar.value) }}
@@ -70,7 +70,7 @@
           [attr.x2]="average"
           y1="0"
           [attr.y2]="bars().length * 32"
-          stroke="#f59e0b"
+          class="stroke-warning"
           stroke-width="2"
           stroke-dasharray="4 4"
           data-testid="bar-chart-average"
@@ -81,7 +81,7 @@
           [attr.x2]="verticalRight"
           [attr.y1]="average"
           [attr.y2]="average"
-          stroke="#f59e0b"
+          class="stroke-warning"
           stroke-width="2"
           stroke-dasharray="4 4"
           data-testid="bar-chart-average"

@@ -1,10 +1,10 @@
 <header
-  class="bg-white shadow-xs px-6 py-4 flex flex-wrap justify-between items-center gap-3"
+  class="bg-surface-elevated shadow-xs px-6 py-4 flex flex-wrap justify-between items-center gap-3"
 >
   <div class="flex items-center gap-2">
     <a
       routerLink="/"
-      class="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+      class="text-xl font-bold text-text-primary hover:text-action transition-colors"
       >DinDin</a
     >
     @if (user() && subscriptionLoaded()) {
@@ -13,8 +13,8 @@
         class="rounded-full px-2 py-0.5 text-xs font-medium"
         [class]="
           isSubscriber()
-            ? 'bg-emerald-100 text-emerald-700'
-            : 'bg-gray-100 text-gray-600'
+            ? 'bg-positive-soft text-positive-ink'
+            : 'bg-surface-sunken text-text-secondary'
         "
       >
         {{ isSubscriber() ? 'Assinante' : 'Não assinante' }}
@@ -22,54 +22,55 @@
     }
   </div>
   <div class="flex flex-wrap items-center gap-4">
+    <app-theme-toggle />
     @if (user(); as currentUser) {
       <nav class="flex flex-wrap items-center gap-4" data-testid="main-nav">
         <a
           routerLink="/"
-          routerLinkActive="text-blue-600! font-semibold"
+          routerLinkActive="text-action! font-semibold"
           [routerLinkActiveOptions]="{ exact: true }"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           >Dashboard</a
         >
         <a
           routerLink="/carteira"
-          routerLinkActive="text-blue-600! font-semibold"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          routerLinkActive="text-action! font-semibold"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           >Carteira</a
         >
         <a
           routerLink="/geladeira"
-          routerLinkActive="text-blue-600! font-semibold"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          routerLinkActive="text-action! font-semibold"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           >Geladeira</a
         >
         <a
           routerLink="/provento"
-          routerLinkActive="text-blue-600! font-semibold"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          routerLinkActive="text-action! font-semibold"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           >Proventos</a
         >
         <a
           routerLink="/carteira-recomendada"
-          routerLinkActive="text-blue-600! font-semibold"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          routerLinkActive="text-action! font-semibold"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           data-testid="recommended-wallet-link"
           >Carteira recomendada</a
         >
         <a
           routerLink="/assinatura"
-          routerLinkActive="text-blue-600! font-semibold"
-          class="text-sm font-medium text-gray-700 hover:text-blue-600"
+          routerLinkActive="text-action! font-semibold"
+          class="text-sm font-medium text-text-secondary hover:text-action"
           data-testid="billing-link"
           >Assinatura</a
         >
       </nav>
-      <span class="text-sm text-gray-700 hidden sm:inline">{{
+      <span class="text-sm text-text-secondary hidden sm:inline">{{
         currentUser.email
       }}</span>
       <button
         (click)="logout()"
-        class="text-sm text-red-600 hover:text-red-800 font-medium"
+        class="text-sm text-danger hover:text-danger-ink font-medium"
       >
         Sair
       </button>
@@ -79,6 +80,6 @@
 
 <router-outlet />
 
-<footer class="px-6 py-4 text-center text-xs text-gray-400">
+<footer class="px-6 py-4 text-center text-xs text-text-muted">
   <span data-testid="app-version">v{{ version }}</span>
 </footer>

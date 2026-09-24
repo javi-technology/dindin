@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import type { TickerValue } from 'dindin-shared-types';
 import { formatCurrency, formatPercent } from '../../../utils/format.util';
+import { CHART_SERIES, chartColor } from '../chart-palette';
 
 export interface CompositionSlice {
   label: string;
@@ -15,19 +16,11 @@ export interface CompositionSlice {
   path: string;
 }
 
-const COLORS = [
-  '#2563eb',
-  '#16a34a',
-  '#f59e0b',
-  '#dc2626',
-  '#7c3aed',
-  '#0891b2',
-  '#db2777',
-  '#65a30d',
-  '#9ca3af',
-];
-
-const MAX_SLICES = COLORS.length;
+/*
+  Uma fatia a mais que a série categórica: a última é o "Outros", que agrupa o
+  restante e usa a cor neutra reservada para isso.
+*/
+const MAX_SLICES = CHART_SERIES.length + 1;
 const CENTER = 100;
 const OUTER_RADIUS = 90;
 const INNER_RADIUS = 55;
@@ -84,7 +77,7 @@ export class CompositionChartComponent {
         label,
         value,
         percent: fraction * 100,
-        color: COLORS[index],
+        color: chartColor(index),
         path,
       };
     });

@@ -1,8 +1,8 @@
-<section class="bg-white rounded-2xl shadow-lg p-6">
-  <h2 class="text-xl font-bold text-gray-900 mb-4">Evolução patrimonial</h2>
+<section class="bg-surface-elevated rounded-2xl shadow-lg p-6">
+  <h2 class="text-xl font-bold text-text-primary mb-4">Evolução patrimonial</h2>
 
   @if (!hasEnoughData()) {
-    <p data-testid="patrimony-empty" class="text-gray-600">
+    <p data-testid="patrimony-empty" class="text-text-secondary">
       Ainda não há histórico suficiente. O primeiro snapshot foi registrado
       hoje; volte amanhã para ver a evolução.
     </p>
@@ -20,24 +20,28 @@
           x2="580"
           [attr.y1]="tick.y"
           [attr.y2]="tick.y"
-          stroke="#e5e7eb"
+          class="stroke-border"
           stroke-width="1"
         />
         <text
           x="58"
           [attr.y]="tick.y + 4"
           text-anchor="end"
-          class="fill-gray-500 text-[10px]"
+          class="fill-text-muted text-[10px]"
         >
           {{ tick.label }}
         </text>
       }
 
-      <path [attr.d]="areaPath()" fill="#dbeafe" data-testid="patrimony-area" />
+      <path
+        [attr.d]="areaPath()"
+        class="fill-brand-soft"
+        data-testid="patrimony-area"
+      />
       <polyline
         [attr.points]="linePath()"
         fill="none"
-        stroke="#2563eb"
+        class="stroke-action"
         stroke-width="3"
         stroke-linecap="round"
         stroke-linejoin="round"
@@ -47,13 +51,13 @@
           [attr.cx]="point.x"
           [attr.cy]="point.y"
           r="4"
-          [attr.fill]="last ? '#1d4ed8' : '#2563eb'"
+          [class]="last ? 'fill-action-hover' : 'fill-action'"
         />
       }
       <text
         x="65"
         y="207"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
         data-testid="date-start"
       >
         {{ formatDate(snapshots()[0].date) }}
@@ -62,7 +66,7 @@
         x="580"
         y="207"
         text-anchor="end"
-        class="fill-gray-500 text-[10px]"
+        class="fill-text-muted text-[10px]"
         data-testid="date-end"
       >
         {{ formatDate(snapshots()[snapshots().length - 1].date) }}

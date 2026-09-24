@@ -26,6 +26,16 @@ const DEFAULT_FROM = 'DinDin <alertas@javitech.online>';
 // domínio quando houver caixa lá.
 const DEFAULT_REPLY_TO = 'vkremersantos@icloud.com';
 const APP_URL = 'https://dindin-4e720.web.app/geladeira';
+/*
+ * Cores da paleta (issue #393) em hexadecimal literal: cliente de e-mail não
+ * lê o CSS do app, então o token do Tailwind não chega aqui. Os valores são os
+ * do tema claro, porque o fundo da mensagem é o branco do cliente — os pares
+ * de texto sobre `#ffffff` ficam acima de 4,5:1.
+ */
+const MAIL_BACKGROUND = '#ffffff';
+const MAIL_TEXT = '#141410';
+const MAIL_MUTED = '#52524d';
+const MAIL_ACTION = '#008654';
 // O Resend limita requisições por segundo; os envios são sequenciais e este
 // intervalo os espaça. Os testes zeram para não esperar de verdade.
 const SEND_INTERVAL_MS = Number(process.env.ALERT_MAIL_INTERVAL_MS ?? 600);
@@ -73,14 +83,16 @@ function buildEmail(alert: Alert, to: string) {
   // `ticker` e `fridgeName` são texto do usuário: sem escape, um nome de
   // geladeira com markup quebraria o e-mail ou injetaria um link arbitrário.
   const html = [
+    `<div style="background-color:${MAIL_BACKGROUND};color:${MAIL_TEXT}">`,
     `<p><strong>${escapeHtml(alert.ticker)}</strong> atingiu o preço-alvo que você definiu.</p>`,
     '<ul>',
     `<li>Preço atual: <strong>${current}</strong></li>`,
     `<li>Preço-alvo: ${target}</li>`,
     `<li>Geladeira: ${escapeHtml(fridge)}</li>`,
     '</ul>',
-    `<p><a href="${APP_URL}">Ver na geladeira</a></p>`,
-    '<p style="color:#6b7280;font-size:12px">Este é um aviso automático do DinDin e não é recomendação de investimento.</p>',
+    `<p><a href="${APP_URL}" style="color:${MAIL_ACTION}">Ver na geladeira</a></p>`,
+    `<p style="color:${MAIL_MUTED};font-size:12px">Este é um aviso automático do DinDin e não é recomendação de investimento.</p>`,
+    '</div>',
   ].join('');
 
   return {

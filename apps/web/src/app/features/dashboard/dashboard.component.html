@@ -1,17 +1,17 @@
-<main class="min-h-screen bg-gray-50 p-6">
+<main class="min-h-screen bg-surface p-6">
   <div class="max-w-5xl mx-auto">
     <div
       class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6"
     >
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p class="text-gray-600">Visão consolidada da sua carteira</p>
+        <h1 class="text-2xl font-bold text-text-primary">Dashboard</h1>
+        <p class="text-text-secondary">Visão consolidada da sua carteira</p>
       </div>
 
       <span
         class="text-sm"
-        [class.text-green-700]="backendOnline()"
-        [class.text-gray-500]="!backendOnline()"
+        [class.text-positive]="backendOnline()"
+        [class.text-text-muted]="!backendOnline()"
         data-testid="backend-status"
       >
         {{ backendOnline() ? 'Backend online' : 'Backend indisponível' }}
@@ -20,7 +20,7 @@
 
     @if (error()) {
       <div
-        class="bg-red-50 text-red-800 rounded-lg p-4 mb-6"
+        class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-6"
         data-testid="error-message"
       >
         {{ error() }}
@@ -30,49 +30,55 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       <a
         routerLink="/carteira"
-        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        class="bg-surface-elevated rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
         data-testid="card-wallet"
       >
-        <div class="flex items-center gap-2 text-blue-600 mb-3">
+        <div class="flex items-center gap-2 text-action mb-3">
           <svg lucideWallet [size]="18"></svg>
-          <span class="text-sm font-medium text-gray-700"
+          <span class="text-sm font-medium text-text-secondary"
             >Total da carteira</span
           >
         </div>
-        <p class="text-3xl font-bold text-gray-900" data-testid="wallet-value">
+        <p
+          class="text-3xl font-bold text-text-primary"
+          data-testid="wallet-value"
+        >
           {{ displayValue(totalWallet()) }}
         </p>
       </a>
 
       <a
         routerLink="/geladeira"
-        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        class="bg-surface-elevated rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
         data-testid="card-fridge"
       >
-        <div class="flex items-center gap-2 text-cyan-600 mb-3">
+        <div class="flex items-center gap-2 text-action mb-3">
           <svg lucideRefrigerator [size]="18"></svg>
-          <span class="text-sm font-medium text-gray-700"
+          <span class="text-sm font-medium text-text-secondary"
             >Total da geladeira</span
           >
         </div>
-        <p class="text-3xl font-bold text-gray-900" data-testid="fridge-value">
+        <p
+          class="text-3xl font-bold text-text-primary"
+          data-testid="fridge-value"
+        >
           {{ displayValue(totalFridge()) }}
         </p>
       </a>
 
       <a
         routerLink="/provento"
-        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+        class="bg-surface-elevated rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
         data-testid="card-dividends"
       >
-        <div class="flex items-center gap-2 text-green-600 mb-3">
+        <div class="flex items-center gap-2 text-positive mb-3">
           <svg lucideTrendingUp [size]="18"></svg>
-          <span class="text-sm font-medium text-gray-700"
+          <span class="text-sm font-medium text-text-secondary"
             >Proventos do mês</span
           >
         </div>
         <p
-          class="text-3xl font-bold text-gray-900"
+          class="text-3xl font-bold text-text-primary"
           data-testid="dividends-value"
         >
           {{ displayValue(totalDividends()) }}
@@ -94,7 +100,7 @@
 
     @if (patrimonyError()) {
       <p
-        class="text-red-700 bg-red-50 rounded-lg p-4 mb-6"
+        class="text-danger-ink bg-danger-soft rounded-lg p-4 mb-6"
         data-testid="patrimony-error"
       >
         {{ patrimonyError() }}
@@ -104,14 +110,14 @@
     @if (isAdmin()) {
       <a
         routerLink="/admin/assets"
-        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+        class="inline-block bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors"
         data-testid="admin-link"
       >
         Admin: ativos
       </a>
       <a
         routerLink="/admin/users"
-        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-lg transition-colors ms-2"
+        class="inline-block bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors ms-2"
         data-testid="admin-users-link"
       >
         Admin: usuários
