@@ -2,7 +2,16 @@ import { BrapiHttpError, fetchInBatches } from './brapi-batch';
 
 export interface QuoteResult {
   price: number;
-  updatedAt: string;
+  /**
+   * Horário de apuração informado pela fonte (`regularMarketTime`), em
+   * ISO-8601 (issue #387).
+   *
+   * Opcional de propósito: quando a Brapi não informa, a cotação é gravada
+   * sem o campo. Preencher com a hora da nossa consulta faria um dado em
+   * cache parecer recém-apurado — exatamente a confusão que o campo existe
+   * para desfazer.
+   */
+  quotedAt?: string;
 }
 
 interface BrapiResult {
@@ -75,9 +84,10 @@ async function fetchQuoteBatch(
   for (const item of results) {
     const price = item.data?.regularMarketPrice ?? null;
     if (price !== null && price !== undefined) {
+      const quotedAt = item.data?.regularMarketTime ?? undefined;
       quoteMap.set((item.requestedSymbol ?? item.symbol).toUpperCase(), {
         price,
-        updatedAt: item.data?.regularMarketTime ?? new Date().toISOString(),
+        ...(quotedAt && { quotedAt }),
       });
     }
   }

@@ -56,8 +56,29 @@ describe('BrapiService — fetchQuotes', () => {
       expect(result.size).toBe(1);
       expect(result.get('HGLG11')).toEqual({
         price: 165.5,
-        updatedAt: '2026-07-15T18:00:00-03:00',
+        quotedAt: '2026-07-15T18:00:00-03:00',
       });
+    });
+
+    // O horário de apuração é opcional (issue #387): sem ele, a cotação é
+    // gravada sem o campo em vez de receber a hora da nossa consulta, que
+    // seria indistinguível de um fechamento consolidado.
+    it('deve retornar cotação sem horário de apuração quando a fonte não informa', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'HGLG11',
+            data: {
+              regularMarketPrice: 165.5,
+              regularMarketTime: null,
+            },
+          },
+        ],
+      });
+
+      const result = await fetchQuotes(['HGLG11']);
+
+      expect(result.get('HGLG11')).toEqual({ price: 165.5 });
     });
 
     it('deve retornar cotações de ações e FIIs na mesma requisição (até 20 ativos, limite do plano Pro)', async () => {

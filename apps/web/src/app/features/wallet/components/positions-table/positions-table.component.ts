@@ -14,6 +14,7 @@ import {
 import {
   formatCurrency,
   formatPercent,
+  formatQuotedAt,
 } from '../../../../shared/utils/format.util';
 import {
   LucideArrowDown,
@@ -198,4 +199,5 @@ export class PositionsTableComponent {
 
   formatCurrency = formatCurrency;
   formatPercent = formatPercent;
+  formatQuotedAt = formatQuotedAt;
 }

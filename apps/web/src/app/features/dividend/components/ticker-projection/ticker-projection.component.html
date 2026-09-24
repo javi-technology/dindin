@@ -1,21 +1,23 @@
 <section>
-  <h2 class="text-xl font-semibold text-gray-900 mb-4">Projeção por ativo</h2>
+  <h2 class="text-xl font-semibold text-text-primary mb-4">
+    Projeção por ativo
+  </h2>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     @for (card of cards(); track card.item.ticker) {
       <article
-        class="rounded-lg border border-gray-200 p-4"
+        class="rounded-lg border border-border p-4"
         data-testid="ticker-card"
       >
         <header class="flex items-start justify-between gap-2">
-          <p class="font-semibold text-gray-900">
+          <p class="font-semibold text-text-primary">
             {{ card.item.ticker }}
           </p>
           @if (card.trend) {
             <span
               class="text-sm font-medium"
-              [class.text-green-700]="card.trend === 'up'"
-              [class.text-red-700]="card.trend === 'down'"
-              [class.text-gray-500]="card.trend === 'stable'"
+              [class.text-positive]="card.trend === 'up'"
+              [class.text-danger]="card.trend === 'down'"
+              [class.text-text-muted]="card.trend === 'stable'"
               [attr.data-trend]="card.trend"
               [attr.title]="trendLabel(card.trend)"
               data-testid="card-trend"
@@ -27,12 +29,12 @@
         </header>
 
         <p
-          class="text-2xl font-bold text-gray-900 mt-2"
+          class="text-2xl font-bold text-text-primary mt-2"
           data-testid="card-dividend-per-share"
         >
           {{ formatCurrency(card.item.monthlyDividend) }}
         </p>
-        <p class="text-sm text-gray-500">por cota</p>
+        <p class="text-sm text-text-muted">por cota</p>
 
         @if (card.history.length > 1) {
           <div class="mt-3">
@@ -47,18 +49,18 @@
 
         <dl class="mt-3 space-y-1 text-sm">
           <div class="flex justify-between gap-2">
-            <dt class="text-gray-500">Quantidade</dt>
-            <dd class="text-gray-900">{{ card.item.quantity }}</dd>
+            <dt class="text-text-muted">Quantidade</dt>
+            <dd class="text-text-primary">{{ card.item.quantity }}</dd>
           </div>
           <div class="flex justify-between gap-2">
-            <dt class="text-gray-500">Proventos/mês</dt>
-            <dd class="font-medium text-gray-900">
+            <dt class="text-text-muted">Proventos/mês</dt>
+            <dd class="font-medium text-text-primary">
               {{ formatCurrency(card.item.monthlyIncome) }}
             </dd>
           </div>
           <div class="flex justify-between gap-2">
-            <dt class="text-gray-500">Pagamento</dt>
-            <dd class="text-gray-900" data-testid="payment-date">
+            <dt class="text-text-muted">Pagamento</dt>
+            <dd class="text-text-primary" data-testid="payment-date">
               {{ formatDate(card.item.paymentDate) }}
             </dd>
           </div>
@@ -69,20 +71,20 @@
 
   @if (hiddenCount() > 0) {
     <div
-      class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+      class="mt-4 rounded-xl border border-brand-soft bg-brand-soft p-5"
       data-testid="projections-paywall"
     >
-      <h3 class="text-base font-semibold text-gray-900">
+      <h3 class="text-base font-semibold text-text-primary">
         Mais {{ hiddenCount() }}
         {{ hiddenCount() === 1 ? 'ativo' : 'ativos' }} para assinantes
       </h3>
-      <p class="mt-2 text-sm text-gray-700">
+      <p class="mt-2 text-sm text-text-secondary">
         O plano gratuito mostra a projeção de 3 ativos. Assine para ver a
         projeção de todos.
       </p>
       <a
         routerLink="/assinatura"
-        class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+        class="mt-4 inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg"
         data-testid="projections-paywall-cta"
         >Assinar</a
       >

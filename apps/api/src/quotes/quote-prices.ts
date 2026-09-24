@@ -98,6 +98,39 @@ export async function getQuotesByTicker(
   return quotes;
 }
 
+/** Preço atual de um ticker e quando ele foi apurado na fonte (issue #390). */
+export interface CurrentPrice {
+  price: number;
+  /** ISO-8601; ausente nas cotações gravadas antes da #387. */
+  quotedAt?: string;
+}
+
+/**
+ * Preço atual e horário de apuração dos tickers informados (issue #390).
+ *
+ * Os dois campos saem da mesma leitura: a tela mostra quando o preço foi
+ * apurado, e cobrar uma segunda viagem ao Firestore só para isso repetiria o
+ * custo por requisição que a #299 tirou daqui. Ticker sem cotação válida fica
+ * **fora** do Map, como em `getQuotePricesByTicker`.
+ */
+export async function getCurrentPricesByTicker(
+  tickers: string[],
+): Promise<Map<string, CurrentPrice>> {
+  const quotes = await getQuotesByTicker(tickers);
+  const prices = new Map<string, CurrentPrice>();
+
+  for (const [ticker, quote] of quotes) {
+    const price = validPrice(quote.price);
+    if (price === undefined) continue;
+    prices.set(ticker, {
+      price,
+      ...(quote.quotedAt && { quotedAt: quote.quotedAt }),
+    });
+  }
+
+  return prices;
+}
+
 /**
  * Mapa `ticker → preço` apenas dos tickers informados (issue #221).
  *

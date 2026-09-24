@@ -1,6 +1,6 @@
 @if (shownError()) {
   <div
-    class="bg-red-50 text-red-800 rounded-lg p-3 mb-4 text-sm"
+    class="bg-danger-soft text-danger-ink rounded-lg p-3 mb-4 text-sm"
     data-testid="form-error"
   >
     {{ shownError() }}
@@ -11,13 +11,13 @@
   <div>
     <label
       for="item-ticker"
-      class="block text-sm font-medium text-gray-700 mb-1"
+      class="block text-sm font-medium text-text-secondary mb-1"
       >Ticker</label
     >
     <select
       id="item-ticker"
       formControlName="ticker"
-      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+      class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
     >
       <option value="" disabled>Selecione um ativo</option>
       @for (asset of assets(); track asset.ticker) {
@@ -27,7 +27,7 @@
       }
     </select>
     @if (assetsError()) {
-      <p class="text-red-600 text-xs mt-1" data-testid="assets-error">
+      <p class="text-danger text-xs mt-1" data-testid="assets-error">
         {{ assetsError() }}
       </p>
     }
@@ -36,7 +36,7 @@
   <div>
     <label
       for="item-quantity"
-      class="block text-sm font-medium text-gray-700 mb-1"
+      class="block text-sm font-medium text-text-secondary mb-1"
       >Quantidade</label
     >
     <input
@@ -44,21 +44,21 @@
       type="number"
       step="any"
       formControlName="quantity"
-      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+      class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
     />
   </div>
 
   <div>
     <label
       for="item-transferred-price"
-      class="block text-sm font-medium text-gray-700 mb-1"
+      class="block text-sm font-medium text-text-secondary mb-1"
       >Preço de transferência (R$)</label
     >
     <input
       id="item-transferred-price"
       type="text"
       formControlName="transferredPrice"
-      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+      class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
       placeholder="Ex: 110,50"
     />
   </div>
@@ -66,14 +66,14 @@
   <div>
     <label
       for="item-target-price"
-      class="block text-sm font-medium text-gray-700 mb-1"
+      class="block text-sm font-medium text-text-secondary mb-1"
       >Preço-alvo (R$)</label
     >
     <input
       id="item-target-price"
       type="text"
       formControlName="targetPrice"
-      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+      class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
       placeholder="Ex: 120,00"
     />
   </div>
@@ -81,7 +81,7 @@
   <div class="flex justify-end gap-3 pt-2">
     <button
       type="button"
-      class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-text-secondary bg-surface-sunken hover:bg-border rounded-lg transition-colors"
       data-testid="btn-cancelar-item"
       (click)="close()"
     >
@@ -89,7 +89,7 @@
     </button>
     <button
       type="submit"
-      class="px-4 py-2 text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-on-action bg-action hover:bg-action-hover rounded-lg transition-colors"
     >
       {{ item() ? 'Salvar' : 'Adicionar' }}
     </button>

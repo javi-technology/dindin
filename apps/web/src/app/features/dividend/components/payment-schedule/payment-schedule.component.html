@@ -1,43 +1,45 @@
 <section data-testid="payment-schedule">
-  <h2 class="text-xl font-semibold text-gray-900 mb-1">Agenda de pagamentos</h2>
-  <p class="text-sm text-gray-500 mb-4" data-testid="schedule-scope-note">
+  <h2 class="text-xl font-semibold text-text-primary mb-1">
+    Agenda de pagamentos
+  </h2>
+  <p class="text-sm text-text-muted mb-4" data-testid="schedule-scope-note">
     Considera apenas os ativos das carteiras; o total da geladeira aparece no
     card de projeção.
   </p>
 
   @if (schedule().upcoming.length > 0 || schedule().upcomingTotal > 0) {
     <div class="mb-6" data-testid="schedule-upcoming">
-      <p class="text-sm font-medium text-gray-600 mb-3">
+      <p class="text-sm font-medium text-text-secondary mb-3">
         A receber: {{ formatCurrency(schedule().upcomingTotal) }}
       </p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         @for (day of schedule().upcoming; track day.date) {
           <article
-            class="rounded-lg border border-gray-200 p-4"
+            class="rounded-lg border border-border p-4"
             data-testid="schedule-day"
           >
             <header
               class="flex flex-wrap items-baseline justify-between gap-2 mb-3"
             >
-              <p class="font-semibold text-gray-900">
+              <p class="font-semibold text-text-primary">
                 {{ day.relativeLabel }}
-                <span class="font-normal text-gray-500">
+                <span class="font-normal text-text-muted">
                   · {{ formatDate(day.date) }}
                 </span>
               </p>
-              <p class="font-bold text-green-700">
+              <p class="font-bold text-positive">
                 {{ formatCurrency(day.total) }}
               </p>
             </header>
             <ul class="space-y-2">
               @for (item of day.items; track item.ticker) {
                 <li class="text-sm">
-                  <span class="font-medium text-gray-900">
+                  <span class="font-medium text-text-primary">
                     {{ item.ticker }}
                   </span>
-                  <span class="block text-gray-600">
+                  <span class="block text-text-secondary">
                     <strong
-                      class="text-base text-gray-900"
+                      class="text-base text-text-primary"
                       data-testid="schedule-dividend-per-share"
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
@@ -56,37 +58,37 @@
 
   @if (schedule().paid.length > 0 || schedule().paidTotal > 0) {
     <div class="mb-6" data-testid="schedule-paid">
-      <p class="text-sm font-medium text-gray-600 mb-3">
+      <p class="text-sm font-medium text-text-secondary mb-3">
         Já pagos: {{ formatCurrency(schedule().paidTotal) }}
       </p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         @for (day of schedule().paid; track day.date) {
           <article
-            class="rounded-lg border border-gray-200 bg-gray-50 p-4"
+            class="rounded-lg border border-border bg-surface-sunken p-4"
             data-testid="schedule-day"
           >
             <header
               class="flex flex-wrap items-baseline justify-between gap-2 mb-3"
             >
-              <p class="font-semibold text-gray-700">
+              <p class="font-semibold text-text-secondary">
                 {{ day.relativeLabel }}
-                <span class="font-normal text-gray-500">
+                <span class="font-normal text-text-muted">
                   · {{ formatDate(day.date) }}
                 </span>
               </p>
-              <p class="font-bold text-gray-700">
+              <p class="font-bold text-text-secondary">
                 {{ formatCurrency(day.total) }}
               </p>
             </header>
             <ul class="space-y-2">
               @for (item of day.items; track item.ticker) {
-                <li class="text-sm text-gray-600">
-                  <span class="font-medium text-gray-800">
+                <li class="text-sm text-text-secondary">
+                  <span class="font-medium text-text-primary">
                     {{ item.ticker }}
                   </span>
                   <span class="block">
                     <strong
-                      class="text-base text-gray-800"
+                      class="text-base text-text-primary"
                       data-testid="schedule-dividend-per-share"
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
@@ -105,13 +107,13 @@
 
   @if (schedule().withoutDate.length > 0) {
     <div
-      class="rounded-lg border border-dashed border-gray-300 p-4"
+      class="rounded-lg border border-dashed border-border-strong p-4"
       data-testid="schedule-without-date"
     >
-      <p class="text-sm font-medium text-gray-600 mb-2">
+      <p class="text-sm font-medium text-text-secondary mb-2">
         Sem data de pagamento anunciada
       </p>
-      <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+      <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
         @for (item of schedule().withoutDate; track item.ticker) {
           <li>
             <span class="font-medium">{{ item.ticker }}</span>
@@ -128,17 +130,17 @@
 
   @if (hiddenDateCount() > 0 || hiddenWithoutDateCount() > 0) {
     <div
-      class="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+      class="mt-4 rounded-xl border border-brand-soft bg-brand-soft p-5"
       data-testid="schedule-paywall"
     >
-      <h3 class="text-base font-semibold text-gray-900">
+      <h3 class="text-base font-semibold text-text-primary">
         Agenda completa para assinantes
       </h3>
-      <p class="mt-2 text-sm text-gray-700">
+      <p class="mt-2 text-sm text-text-secondary">
         O plano gratuito mostra as 2 datas mais próximas de hoje. Os totais
         acima já consideram todos os pagamentos.
       </p>
-      <p class="mt-1 text-sm text-gray-700">
+      <p class="mt-1 text-sm text-text-secondary">
         @if (hiddenDateCount() > 0) {
           Mais {{ hiddenDateCount() }}
           {{ hiddenDateCount() === 1 ? 'data' : 'datas' }} de pagamento
@@ -153,7 +155,7 @@
       </p>
       <a
         routerLink="/assinatura"
-        class="mt-4 inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg"
+        class="mt-4 inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg"
         data-testid="schedule-paywall-cta"
         >Assinar</a
       >

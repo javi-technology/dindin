@@ -1,14 +1,16 @@
-<main class="min-h-screen bg-gray-50 p-6">
-  <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-8">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Proventos</h1>
+<main class="min-h-screen bg-surface p-6">
+  <div class="max-w-4xl mx-auto bg-surface-elevated rounded-2xl shadow-lg p-8">
+    <h1 class="text-2xl font-bold text-text-primary mb-6">Proventos</h1>
 
     @if (loading()) {
-      <p class="text-gray-600" data-testid="loading-message">Carregando...</p>
+      <p class="text-text-secondary" data-testid="loading-message">
+        Carregando...
+      </p>
     }
 
     @if (error()) {
       <div
-        class="bg-red-50 text-red-800 rounded-lg p-4 mb-4"
+        class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-4"
         data-testid="error-message"
       >
         <p class="font-medium">{{ error() }}</p>
@@ -37,7 +39,7 @@
         }
 
         @if (byTicker().length === 0) {
-          <p class="text-gray-600">Nenhum provento registrado.</p>
+          <p class="text-text-secondary">Nenhum provento registrado.</p>
         } @else {
           <app-ticker-projection
             [cards]="cards()"

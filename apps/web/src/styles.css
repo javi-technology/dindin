@@ -11,6 +11,316 @@
 }
 
 /*
+  Paleta Verde-Jade e Creme (issue #391). As escalas são a matéria-prima; as
+  telas não as consomem direto. Quem elas consomem é a camada semântica logo
+  abaixo, porque só ela sabe qual passo cada papel usa em cada tema.
+
+  `jade` nasce ancorada em #00bb77 no passo 500 e `creme` em #fdfbd4 no passo
+  50: os dois valores da identidade. Os demais passos variam a luminosidade em
+  OKLCH preservando a matiz — 158,6° no jade, 104,9° no creme. Os neutros saem
+  da mesma matiz do creme com croma quase nulo, para o cinza do app não brigar
+  com a marca, e por isso substituem o `neutral` padrão do Tailwind.
+
+  Ver `docs/paleta.md` para o uso de cada token e as razões de contraste.
+*/
+@theme {
+  --color-jade-50: #e4ffee;
+  --color-jade-100: #cff9df;
+  --color-jade-300: #7ddfaa;
+  --color-jade-400: #4acf8f;
+  --color-jade-500: #00bb77;
+  --color-jade-600: #009f65;
+  --color-jade-700: #008654;
+  --color-jade-900: #005634;
+  --color-jade-950: #0a2a1f;
+
+  --color-creme-50: #fdfbd4;
+  --color-creme-300: #e2dc8e;
+  --color-creme-600: #948b05;
+  --color-creme-700: #7b7301;
+  --color-creme-900: #4f4a00;
+
+  --color-neutral-50: #fbfaf4;
+  --color-neutral-100: #f4f3eb;
+  --color-neutral-200: #e7e7e1;
+  --color-neutral-300: #d2d2cc;
+  --color-neutral-400: #ababa5;
+  --color-neutral-450: #9a9a94;
+  --color-neutral-500: #888883;
+  --color-neutral-600: #696964;
+  --color-neutral-700: #52524d;
+  --color-neutral-800: #3a3935;
+  --color-neutral-850: #2c2c27;
+  --color-neutral-900: #1f1e1a;
+  --color-neutral-950: #141410;
+  --color-neutral-975: #12120e;
+
+  --color-info-50: #e3f5fa;
+  --color-info-400: #28bde0;
+  --color-info-600: #0388a4;
+  --color-info-800: #045a6d;
+  --color-info-950: #0d2a31;
+  --color-warning-50: #f9efd8;
+  --color-warning-400: #d7a035;
+  --color-warning-600: #9f7100;
+  --color-warning-800: #6e4e00;
+  --color-warning-950: #2e2410;
+  --color-danger-50: #fdecec;
+  --color-danger-300: #fbb0ab;
+  --color-danger-400: #f8837c;
+  --color-danger-600: #c04442;
+  --color-danger-800: #8e2e2c;
+  --color-danger-950: #331a19;
+  --color-positive-50: #e6f4e8;
+  --color-positive-400: #70c174;
+  --color-positive-700: #167425;
+  --color-positive-900: #10561c;
+  --color-positive-950: #16261a;
+
+  /*
+    Texto sobre a ação primária no escuro. Fica fora da escala jade de
+    propósito: é um par de contraste, não um passo de luminosidade.
+  */
+  --color-jade-ink: #0b2e22;
+}
+
+/*
+  Camada semântica: um token por papel, que é o que a marcação das telas usa.
+  `@theme inline` importa porque mantém a utilitária apontando para a variável
+  em vez de resolver o valor na hora da compilação — sem isso, a troca de tema
+  abaixo não chegaria às classes já geradas.
+*/
+@theme inline {
+  --color-surface: var(--dindin-surface);
+  --color-surface-elevated: var(--dindin-surface-elevated);
+  --color-surface-sunken: var(--dindin-surface-sunken);
+  --color-text-primary: var(--dindin-text-primary);
+  --color-text-secondary: var(--dindin-text-secondary);
+  --color-text-muted: var(--dindin-text-muted);
+  --color-action: var(--dindin-action);
+  --color-action-hover: var(--dindin-action-hover);
+  --color-on-action: var(--dindin-on-action);
+  --color-accent: var(--dindin-accent);
+  --color-border: var(--dindin-border);
+  --color-border-strong: var(--dindin-border-strong);
+  --color-focus: var(--dindin-focus);
+  --color-info: var(--dindin-info);
+  --color-warning: var(--dindin-warning);
+  --color-danger: var(--dindin-danger);
+  --color-danger-hover: var(--dindin-danger-hover);
+  --color-on-danger: var(--dindin-on-danger);
+  --color-positive: var(--dindin-positive);
+
+  /*
+    Véu do modal. É um token porque a opacidade sobre preto puro que serve ao
+    tema claro deixa o escuro lavado: no escuro o véu precisa ser mais opaco
+    para separar o modal da superfície, que já é escura.
+  */
+  --color-overlay: var(--dindin-overlay);
+
+  /*
+    Sombra como token. A sombra padrão do Tailwind é preta com 10% de opacidade
+    e desaparece sobre a superfície escura; no escuro ela precisa ser mais
+    densa para o cartão continuar descolado do fundo.
+  */
+  --shadow-xs: 0 1px 2px 0 var(--dindin-shadow-weak);
+  --shadow-lg:
+    0 10px 15px -3px var(--dindin-shadow), 0 4px 6px -4px var(--dindin-shadow);
+  --shadow-xl:
+    0 20px 25px -5px var(--dindin-shadow), 0 8px 10px -6px var(--dindin-shadow);
+
+  /*
+    Série categórica dos gráficos (issue #393). A ordem é o que importa: as
+    séries vizinhas se distinguem por luminosidade, não por matiz, para
+    continuarem legíveis em impressão em tons de cinza e para quem tem baixa
+    visão de cor. `chart-other` é a fatia que agrupa o restante.
+  */
+  --color-chart-1: var(--dindin-chart-1);
+  --color-chart-2: var(--dindin-chart-2);
+  --color-chart-3: var(--dindin-chart-3);
+  --color-chart-4: var(--dindin-chart-4);
+  --color-chart-5: var(--dindin-chart-5);
+  --color-chart-6: var(--dindin-chart-6);
+  --color-chart-7: var(--dindin-chart-7);
+  --color-chart-8: var(--dindin-chart-8);
+  --color-chart-other: var(--dindin-chart-other);
+
+  /*
+    Os pares `-soft`/`-ink` (issue #392) atendem badge, faixa de aviso e
+    mensagem de erro, que precisam de fundo tingido com texto legível por
+    cima. O passo `-ink` também passa dos 4,5:1 sobre a superfície comum, para
+    o mesmo token servir ao texto dentro e fora do tom suave.
+  */
+  --color-brand-soft: var(--dindin-brand-soft);
+  --color-brand-ink: var(--dindin-brand-ink);
+  --color-info-soft: var(--dindin-info-soft);
+  --color-info-ink: var(--dindin-info-ink);
+  --color-warning-soft: var(--dindin-warning-soft);
+  --color-warning-ink: var(--dindin-warning-ink);
+  --color-danger-soft: var(--dindin-danger-soft);
+  --color-danger-ink: var(--dindin-danger-ink);
+  --color-positive-soft: var(--dindin-positive-soft);
+  --color-positive-ink: var(--dindin-positive-ink);
+}
+
+/*
+  Tema claro. O creme é superfície, nunca ação: #fdfbd4 sobre branco dá 1,05:1.
+  A ação primária usa o jade escurecido com texto branco (4,63:1), porque o
+  jade puro sobre branco dá 2,51:1 e reprovaria AA.
+*/
+:root {
+  color-scheme: light;
+  --dindin-surface: var(--color-neutral-50);
+  --dindin-surface-elevated: #ffffff;
+  --dindin-surface-sunken: var(--color-neutral-100);
+  --dindin-text-primary: var(--color-neutral-950);
+  --dindin-text-secondary: var(--color-neutral-700);
+  --dindin-text-muted: var(--color-neutral-600);
+  --dindin-action: var(--color-jade-700);
+  --dindin-action-hover: var(--color-jade-900);
+  --dindin-on-action: #ffffff;
+  --dindin-accent: var(--color-creme-700);
+  --dindin-border: var(--color-neutral-200);
+  --dindin-border-strong: var(--color-neutral-500);
+  --dindin-focus: var(--color-jade-700);
+  --dindin-info: var(--color-info-600);
+  --dindin-warning: var(--color-warning-600);
+  --dindin-danger: var(--color-danger-600);
+  --dindin-danger-hover: var(--color-danger-800);
+  --dindin-on-danger: #ffffff;
+  --dindin-positive: var(--color-positive-700);
+  --dindin-overlay: rgb(20 20 16 / 0.5);
+  --dindin-shadow: rgb(20 20 16 / 0.12);
+  --dindin-shadow-weak: rgb(20 20 16 / 0.06);
+  --dindin-chart-1: var(--color-jade-700);
+  --dindin-chart-2: var(--color-jade-300);
+  --dindin-chart-3: var(--color-danger-800);
+  --dindin-chart-4: var(--color-info-400);
+  --dindin-chart-5: var(--color-creme-700);
+  --dindin-chart-6: var(--color-positive-400);
+  --dindin-chart-7: var(--color-info-600);
+  --dindin-chart-8: var(--color-warning-400);
+  --dindin-chart-other: var(--color-neutral-500);
+  --dindin-brand-soft: var(--color-jade-50);
+  --dindin-brand-ink: var(--color-jade-900);
+  --dindin-info-soft: var(--color-info-50);
+  --dindin-info-ink: var(--color-info-800);
+  --dindin-warning-soft: var(--color-warning-50);
+  --dindin-warning-ink: var(--color-warning-800);
+  --dindin-danger-soft: var(--color-danger-50);
+  --dindin-danger-ink: var(--color-danger-800);
+  --dindin-positive-soft: var(--color-positive-50);
+  --dindin-positive-ink: var(--color-positive-900);
+}
+
+/*
+  Tema escuro. Os papéis das duas cores da marca se invertem: o jade clareia
+  para virar ação (jade-700 contra a superfície escura cai para 3,60:1) e o
+  creme deixa de ser fundo para virar acento. As superfícies são neutros
+  quentes, não preto, porque preto puro com cor saturada por cima provoca
+  halation.
+
+  As escalas não mudam de valor entre os temas; muda só o passo para onde
+  cada papel aponta.
+*/
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --dindin-surface: var(--color-neutral-975);
+    --dindin-surface-elevated: var(--color-neutral-900);
+    --dindin-surface-sunken: var(--color-neutral-850);
+    --dindin-text-primary: var(--color-neutral-200);
+    --dindin-text-secondary: var(--color-neutral-400);
+    --dindin-text-muted: var(--color-neutral-450);
+    --dindin-action: var(--color-jade-500);
+    --dindin-action-hover: var(--color-jade-400);
+    --dindin-on-action: var(--color-jade-ink);
+    --dindin-accent: var(--color-creme-50);
+    --dindin-border: var(--color-neutral-800);
+    --dindin-border-strong: var(--color-neutral-600);
+    --dindin-focus: var(--color-jade-400);
+    --dindin-info: var(--color-info-400);
+    --dindin-warning: var(--color-warning-400);
+    --dindin-danger: var(--color-danger-400);
+    --dindin-danger-hover: var(--color-danger-300);
+    --dindin-on-danger: var(--color-neutral-950);
+    --dindin-positive: var(--color-positive-400);
+    --dindin-overlay: rgb(5 5 3 / 0.7);
+    --dindin-shadow: rgb(0 0 0 / 0.55);
+    --dindin-shadow-weak: rgb(0 0 0 / 0.35);
+    --dindin-chart-1: var(--color-jade-500);
+    --dindin-chart-2: var(--color-jade-100);
+    --dindin-chart-3: var(--color-danger-600);
+    --dindin-chart-4: var(--color-info-400);
+    --dindin-chart-5: var(--color-warning-600);
+    --dindin-chart-6: var(--color-positive-400);
+    --dindin-chart-7: var(--color-info-600);
+    --dindin-chart-8: var(--color-creme-300);
+    --dindin-chart-other: var(--color-neutral-500);
+    --dindin-brand-soft: var(--color-jade-950);
+    --dindin-brand-ink: var(--color-jade-300);
+    --dindin-info-soft: var(--color-info-950);
+    --dindin-info-ink: var(--color-info-400);
+    --dindin-warning-soft: var(--color-warning-950);
+    --dindin-warning-ink: var(--color-warning-400);
+    --dindin-danger-soft: var(--color-danger-950);
+    --dindin-danger-ink: var(--color-danger-400);
+    --dindin-positive-soft: var(--color-positive-950);
+    --dindin-positive-ink: var(--color-positive-400);
+  }
+}
+
+/*
+  O escuro por escolha do usuário. As declarações repetem as do bloco
+  acima porque CSS não tem como um seletor reaproveitar as de outro; a
+  suíte exige que os dois blocos digam exatamente a mesma coisa.
+*/
+[data-theme='dark'] {
+  color-scheme: dark;
+  --dindin-surface: var(--color-neutral-975);
+  --dindin-surface-elevated: var(--color-neutral-900);
+  --dindin-surface-sunken: var(--color-neutral-850);
+  --dindin-text-primary: var(--color-neutral-200);
+  --dindin-text-secondary: var(--color-neutral-400);
+  --dindin-text-muted: var(--color-neutral-450);
+  --dindin-action: var(--color-jade-500);
+  --dindin-action-hover: var(--color-jade-400);
+  --dindin-on-action: var(--color-jade-ink);
+  --dindin-accent: var(--color-creme-50);
+  --dindin-border: var(--color-neutral-800);
+  --dindin-border-strong: var(--color-neutral-600);
+  --dindin-focus: var(--color-jade-400);
+  --dindin-info: var(--color-info-400);
+  --dindin-warning: var(--color-warning-400);
+  --dindin-danger: var(--color-danger-400);
+  --dindin-danger-hover: var(--color-danger-300);
+  --dindin-on-danger: var(--color-neutral-950);
+  --dindin-positive: var(--color-positive-400);
+  --dindin-overlay: rgb(5 5 3 / 0.7);
+  --dindin-shadow: rgb(0 0 0 / 0.55);
+  --dindin-shadow-weak: rgb(0 0 0 / 0.35);
+  --dindin-chart-1: var(--color-jade-500);
+  --dindin-chart-2: var(--color-jade-100);
+  --dindin-chart-3: var(--color-danger-600);
+  --dindin-chart-4: var(--color-info-400);
+  --dindin-chart-5: var(--color-warning-600);
+  --dindin-chart-6: var(--color-positive-400);
+  --dindin-chart-7: var(--color-info-600);
+  --dindin-chart-8: var(--color-creme-300);
+  --dindin-chart-other: var(--color-neutral-500);
+  --dindin-brand-soft: var(--color-jade-950);
+  --dindin-brand-ink: var(--color-jade-300);
+  --dindin-info-soft: var(--color-info-950);
+  --dindin-info-ink: var(--color-info-400);
+  --dindin-warning-soft: var(--color-warning-950);
+  --dindin-warning-ink: var(--color-warning-400);
+  --dindin-danger-soft: var(--color-danger-950);
+  --dindin-danger-ink: var(--color-danger-400);
+  --dindin-positive-soft: var(--color-positive-950);
+  --dindin-positive-ink: var(--color-positive-400);
+}
+
+/*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
   looks the same as it did with Tailwind CSS v3.
@@ -24,7 +334,7 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--dindin-border, currentcolor);
   }
 }
 
@@ -33,6 +343,16 @@
   usar a cor do texto com 50% de opacidade. Mantém o comportamento do v3.
 */
 @layer base {
+  /*
+    O corpo da página precisa de fundo próprio: o `bg-surface` das telas cobre
+    só o `<main>`, e sem isto a área fora do conteúdo continua branca no tema
+    escuro.
+  */
+  body {
+    background-color: var(--dindin-surface);
+    color: var(--dindin-text-primary);
+  }
+
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
@@ -40,6 +360,6 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-gray-400);
+    color: var(--dindin-text-muted);
   }
 }

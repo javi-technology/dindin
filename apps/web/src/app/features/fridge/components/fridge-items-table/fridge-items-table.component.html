@@ -2,21 +2,25 @@
   <div class="overflow-x-auto">
     <table class="w-full text-left border-collapse">
       <thead>
-        <tr class="border-b border-gray-200">
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700">Ticker</th>
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+        <tr class="border-b border-border">
+          <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
+            Ticker
+          </th>
+          <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
             Quantidade
           </th>
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+          <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
             Preço atual
           </th>
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+          <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
             Preço-alvo
           </th>
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+          <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
             Potencial
           </th>
-          <th class="py-3 px-4 text-sm font-semibold text-gray-700 text-right">
+          <th
+            class="py-3 px-4 text-sm font-semibold text-text-secondary text-right"
+          >
             Ações
           </th>
         </tr>
@@ -24,31 +28,38 @@
       <tbody>
         @for (item of items(); track item.id; let i = $index) {
           <tr
-            class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+            class="border-b border-border hover:bg-surface-sunken transition-colors"
           >
-            <td class="py-3 px-4 text-gray-900 font-medium">
+            <td class="py-3 px-4 text-text-primary font-medium">
               {{ item.ticker }}
             </td>
-            <td class="py-3 px-4 text-gray-700">
+            <td class="py-3 px-4 text-text-secondary">
               {{ item.quantity }}
             </td>
-            <td class="py-3 px-4 text-gray-700">
+            <td class="py-3 px-4 text-text-secondary">
               {{
                 item.currentPrice != null
                   ? formatCurrency(item.currentPrice)
                   : formatCurrency(item.transferredPrice)
               }}
+              @if (formatQuotedAt(item.currentPriceQuotedAt); as apurada) {
+                <span
+                  [attr.data-testid]="'cotacao-apurada-' + i"
+                  class="block text-xs text-text-muted"
+                  >{{ apurada }}</span
+                >
+              }
             </td>
-            <td class="py-3 px-4 text-gray-700">
+            <td class="py-3 px-4 text-text-secondary">
               {{ formatCurrency(item.targetPrice) }}
             </td>
-            <td class="py-3 px-4 text-gray-700">
+            <td class="py-3 px-4 text-text-secondary">
               {{ formatPotential(item) }}
             </td>
             <td class="py-3 px-4 text-right">
               <button
                 [attr.data-testid]="'btn-descongelar-item-' + i"
-                class="text-emerald-600 hover:text-emerald-800 font-medium text-sm mr-3 inline-flex items-center"
+                class="text-positive hover:text-positive-ink font-medium text-sm mr-3 inline-flex items-center"
                 (click)="unfreeze.emit(item)"
               >
                 <svg lucideFlame [size]="14" class="mr-1"></svg>
@@ -56,7 +67,7 @@
               </button>
               <button
                 [attr.data-testid]="'btn-editar-item-' + i"
-                class="text-cyan-600 hover:text-cyan-800 font-medium text-sm mr-3 inline-flex items-center"
+                class="text-action hover:text-brand-ink font-medium text-sm mr-3 inline-flex items-center"
                 (click)="edit.emit(item)"
               >
                 <svg lucidePencil [size]="14" class="mr-1"></svg>
@@ -64,7 +75,7 @@
               </button>
               <button
                 [attr.data-testid]="'btn-remover-item-' + i"
-                class="text-red-600 hover:text-red-800 font-medium text-sm inline-flex items-center"
+                class="text-danger hover:text-danger-ink font-medium text-sm inline-flex items-center"
                 (click)="remove.emit(item)"
               >
                 <svg lucideTrash2 [size]="14" class="mr-1"></svg>

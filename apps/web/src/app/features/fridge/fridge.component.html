@@ -1,22 +1,24 @@
-<main class="min-h-screen bg-gray-50 p-6">
+<main class="min-h-screen bg-surface p-6">
   <div class="max-w-5xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+    <div class="bg-surface-elevated rounded-2xl shadow-lg p-6 mb-6">
       <div
         class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4"
       >
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Geladeira</h1>
-          <p class="text-gray-600">Acompanhe seus FIIs na geladeira</p>
+          <h1 class="text-2xl font-bold text-text-primary">Geladeira</h1>
+          <p class="text-text-secondary">Acompanhe seus FIIs na geladeira</p>
         </div>
 
         @if (fridges().length > 0) {
           <div class="flex items-center gap-2">
-            <label for="fridge-select" class="text-sm font-medium text-gray-700"
+            <label
+              for="fridge-select"
+              class="text-sm font-medium text-text-secondary"
               >Geladeira:</label
             >
             <select
               id="fridge-select"
-              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+              class="border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
               [value]="selectedFridge()?.id"
               (change)="onFridgeChange($event)"
             >
@@ -30,7 +32,7 @@
 
       @if (error()) {
         <div
-          class="bg-red-50 text-red-800 rounded-lg p-4 mb-4"
+          class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-4"
           data-testid="error-message"
         >
           {{ error() }}
@@ -38,19 +40,19 @@
       }
 
       @if (loading()) {
-        <p class="text-gray-600">Carregando...</p>
+        <p class="text-text-secondary">Carregando...</p>
       }
 
       @if (!loading()) {
         @if (fridges().length === 0) {
-          <div class="text-center py-12 text-gray-500">
+          <div class="text-center py-12 text-text-muted">
             <p class="text-lg mb-2">Nenhuma geladeira encontrada.</p>
             <p class="text-sm mb-4">
               Crie uma geladeira para começar a adicionar itens.
             </p>
             <button
               data-testid="btn-criar-geladeira"
-              class="bg-cyan-600 hover:bg-cyan-700 text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
+              class="bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
               (click)="createDefaultFridge()"
             >
               <svg lucideRefrigerator [size]="18" class="mr-2"></svg>
@@ -63,7 +65,7 @@
           <div class="flex justify-end items-center mb-4">
             <button
               data-testid="btn-adicionar-item"
-              class="bg-cyan-600 hover:bg-cyan-700 text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
+              class="bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center"
               (click)="openForm()"
             >
               <svg lucidePlus [size]="18" class="mr-2"></svg>
@@ -72,7 +74,7 @@
           </div>
 
           @if (items().length === 0) {
-            <div class="text-center py-12 text-gray-500">
+            <div class="text-center py-12 text-text-muted">
               <p class="text-lg">Nenhum item na geladeira.</p>
               <p class="text-sm">Adicione um item para começar.</p>
             </div>

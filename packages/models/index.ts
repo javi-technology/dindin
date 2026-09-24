@@ -79,6 +79,13 @@ export interface Position {
   quantity: number;
   averagePrice: number; // preço médio de compra (BRL)
   currentPrice?: number; // último preço conhecido
+  /**
+   * ISO-8601 — quando o `currentPrice` foi apurado na fonte (issue #390).
+   *
+   * Resolvido na leitura a partir de `quotes/{ticker}`, como o `currentPrice`;
+   * ausente enquanto a cotação for anterior à #387.
+   */
+  currentPriceQuotedAt?: string;
   /** Indica se a posição está na geladeira (acompanhamento para venda). */
   inFridge: boolean;
   /** Preço-alvo para venda quando na geladeira. */
@@ -108,6 +115,8 @@ export interface FridgeItem {
   transferredPrice: number; // preço de transferência (quando saiu da carteira)
   targetPrice: number; // preço-alvo para voltar à carteira
   currentPrice?: number;
+  /** ISO-8601 — quando o `currentPrice` foi apurado na fonte (issue #390). */
+  currentPriceQuotedAt?: string;
   assetType?: AssetType;
   notes?: string;
   createdAt: string;
@@ -136,7 +145,15 @@ export interface Quote {
   monthlyDividend: number; // último provento/rendimento por cota/ação
   dividendPaymentDate?: string; // YYYY-MM-DD — data de pagamento do provento
   annualDividend?: number; // soma dos proventos pagos nos últimos 12 meses
-  updatedAt: string; // ISO-8601
+  updatedAt: string; // ISO-8601 — quando *nós* gravamos a cotação
+  /**
+   * ISO-8601 — quando a cotação foi apurada na fonte (issue #387).
+   *
+   * Distinto de `updatedAt`: é o que permite saber se o preço é o fechamento
+   * consolidado ou o último negócio do pregão contínuo, e separar atraso da
+   * fonte de falha nossa. Ausente nas cotações gravadas antes da #387.
+   */
+  quotedAt?: string;
   source: string; // ex: "brapi"
 }
 

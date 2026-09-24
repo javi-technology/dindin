@@ -55,6 +55,28 @@ export function formatDate(value: string | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * Rótulo da data de apuração da cotação (issue #390), como
+ * "Fechamento de 23/09/2026", ou `null` quando não há horário de apuração.
+ *
+ * O dia é o de São Paulo, não o do UTC: o fechamento de um pregão carimbado
+ * em 02:00Z pertence ao dia anterior aqui, e exibir o dia seguinte faria o
+ * preço parecer mais novo do que é. Cotações gravadas antes da #387 não têm
+ * o horário, e a tela então não mostra indicação nenhuma.
+ */
+export function formatQuotedAt(value: string | undefined): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const date = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parsed);
+  return `Fechamento de ${date}`;
+}
+
 /** Formata um número como moeda compacta em reais (pt-BR). */
 export function formatCompactCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {

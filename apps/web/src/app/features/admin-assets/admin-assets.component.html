@@ -1,12 +1,12 @@
-<main class="min-h-screen bg-gray-50 p-6">
+<main class="min-h-screen bg-surface p-6">
   <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+    <div class="bg-surface-elevated rounded-2xl shadow-lg p-6 mb-6">
       <div
         class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4"
       >
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Administração</h1>
-          <p class="text-gray-600">
+          <h1 class="text-2xl font-bold text-text-primary">Administração</h1>
+          <p class="text-text-secondary">
             {{
               editingTicker()
                 ? 'Editar ativo do catálogo'
@@ -16,7 +16,7 @@
         </div>
         <a
           routerLink="/"
-          class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800"
+          class="inline-flex items-center text-sm font-medium text-action hover:text-brand-ink"
         >
           <svg lucideArrowLeft [size]="16" class="mr-1"></svg>
           Voltar
@@ -25,7 +25,7 @@
 
       @if (error()) {
         <div
-          class="bg-red-50 text-red-800 rounded-lg p-4 mb-4"
+          class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-4"
           data-testid="error-message"
         >
           {{ error() }}
@@ -34,7 +34,7 @@
 
       @if (successMessage()) {
         <div
-          class="bg-green-50 text-green-800 rounded-lg p-4 mb-4"
+          class="bg-positive-soft text-positive-ink rounded-lg p-4 mb-4"
           data-testid="success-message"
         >
           {{ successMessage() }}
@@ -44,7 +44,7 @@
       <form [formGroup]="form" (ngSubmit)="saveAsset()" class="space-y-4 mb-8">
         @if (formError()) {
           <div
-            class="bg-red-50 text-red-800 rounded-lg p-3 text-sm"
+            class="bg-danger-soft text-danger-ink rounded-lg p-3 text-sm"
             data-testid="form-error"
           >
             {{ formError() }}
@@ -55,40 +55,40 @@
           <div>
             <label
               for="ticker"
-              class="block text-sm font-medium text-gray-700 mb-1"
+              class="block text-sm font-medium text-text-secondary mb-1"
               >Ticker</label
             >
             <input
               id="ticker"
               type="text"
               formControlName="ticker"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
+              class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
+              [class.border-danger]="
                 form.get('ticker')?.invalid && form.get('ticker')?.touched
               "
             />
             @if (form.get('ticker')?.invalid && form.get('ticker')?.touched) {
-              <p class="text-red-600 text-xs mt-1">Ticker é obrigatório.</p>
+              <p class="text-danger text-xs mt-1">Ticker é obrigatório.</p>
             }
           </div>
 
           <div>
             <label
               for="name"
-              class="block text-sm font-medium text-gray-700 mb-1"
+              class="block text-sm font-medium text-text-secondary mb-1"
               >Nome</label
             >
             <input
               id="name"
               type="text"
               formControlName="name"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              [class.border-red-500]="
+              class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
+              [class.border-danger]="
                 form.get('name')?.invalid && form.get('name')?.touched
               "
             />
             @if (form.get('name')?.invalid && form.get('name')?.touched) {
-              <p class="text-red-600 text-xs mt-1">Nome é obrigatório.</p>
+              <p class="text-danger text-xs mt-1">Nome é obrigatório.</p>
             }
           </div>
         </div>
@@ -97,13 +97,13 @@
           <div>
             <label
               for="assetType"
-              class="block text-sm font-medium text-gray-700 mb-1"
+              class="block text-sm font-medium text-text-secondary mb-1"
               >Tipo</label
             >
             <select
               id="assetType"
               formControlName="assetType"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-border-strong rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-focus"
             >
               @for (type of assetTypes; track type.value) {
                 <option [value]="type.value">{{ type.label }}</option>
@@ -119,9 +119,11 @@
                 class="sr-only peer"
               />
               <div
-                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-hidden peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:rtl:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:inset-s-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"
+                class="relative w-11 h-6 bg-border peer-focus:outline-hidden peer-focus:ring-2 peer-focus:ring-focus rounded-full peer peer-checked:after:translate-x-full peer-checked:rtl:after:-translate-x-full peer-checked:after:border-surface-elevated after:content-[''] after:absolute after:top-[2px] after:inset-s-[2px] after:bg-surface-elevated after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-action"
               ></div>
-              <span class="ms-3 text-sm font-medium text-gray-700">Ativo</span>
+              <span class="ms-3 text-sm font-medium text-text-secondary"
+                >Ativo</span
+              >
             </label>
           </div>
         </div>
@@ -130,9 +132,9 @@
           <input
             type="checkbox"
             formControlName="qualifiedInvestor"
-            class="form-checkbox h-4 w-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500"
+            class="form-checkbox h-4 w-4 rounded-sm border-border-strong text-action focus:ring-focus"
           />
-          <span class="ms-2 text-sm font-medium text-gray-700">
+          <span class="ms-2 text-sm font-medium text-text-secondary">
             Investidor qualificado
           </span>
         </label>
@@ -141,7 +143,7 @@
           @if (editingTicker()) {
             <button
               type="button"
-              class="mr-3 text-gray-600 hover:text-gray-900 text-sm font-medium"
+              class="mr-3 text-text-secondary hover:text-text-primary text-sm font-medium"
               (click)="cancelEditing()"
             >
               Cancelar
@@ -149,7 +151,7 @@
           }
           <button
             type="submit"
-            class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            class="inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
             [disabled]="form.invalid"
           >
             @if (editingTicker()) {
@@ -163,58 +165,62 @@
         </div>
       </form>
 
-      <h2 class="text-lg font-semibold text-gray-800 mb-3">
+      <h2 class="text-lg font-semibold text-text-primary mb-3">
         Ativos cadastrados
       </h2>
 
       @if (loading()) {
-        <p class="text-gray-600">Carregando...</p>
+        <p class="text-text-secondary">Carregando...</p>
       }
 
       @if (!loading() && assets().length === 0) {
-        <p class="text-gray-500">Nenhum ativo cadastrado no catálogo.</p>
+        <p class="text-text-muted">Nenhum ativo cadastrado no catálogo.</p>
       }
 
       @if (!loading() && assets().length > 0) {
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-gray-200">
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+              <tr class="border-b border-border">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Ticker
                 </th>
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Nome
                 </th>
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Tipo
                 </th>
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Status
                 </th>
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Qualificado
                 </th>
-                <th class="py-3 px-4 text-sm font-semibold text-gray-700">
+                <th class="py-3 px-4 text-sm font-semibold text-text-secondary">
                   Ações
                 </th>
               </tr>
             </thead>
             <tbody>
               @for (asset of assets(); track asset.ticker) {
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                  <td class="py-3 px-4 text-gray-900 font-medium">
+                <tr class="border-b border-border hover:bg-surface-sunken">
+                  <td class="py-3 px-4 text-text-primary font-medium">
                     {{ asset.ticker }}
                   </td>
-                  <td class="py-3 px-4 text-gray-700">{{ asset.name }}</td>
-                  <td class="py-3 px-4 text-gray-700">{{ asset.assetType }}</td>
+                  <td class="py-3 px-4 text-text-secondary">
+                    {{ asset.name }}
+                  </td>
+                  <td class="py-3 px-4 text-text-secondary">
+                    {{ asset.assetType }}
+                  </td>
                   <td class="py-3 px-4">
                     <span
                       class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                      [class.bg-green-100]="asset.active"
-                      [class.text-green-800]="asset.active"
-                      [class.bg-gray-100]="!asset.active"
-                      [class.text-gray-800]="!asset.active"
+                      [class.bg-positive-soft]="asset.active"
+                      [class.text-positive-ink]="asset.active"
+                      [class.bg-surface-sunken]="!asset.active"
+                      [class.text-text-primary]="!asset.active"
                     >
                       {{ asset.active ? 'Ativo' : 'Inativo' }}
                     </span>
@@ -222,13 +228,13 @@
                   <td class="py-3 px-4">
                     @if (asset.qualifiedInvestor) {
                       <span
-                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning-soft text-warning-ink"
                       >
                         Sim
                       </span>
                     } @else {
                       <span
-                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-surface-sunken text-text-secondary"
                       >
                         —
                       </span>
@@ -237,7 +243,7 @@
                   <td class="py-3 px-4">
                     <button
                       type="button"
-                      class="inline-flex items-center text-blue-700 hover:text-blue-900 text-sm font-medium"
+                      class="inline-flex items-center text-action hover:text-brand-ink text-sm font-medium"
                       (click)="startEditing(asset)"
                     >
                       <svg lucidePencil [size]="16" class="mr-1"></svg>

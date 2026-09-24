@@ -116,4 +116,28 @@ describe('FridgeItemsTableComponent', () => {
     expect(editados).toEqual([items[0]]);
     expect(removidos).toEqual([items[0]]);
   });
+  // Sem a data de apuração (issue #390), um fechamento do dia anterior parece
+  // um preço errado.
+  describe('data de apuração da cotação', () => {
+    it('deve exibir a data de apuração junto do preço atual', () => {
+      setup([
+        {
+          ...items[0],
+          currentPrice: 112,
+          currentPriceQuotedAt: '2026-09-23T21:31:00Z',
+        },
+      ]);
+
+      expect(
+        element('[data-testid="cotacao-apurada-0"]')?.textContent?.trim(),
+      ).toBe('Fechamento de 23/09/2026');
+    });
+
+    it('não deve exibir indicação quando a cotação não tem data de apuração', () => {
+      setup([{ ...items[0], currentPrice: 112 }]);
+
+      expect(element('[data-testid="cotacao-apurada-0"]')).toBeNull();
+      expect(rows().length).toBe(1);
+    });
+  });
 });
