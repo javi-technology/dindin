@@ -39,6 +39,7 @@ const light = declarations(bodyOf(':root'));
 const dark = declarations(
   bodyOf(':root', bodyOf('@media (prefers-color-scheme: dark)')),
 );
+const darkByChoice = declarations(bodyOf("[data-theme='dark']"));
 
 const roles = [
   'surface',
@@ -266,6 +267,19 @@ describe('paleta Verde-Jade e Creme', () => {
       }
     },
   );
+
+  it('aplica o mesmo escuro pela preferência do sistema e pela escolha', () => {
+    // O bloco é duplicado por necessidade: CSS não tem como um seletor
+    // reaproveitar as declarações do outro. Este teste é o que mantém os dois
+    // em pé de igualdade.
+    expect(darkByChoice).toEqual(dark);
+  });
+
+  it('deixa a escolha do claro vencer a preferência do sistema', () => {
+    const media = bodyOf('@media (prefers-color-scheme: dark)');
+
+    expect(media).toContain(":root:not([data-theme='light'])");
+  });
 
   it('documenta cada papel da paleta', () => {
     for (const role of roles) {
