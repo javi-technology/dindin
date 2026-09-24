@@ -198,6 +198,37 @@ describe('AlertMailService', () => {
     expect(body.html).toContain('R$ 125,50');
   });
 
+  it('deve usar as cores da paleta no corpo do e-mail', async () => {
+    seedFirestore();
+
+    await sendAlertEmails('user-1', [alert()]);
+
+    const html = requestBody().html as string;
+    const usadas = [...html.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) =>
+      m[0].toLowerCase(),
+    );
+
+    // E-mail não lê o CSS do app: a cor vai no HTML da mensagem, em
+    // hexadecimal literal, e por isso precisa ser conferida aqui.
+    expect(usadas.length).toBeGreaterThan(0);
+    expect(new Set(usadas)).toEqual(
+      new Set(['#141410', '#52524d', '#008654', '#ffffff']),
+    );
+  });
+
+  it('deve manter o texto do e-mail acima de 4,5:1 sobre o fundo', async () => {
+    seedFirestore();
+
+    await sendAlertEmails('user-1', [alert()]);
+
+    const html = requestBody().html as string;
+    const fundo = '#ffffff';
+    for (const cor of ['#141410', '#52524d', '#008654']) {
+      expect(html).toContain(cor);
+      expect(contraste(cor, fundo)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('deve escapar markup vindo do nome da geladeira', async () => {
     seedFirestore();
 
@@ -352,3 +383,18 @@ describe('AlertMailService', () => {
     expect(functionsLogger.error).toHaveBeenCalled();
   });
 });
+
+/** Razão de contraste do WCAG 2.1 entre duas cores em hexadecimal. */
+function contraste(a: string, b: string): number {
+  const luminancia = (hex: string): number => {
+    const canais = [1, 3, 5].map((inicio) => {
+      const valor = parseInt(hex.slice(inicio, inicio + 2), 16) / 255;
+      return valor <= 0.03928
+        ? valor / 12.92
+        : Math.pow((valor + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * canais[0] + 0.7152 * canais[1] + 0.0722 * canais[2];
+  };
+  const [claro, escuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+  return (claro + 0.05) / (escuro + 0.05);
+}
