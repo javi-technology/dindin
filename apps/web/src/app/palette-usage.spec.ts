@@ -89,6 +89,18 @@ function offenders(pattern: RegExp): string[] {
 
 const prefixes = PREFIXES.join('|');
 
+/*
+  Utilitária de cor com valor arbitrário: `bg-[#ff0000]`, `text-[color:var(--x)]`
+  ou `bg-[--token]`. Só conta como cor o que começa com notação de cor — a
+  mesma sintaxe serve para tamanho e sombra, que não são assunto da paleta.
+*/
+function arbitraryColorPattern(): RegExp {
+  return new RegExp(
+    `\\b(?:${prefixes})-\\[(?:#|rgba?\\(|hsla?\\(|oklch\\(|oklab\\(|lab\\(|lch\\(|color:|--)`,
+    'g',
+  );
+}
+
 describe('uso da paleta nas telas', () => {
   it('não usa utilitária de cor literal do Tailwind', () => {
     const pattern = new RegExp(
@@ -106,9 +118,49 @@ describe('uso da paleta nas telas', () => {
     expect(offenders(pattern)).toEqual([]);
   });
 
-  it('não usa preto, branco nem cor arbitrária na marcação', () => {
+  it('não usa preto nem branco na marcação', () => {
     const pattern =
       /\b(?:bg|text|border|ring|divide|fill|stroke|outline)-(?:black|white)\b/g;
     expect(offenders(pattern)).toEqual([]);
+  });
+
+  it('não usa cor arbitrária na marcação', () => {
+    expect(offenders(arbitraryColorPattern())).toEqual([]);
+  });
+});
+
+/*
+  O detector de cor arbitraria precisa do proprio teste: varrer os arquivos so
+  prova que hoje nao ha violacao, nao que o padrao reconheceria uma. E o
+  recorte e estreito de proposito — `text-[13px]` e `shadow-[0_1px_2px]` usam a
+  mesma sintaxe e nao tem nada a ver com cor.
+*/
+describe('detecção de cor arbitrária', () => {
+  const casa = (classe: string): boolean =>
+    arbitraryColorPattern().test(classe);
+
+  it.each([
+    'bg-[#ff0000]',
+    'text-[#fff]',
+    'border-[#123456]',
+    'text-[color:var(--color-surface)]',
+    'bg-[rgb(255,0,0)]',
+    'bg-[rgba(255,0,0,0.5)]',
+    'text-[hsl(120,50%,50%)]',
+    'bg-[oklch(0.7_0.1_150)]',
+    'bg-[--color-surface]',
+  ])('deve reprovar %s', (classe) => {
+    expect(casa(classe)).toBe(true);
+  });
+
+  it.each([
+    'text-[13px]',
+    'w-[2px]',
+    'max-w-[40ch]',
+    'shadow-[0_1px_2px]',
+    'grid-cols-[1fr_auto]',
+    'bg-surface',
+  ])('não deve reprovar %s', (classe) => {
+    expect(casa(classe)).toBe(false);
   });
 });
