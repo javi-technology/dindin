@@ -119,6 +119,17 @@
   --color-overlay: var(--dindin-overlay);
 
   /*
+    Sombra como token. A sombra padrão do Tailwind é preta com 10% de opacidade
+    e desaparece sobre a superfície escura; no escuro ela precisa ser mais
+    densa para o cartão continuar descolado do fundo.
+  */
+  --shadow-xs: 0 1px 2px 0 var(--dindin-shadow-weak);
+  --shadow-lg:
+    0 10px 15px -3px var(--dindin-shadow), 0 4px 6px -4px var(--dindin-shadow);
+  --shadow-xl:
+    0 20px 25px -5px var(--dindin-shadow), 0 8px 10px -6px var(--dindin-shadow);
+
+  /*
     Série categórica dos gráficos (issue #393). A ordem é o que importa: as
     séries vizinhas se distinguem por luminosidade, não por matiz, para
     continuarem legíveis em impressão em tons de cinza e para quem tem baixa
@@ -158,6 +169,7 @@
   jade puro sobre branco dá 2,51:1 e reprovaria AA.
 */
 :root {
+  color-scheme: light;
   --dindin-surface: var(--color-neutral-50);
   --dindin-surface-elevated: #ffffff;
   --dindin-surface-sunken: var(--color-neutral-100);
@@ -178,6 +190,8 @@
   --dindin-on-danger: #ffffff;
   --dindin-positive: var(--color-positive-700);
   --dindin-overlay: rgb(20 20 16 / 0.5);
+  --dindin-shadow: rgb(20 20 16 / 0.12);
+  --dindin-shadow-weak: rgb(20 20 16 / 0.06);
   --dindin-chart-1: var(--color-jade-700);
   --dindin-chart-2: var(--color-jade-300);
   --dindin-chart-3: var(--color-danger-800);
@@ -210,7 +224,8 @@
   cada papel aponta.
 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --dindin-surface: var(--color-neutral-975);
     --dindin-surface-elevated: var(--color-neutral-900);
     --dindin-surface-sunken: var(--color-neutral-850);
@@ -231,6 +246,8 @@
     --dindin-on-danger: var(--color-neutral-950);
     --dindin-positive: var(--color-positive-400);
     --dindin-overlay: rgb(5 5 3 / 0.7);
+    --dindin-shadow: rgb(0 0 0 / 0.55);
+    --dindin-shadow-weak: rgb(0 0 0 / 0.35);
     --dindin-chart-1: var(--color-jade-500);
     --dindin-chart-2: var(--color-jade-100);
     --dindin-chart-3: var(--color-danger-600);
@@ -251,6 +268,56 @@
     --dindin-positive-soft: var(--color-positive-950);
     --dindin-positive-ink: var(--color-positive-400);
   }
+}
+
+/*
+  O escuro por escolha do usuário. As declarações repetem as do bloco
+  acima porque CSS não tem como um seletor reaproveitar as de outro; a
+  suíte exige que os dois blocos digam exatamente a mesma coisa.
+*/
+[data-theme='dark'] {
+  color-scheme: dark;
+  --dindin-surface: var(--color-neutral-975);
+  --dindin-surface-elevated: var(--color-neutral-900);
+  --dindin-surface-sunken: var(--color-neutral-850);
+  --dindin-text-primary: var(--color-neutral-200);
+  --dindin-text-secondary: var(--color-neutral-400);
+  --dindin-text-muted: var(--color-neutral-450);
+  --dindin-action: var(--color-jade-500);
+  --dindin-action-hover: var(--color-jade-400);
+  --dindin-on-action: var(--color-jade-ink);
+  --dindin-accent: var(--color-creme-50);
+  --dindin-border: var(--color-neutral-800);
+  --dindin-border-strong: var(--color-neutral-600);
+  --dindin-focus: var(--color-jade-400);
+  --dindin-info: var(--color-info-400);
+  --dindin-warning: var(--color-warning-400);
+  --dindin-danger: var(--color-danger-400);
+  --dindin-danger-hover: var(--color-danger-300);
+  --dindin-on-danger: var(--color-neutral-950);
+  --dindin-positive: var(--color-positive-400);
+  --dindin-overlay: rgb(5 5 3 / 0.7);
+  --dindin-shadow: rgb(0 0 0 / 0.55);
+  --dindin-shadow-weak: rgb(0 0 0 / 0.35);
+  --dindin-chart-1: var(--color-jade-500);
+  --dindin-chart-2: var(--color-jade-100);
+  --dindin-chart-3: var(--color-danger-600);
+  --dindin-chart-4: var(--color-info-400);
+  --dindin-chart-5: var(--color-warning-600);
+  --dindin-chart-6: var(--color-positive-400);
+  --dindin-chart-7: var(--color-info-600);
+  --dindin-chart-8: var(--color-creme-300);
+  --dindin-chart-other: var(--color-neutral-500);
+  --dindin-brand-soft: var(--color-jade-950);
+  --dindin-brand-ink: var(--color-jade-300);
+  --dindin-info-soft: var(--color-info-950);
+  --dindin-info-ink: var(--color-info-400);
+  --dindin-warning-soft: var(--color-warning-950);
+  --dindin-warning-ink: var(--color-warning-400);
+  --dindin-danger-soft: var(--color-danger-950);
+  --dindin-danger-ink: var(--color-danger-400);
+  --dindin-positive-soft: var(--color-positive-950);
+  --dindin-positive-ink: var(--color-positive-400);
 }
 
 /*
@@ -276,6 +343,16 @@
   usar a cor do texto com 50% de opacidade. Mantém o comportamento do v3.
 */
 @layer base {
+  /*
+    O corpo da página precisa de fundo próprio: o `bg-surface` das telas cobre
+    só o `<main>`, e sem isto a área fora do conteúdo continua branca no tema
+    escuro.
+  */
+  body {
+    background-color: var(--dindin-surface);
+    color: var(--dindin-text-primary);
+  }
+
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;

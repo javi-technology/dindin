@@ -6,6 +6,30 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      Resolve o tema antes da primeira pintura (issue #394): aplicado só quando
+      o Angular sobe, o escuro apareceria depois de um lampejo de tela clara.
+      A lógica espelha a de `core/services/theme.service.ts`, que reaplica o
+      valor quando a escolha muda durante a sessão.
+    -->
+    <script>
+      (function () {
+        var escolha = null;
+        try {
+          escolha = localStorage.getItem('dindin-theme');
+        } catch (erro) {
+          escolha = null;
+        }
+        var tema =
+          escolha === 'light' || escolha === 'dark'
+            ? escolha
+            : matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.setAttribute('data-theme', tema);
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>

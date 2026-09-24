@@ -169,6 +169,37 @@ decorativa pode usar `neutral-800` `#3A3935`.
 | número em alta / em baixa              | `text-positive` / `text-danger` |
 | badge, faixa de aviso, erro            | `bg-<x>-soft text-<x>-ink`      |
 
+## Troca de tema
+
+O tema padrão é o do sistema operacional. A escolha explícita do usuário —
+claro, escuro ou "padrão do sistema" — fica no `localStorage`, sob a chave
+`dindin-theme`, e vence a preferência do sistema. `system` não guarda valor: a
+ausência de chave é o que significa "siga o sistema".
+
+- `core/services/theme.service.ts` mantém a escolha e escreve `data-theme` no
+  `<html>`.
+- `shared/components/theme-toggle` são três botões, e não um interruptor de
+  duas posições: com dois estados não haveria como voltar a seguir o sistema.
+- `index.html` repete o cálculo num script no `<head>`, antes da primeira
+  pintura. Sem ele, quem escolheu o escuro veria a tela clara piscar antes de o
+  Angular subir.
+
+No CSS, o escuro tem dois caminhos:
+
+```css
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { … } }
+[data-theme='dark'] { … }
+```
+
+O `:not([data-theme='light'])` é o que faz a escolha do claro vencer um sistema
+no escuro. As declarações se repetem nos dois blocos porque CSS não tem como um
+seletor reaproveitar as de outro — a suíte exige que os dois digam exatamente a
+mesma coisa.
+
+`color-scheme` acompanha o tema, para input, select e barra de rolagem do
+navegador não ficarem claros sobre a tela escura. A sombra também é token: a do
+Tailwind é preta com 10% de opacidade e some sobre a superfície escura.
+
 ## Gráficos
 
 A série categórica dos gráficos fica em

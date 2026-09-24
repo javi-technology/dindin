@@ -281,6 +281,24 @@ describe('paleta Verde-Jade e Creme', () => {
     expect(media).toContain(":root:not([data-theme='light'])");
   });
 
+  it('pinta o corpo da página com o token de superfície', () => {
+    // Sem isto, a área fora do conteúdo continua branca no tema escuro.
+    const body = bodyOf('body {');
+
+    expect(body).toContain('background-color: var(--dindin-surface)');
+    expect(body).toContain('color: var(--dindin-text-primary)');
+  });
+
+  it('informa o esquema de cor aos controles nativos', () => {
+    // `color-scheme` é o que faz input, select e barra de rolagem do navegador
+    // acompanharem o tema; sem ele ficam claros sobre a tela escura.
+    expect(bodyOf(':root')).toContain('color-scheme: light');
+    expect(
+      bodyOf(':root', bodyOf('@media (prefers-color-scheme: dark)')),
+    ).toContain('color-scheme: dark');
+    expect(bodyOf("[data-theme='dark']")).toContain('color-scheme: dark');
+  });
+
   it('documenta cada papel da paleta', () => {
     for (const role of roles) {
       expect(doc, `papel ${role} sem documentação`).toContain(`\`${role}\``);
