@@ -271,4 +271,26 @@ describe('PositionsTableComponent', () => {
       expect(removida).toEqual([positions[1]]);
     });
   });
+  // Sem a data de apuração (issue #390), um fechamento do dia anterior parece
+  // um preço errado.
+  describe('data de apuração da cotação', () => {
+    it('deve exibir a data de apuração junto do preço atual', () => {
+      fixture.componentRef.setInput('positions', [
+        { ...positions[0], currentPriceQuotedAt: '2026-09-23T21:31:00Z' },
+      ]);
+      fixture.detectChanges();
+
+      expect(
+        element('[data-testid="cotacao-apurada-0"]')?.textContent?.trim(),
+      ).toBe('Fechamento de 23/09/2026');
+    });
+
+    it('não deve exibir indicação quando a cotação não tem data de apuração', () => {
+      fixture.componentRef.setInput('positions', [positions[0]]);
+      fixture.detectChanges();
+
+      expect(element('[data-testid="cotacao-apurada-0"]')).toBeNull();
+      expect(rows().length).toBe(1);
+    });
+  });
 });

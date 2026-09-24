@@ -306,10 +306,30 @@ câmbio, então uma carteira em outra moeda seria calculada como se fosse em
 reais. Por isso `POST /api/wallets` e `PUT /api/wallets/:id` rejeitam com 400
 qualquer `currency` diferente de `BRL`. Multimoeda está fora da v1.
 
+## Cotações: horários e reconciliação
+
+A cadeia diária roda depois do encerramento do after-market da B3 (19:00), em
+`America/Sao_Paulo`: cotações às **19:30**, snapshot patrimonial às **20:00** e
+preço-alvo às **20:15** (issue #388). Os três se movem em bloco, porque os dois
+últimos leem o preço gravado pelo primeiro.
+
+Cada cotação guarda dois horários distintos: `updatedAt`, quando **nós**
+escrevemos, e `quotedAt`, quando a **fonte** apurou o preço (issue #387). É o
+`quotedAt` que aparece nas telas de geladeira e de posições como
+"Fechamento de dd/MM/aaaa" (issue #390), e é ele que permite medir no Cloud
+Logging a que horas a Brapi consolida o fechamento de cada pregão.
+
+Às **23:30**, `reconcileQuotesScheduled` volta e corrige apenas o preço do dia
+(issue #389), sem registrar proventos nem tirar a foto de data-com — a Brapi
+pode continuar servindo o último negócio do pregão contínuo por horas depois do
+fechamento. A cotação só é sobrescrita quando o `quotedAt` da fonte é posterior
+ao já gravado, para um dado em cache não substituir um fechamento consolidado.
+
 ## Alertas de preço-alvo da geladeira
 
-Todo dia às 19:15 (após a atualização de cotações das 18:30 e o snapshot
-patrimonial das 19:00), a function `checkTargetPricesScheduled` compara a
+Todo dia às 20:15 (após a atualização de cotações das 19:30 e o snapshot
+patrimonial das 20:00, já depois do encerramento do after-market), a function
+`checkTargetPricesScheduled` compara a
 cotação atual de cada item da geladeira com o `targetPrice` definido pelo
 usuário e grava um alerta em `users/{uid}/alerts/{fridgeId}_{ticker}`.
 

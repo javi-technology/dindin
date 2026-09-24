@@ -5,7 +5,10 @@ import {
   output,
 } from '@angular/core';
 import { FridgeItem } from 'dindin-models';
-import { formatCurrency } from '../../../../shared/utils/format.util';
+import {
+  formatCurrency,
+  formatQuotedAt,
+} from '../../../../shared/utils/format.util';
 import { LucideFlame, LucidePencil, LucideTrash2 } from '@lucide/angular';
 
 /**
@@ -47,4 +50,5 @@ export class FridgeItemsTableComponent {
   }
 
   formatCurrency = formatCurrency;
+  formatQuotedAt = formatQuotedAt;
 }

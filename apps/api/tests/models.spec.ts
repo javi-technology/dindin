@@ -11,6 +11,7 @@ import {
   Dividend,
   PatrimonySnapshot,
   Alert,
+  Quote,
 } from 'dindin-models';
 
 // ---------------------------------------------------------------------------
@@ -297,5 +298,69 @@ describe('models – Alert', () => {
     };
     expect(alert.notifiedAt).toBeDefined();
     expect(alert.clearedAt).toBeDefined();
+  });
+});
+
+describe('models – Quote', () => {
+  it('deve aceitar o horário de apuração da fonte, distinto do horário da escrita', () => {
+    const quote: Quote = {
+      ticker: 'TRXF11',
+      price: 73.9,
+      monthlyDividend: 0.7,
+      updatedAt: '2026-09-23T22:30:12Z',
+      quotedAt: '2026-09-23T21:31:00Z',
+      source: 'brapi',
+    };
+
+    expect(quote.quotedAt).not.toBe(quote.updatedAt);
+  });
+
+  it('deve aceitar cotação sem horário de apuração (gravada antes da #387)', () => {
+    const quote: Quote = {
+      ticker: 'MXRF11',
+      price: 10.32,
+      monthlyDividend: 0.07,
+      updatedAt: '2026-09-23T22:30:12Z',
+      source: 'brapi',
+    };
+
+    expect(quote.quotedAt).toBeUndefined();
+  });
+});
+
+describe('models – horário de apuração do preço atual', () => {
+  it('deve aceitar o horário de apuração junto do preço atual da posição', () => {
+    const position: Position = {
+      id: 'pos-1',
+      walletId: 'wallet-1',
+      ticker: 'TRXF11',
+      assetType: 'FII',
+      quantity: 100,
+      averagePrice: 70,
+      currentPrice: 73.9,
+      currentPriceQuotedAt: '2026-09-23T21:31:00Z',
+      inFridge: false,
+      createdAt: '2026-09-23T00:00:00Z',
+      updatedAt: '2026-09-23T00:00:00Z',
+    };
+
+    expect(position.currentPriceQuotedAt).toBeDefined();
+  });
+
+  it('deve aceitar o horário de apuração junto do preço atual do item da geladeira', () => {
+    const item: FridgeItem = {
+      id: 'item-1',
+      fridgeId: 'fridge-1',
+      ticker: 'TRXF11',
+      quantity: 100,
+      transferredPrice: 70,
+      targetPrice: 80,
+      currentPrice: 73.9,
+      currentPriceQuotedAt: '2026-09-23T21:31:00Z',
+      createdAt: '2026-09-23T00:00:00Z',
+      updatedAt: '2026-09-23T00:00:00Z',
+    };
+
+    expect(item.currentPriceQuotedAt).toBeDefined();
   });
 });

@@ -1,10 +1,11 @@
-import { fetchQuotes, QuoteResult } from './brapi.service';
+import { QuoteResult } from './brapi.service';
+import { fetchCatalogQuotes } from './catalog-quotes';
 import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
 import { listActiveAssetTickers } from '../assets/asset.service';
 import { recordPaidDividends } from '../dividend/dividend-sync-record.service';
 import { today } from '../shared/date';
-import { logError, logInfo, logWarn } from '../shared/logger';
+import { logError, logInfo } from '../shared/logger';
 
 // Processa os tickers com cotação em lotes, para não disparar centenas de
 // escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
@@ -52,10 +53,14 @@ async function processTickerQuote(
       QUOTE_SOURCE,
       dividend?.paymentDate,
       dividend?.annualDividend,
+      quote.quotedAt,
     );
     logInfo('updateAllQuotes.tickerUpdated', {
       ticker,
       price: quote.price,
+      // Horário de apuração na fonte (#387): é o que permite medir no Cloud
+      // Logging a que horas a Brapi consolida o fechamento de cada pregão.
+      quotedAt: quote.quotedAt,
       source: QUOTE_SOURCE,
     });
   } catch (error) {
@@ -67,32 +72,6 @@ async function processTickerQuote(
   // Registra os proventos pagos nos usuários (#112). O estado do registro
   // só é gravado após o commit, então uma falha aqui é refeita no próximo sync.
   await recordTickerDividends(ticker, dividend, today);
-}
-
-/**
- * Busca cotações na Brapi, a fonte oficial e única do DinDin.
- *
- * Tickers sem cotação são apenas logados. Lança erro quando a Brapi falha por
- * completo, para que o scheduler acione o retry.
- */
-async function fetchBrapiQuotes(
-  tickerList: string[],
-): Promise<Map<string, QuoteResult>> {
-  let quotes: Map<string, QuoteResult>;
-  try {
-    quotes = await fetchQuotes(tickerList);
-  } catch (error) {
-    const brapiError = error as Error;
-    logError('updateAllQuotes.brapiFailed', { message: brapiError.message });
-    throw new Error(`Nenhuma cotação obtida na Brapi: ${brapiError.message}`);
-  }
-
-  const withoutQuote = tickerList.filter((ticker) => !quotes.has(ticker));
-  if (withoutQuote.length > 0) {
-    logWarn('updateAllQuotes.tickersWithoutQuote', { tickers: withoutQuote });
-  }
-
-  return quotes;
 }
 
 /**
@@ -122,7 +101,7 @@ export async function updateAllQuotes(): Promise<void> {
     logInfo('updateAllQuotes.start', { tickers: assetList.length });
 
     const tickerList = assetList.map((asset) => asset.ticker);
-    const quotes = await fetchBrapiQuotes(tickerList);
+    const quotes = await fetchCatalogQuotes(tickerList, 'updateAllQuotes');
 
     let dividends: Map<string, DividendInfo>;
     try {

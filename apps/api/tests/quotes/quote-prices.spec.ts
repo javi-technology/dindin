@@ -5,6 +5,7 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 import {
+  getCurrentPricesByTicker,
   getQuotePricesByTicker,
   getQuotesByTicker,
   loadAllQuotePrices,
@@ -221,6 +222,55 @@ describe('quotes/quote-prices', () => {
       expect(getAll).toHaveBeenCalledTimes(2);
       expect(getAll.mock.calls[0]).toHaveLength(500);
       expect(prices.size).toBe(501);
+    });
+  });
+  // O preço exibido vem acompanhado de quando foi apurado na fonte (#390):
+  // os dois campos saem da mesma leitura, para não cobrar uma segunda.
+  describe('getCurrentPricesByTicker', () => {
+    function firestoreWithQuotes(quotes: Record<string, unknown>) {
+      const getAll = jest.fn(async (...refs: { id: string }[]) =>
+        refs.map((ref) => ({
+          id: ref.id,
+          exists: quotes[ref.id] !== undefined,
+          data: () => quotes[ref.id],
+        })),
+      );
+      getFirestoreMock.mockReturnValue({
+        collection: jest.fn(() => ({ doc: (id: string) => ({ id }) })),
+        getAll,
+      });
+      return getAll;
+    }
+
+    it('deve devolver preço e horário de apuração', async () => {
+      firestoreWithQuotes({
+        HGLG11: { price: 112.5, quotedAt: '2026-09-23T21:31:00Z' },
+      });
+
+      const prices = await getCurrentPricesByTicker(['HGLG11']);
+
+      expect(prices.get('HGLG11')).toEqual({
+        price: 112.5,
+        quotedAt: '2026-09-23T21:31:00Z',
+      });
+    });
+
+    it('deve devolver só o preço quando a cotação não tem horário de apuração', async () => {
+      firestoreWithQuotes({ HGLG11: { price: 112.5 } });
+
+      const prices = await getCurrentPricesByTicker(['HGLG11']);
+
+      expect(prices.get('HGLG11')).toEqual({ price: 112.5 });
+    });
+
+    it('deve deixar fora o ticker com preço inválido', async () => {
+      firestoreWithQuotes({
+        HGLG11: { price: Number.NaN, quotedAt: '2026-09-23T21:31:00Z' },
+      });
+
+      const prices = await getCurrentPricesByTicker(['HGLG11']);
+
+      expect(prices.has('HGLG11')).toBe(false);
     });
   });
 });
