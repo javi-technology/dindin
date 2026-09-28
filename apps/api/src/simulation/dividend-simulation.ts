@@ -1,5 +1,6 @@
 import { roundCurrency } from '../shared/numbers';
 import { buyWholeSharesWithRemainder } from '../shared/whole-share-allocation';
+import { todayAsUtcDate } from '../shared/date';
 
 /**
  * Motor de simulação de proventos (issue #395).
@@ -142,9 +143,12 @@ export function simulateDividendIncome(
 ): SimulationResult {
   const amount = validAmount(input.amount);
   const months = Math.max(1, Math.trunc(input.months) || 1);
+  // Meia-noite UTC dos dois lados: comparar um instante com horário contra a
+  // meia-noite do pagamento marcaria o ativo como desatualizado já no 90º dia,
+  // um dia antes do prazo.
   const reference = input.referenceDate
     ? new Date(`${input.referenceDate.slice(0, 10)}T00:00:00Z`)
-    : new Date();
+    : todayAsUtcDate();
 
   const states: AssetState[] = input.assets.map((asset, index) => {
     const price = validAmount(asset.price);
