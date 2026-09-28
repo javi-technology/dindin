@@ -83,16 +83,19 @@ void main() {
 
     // Falhar a rede com cache em mãos é o caso do metrô: mostrar o número
     // antigo, marcado como antigo, vale mais do que uma tela de erro.
-    test('falha de rede com cache mantém o dado, marcado como do cache', () async {
-      await cache.gravar('numero', {'v': 7});
-      final r = recurso(buscar: () async => throw const NetworkException());
+    test(
+      'falha de rede com cache mantém o dado, marcado como do cache',
+      () async {
+        await cache.gravar('numero', {'v': 7});
+        final r = recurso(buscar: () async => throw const NetworkException());
 
-      await r.carregar();
+        await r.carregar();
 
-      expect(r.estado.dados, 7);
-      expect(r.estado.doCache, isTrue);
-      expect(r.estado.erro, isNotNull);
-    });
+        expect(r.estado.dados, 7);
+        expect(r.estado.doCache, isTrue);
+        expect(r.estado.erro, isNotNull);
+      },
+    );
 
     test('cache corrompido para o tipo é ignorado', () async {
       await cache.gravar('numero', {'outro': 'campo'});
