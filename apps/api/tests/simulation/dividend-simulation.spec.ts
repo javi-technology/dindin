@@ -2,6 +2,7 @@ import {
   STALE_DIVIDEND_DAYS,
   simulateDividendIncome,
 } from '../../src/simulation/dividend-simulation';
+import { todayAsUtcDate } from '../../src/shared/date';
 
 const assets = [
   { ticker: 'AAAA11', weight: 0.5, price: 10, monthlyDividend: 0.1 },
@@ -200,6 +201,69 @@ describe('dividend-simulation', () => {
 
     expect(result.staleDividendTickers).toEqual([]);
     expect(result.byTicker[0].staleDividend).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Fronteira dos 90 dias sem `referenceDate` (issue #395)
+  //
+  // Em produção o `reference` era `new Date()`, com horário, comparado contra a
+  // meia-noite UTC do pagamento. No 90º dia, qualquer hora depois da meia-noite
+  // já passava dos 90 dias e o ativo aparecia como desatualizado um dia antes
+  // do prazo. Os testes acima não pegavam isso porque passam `referenceDate`,
+  // que já vem normalizado.
+  // -------------------------------------------------------------------------
+  describe('sem data de referência informada', () => {
+    const simularComPagamentoEm = (paymentDate: string) =>
+      simulateDividendIncome({
+        assets: [
+          {
+            ticker: 'VELH11',
+            price: 10,
+            monthlyDividend: 0.1,
+            dividendPaymentDate: paymentDate,
+          },
+        ],
+        amount: 100,
+        months: 1,
+        mode: 'withdraw',
+      });
+
+    /** `dias` antes de hoje no fuso do produto, como `YYYY-MM-DD`. */
+    const diasAtras = (dias: number): string => {
+      const hoje = todayAsUtcDate();
+      hoje.setUTCDate(hoje.getUTCDate() - dias);
+      return hoje.toISOString().slice(0, 10);
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    // Fim do dia no fuso do produto: é a hora em que a comparação com horário
+    // estourava o prazo.
+    function fixarRelogioNoFimDoDia(): void {
+      jest.useFakeTimers();
+      const agora = new Date();
+      agora.setUTCHours(23, 59, 0, 0);
+      jest.setSystemTime(agora);
+    }
+
+    it('não deve marcar como desatualizado o provento no 90º dia', () => {
+      fixarRelogioNoFimDoDia();
+
+      const result = simularComPagamentoEm(diasAtras(STALE_DIVIDEND_DAYS));
+
+      expect(result.staleDividendTickers).toEqual([]);
+      expect(result.byTicker[0].staleDividend).toBeUndefined();
+    });
+
+    it('deve marcar como desatualizado o provento no 91º dia', () => {
+      fixarRelogioNoFimDoDia();
+
+      const result = simularComPagamentoEm(diasAtras(STALE_DIVIDEND_DAYS + 1));
+
+      expect(result.staleDividendTickers).toEqual(['VELH11']);
+    });
   });
 
   it('deve manter fora da alocação o ativo sem preço utilizável', () => {
