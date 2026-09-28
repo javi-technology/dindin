@@ -49,6 +49,19 @@ const importadosDoModels = Object.entries(schemas)
 
 const ehEnum = (schema) => Array.isArray(schema.enum);
 
+/**
+ * Se o schema admite `null` como valor.
+ *
+ * `recommendedWeight` é obrigatório **e** anulável: o ativo está na carteira
+ * sugerida, então o campo sempre vem, mas o peso pode não existir. Tratar
+ * "obrigatório" como "não nulo" gerava `(json[...] as num).toDouble()`, que
+ * estoura em execução, no celular, com `Null is not a subtype of num`.
+ */
+const admiteNulo = (schema) =>
+  (Array.isArray(schema.type) && schema.type.includes('null')) ||
+  (Array.isArray(schema.oneOf) &&
+    schema.oneOf.some((parte) => parte.type === 'null'));
+
 const ehObjeto = (schema) =>
   schema.type === 'object' || Array.isArray(schema.allOf);
 
@@ -391,8 +404,12 @@ const gerarDart = () => {
     // Construtor nomeado: com dez ou mais campos, posicional seria ilegível
     // e uma troca de ordem passaria batida pelo compilador.
     linhas.push(`  const ${nome}({`);
-    for (const [campo] of campos) {
-      const obrigatorio = required.has(campo) ? 'required ' : '';
+    for (const [campo, valor] of campos) {
+      // Um campo obrigatório que admite nulo continua `required` no
+      // construtor: quem monta o objeto precisa dizer que não sabe o valor,
+      // em vez de esquecê-lo por omissão.
+      const obrigatorio =
+        required.has(campo) && !admiteNulo(valor) ? 'required ' : '';
       linhas.push(`    ${obrigatorio}this.${camel(campo)},`);
     }
     linhas.push('  });', '');
@@ -402,7 +419,7 @@ const gerarDart = () => {
     );
     for (const [campo, valor] of campos) {
       const acesso = `json['${campo}']`;
-      if (required.has(campo)) {
+      if (required.has(campo) && !admiteNulo(valor)) {
         linhas.push(`        ${camel(campo)}: ${lerDart(valor, acesso)},`);
       } else {
         linhas.push(
@@ -414,7 +431,7 @@ const gerarDart = () => {
 
     for (const [campo, valor] of campos) {
       linhas.push(...docDart(valor.description, '  '));
-      const nulo = required.has(campo) ? '' : '?';
+      const nulo = required.has(campo) && !admiteNulo(valor) ? '' : '?';
       linhas.push(`  final ${tipoDart(valor)}${nulo} ${camel(campo)};`);
     }
     linhas.push('');
@@ -424,12 +441,16 @@ const gerarDart = () => {
     linhas.push('  Map<String, dynamic> toJson() => {');
     for (const [campo, valor] of campos) {
       const ref = camel(campo);
-      const opcional = !required.has(campo);
-      const escrita = escreverDart(valor, ref, opcional);
-      if (opcional) {
-        linhas.push(`        if (${ref} != null) '${campo}': ${escrita},`);
-      } else {
+      const nulavel = !required.has(campo) || admiteNulo(valor);
+      const escrita = escreverDart(valor, ref, nulavel);
+
+      // O obrigatório-mas-anulável é sempre enviado, inclusive como `null`:
+      // omiti-lo mudaria o pedido, porque a API distingue campo ausente de
+      // campo nulo.
+      if (required.has(campo)) {
         linhas.push(`        '${campo}': ${escrita},`);
+      } else {
+        linhas.push(`        if (${ref} != null) '${campo}': ${escrita},`);
       }
     }
     linhas.push('      };', '}', '');

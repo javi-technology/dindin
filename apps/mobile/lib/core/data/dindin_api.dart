@@ -164,6 +164,53 @@ class DinDinApi {
   Future<void> excluirProvento(String id) =>
       _client.delete('/api/dividends/$id');
 
+  // -------------------------------------------------------------------------
+  // Carteira sugerida e simulação (issue #404)
+  // -------------------------------------------------------------------------
+
+  /// Carteiras sugeridas disponíveis, com os meses que cada uma publicou.
+  ///
+  /// O sistema prevê mais de uma além da do BB, então a tela escolhe qual
+  /// consultar em vez de assumir uma só.
+  Future<List<SimulationWalletOption>> carteirasParaSimular() async => _lista(
+    await _client.get('/api/simulations/wallets'),
+    SimulationWalletOption.fromJson,
+  );
+
+  /// Simulação geral por carteira sugerida — **gratuita**.
+  Future<WalletSimulationResponse> simularCarteira(
+    WalletSimulationRequest dados,
+  ) async => WalletSimulationResponse.fromJson(
+    await _client.post('/api/simulations/wallet', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  /// Simulação por ativo específico — recurso de assinante.
+  ///
+  /// Sem o entitlement, a API responde 402 com `code:
+  /// 'SUBSCRIPTION_REQUIRED'`, que o app reconhece para oferecer a assinatura
+  /// em vez de mostrar "erro". A liberação no app depende de compra in-app
+  /// (issue #405).
+  Future<AssetSimulationResponse> simularAtivo(
+    AssetSimulationRequest dados,
+  ) async => AssetSimulationResponse.fromJson(
+    await _client.post('/api/simulations/asset', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  Future<RecommendedWallet> carteiraSugerida() async =>
+      RecommendedWallet.fromJson(
+        await _client.get('/api/recommended-wallets/bb-fii/latest')
+            as Map<String, dynamic>,
+      );
+
+  Future<RecommendedWalletComparison> compararComSugerida(
+    String carteiraId,
+  ) async => RecommendedWalletComparison.fromJson(
+    await _client.get('/api/recommended-wallets/bb-fii/compare/$carteiraId')
+        as Map<String, dynamic>,
+  );
+
   static List<T> _lista<T>(
     dynamic corpo,
     T Function(Map<String, dynamic>) converter,

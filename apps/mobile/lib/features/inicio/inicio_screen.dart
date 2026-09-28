@@ -13,6 +13,7 @@ import '../carteiras/carteira_form.dart';
 import '../carteiras/posicao_form.dart';
 import '../geladeira/item_form.dart';
 import '../proventos/provento_form.dart';
+import '../simulacao/simulacao_screen.dart';
 import '../carteiras/carteiras_view.dart';
 import '../carteiras/posicoes_view.dart';
 import '../geladeira/geladeira_view.dart';
@@ -174,7 +175,13 @@ class _InicioScreenState extends State<InicioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rotulos = ['Patrimônio', 'Carteiras', 'Geladeira', 'Proventos'];
+    final rotulos = [
+      'Patrimônio',
+      'Carteiras',
+      'Geladeira',
+      'Proventos',
+      'Simular',
+    ];
     final corpos = [
       _Observando(
         _patrimonio,
@@ -194,6 +201,13 @@ class _InicioScreenState extends State<InicioScreen> {
       ),
       _abaGeladeira(),
       _abaProventos(),
+      _Observando(
+        _carteiras,
+        (estado) => SimulacaoScreen(
+          api: widget.api,
+          carteiras: estado.dados ?? const [],
+        ),
+      ),
     ];
 
     return Scaffold(
@@ -246,6 +260,10 @@ class _InicioScreenState extends State<InicioScreen> {
           NavigationDestination(
             icon: Icon(Icons.payments_outlined),
             label: 'Proventos',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            label: 'Simular',
           ),
         ],
       ),

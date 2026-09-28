@@ -211,6 +211,25 @@ Regras:
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Carteira sugerida e simulação no app (`apps/mobile`)
+
+- A **simulação geral por carteira sugerida é gratuita**; a simulação por
+  ativo específico é recurso de assinante. No app, a liberação do pago depende
+  de compra in-app (issue #405): até lá o ponto de entrada existe, marcado com
+  `SeloAssinante`. Escondê-lo faria o assinante da web não encontrá-lo no app.
+- A tela **permite escolher a carteira sugerida** quando há mais de uma. O
+  sistema prevê outras além da do BB, e assumir uma só quebraria na segunda.
+- O valor a investir vai para a API **como o usuário digitou**: a API converte
+  o texto em pt-BR, e converter dos dois lados é convidar os dois a
+  discordarem sobre o que `1.500` significa.
+- A **premissa da projeção fica visível** no resultado (parte do último
+  provento real, assumindo repetição), e o **troco não alocado** aparece: sem
+  ele, a conta do usuário não fecha com o aporte que ele informou.
+- A comparação com a carteira sugerida é **cartão por ativo**, não tabela: em
+  tela de celular, quatro colunas viram rolagem horizontal, que esconde
+  justamente a coluna da comparação. Ativo ausente na carteira é sinalizado,
+  não zerado — "não está" e "está com peso nenhum" são coisas diferentes.
+
 ### Operações de escrita do app (`apps/mobile`)
 
 - **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de

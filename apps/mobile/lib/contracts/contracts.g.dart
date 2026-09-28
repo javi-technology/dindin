@@ -541,8 +541,8 @@ class RecommendedWallet {
 class RecommendedWalletComparisonItem {
   const RecommendedWalletComparisonItem({
     required this.ticker,
-    required this.recommendedWeight,
-    required this.currentWeight,
+    this.recommendedWeight,
+    this.currentWeight,
     required this.quantity,
     required this.currentValue,
     required this.status,
@@ -551,16 +551,20 @@ class RecommendedWalletComparisonItem {
   factory RecommendedWalletComparisonItem.fromJson(Map<String, dynamic> json) =>
       RecommendedWalletComparisonItem(
         ticker: json['ticker'] as String,
-        recommendedWeight: (json['recommendedWeight'] as num).toDouble(),
-        currentWeight: (json['currentWeight'] as num).toDouble(),
+        recommendedWeight: json['recommendedWeight'] == null
+            ? null
+            : (json['recommendedWeight'] as num).toDouble(),
+        currentWeight: json['currentWeight'] == null
+            ? null
+            : (json['currentWeight'] as num).toDouble(),
         quantity: (json['quantity'] as num).toDouble(),
         currentValue: (json['currentValue'] as num).toDouble(),
         status: json['status'] as String,
       );
 
   final String ticker;
-  final double recommendedWeight;
-  final double currentWeight;
+  final double? recommendedWeight;
+  final double? currentWeight;
   final double quantity;
   final double currentValue;
   final String status;
@@ -946,9 +950,9 @@ enum SubscriptionProvider {
 class StripeSubscriptionState {
   const StripeSubscriptionState({
     required this.status,
-    required this.interval,
+    this.interval,
     this.providerSubscriptionId,
-    required this.currentPeriodEnd,
+    this.currentPeriodEnd,
     required this.cancelAtPeriodEnd,
     required this.updatedAt,
   });
@@ -956,25 +960,29 @@ class StripeSubscriptionState {
   factory StripeSubscriptionState.fromJson(Map<String, dynamic> json) =>
       StripeSubscriptionState(
         status: SubscriptionStatus.fromJson(json['status'] as String),
-        interval: SubscriptionInterval.fromJson(json['interval'] as String),
+        interval: json['interval'] == null
+            ? null
+            : SubscriptionInterval.fromJson(json['interval'] as String),
         providerSubscriptionId: json['providerSubscriptionId'] == null
             ? null
             : json['providerSubscriptionId'] as String,
-        currentPeriodEnd: json['currentPeriodEnd'] as String,
+        currentPeriodEnd: json['currentPeriodEnd'] == null
+            ? null
+            : json['currentPeriodEnd'] as String,
         cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool,
         updatedAt: json['updatedAt'] as String,
       );
 
   final SubscriptionStatus status;
-  final SubscriptionInterval interval;
+  final SubscriptionInterval? interval;
   final String? providerSubscriptionId;
-  final String currentPeriodEnd;
+  final String? currentPeriodEnd;
   final bool cancelAtPeriodEnd;
   final String updatedAt;
 
   Map<String, dynamic> toJson() => {
     'status': status.toJson(),
-    'interval': interval.toJson(),
+    'interval': interval?.toJson(),
     if (providerSubscriptionId != null)
       'providerSubscriptionId': providerSubscriptionId,
     'currentPeriodEnd': currentPeriodEnd,
@@ -987,13 +995,13 @@ class StripeSubscriptionState {
 class UserSubscription {
   const UserSubscription({
     required this.status,
-    required this.plan,
-    required this.interval,
-    required this.provider,
+    this.plan,
+    this.interval,
+    this.provider,
     this.providerCustomerId,
     this.providerSubscriptionId,
     this.providerEventCreated,
-    required this.currentPeriodEnd,
+    this.currentPeriodEnd,
     required this.cancelAtPeriodEnd,
     required this.updatedAt,
     this.stripe,
@@ -1002,9 +1010,15 @@ class UserSubscription {
   factory UserSubscription.fromJson(Map<String, dynamic> json) =>
       UserSubscription(
         status: SubscriptionStatus.fromJson(json['status'] as String),
-        plan: SubscriptionPlan.fromJson(json['plan'] as String),
-        interval: SubscriptionInterval.fromJson(json['interval'] as String),
-        provider: SubscriptionProvider.fromJson(json['provider'] as String),
+        plan: json['plan'] == null
+            ? null
+            : SubscriptionPlan.fromJson(json['plan'] as String),
+        interval: json['interval'] == null
+            ? null
+            : SubscriptionInterval.fromJson(json['interval'] as String),
+        provider: json['provider'] == null
+            ? null
+            : SubscriptionProvider.fromJson(json['provider'] as String),
         providerCustomerId: json['providerCustomerId'] == null
             ? null
             : json['providerCustomerId'] as String,
@@ -1014,7 +1028,9 @@ class UserSubscription {
         providerEventCreated: json['providerEventCreated'] == null
             ? null
             : (json['providerEventCreated'] as num).toInt(),
-        currentPeriodEnd: json['currentPeriodEnd'] as String,
+        currentPeriodEnd: json['currentPeriodEnd'] == null
+            ? null
+            : json['currentPeriodEnd'] as String,
         cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool,
         updatedAt: json['updatedAt'] as String,
         stripe: json['stripe'] == null
@@ -1025,15 +1041,15 @@ class UserSubscription {
       );
 
   final SubscriptionStatus status;
-  final SubscriptionPlan plan;
-  final SubscriptionInterval interval;
-  final SubscriptionProvider provider;
+  final SubscriptionPlan? plan;
+  final SubscriptionInterval? interval;
+  final SubscriptionProvider? provider;
   final String? providerCustomerId;
   final String? providerSubscriptionId;
 
   /// `event.created` do último evento aplicado — protege contra webhooks fora de ordem.
   final int? providerEventCreated;
-  final String currentPeriodEnd;
+  final String? currentPeriodEnd;
   final bool cancelAtPeriodEnd;
   final String updatedAt;
 
@@ -1042,9 +1058,9 @@ class UserSubscription {
 
   Map<String, dynamic> toJson() => {
     'status': status.toJson(),
-    'plan': plan.toJson(),
-    'interval': interval.toJson(),
-    'provider': provider.toJson(),
+    'plan': plan?.toJson(),
+    'interval': interval?.toJson(),
+    'provider': provider?.toJson(),
     if (providerCustomerId != null) 'providerCustomerId': providerCustomerId,
     if (providerSubscriptionId != null)
       'providerSubscriptionId': providerSubscriptionId,
@@ -1061,31 +1077,37 @@ class UserSubscription {
 class PublicSubscription {
   const PublicSubscription({
     required this.status,
-    required this.plan,
-    required this.interval,
-    required this.currentPeriodEnd,
+    this.plan,
+    this.interval,
+    this.currentPeriodEnd,
     required this.cancelAtPeriodEnd,
   });
 
   factory PublicSubscription.fromJson(Map<String, dynamic> json) =>
       PublicSubscription(
         status: SubscriptionStatus.fromJson(json['status'] as String),
-        plan: SubscriptionPlan.fromJson(json['plan'] as String),
-        interval: SubscriptionInterval.fromJson(json['interval'] as String),
-        currentPeriodEnd: json['currentPeriodEnd'] as String,
+        plan: json['plan'] == null
+            ? null
+            : SubscriptionPlan.fromJson(json['plan'] as String),
+        interval: json['interval'] == null
+            ? null
+            : SubscriptionInterval.fromJson(json['interval'] as String),
+        currentPeriodEnd: json['currentPeriodEnd'] == null
+            ? null
+            : json['currentPeriodEnd'] as String,
         cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool,
       );
 
   final SubscriptionStatus status;
-  final SubscriptionPlan plan;
-  final SubscriptionInterval interval;
-  final String currentPeriodEnd;
+  final SubscriptionPlan? plan;
+  final SubscriptionInterval? interval;
+  final String? currentPeriodEnd;
   final bool cancelAtPeriodEnd;
 
   Map<String, dynamic> toJson() => {
     'status': status.toJson(),
-    'plan': plan.toJson(),
-    'interval': interval.toJson(),
+    'plan': plan?.toJson(),
+    'interval': interval?.toJson(),
     'currentPeriodEnd': currentPeriodEnd,
     'cancelAtPeriodEnd': cancelAtPeriodEnd,
   };
@@ -1184,50 +1206,58 @@ class SetupResponse {
 class AdminSubscriptionView {
   const AdminSubscriptionView({
     required this.status,
-    required this.plan,
-    required this.interval,
-    required this.currentPeriodEnd,
+    this.plan,
+    this.interval,
+    this.currentPeriodEnd,
     required this.cancelAtPeriodEnd,
-    required this.provider,
-    required this.stripeStatus,
+    this.provider,
+    this.stripeStatus,
   });
 
   factory AdminSubscriptionView.fromJson(Map<String, dynamic> json) =>
       AdminSubscriptionView(
         status: SubscriptionStatus.fromJson(json['status'] as String),
-        plan: SubscriptionPlan.fromJson(json['plan'] as String),
-        interval: SubscriptionInterval.fromJson(json['interval'] as String),
-        currentPeriodEnd: json['currentPeriodEnd'] as String,
+        plan: json['plan'] == null
+            ? null
+            : SubscriptionPlan.fromJson(json['plan'] as String),
+        interval: json['interval'] == null
+            ? null
+            : SubscriptionInterval.fromJson(json['interval'] as String),
+        currentPeriodEnd: json['currentPeriodEnd'] == null
+            ? null
+            : json['currentPeriodEnd'] as String,
         cancelAtPeriodEnd: json['cancelAtPeriodEnd'] as bool,
-        provider: SubscriptionProvider.fromJson(json['provider'] as String),
-        stripeStatus: SubscriptionStatus.fromJson(
-          json['stripeStatus'] as String,
-        ),
+        provider: json['provider'] == null
+            ? null
+            : SubscriptionProvider.fromJson(json['provider'] as String),
+        stripeStatus: json['stripeStatus'] == null
+            ? null
+            : SubscriptionStatus.fromJson(json['stripeStatus'] as String),
       );
 
   final SubscriptionStatus status;
-  final SubscriptionPlan plan;
-  final SubscriptionInterval interval;
-  final String currentPeriodEnd;
+  final SubscriptionPlan? plan;
+  final SubscriptionInterval? interval;
+  final String? currentPeriodEnd;
   final bool cancelAtPeriodEnd;
-  final SubscriptionProvider provider;
-  final SubscriptionStatus stripeStatus;
+  final SubscriptionProvider? provider;
+  final SubscriptionStatus? stripeStatus;
 
   Map<String, dynamic> toJson() => {
     'status': status.toJson(),
-    'plan': plan.toJson(),
-    'interval': interval.toJson(),
+    'plan': plan?.toJson(),
+    'interval': interval?.toJson(),
     'currentPeriodEnd': currentPeriodEnd,
     'cancelAtPeriodEnd': cancelAtPeriodEnd,
-    'provider': provider.toJson(),
-    'stripeStatus': stripeStatus.toJson(),
+    'provider': provider?.toJson(),
+    'stripeStatus': stripeStatus?.toJson(),
   };
 }
 
 class AdminUser {
   const AdminUser({
     required this.uid,
-    required this.email,
+    this.email,
     required this.admin,
     required this.subscription,
     required this.entitlements,
@@ -1235,7 +1265,7 @@ class AdminUser {
 
   factory AdminUser.fromJson(Map<String, dynamic> json) => AdminUser(
     uid: json['uid'] as String,
-    email: json['email'] as String,
+    email: json['email'] == null ? null : json['email'] as String,
     admin: json['admin'] as bool,
     subscription: AdminSubscriptionView.fromJson(
       json['subscription'] as Map<String, dynamic>,
@@ -1246,7 +1276,7 @@ class AdminUser {
   );
 
   final String uid;
-  final String email;
+  final String? email;
   final bool admin;
   final AdminSubscriptionView subscription;
   final List<Entitlement> entitlements;
@@ -1262,19 +1292,18 @@ class AdminUser {
 
 /// `currentPeriodEnd: null` = sem validade.
 class GrantSubscriptionRequest {
-  const GrantSubscriptionRequest({
-    required this.plan,
-    required this.currentPeriodEnd,
-  });
+  const GrantSubscriptionRequest({required this.plan, this.currentPeriodEnd});
 
   factory GrantSubscriptionRequest.fromJson(Map<String, dynamic> json) =>
       GrantSubscriptionRequest(
         plan: SubscriptionPlan.fromJson(json['plan'] as String),
-        currentPeriodEnd: json['currentPeriodEnd'] as String,
+        currentPeriodEnd: json['currentPeriodEnd'] == null
+            ? null
+            : json['currentPeriodEnd'] as String,
       );
 
   final SubscriptionPlan plan;
-  final String currentPeriodEnd;
+  final String? currentPeriodEnd;
 
   Map<String, dynamic> toJson() => {
     'plan': plan.toJson(),

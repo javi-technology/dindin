@@ -205,31 +205,39 @@ void main() {
   // A simulação por ativo é recurso de assinante, e a API responde com o
   // código de contrato que o app precisa reconhecer para oferecer a
   // assinatura em vez de mostrar "erro".
-  test('simulação por ativo sem assinatura expõe o código de contrato',
-      () async {
-    final api = DinDinApi(
-      ApiClient(
-        baseUrl: 'https://api.exemplo',
-        tokenProvider: _ComToken(),
-        httpClient: MockClient(
-          (req) async => http.Response(
-            jsonEncode({
-              'error': 'Recurso exclusivo para assinantes',
-              'code': 'SUBSCRIPTION_REQUIRED',
-            }),
-            402,
+  test(
+    'simulação por ativo sem assinatura expõe o código de contrato',
+    () async {
+      final api = DinDinApi(
+        ApiClient(
+          baseUrl: 'https://api.exemplo',
+          tokenProvider: _ComToken(),
+          httpClient: MockClient(
+            (req) async => http.Response(
+              jsonEncode({
+                'error': 'Recurso exclusivo para assinantes',
+                'code': 'SUBSCRIPTION_REQUIRED',
+              }),
+              402,
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    await expectLater(
-      api.simularAtivo(
-        const AssetSimulationRequest(ticker: 'HGLG11', amount: 1000, months: 12),
-      ),
-      throwsA(
-        predicate((e) => e is ApiException && e.code == 'SUBSCRIPTION_REQUIRED'),
-      ),
-    );
-  });
+      await expectLater(
+        api.simularAtivo(
+          const AssetSimulationRequest(
+            ticker: 'HGLG11',
+            amount: 1000,
+            months: 12,
+          ),
+        ),
+        throwsA(
+          predicate(
+            (e) => e is ApiException && e.code == 'SUBSCRIPTION_REQUIRED',
+          ),
+        ),
+      );
+    },
+  );
 }

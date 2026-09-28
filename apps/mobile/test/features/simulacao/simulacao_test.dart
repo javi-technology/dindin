@@ -92,10 +92,7 @@ void main() {
       List<SimulationWalletOption>? disponiveis,
     }) => tester.pumpWidget(
       emApp(
-        SimulacaoForm(
-          carteiras: disponiveis ?? opcoes,
-          aoSimular: aoSimular,
-        ),
+        SimulacaoForm(carteiras: disponiveis ?? opcoes, aoSimular: aoSimular),
       ),
     );
 

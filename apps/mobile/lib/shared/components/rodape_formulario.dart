@@ -13,12 +13,16 @@ class RodapeFormulario extends StatelessWidget {
     required this.aoSalvar,
     this.erro,
     this.rotulo = 'Salvar',
+    this.chaveDoBotao = const Key('botao-salvar'),
   });
 
   final bool enviando;
   final VoidCallback aoSalvar;
   final String? erro;
   final String rotulo;
+
+  /// Chave do botão, para a tela poder apontá-la nos testes.
+  final Key chaveDoBotao;
 
   @override
   Widget build(BuildContext context) {
@@ -43,11 +47,11 @@ class RodapeFormulario extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         FilledButton(
-          key: const Key('botao-salvar'),
+          key: chaveDoBotao,
           // Indisponível durante o envio: é a metade visível da proteção
           // contra o toque duplo, e a que o usuário entende.
           onPressed: enviando ? null : aoSalvar,
-          child: Text(enviando ? 'Salvando…' : rotulo),
+          child: Text(enviando ? '$rotulo…' : rotulo),
         ),
       ],
     );
