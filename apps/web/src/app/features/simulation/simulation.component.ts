@@ -15,6 +15,7 @@ import type {
   AssetSimulationResponse,
   SimulationMode,
   SimulationWalletOption,
+  WalletSimulationRequest,
   WalletSimulationResponse,
 } from 'dindin-shared-types';
 import { SimulationService } from '../../core/services/simulation.service';
@@ -77,6 +78,10 @@ export class SimulationComponent implements OnInit {
   private readonly walletRequest =
     new Subject<WalletSimulationRequest | null>();
 
+  /** O mesmo, para a simulação por ativo. */
+  private readonly assetRequest =
+    new Subject<AssetSimulationRequestEvent | null>();
+
   constructor() {
     this.walletRequest
       .pipe(
@@ -105,6 +110,39 @@ export class SimulationComponent implements OnInit {
           return;
         }
         this.result.set(outcome);
+      });
+
+    this.assetRequest
+      .pipe(
+        switchMap((request) =>
+          request === null
+            ? EMPTY
+            : this.simulationService.simulateAsset(request).pipe(
+                catchError(
+                  (failure: { status?: number; error?: { error?: string } }) =>
+                    of({
+                      // O 403 já vira paywall pelo interceptor; repetir a
+                      // mensagem aqui só empilharia dois avisos do mesmo
+                      // bloqueio.
+                      error:
+                        failure?.status === 403
+                          ? null
+                          : (failure?.error?.error ??
+                            'Não foi possível simular o ativo. Tente novamente.'),
+                    }),
+                ),
+              ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((outcome) => {
+        this.assetLoading.set(false);
+        if ('error' in outcome) {
+          this.assetResult.set(null);
+          this.assetError.set(outcome.error);
+          return;
+        }
+        this.assetResult.set(outcome);
       });
   }
 
@@ -196,27 +234,19 @@ export class SimulationComponent implements OnInit {
 
     this.assetError.set(null);
     this.assetLoading.set(true);
-    this.simulationService
-      .simulateAsset(request)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (result) => {
-          this.assetResult.set(result);
-          this.assetLoading.set(false);
-        },
-        error: (failure: { status?: number; error?: { error?: string } }) => {
-          this.assetLoading.set(false);
-          this.assetResult.set(null);
-          // O 403 já vira paywall pelo interceptor; repetir a mensagem aqui
-          // só empilharia dois avisos do mesmo bloqueio.
-          this.assetError.set(
-            failure?.status === 403
-              ? null
-              : (failure?.error?.error ??
-                  'Não foi possível simular o ativo. Tente novamente.'),
-          );
-        },
-      });
+    this.assetRequest.next(request);
+  }
+
+  /**
+   * Pelos mesmos motivos do resultado da carteira: a projeção exibida vale
+   * para o ticker e os valores que a geraram. Deixá-la na tela depois de o
+   * usuário trocar de ativo mostraria a projeção de um papel sob o nome de
+   * outro.
+   */
+  discardAssetResult(): void {
+    this.assetResult.set(null);
+    this.assetLoading.set(false);
+    this.assetRequest.next(null);
   }
 
   simulate(): void {

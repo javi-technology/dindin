@@ -51,6 +51,11 @@ export class AssetSimulationComponent {
 
   readonly simulate = output<AssetSimulationRequestEvent>();
   readonly validationError = output<string>();
+  /**
+   * Qualquer edição do formulário. O resultado fica no pai, e a partir daqui
+   * ele deixou de descrever o que está escrito nos campos.
+   */
+  readonly parametersChanged = output<void>();
 
   readonly ticker = signal('');
   readonly amount = signal('');
@@ -60,18 +65,22 @@ export class AssetSimulationComponent {
 
   onTickerInput(event: Event): void {
     this.ticker.set((event.target as HTMLInputElement).value);
+    this.parametersChanged.emit();
   }
 
   onAmountInput(event: Event): void {
     this.amount.set((event.target as HTMLInputElement).value);
+    this.parametersChanged.emit();
   }
 
   onMonthsInput(event: Event): void {
     this.months.set((event.target as HTMLInputElement).value);
+    this.parametersChanged.emit();
   }
 
   selectMode(mode: string): void {
     this.mode.set(mode === 'reinvest' ? 'reinvest' : 'withdraw');
+    this.parametersChanged.emit();
   }
 
   requestSimulation(): void {

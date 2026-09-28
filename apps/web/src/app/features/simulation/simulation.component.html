@@ -134,6 +134,7 @@
         [error]="assetError()"
         [result]="assetResult()"
         (simulate)="simulateAsset($event)"
+        (parametersChanged)="discardAssetResult()"
       />
     </div>
   </div>
