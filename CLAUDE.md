@@ -10,7 +10,7 @@
 
 ## Visão Geral
 
-Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Flutter 3.47 (app iOS e Android), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
 
 ### Estrutura do Repositório
 
@@ -18,6 +18,7 @@ Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend
 apps/
   api/    # Cloud Functions (Express + TypeScript) — regras de negócio e APIs; src/ e tests/
   web/    # Angular + Tailwind — src/app/{core,features,shared}/
+  mobile/ # App Flutter (Dart) para iOS e Android — lib/ e test/
 packages/
   models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
   shared-types/  # Tipos TypeScript compartilhados entre frontend e backend
@@ -32,6 +33,10 @@ npm run api:build                              # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
 npm run test --workspace=apps/web              # testes do frontend (Vitest)
+npm run mobile:test                            # testes do app (flutter test)
+npm run mobile:lint                            # análise estática do app (flutter analyze)
+npm run mobile:format                          # formatar o app (dart format)
+npm run mobile:format:check                    # verificar a formatação do app
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
@@ -171,10 +176,28 @@ Regras:
 
 ## Testes
 
-| Camada   | Ferramenta | Localização                   |
-| -------- | ---------- | ----------------------------- |
-| API      | Jest       | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Vitest     | `apps/web/src/**/*.spec.ts`   |
+| Camada   | Ferramenta   | Localização                       |
+| -------- | ------------ | --------------------------------- |
+| API      | Jest         | `apps/api/tests/**/*.spec.ts`     |
+| Frontend | Vitest       | `apps/web/src/**/*.spec.ts`       |
+| Mobile   | flutter test | `apps/mobile/test/**/*_test.dart` |
+
+### App Flutter (`apps/mobile`)
+
+- A versão do SDK está fixada em `apps/mobile/.flutter-version`, e o job
+  `build-and-test-mobile` do CI usa **a mesma**. O job confere as duas e
+  reprova quando divergem — SDK diferente do validado no pipeline é a origem
+  clássica de "na minha máquina funciona".
+- O job roda formatação (`dart format --set-exit-if-changed`), análise
+  (`flutter analyze --fatal-infos`) e a suíte, e **bloqueia o deploy**, como já
+  fazem `lint` e as duas suítes de Node.
+- Os workspaces npm **não** usam o glob `apps/*`: listam `apps/api` e
+  `apps/web` um a um. Uma pasta sem `package.json` dentro de `apps/` quebraria
+  o `npm ci`, e o glob a abarcaria em silêncio.
+- Prettier e ESLint não alcançam `.dart`: use os comandos `mobile:*` antes de
+  commitar código do app, do mesmo modo que `format` e `lint` para o resto.
+- `google-services.json`, `GoogleService-Info.plist` e `firebase_options.dart`
+  ficam fora do versionamento, como qualquer credencial.
 
 ### Frontend: testes unitários browserless
 

@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/api",
+    "apps/web",
     "packages/*"
   ],
   "scripts": {
@@ -17,7 +18,11 @@
     "deploy": "firebase deploy",
     "lint": "npm run lint --workspaces --if-present && eslint packages",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "mobile:format": "cd apps/mobile && dart format .",
+    "mobile:format:check": "cd apps/mobile && dart format --output=none --set-exit-if-changed .",
+    "mobile:lint": "cd apps/mobile && flutter analyze --fatal-infos",
+    "mobile:test": "cd apps/mobile && flutter test"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
