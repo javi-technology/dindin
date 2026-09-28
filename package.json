@@ -19,6 +19,8 @@
     "lint": "npm run lint --workspaces --if-present && eslint packages",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "contracts:gen": "node scripts/gen-contracts.mjs",
+    "contracts:check": "node scripts/gen-contracts.mjs --check",
     "mobile:format": "cd apps/mobile && dart format .",
     "mobile:format:check": "cd apps/mobile && dart format --output=none --set-exit-if-changed .",
     "mobile:lint": "cd apps/mobile && flutter analyze --fatal-infos",
@@ -28,6 +30,7 @@
     "eslint": "^9.39.5",
     "firebase-tools": "^15.30.0",
     "prettier": "^3.9.6",
+    "yaml": "^2.9.1",
     "typescript": "~6.0",
     "typescript-eslint": "^8.70.0"
   },

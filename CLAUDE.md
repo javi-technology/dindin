@@ -40,6 +40,8 @@ npm run mobile:format:check                    # verificar a formatação do app
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
+npm run contracts:gen                          # regerar os contratos (TS e Dart) do OpenAPI
+npm run contracts:check                        # verificar se o código gerado está em dia
 npm run docs:rules                             # regerar os guias a partir deste arquivo
 firebase deploy                                # deploy completo
 ```
@@ -181,6 +183,33 @@ Regras:
 | API      | Jest         | `apps/api/tests/**/*.spec.ts`     |
 | Frontend | Vitest       | `apps/web/src/**/*.spec.ts`       |
 | Mobile   | flutter test | `apps/mobile/test/**/*_test.dart` |
+
+### Contratos da API (`openapi/dindin.yaml`)
+
+**A descrição OpenAPI é a fonte dos contratos.** Dela saem, por
+`npm run contracts:gen`:
+
+| Gerado                                       | Consumidor     |
+| -------------------------------------------- | -------------- |
+| `packages/shared-types/generated.ts`         | API e frontend |
+| `apps/mobile/lib/contracts/contracts.g.dart` | App Flutter    |
+
+- **Não edite os gerados**: a alteração é perdida na próxima geração e o CI
+  reprova. `packages/shared-types/index.ts` apenas reexporta o gerado.
+- Para **alterar ou adicionar uma rota**: escreva a rota, descreva-a no
+  `openapi/dindin.yaml` (path e schemas), rode `npm run contracts:gen` e
+  commite os gerados junto. Passa a existir esse passo entre escrever a rota
+  e usá-la — sem ele, o app repetiria o contrato à mão e um campo renomeado
+  só apareceria no celular do usuário, depois do deploy (issue #399).
+- Um teste compara as rotas registradas no Express com os paths do YAML:
+  rota fora da descrição, ou descrição sem rota, reprova a suíte.
+- `npm run contracts:check` roda em **dois** jobs do CI: no `lint`, que não
+  tem SDK do Dart e confere o TypeScript, e no `build-and-test-mobile`, que
+  tem o Flutter e confere o modelo Dart.
+- `x-ts-import: dindin-models` marca o schema que já existe em
+  `packages/models`: o TypeScript importa e reexporta de lá, em vez de criar
+  uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
+  que não tem esse pacote, gera a classe.
 
 ### App Flutter (`apps/mobile`)
 
