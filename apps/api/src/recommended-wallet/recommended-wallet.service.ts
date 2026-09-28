@@ -17,9 +17,42 @@ import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
 import { logInfo } from '../shared/logger';
+import { DEFAULT_RECOMMENDED_WALLET_SLUG } from './providers';
+import { FieldPath, Query } from 'firebase-admin/firestore';
 
-export function recommendedWalletId(month: string): string {
-  return `bb-fii_${month}`.toLowerCase();
+export function recommendedWalletId(
+  month: string,
+  slug: string = DEFAULT_RECOMMENDED_WALLET_SLUG,
+): string {
+  return `${slug}_${month}`.toLowerCase();
+}
+
+/**
+ * Carteiras de um provedor, da mais recente para a mais antiga (issue #395).
+ *
+ * O recorte é pelo prefixo do id (`bb-fii_2026-09`), não por um campo: o id
+ * já carrega o provedor e o mês em ordem lexicográfica, então a consulta não
+ * depende de índice composto nem de reescrever os documentos existentes para
+ * ganhar um campo novo.
+ */
+function providerQuery(slug: string): Query {
+  return recommendedWalletsCollection()
+    .orderBy(FieldPath.documentId(), 'desc')
+    .startAt(`${slug}_\uf8ff`)
+    .endAt(`${slug}_`);
+}
+
+/** O `providerSlug` dos documentos anteriores à #395 sai do próprio id. */
+function toWallet(doc: { id: string; data: () => unknown }): RecommendedWallet {
+  const data = doc.data() as Partial<RecommendedWallet>;
+  return {
+    ...data,
+    id: doc.id,
+    providerSlug:
+      data.providerSlug ??
+      doc.id?.split('_')[0] ??
+      DEFAULT_RECOMMENDED_WALLET_SLUG,
+  } as RecommendedWallet;
 }
 
 function sourceFileName(sourceFile: string): string {
@@ -69,6 +102,7 @@ export async function buildRecommendedWallet(
   const wallet: RecommendedWallet = {
     id,
     provider: 'BB',
+    providerSlug: DEFAULT_RECOMMENDED_WALLET_SLUG,
     month: parsedFile.month,
     revision: parsedFile.revision,
     publishedAt: parsed.publishedAt,
@@ -120,22 +154,24 @@ export async function importBbWallet(
 
 export async function getRecommendedWallet(
   month?: string,
+  slug: string = DEFAULT_RECOMMENDED_WALLET_SLUG,
 ): Promise<RecommendedWallet | null> {
-  const collection = recommendedWalletsCollection();
-  const doc = month
-    ? await collection.doc(recommendedWalletId(month)).get()
-    : (await collection.orderBy('month', 'desc').limit(1).get()).docs[0];
-  if (!doc || !doc.exists) return null;
-  return { id: doc.id, ...doc.data() } as RecommendedWallet;
+  if (month) {
+    const doc = await recommendedWalletsCollection()
+      .doc(recommendedWalletId(month, slug))
+      .get();
+    return doc.exists ? toWallet(doc) : null;
+  }
+  const snapshot = await providerQuery(slug).limit(1).get();
+  const [doc] = snapshot.docs;
+  return doc ? toWallet(doc) : null;
 }
 
-export async function listRecommendedWallets(): Promise<RecommendedWallet[]> {
-  const snapshot = await recommendedWalletsCollection()
-    .orderBy('month', 'desc')
-    .get();
-  return snapshot.docs.map(
-    (doc) => ({ id: doc.id, ...doc.data() }) as RecommendedWallet,
-  );
+export async function listRecommendedWallets(
+  slug: string = DEFAULT_RECOMMENDED_WALLET_SLUG,
+): Promise<RecommendedWallet[]> {
+  const snapshot = await providerQuery(slug).get();
+  return snapshot.docs.map(toWallet);
 }
 
 export async function confirmRecommendedWallet(
@@ -176,8 +212,9 @@ export async function compareWithWallet(
   walletId: string,
   month?: string,
   wallet: 'renda' | 'ganho' = 'renda',
+  slug: string = DEFAULT_RECOMMENDED_WALLET_SLUG,
 ): Promise<RecommendedWalletComparison> {
-  const recommended = await getRecommendedWallet(month);
+  const recommended = await getRecommendedWallet(month, slug);
   if (!recommended) {
     throw HttpError.notFound('Carteira recomendada não encontrada');
   }

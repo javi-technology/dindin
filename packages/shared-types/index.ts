@@ -1,4 +1,8 @@
-import type { AssetType } from 'dindin-models';
+import type {
+  AiSuggestionTab,
+  AssetType,
+  RecommendedWalletProvider,
+} from 'dindin-models';
 
 // Tipos compartilhados entre web e api serão adicionados aqui.
 
@@ -288,4 +292,100 @@ export interface DashboardSummaryResponse {
   monthlyIncomeTotal: number;
   /** Composição consolidada por ticker, em ordem decrescente de valor. */
   composition: TickerValue[];
+}
+
+// ---------------------------------------------------------------------------
+// Simulação de proventos (issues #395 e #396)
+//
+// O resultado da simulação é contrato de tela: a projeção, o troco e a
+// premissa saem do motor da API e são exibidos sem recálculo no cliente.
+// ---------------------------------------------------------------------------
+
+/** Proventos reinvestidos em novas cotas ou sacados. */
+export type SimulationMode = 'reinvest' | 'withdraw';
+
+/**
+ * Premissa da projeção, explícita no resultado: parte do **último provento
+ * real** e assume que ele se repete. Não vale para pagador trimestral nem
+ * para FII de provento variável, e a tela precisa dizer isso.
+ */
+export interface SimulationBasis {
+  source: 'monthlyDividend';
+  assumesRepetition: true;
+  staleAfterDays: number;
+}
+
+export interface SimulationItem {
+  ticker: string;
+  price: number;
+  monthlyDividend: number;
+  /** Cotas compradas com o aporte inicial. */
+  quantity: number;
+  /** Cotas ao fim do horizonte; difere de `quantity` no reinvestimento. */
+  finalQuantity: number;
+  investedAmount: number;
+  monthlyIncome: number;
+  totalIncome: number;
+  /** Sem cotação utilizável: ficou fora da alocação. */
+  missingPrice?: true;
+  /** Sem último provento real conhecido: entrou com renda zero, declarada. */
+  missingDividend?: true;
+  /** Último provento real além de `basis.staleAfterDays`. */
+  staleDividend?: true;
+}
+
+export interface SimulationResult {
+  amount: number;
+  months: number;
+  mode: SimulationMode;
+  allocatedAmount: number;
+  /** Troco do aporte: não comprou cota inteira e não rende. */
+  unallocatedAmount: number;
+  monthlyIncome: number;
+  totalIncome: number;
+  reinvestedAmount: number;
+  uninvestedIncome: number;
+  byTicker: SimulationItem[];
+  missingDividendTickers: string[];
+  staleDividendTickers: string[];
+  basis: SimulationBasis;
+}
+
+/** Provedor de carteira sugerida e os meses que ele tem publicados. */
+export interface SimulationWalletOption {
+  slug: string;
+  label: string;
+  provider: RecommendedWalletProvider;
+  months: string[];
+}
+
+export interface WalletSimulationRequest {
+  /** Número ou texto em pt-BR (`1.500,55`); a API converte. */
+  amount: number | string;
+  months: number;
+  mode?: SimulationMode;
+  /** Provedor da carteira sugerida; o padrão é o primeiro do catálogo. */
+  provider?: string;
+  /** Mês da carteira; o padrão é a mais recente do provedor. */
+  month?: string;
+  tab?: AiSuggestionTab;
+}
+
+export interface AssetSimulationRequest {
+  ticker: string;
+  /** Número ou texto em pt-BR (`1.500,55`); a API converte. */
+  amount: number | string;
+  months: number;
+  mode?: SimulationMode;
+}
+
+/** Recurso de assinante (`projections`); ver `AssetSimulationRequest`. */
+export interface AssetSimulationResponse extends SimulationResult {
+  ticker: string;
+}
+
+export interface WalletSimulationResponse extends SimulationResult {
+  provider: Omit<SimulationWalletOption, 'months'>;
+  walletMonth: string;
+  tab: AiSuggestionTab;
 }

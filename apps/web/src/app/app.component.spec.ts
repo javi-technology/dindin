@@ -52,7 +52,7 @@ describe('AppComponent', () => {
     fixture = TestBed.createComponent(AppComponent);
   });
 
-  it('deve exibir navegação entre dashboard, carteira, geladeira, proventos, carteira recomendada e assinatura quando autenticado', () => {
+  it('deve exibir navegação entre dashboard, carteira, geladeira, proventos, carteira recomendada, simulação e assinatura quando autenticado', () => {
     authServiceMock.user.set({ email: 'user@dindin.app' });
 
     fixture.detectChanges();
@@ -67,6 +67,7 @@ describe('AppComponent', () => {
       'Geladeira',
       'Proventos',
       'Carteira recomendada',
+      'Simulação',
       'Assinatura',
     ]);
   });

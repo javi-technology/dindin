@@ -203,10 +203,22 @@ export interface RecommendedWalletAsset {
 
 export type RecommendedWalletStatus = 'pending_review' | 'confirmed';
 
+/**
+ * Instituição que publica a carteira sugerida (issue #395). Era o literal
+ * `'BB'` no model; virou união nomeada porque está previsto haver mais de uma
+ * carteira sugerida, e o provedor passou a ser parâmetro das rotas.
+ */
+export type RecommendedWalletProvider = 'BB';
+
 /** Carteira recomendada publicada pelo Banco do Brasil. */
 export interface RecommendedWallet {
   id: string;
-  provider: 'BB';
+  provider: RecommendedWalletProvider;
+  /**
+   * Prefixo do id do documento, que separa as carteiras por provedor.
+   * Ausente nos documentos gravados antes da #395; a leitura o deriva do id.
+   */
+  providerSlug?: string;
   month: string;
   revision: number;
   publishedAt: string;

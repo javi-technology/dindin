@@ -2,6 +2,7 @@ import {
   AiSuggestionItem,
   RecommendedWalletComparisonItem,
 } from 'dindin-models';
+import { buyWholeSharesWithRemainder } from '../shared/whole-share-allocation';
 
 /**
  * Regras de alocação da sugestão da IA (issue #306).
@@ -119,25 +120,20 @@ export function redistributeUnspentAmounts(
     (total, state) => total + state.quantity * state.price,
     0,
   );
-  let pool = roundAmount(totalAvailable - fixedSpent - eligibleSpent);
+  const pool = roundAmount(totalAvailable - fixedSpent - eligibleSpent);
   if (pool <= 0) return items;
 
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const orderedStates = [...eligibleStates].sort(
-      (a, b) =>
-        Number(a.quantity > 0) - Number(b.quantity > 0) ||
-        a.item.priority - b.item.priority ||
-        a.index - b.index,
-    );
-    for (const state of orderedStates) {
-      if (pool + 1e-9 < state.price) continue;
-      state.quantity += 1;
-      pool = roundAmount(pool - state.price);
-      changed = true;
-    }
-  }
+  // A compra de cota inteira com o troco é a mesma conta da simulação de
+  // proventos e mora em `shared/whole-share-allocation` (issue #395).
+  const candidates = eligibleStates.map((state) => ({
+    price: state.price,
+    priority: state.item.priority,
+    quantity: state.quantity,
+  }));
+  buyWholeSharesWithRemainder(candidates, pool);
+  eligibleStates.forEach((state, index) => {
+    state.quantity = candidates[index].quantity;
+  });
 
   const updatedByIndex = new Map<number, AiSuggestionItem>();
   for (const state of eligibleStates) {
