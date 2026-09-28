@@ -198,7 +198,9 @@ void main() {
     });
 
     test('aceita 204 sem corpo', () async {
-      final client = clienteCom(MockClient((req) async => http.Response('', 204)));
+      final client = clienteCom(
+        MockClient((req) async => http.Response('', 204)),
+      );
 
       expect(await client.delete('/api/wallets/w1'), isNull);
     });

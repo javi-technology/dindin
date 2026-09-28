@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -183,5 +184,54 @@ describe('app Flutter em apps/mobile', () => {
     ])('deve expor %s', (script, comando) => {
       expect(scripts()[script]).toContain(comando);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Autenticação nativa do app (issue #400)
+//
+// A configuração do Firebase no app é credencial e mora fora do repositório;
+// o que precisa estar versionado é o caminho para obtê-la. Sem isso, o
+// próximo a clonar descobre o passo pelo erro em tempo de execução.
+// ---------------------------------------------------------------------------
+describe('Firebase no app', () => {
+  const doc = (): string => conteudo('docs/mobile-firebase.md');
+
+  it('deve documentar como obter os arquivos de configuração', () => {
+    expect(doc()).toContain('google-services.json');
+    expect(doc()).toContain('GoogleService-Info.plist');
+  });
+
+  // O login com Google no Android simplesmente não funciona sem o SHA
+  // registrado, e o erro que aparece não diz qual é o problema.
+  it('deve documentar o registro do SHA-1', () => {
+    expect(doc()).toContain('SHA-1');
+    expect(doc()).toContain('signingReport');
+  });
+
+  it('deve registrar o identificador de pacote das duas plataformas', () => {
+    expect(doc()).toContain('tech.javi.dindin');
+    expect(conteudo('apps/mobile/android/app/build.gradle.kts')).toContain(
+      'applicationId = "tech.javi.dindin"',
+    );
+    expect(
+      conteudo('apps/mobile/ios/Runner.xcodeproj/project.pbxproj'),
+    ).toContain('PRODUCT_BUNDLE_IDENTIFIER = tech.javi.dindin;');
+  });
+
+  it('não deve versionar nenhuma configuração do Firebase', () => {
+    const versionados = execFileSync(
+      'git',
+      [
+        'ls-files',
+        '--',
+        'apps/mobile/**/google-services.json',
+        'apps/mobile/**/GoogleService-Info.plist',
+        'apps/mobile/**/firebase_options.dart',
+      ],
+      { cwd: repoRoot, encoding: 'utf-8' },
+    ).trim();
+
+    expect(versionados).toBe('');
   });
 });

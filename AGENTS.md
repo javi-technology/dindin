@@ -226,7 +226,21 @@ Regras:
 - Prettier e ESLint não alcançam `.dart`: use os comandos `mobile:*` antes de
   commitar código do app, do mesmo modo que `format` e `lint` para o resto.
 - `google-services.json`, `GoogleService-Info.plist` e `firebase_options.dart`
-  ficam fora do versionamento, como qualquer credencial.
+  ficam fora do versionamento, como qualquer credencial. Como obtê-los está em
+  `docs/mobile-firebase.md` (issue #400).
+- O identificador de pacote é **`tech.javi.dindin`** nas duas plataformas, e
+  precisa bater com o registrado no Firebase: mudar um e esquecer o outro
+  derruba o login com Google só numa delas, com um erro que não diz qual.
+- O app **não guarda token por conta própria**: o `firebase_auth` restaura a
+  sessão na abertura e renova o ID token. O `ApiClient` manda o token em toda
+  requisição e, num 401, renova à força e repete a requisição **uma vez** —
+  repetir sem limite viraria laço quando a sessão realmente acabou.
+- Toda conversa com o SDK do Firebase passa por `AuthBackend`. É o que permite
+  testar o fluxo de login sem rede nem emulador, como a regra de testes
+  browserless já exige do frontend.
+- Erro de login vira mensagem em pt-BR no `AuthService`; código desconhecido
+  cai numa mensagem genérica, porque `invalid-credential` na tela não diz ao
+  usuário o que fazer.
 
 ### Frontend: testes unitários browserless
 

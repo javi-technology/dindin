@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:dindin_mobile/core/auth/auth_backend.dart';
 import 'package:dindin_mobile/core/auth/auth_service.dart';
 import 'package:dindin_mobile/core/auth/auth_exception.dart';
 import 'package:dindin_mobile/core/auth/sessao.dart';
+
+import 'auth_backend_falso.dart';
 
 // ---------------------------------------------------------------------------
 // Autenticação nativa do app (issue #400).
@@ -16,73 +15,10 @@ import 'package:dindin_mobile/core/auth/sessao.dart';
 // — sessão que sobrevive à abertura do app e erro em português.
 // ---------------------------------------------------------------------------
 
-class _BackendFalso implements AuthBackend {
-  _BackendFalso({Sessao? inicial}) {
-    _controller = StreamController<Sessao?>.broadcast(
-      onListen: () => _controller.add(inicial),
-    );
-    _atual = inicial;
-  }
-
-  late final StreamController<Sessao?> _controller;
-  Sessao? _atual;
-
-  Object? erroAoEntrar;
-  int entradasComEmail = 0;
-  int entradasComGoogle = 0;
-  int saidas = 0;
-  final List<bool> renovacoes = [];
-  String token = 'token-1';
-
-  @override
-  Stream<Sessao?> get sessoes => _controller.stream;
-
-  @override
-  Sessao? get sessaoAtual => _atual;
-
-  void _entrar(Sessao sessao) {
-    _atual = sessao;
-    _controller.add(sessao);
-  }
-
-  @override
-  Future<void> entrarComEmail(String email, String senha) async {
-    entradasComEmail++;
-    if (erroAoEntrar != null) throw erroAoEntrar!;
-    _entrar(const Sessao(uid: 'u1', email: 'a@b.c'));
-  }
-
-  @override
-  Future<void> cadastrarComEmail(String email, String senha) async {
-    if (erroAoEntrar != null) throw erroAoEntrar!;
-    _entrar(const Sessao(uid: 'u1', email: 'a@b.c'));
-  }
-
-  @override
-  Future<void> entrarComGoogle() async {
-    entradasComGoogle++;
-    if (erroAoEntrar != null) throw erroAoEntrar!;
-    _entrar(const Sessao(uid: 'u2', email: 'g@b.c'));
-  }
-
-  @override
-  Future<void> sair() async {
-    saidas++;
-    _atual = null;
-    _controller.add(null);
-  }
-
-  @override
-  Future<String?> idToken({bool forceRefresh = false}) async {
-    renovacoes.add(forceRefresh);
-    return _atual == null ? null : token;
-  }
-}
-
 void main() {
   group('login', () {
     test('com e-mail e senha abre a sessão', () async {
-      final backend = _BackendFalso();
+      final backend = AuthBackendFalso();
       final service = AuthService(backend);
 
       await service.entrarComEmail('a@b.c', 'segredo');
@@ -92,7 +28,7 @@ void main() {
     });
 
     test('com Google usa o fluxo nativo da plataforma', () async {
-      final backend = _BackendFalso();
+      final backend = AuthBackendFalso();
       final service = AuthService(backend);
 
       await service.entrarComGoogle();
@@ -102,7 +38,7 @@ void main() {
     });
 
     test('publica a sessão para quem observa', () async {
-      final backend = _BackendFalso();
+      final backend = AuthBackendFalso();
       final service = AuthService(backend);
       final vistas = <Sessao?>[];
       final assinatura = service.sessoes.listen(vistas.add);
@@ -119,7 +55,7 @@ void main() {
   // o usuário lê "user-not-found" e não sabe o que fazer.
   group('falha de login', () {
     test('credencial inválida vira mensagem em português', () async {
-      final backend = _BackendFalso()
+      final backend = AuthBackendFalso()
         ..erroAoEntrar = const CodigoDeAuth('invalid-credential');
       final service = AuthService(backend);
 
@@ -136,7 +72,7 @@ void main() {
     });
 
     test('cancelamento do Google não é erro para o usuário', () async {
-      final backend = _BackendFalso()
+      final backend = AuthBackendFalso()
         ..erroAoEntrar = const CodigoDeAuth('cancelado-pelo-usuario');
       final service = AuthService(backend);
 
@@ -147,7 +83,8 @@ void main() {
     });
 
     test('código desconhecido não vaza para a tela', () async {
-      final backend = _BackendFalso()..erroAoEntrar = const CodigoDeAuth('xpto');
+      final backend = AuthBackendFalso()
+        ..erroAoEntrar = const CodigoDeAuth('xpto');
       final service = AuthService(backend);
 
       await expectLater(
@@ -167,7 +104,7 @@ void main() {
     // Sessão perdida a cada abertura do app inviabiliza o uso no celular:
     // a persistência é requisito, não conveniência.
     test('já vem aberta quando o Firebase a restaurou', () async {
-      final backend = _BackendFalso(
+      final backend = AuthBackendFalso(
         inicial: const Sessao(uid: 'u9', email: 'v@b.c'),
       );
       final service = AuthService(backend);
@@ -176,7 +113,7 @@ void main() {
     });
 
     test('logout encerra a sessão', () async {
-      final backend = _BackendFalso(
+      final backend = AuthBackendFalso(
         inicial: const Sessao(uid: 'u9', email: 'v@b.c'),
       );
       final service = AuthService(backend);
@@ -190,7 +127,7 @@ void main() {
 
   group('como TokenProvider', () {
     test('entrega o ID token da sessão', () async {
-      final backend = _BackendFalso(
+      final backend = AuthBackendFalso(
         inicial: const Sessao(uid: 'u9', email: 'v@b.c'),
       );
       final service = AuthService(backend);
@@ -199,7 +136,7 @@ void main() {
     });
 
     test('repassa o pedido de renovação forçada', () async {
-      final backend = _BackendFalso(
+      final backend = AuthBackendFalso(
         inicial: const Sessao(uid: 'u9', email: 'v@b.c'),
       );
       final service = AuthService(backend);
@@ -210,7 +147,7 @@ void main() {
     });
 
     test('devolve nulo sem sessão', () async {
-      final service = AuthService(_BackendFalso());
+      final service = AuthService(AuthBackendFalso());
 
       expect(await service.idToken(), isNull);
     });

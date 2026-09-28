@@ -1,4 +1,4 @@
-package tech.javi.dindin.dindin_mobile
+package tech.javi.dindin
 
 import io.flutter.embedding.android.FlutterActivity
 
