@@ -122,7 +122,7 @@ describe('simulation.controller — carteira sugerida', () => {
       .send({ months: 1, ...body });
 
     expect(response.status).toBe(400);
-    expect(response.body.error).toMatch(/[çãéó]/);
+    expect(response.body.error).toMatch(/máximo|obrigatório|número/);
     expect(simulateRecommendedWalletMock).not.toHaveBeenCalled();
   });
 

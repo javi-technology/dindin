@@ -55,6 +55,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'simulacao',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/simulation/simulation.component').then(
+        (m) => m.SimulationComponent,
+      ),
+  },
+  {
     path: 'assinatura',
     canActivate: [authGuard],
     loadComponent: () =>

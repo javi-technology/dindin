@@ -1,3 +1,9 @@
+import type {
+  SimulationBasis,
+  SimulationItem,
+  SimulationMode,
+  SimulationResult,
+} from 'dindin-shared-types';
 import { roundCurrency } from '../shared/numbers';
 import { buyWholeSharesWithRemainder } from '../shared/whole-share-allocation';
 import { todayAsUtcDate } from '../shared/date';
@@ -18,8 +24,6 @@ import { todayAsUtcDate } from '../shared/date';
  * de existir em algum extrato.
  */
 
-export type SimulationMode = 'reinvest' | 'withdraw';
-
 /**
  * Dias além dos quais o último provento conhecido deixa de representar o
  * ativo. Dois meses cobrem o pagador mensal atrasado; a partir daí a tela
@@ -39,6 +43,13 @@ export interface SimulationAsset {
   dividendPaymentDate?: string;
 }
 
+export type {
+  SimulationBasis,
+  SimulationItem,
+  SimulationMode,
+  SimulationResult,
+};
+
 export interface SimulationInput {
   assets: SimulationAsset[];
   /** Valor a investir, já convertido para número. */
@@ -48,56 +59,6 @@ export interface SimulationInput {
   mode: SimulationMode;
   /** Hoje, por padrão; injetável para o teste não depender do relógio. */
   referenceDate?: string;
-}
-
-export interface SimulationItem {
-  ticker: string;
-  price: number;
-  monthlyDividend: number;
-  /** Cotas compradas com o aporte inicial. */
-  quantity: number;
-  /** Cotas ao fim do horizonte; difere de `quantity` no reinvestimento. */
-  finalQuantity: number;
-  investedAmount: number;
-  /** Renda do primeiro mês. */
-  monthlyIncome: number;
-  /** Renda somada no horizonte. */
-  totalIncome: number;
-  /** Sem cotação utilizável: fica fora da alocação. */
-  missingPrice?: true;
-  /** Sem último provento real conhecido: entra com renda zero, declarada. */
-  missingDividend?: true;
-  /** Último provento real anterior a `STALE_DIVIDEND_DAYS`. */
-  staleDividend?: true;
-}
-
-/** Premissa da projeção, explícita no resultado em vez de embutida no número. */
-export interface SimulationBasis {
-  source: 'monthlyDividend';
-  assumesRepetition: true;
-  staleAfterDays: number;
-}
-
-export interface SimulationResult {
-  amount: number;
-  months: number;
-  mode: SimulationMode;
-  /** Valor que virou cota inteira. */
-  allocatedAmount: number;
-  /** Troco do aporte: não comprou cota e não rende. */
-  unallocatedAmount: number;
-  /** Renda do primeiro mês. */
-  monthlyIncome: number;
-  /** Renda somada no horizonte. */
-  totalIncome: number;
-  /** Proventos que viraram novas cotas (só no modo reinvestido). */
-  reinvestedAmount: number;
-  /** Proventos acumulados que não completaram uma cota ao fim do horizonte. */
-  uninvestedIncome: number;
-  byTicker: SimulationItem[];
-  missingDividendTickers: string[];
-  staleDividendTickers: string[];
-  basis: SimulationBasis;
 }
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;

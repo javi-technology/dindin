@@ -1,0 +1,131 @@
+<main class="min-h-screen bg-surface p-6">
+  <div class="mx-auto max-w-4xl">
+    <div class="rounded-2xl bg-surface-elevated p-6 shadow-lg">
+      <a
+        routerLink="/"
+        class="mb-3 inline-flex items-center text-sm font-medium text-action hover:text-brand-ink"
+      >
+        <svg lucideArrowLeft [size]="16" class="mr-1"></svg>
+        Voltar
+      </a>
+      <h1 class="text-2xl font-bold text-text-primary">
+        Simulação de investimento
+      </h1>
+      <p class="mt-1 text-sm text-text-secondary">
+        Quanto um valor renderia de proventos na carteira sugerida.
+      </p>
+
+      @if (wallets().length === 0) {
+        <p class="mt-6 text-text-muted" data-testid="empty-wallets">
+          Nenhuma carteira sugerida disponível para simular.
+        </p>
+      } @else {
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+          <label class="text-sm text-text-secondary">
+            Carteira sugerida
+            <select
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="selectedProvider()"
+              (change)="selectProvider($any($event.target).value)"
+              data-testid="provider-select"
+            >
+              @for (wallet of wallets(); track wallet.slug) {
+                <option [value]="wallet.slug">{{ wallet.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="text-sm text-text-secondary">
+            Mês
+            <select
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="selectedMonth()"
+              (change)="selectMonth($any($event.target).value)"
+              data-testid="month-select"
+            >
+              @for (month of availableMonths(); track month) {
+                <option [value]="month">{{ month }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="text-sm text-text-secondary">
+            Perfil
+            <select
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="selectedTab()"
+              (change)="selectTab($any($event.target).value)"
+              data-testid="tab-select"
+            >
+              <option value="renda">Renda</option>
+              <option value="ganho">Ganho de capital</option>
+            </select>
+          </label>
+
+          <label class="text-sm text-text-secondary">
+            Valor a investir
+            <input
+              type="text"
+              inputmode="decimal"
+              placeholder="1.000,00"
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="amount()"
+              (input)="onAmountInput($event)"
+              data-testid="amount-input"
+            />
+          </label>
+
+          <label class="text-sm text-text-secondary">
+            Horizonte (meses)
+            <input
+              type="number"
+              min="1"
+              max="360"
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="months()"
+              (input)="onMonthsInput($event)"
+              data-testid="months-input"
+            />
+          </label>
+
+          <label class="text-sm text-text-secondary">
+            Proventos
+            <select
+              class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+              [value]="mode()"
+              (change)="selectMode($any($event.target).value)"
+              data-testid="mode-select"
+            >
+              <option value="withdraw">Sacados</option>
+              <option value="reinvest">Reinvestidos</option>
+            </select>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          class="mt-5 inline-flex items-center rounded-lg bg-action px-4 py-2 font-medium text-on-action transition-colors hover:bg-action-hover disabled:opacity-50"
+          [disabled]="loading()"
+          (click)="simulate()"
+          data-testid="simulate-button"
+        >
+          <svg lucideCalculator [size]="18" class="mr-2"></svg>
+          {{ loading() ? 'Simulando…' : 'Simular' }}
+        </button>
+      }
+
+      @if (error()) {
+        <p
+          class="mt-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger-ink"
+          data-testid="simulation-error"
+        >
+          {{ error() }}
+        </p>
+      }
+
+      @if (result(); as simulation) {
+        <app-simulation-result [result]="simulation" />
+      }
+    </div>
+  </div>
+</main>
