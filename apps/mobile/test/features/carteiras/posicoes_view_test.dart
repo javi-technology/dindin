@@ -43,9 +43,7 @@ void main() {
   group('posições', () {
     testWidgets('mostra ticker, quantidade e valor em pt-BR', (tester) async {
       await tester.pumpWidget(
-        comPosicoes(
-          EstadoDoRecurso(dados: [posicao(currentPrice: 110.5)]),
-        ),
+        comPosicoes(EstadoDoRecurso(dados: [posicao(currentPrice: 110.5)])),
       );
 
       expect(find.text('HGLG11'), findsOneWidget);
@@ -62,9 +60,7 @@ void main() {
     // Alta e baixa usam `positive` e `danger`, nunca o token da marca.
     testWidgets('valorização aparece com o token positivo', (tester) async {
       await tester.pumpWidget(
-        comPosicoes(
-          EstadoDoRecurso(dados: [posicao(currentPrice: 110)]),
-        ),
+        comPosicoes(EstadoDoRecurso(dados: [posicao(currentPrice: 110)])),
       );
 
       final texto = tester.widget<Text>(
@@ -78,9 +74,7 @@ void main() {
 
     testWidgets('desvalorização aparece com o token de perigo', (tester) async {
       await tester.pumpWidget(
-        comPosicoes(
-          EstadoDoRecurso(dados: [posicao(currentPrice: 90)]),
-        ),
+        comPosicoes(EstadoDoRecurso(dados: [posicao(currentPrice: 90)])),
       );
 
       final texto = tester.widget<Text>(

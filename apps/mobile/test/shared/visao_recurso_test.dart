@@ -13,24 +13,27 @@ import 'package:dindin_mobile/shared/components/visao_recurso.dart';
 // o usuário vai abrir no metrô.
 // ---------------------------------------------------------------------------
 void main() {
-  Widget arvore(EstadoDoRecurso<List<String>> estado, {VoidCallback? recarregar}) =>
-      MaterialApp(
-        theme: DinDinTheme.claro,
-        home: Scaffold(
-          body: VisaoRecurso<List<String>>(
-            estado: estado,
-            aoRecarregar: recarregar ?? () {},
-            vazio: (context) => const Text('nada por aqui'),
-            estaVazio: (dados) => dados.isEmpty,
-            conteudo: (context, dados) => Text(dados.join(', ')),
-          ),
-        ),
-      );
+  Widget arvore(
+    EstadoDoRecurso<List<String>> estado, {
+    VoidCallback? recarregar,
+  }) => MaterialApp(
+    theme: DinDinTheme.claro,
+    home: Scaffold(
+      body: VisaoRecurso<List<String>>(
+        estado: estado,
+        aoRecarregar: recarregar ?? () {},
+        vazio: (context) => const Text('nada por aqui'),
+        estaVazio: (dados) => dados.isEmpty,
+        // O conteúdo é rolável por contrato: é o que habilita o
+        // puxar-para-atualizar.
+        conteudo: (context, dados) =>
+            ListView(children: [Text(dados.join(', '))]),
+      ),
+    ),
+  );
 
   testWidgets('carregando sem dado mostra o indicador', (tester) async {
-    await tester.pumpWidget(
-      arvore(const EstadoDoRecurso(carregando: true)),
-    );
+    await tester.pumpWidget(arvore(const EstadoDoRecurso(carregando: true)));
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
@@ -47,9 +50,7 @@ void main() {
   // como tela em branco faz o usuário achar que perdeu dado quando só não
   // cadastrou nada.
   testWidgets('lista vazia mostra o estado vazio, não erro', (tester) async {
-    await tester.pumpWidget(
-      arvore(const EstadoDoRecurso(dados: <String>[])),
-    );
+    await tester.pumpWidget(arvore(const EstadoDoRecurso(dados: <String>[])));
 
     expect(find.text('nada por aqui'), findsOneWidget);
     expect(find.text('Tentar de novo'), findsNothing);
@@ -112,7 +113,10 @@ void main() {
     testWidgets('some quando a rede responde', (tester) async {
       await tester.pumpWidget(
         arvore(
-          EstadoDoRecurso(dados: const ['HGLG11'], atualizadoEm: DateTime.now()),
+          EstadoDoRecurso(
+            dados: const ['HGLG11'],
+            atualizadoEm: DateTime.now(),
+          ),
         ),
       );
 

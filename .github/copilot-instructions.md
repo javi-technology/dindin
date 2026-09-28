@@ -211,6 +211,37 @@ Regras:
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Telas de consulta do app (`apps/mobile`)
+
+- As telas consomem a API por `DinDinApi`, que devolve os **modelos gerados**
+  da descrição OpenAPI. Nenhuma tela lê `Map<String, dynamic>`: um campo
+  renomeado na API faz o app parar de compilar, em vez de virar zero no
+  celular do usuário depois do deploy.
+- Toda consulta passa por `Recurso`, que guarda a resposta em `CacheLocal` e
+  mostra o último estado conhecido enquanto busca o atual. Uma lista que só
+  aparece depois de a rede responder deixa o app inutilizável no elevador ou
+  no metrô — restrição que o web não tem.
+- **Dado do cache é sempre sinalizado** (`VisaoRecurso` mostra a faixa com a
+  hora da última atualização). Sem o aviso, o cache vira armadilha: o usuário
+  decidiria uma compra sobre a cotação de ontem achando que é a de agora.
+- Falha de rede **com** cache em mãos não apaga a tela: o erro vira aviso e o
+  conteúdo continua. Sem cache, vira `EstadoErro` com nova tentativa.
+- Lista vazia e falha de carregamento são estados **diferentes** e parecem
+  diferentes: tratar as duas como tela em branco faz o usuário achar que
+  perdeu dado quando só não cadastrou nada.
+- **Ativo sem cotação ou sem provento conhecido usa `ValorAusente`, nunca
+  zero**: num app financeiro zero é um número, e o usuário o lê como um —
+  concluiria que o ativo não vale nada ou não paga nada, quando o app é que
+  não sabe.
+- Valorização e desvalorização usam `positive` e `danger`, nunca o token da
+  marca.
+- O logout limpa o cache (`CacheLocal.limpar`): o dado é do usuário
+  autenticado, e deixá-lo para trás mostraria a carteira de quem saiu para
+  quem entrar depois no mesmo aparelho. A escolha de tema não é dado de
+  usuário e permanece.
+- O conteúdo passado a `VisaoRecurso` **precisa ser rolável**: é o que habilita
+  o puxar-para-atualizar, o gesto que o usuário tenta antes de procurar botão.
+
 ### Tema e componentes do app (`apps/mobile`)
 
 - A paleta do app é a **mesma da web** (`docs/paleta.md`). As escalas ficam em

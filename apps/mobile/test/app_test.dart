@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dindin_mobile/app.dart';
 import 'package:dindin_mobile/core/auth/auth_service.dart';
+import 'package:dindin_mobile/core/api/api_client.dart';
+import 'package:dindin_mobile/core/data/cache_local.dart';
+import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +22,13 @@ void main() {
       DinDinApp(
         auth: AuthService(AuthBackendFalso()),
         tema: await ThemeController.carregar(),
+        api: DinDinApi(
+          ApiClient(
+            baseUrl: 'https://api.exemplo',
+            tokenProvider: AuthService(AuthBackendFalso()),
+          ),
+        ),
+        cache: await CacheLocal.abrir(),
       ),
     );
 
@@ -32,6 +42,13 @@ void main() {
       DinDinApp(
         auth: AuthService(AuthBackendFalso()),
         tema: await ThemeController.carregar(),
+        api: DinDinApi(
+          ApiClient(
+            baseUrl: 'https://api.exemplo',
+            tokenProvider: AuthService(AuthBackendFalso()),
+          ),
+        ),
+        cache: await CacheLocal.abrir(),
       ),
     );
 
@@ -45,6 +62,13 @@ void main() {
       DinDinApp(
         auth: AuthService(AuthBackendFalso()),
         tema: await ThemeController.carregar(),
+        api: DinDinApi(
+          ApiClient(
+            baseUrl: 'https://api.exemplo',
+            tokenProvider: AuthService(AuthBackendFalso()),
+          ),
+        ),
+        cache: await CacheLocal.abrir(),
       ),
     );
 

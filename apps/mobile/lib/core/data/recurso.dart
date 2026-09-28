@@ -35,22 +35,23 @@ class EstadoDoRecurso<T> {
 /// que aquilo veio do cache: sem o aviso, o usuário tomaria decisão
 /// financeira sobre um número velho achando que é o de agora.
 class Recurso<T> extends ChangeNotifier {
+  // Os colaboradores são públicos e finais porque parâmetro nomeado em Dart
+  // não pode começar com underscore: privá-los custaria um construtor
+  // posicional de cinco argumentos, onde uma troca de ordem entre
+  // `serializar` e `desserializar` compilaria e só falharia em execução.
   Recurso({
     required this.chave,
-    required CacheLocal cache,
-    required Future<T> Function() buscar,
-    required Object? Function(T) serializar,
-    required T Function(dynamic) desserializar,
-  }) : _cache = cache,
-       _buscar = buscar,
-       _serializar = serializar,
-       _desserializar = desserializar;
+    required this.cache,
+    required this.buscar,
+    required this.serializar,
+    required this.desserializar,
+  });
 
   final String chave;
-  final CacheLocal _cache;
-  final Future<T> Function() _buscar;
-  final Object? Function(T) _serializar;
-  final T Function(dynamic) _desserializar;
+  final CacheLocal cache;
+  final Future<T> Function() buscar;
+  final Object? Function(T) serializar;
+  final T Function(dynamic) desserializar;
 
   EstadoDoRecurso<T> _estado = const EstadoDoRecurso(carregando: true);
 
@@ -74,8 +75,8 @@ class Recurso<T> extends ChangeNotifier {
     );
 
     try {
-      final dados = await _buscar();
-      await _cache.gravar(chave, _serializar(dados));
+      final dados = await buscar();
+      await cache.gravar(chave, serializar(dados));
 
       _publicar(EstadoDoRecurso(dados: dados, atualizadoEm: DateTime.now()));
     } catch (erro) {
@@ -94,11 +95,11 @@ class Recurso<T> extends ChangeNotifier {
   }
 
   (T, DateTime)? _lerDoCache() {
-    final entrada = _cache.ler(chave);
+    final entrada = cache.ler(chave);
     if (entrada == null) return null;
 
     try {
-      return (_desserializar(entrada.dados), entrada.gravadoEm);
+      return (desserializar(entrada.dados), entrada.gravadoEm);
     } catch (_) {
       // O formato guardado não serve mais para este tipo — uma versão
       // anterior do app, por exemplo. Buscar da rede resolve.

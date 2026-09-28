@@ -38,10 +38,16 @@ void main() {
   testWidgets('mostra os totais no padrão brasileiro', (tester) async {
     await tester.pumpWidget(arvore(EstadoDoRecurso(dados: resumo())));
 
-    expect(find.textContaining('1.250,50'), findsOneWidget);
-    expect(find.textContaining('1.000,00'), findsOneWidget);
-    expect(find.textContaining('250,50'), findsOneWidget);
-    expect(find.textContaining('12,75'), findsOneWidget);
+    // `250,50` é substring de `1.250,50`, então o total é conferido pela
+    // própria chave, e não por busca de texto.
+    final total = tester.widget<Text>(
+      find.byKey(const Key('total-patrimonio')),
+    );
+    expect(total.data, 'R\$\u00A01.250,50');
+
+    expect(find.text('R\$\u00A01.000,00'), findsOneWidget);
+    expect(find.text('R\$\u00A0250,50'), findsOneWidget);
+    expect(find.text('R\$\u00A012,75'), findsOneWidget);
   });
 
   testWidgets('lista a composição em ordem de valor', (tester) async {
@@ -82,11 +88,7 @@ void main() {
     await tester.pumpWidget(
       arvore(
         EstadoDoRecurso(
-          dados: resumo(
-            totalWallet: 0,
-            totalFridge: 0,
-            monthlyIncomeTotal: 0,
-          ),
+          dados: resumo(totalWallet: 0, totalFridge: 0, monthlyIncomeTotal: 0),
         ),
       ),
     );
