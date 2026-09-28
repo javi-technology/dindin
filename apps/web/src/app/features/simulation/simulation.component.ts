@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { EMPTY, Subject, catchError, of, switchMap } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import type { AiSuggestionTab } from 'dindin-models';
 import type {
@@ -55,6 +56,47 @@ export class SimulationComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly result = signal<WalletSimulationResponse | null>(null);
 
+  /**
+   * Parâmetros da simulação pedida; `null` quando não há pedido em pé.
+   *
+   * O `switchMap` descarta a resposta do pedido anterior assim que outro
+   * chega, então duas simulações disparadas em sequência não podem se
+   * atropelar na tela.
+   */
+  private readonly walletRequest =
+    new Subject<WalletSimulationRequest | null>();
+
+  constructor() {
+    this.walletRequest
+      .pipe(
+        switchMap((request) =>
+          request === null
+            ? EMPTY
+            : this.simulationService.simulateWallet(request).pipe(
+                // O erro é tratado aqui dentro para não encerrar o fluxo: uma
+                // falha não pode impedir a próxima simulação.
+                catchError((failure: { error?: { error?: string } }) =>
+                  of({
+                    error:
+                      failure?.error?.error ??
+                      'Não foi possível simular. Tente novamente.',
+                  }),
+                ),
+              ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((outcome) => {
+        this.loading.set(false);
+        if ('error' in outcome) {
+          this.result.set(null);
+          this.error.set(outcome.error);
+          return;
+        }
+        this.result.set(outcome);
+      });
+  }
+
   readonly selectedWallet = computed(
     () =>
       this.wallets().find(
@@ -82,29 +124,44 @@ export class SimulationComponent implements OnInit {
   selectProvider(slug: string): void {
     this.selectedProvider.set(slug || null);
     this.selectedMonth.set(this.availableMonths()[0] ?? null);
-    this.result.set(null);
+    this.discardResult();
   }
 
   selectMonth(month: string): void {
     this.selectedMonth.set(month || null);
-    this.result.set(null);
+    this.discardResult();
   }
 
   selectTab(tab: string): void {
     this.selectedTab.set(tab === 'ganho' ? 'ganho' : 'renda');
-    this.result.set(null);
+    this.discardResult();
   }
 
   selectMode(mode: string): void {
     this.mode.set(mode === 'reinvest' ? 'reinvest' : 'withdraw');
+    this.discardResult();
   }
 
   onAmountInput(event: Event): void {
     this.amount.set((event.target as HTMLInputElement).value);
+    this.discardResult();
   }
 
   onMonthsInput(event: Event): void {
     this.months.set((event.target as HTMLInputElement).value);
+    this.discardResult();
+  }
+
+  /**
+   * O resultado vale para os parâmetros que o geraram: mudou um deles, o que
+   * está na tela deixou de valer. Emitir `null` desfaz também a requisição em
+   * voo — sem isso, a resposta antiga chegaria depois e preencheria a tela com
+   * a simulação dos filtros anteriores.
+   */
+  private discardResult(): void {
+    this.result.set(null);
+    this.loading.set(false);
+    this.walletRequest.next(null);
   }
 
   simulate(): void {
@@ -129,29 +186,13 @@ export class SimulationComponent implements OnInit {
     const month = this.selectedMonth();
     this.error.set(null);
     this.loading.set(true);
-    this.simulationService
-      .simulateWallet({
-        amount: raw,
-        months,
-        mode: this.mode(),
-        ...(provider ? { provider } : {}),
-        ...(month ? { month } : {}),
-        tab: this.selectedTab(),
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (result) => {
-          this.result.set(result);
-          this.loading.set(false);
-        },
-        error: (failure: { error?: { error?: string } }) => {
-          this.loading.set(false);
-          this.result.set(null);
-          this.error.set(
-            failure?.error?.error ??
-              'Não foi possível simular. Tente novamente.',
-          );
-        },
-      });
+    this.walletRequest.next({
+      amount: raw,
+      months,
+      mode: this.mode(),
+      ...(provider ? { provider } : {}),
+      ...(month ? { month } : {}),
+      tab: this.selectedTab(),
+    });
   }
 }

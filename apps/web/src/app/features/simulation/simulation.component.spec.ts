@@ -216,21 +216,33 @@ describe('SimulationComponent', () => {
       expect(hasResult()).toBe(false);
     });
 
+    // Pela tela o botão fica desabilitado enquanto carrega, então dois pedidos
+    // não se sobrepõem por duplo clique. O componente não depende disso: quem
+    // garante que a resposta antiga não vence é o `switchMap`.
     it('deve manter a última resposta pedida quando duas se sobrepõem', () => {
       setInput('amount-input', '1000');
       const primeira = pendingResponse();
-      submit();
+      component.simulate();
 
       const segunda = pendingResponse();
-      submit();
+      component.simulate();
 
-      // A primeira chega depois da segunda ter sido pedida: é a resposta de um
-      // pedido que o usuário já substituiu.
       segunda.next(result);
       primeira.next({ ...result, monthlyIncome: 999 });
       fixture.detectChanges();
 
       expect(component.result()?.monthlyIncome).toBe(10);
+    });
+
+    it('deve desabilitar o botão enquanto a simulação está em voo', () => {
+      setInput('amount-input', '1000');
+      pendingResponse();
+      submit();
+
+      const botao = element.querySelector(
+        '[data-testid="simulate-button"]',
+      ) as HTMLButtonElement;
+      expect(botao.disabled).toBe(true);
     });
   });
 

@@ -43,6 +43,20 @@ export interface WalletSimulationParams {
  * alocação em vez de sumir do resultado. Para o provento não há substituto —
  * o ativo entra marcado como sem provento conhecido.
  */
+/**
+ * Preço de cotação aproveitável, ou `undefined` para cair no fechamento.
+ *
+ * A Brapi devolve `regularMarketPrice: 0` para ativo sem negócio no dia, e o
+ * mapeamento guarda esse zero. Com `??`, só `undefined` caía no fechamento: o
+ * zero seguia adiante e o motor descartava da alocação um ativo cuja carteira
+ * sugerida traz preço publicado.
+ */
+function usablePrice(price: number | undefined): number | undefined {
+  return typeof price === 'number' && Number.isFinite(price) && price > 0
+    ? price
+    : undefined;
+}
+
 export async function toSimulationAssets(
   assets: RecommendedWalletAsset[],
 ): Promise<SimulationAsset[]> {
@@ -53,7 +67,7 @@ export async function toSimulationAssets(
     return {
       ticker: asset.ticker,
       weight: asset.weight,
-      price: quote?.price ?? asset.closePrice,
+      price: usablePrice(quote?.price) ?? asset.closePrice,
       ...(quote?.monthlyDividend === undefined
         ? {}
         : { monthlyDividend: quote.monthlyDividend }),
