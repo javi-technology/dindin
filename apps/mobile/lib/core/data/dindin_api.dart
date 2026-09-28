@@ -49,6 +49,121 @@ class DinDinApi {
         ) as Map<String, dynamic>,
       );
 
+  // -------------------------------------------------------------------------
+  // Escrita (issue #403)
+  // -------------------------------------------------------------------------
+
+  Future<Wallet> criarCarteira(CreateWalletRequest dados) async =>
+      Wallet.fromJson(
+        await _client.post('/api/wallets', body: dados.toJson())
+            as Map<String, dynamic>,
+      );
+
+  Future<Wallet> atualizarCarteira(
+    String id,
+    UpdateWalletRequest dados,
+  ) async => Wallet.fromJson(
+    await _client.put('/api/wallets/$id', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  Future<void> excluirCarteira(String id) => _client.delete('/api/wallets/$id');
+
+  Future<Position> criarPosicao(
+    String carteiraId,
+    CreatePositionRequest dados,
+  ) async => Position.fromJson(
+    await _client.post(
+      '/api/wallets/$carteiraId/positions',
+      body: dados.toJson(),
+    ) as Map<String, dynamic>,
+  );
+
+  /// Atualiza a posição.
+  ///
+  /// `toJson` omite o opcional não enviado, o que é o certo para não apagar no
+  /// servidor o que o app não conhece. Mas remover o preço-alvo **exige**
+  /// mandar `targetPrice: null` explícito: omitir o campo manteria o alvo
+  /// gravado, e são pedidos diferentes — daí [removerPrecoAlvo].
+  Future<Position> atualizarPosicao(
+    String carteiraId,
+    String id,
+    UpdatePositionRequest dados, {
+    bool removerPrecoAlvo = false,
+  }) async {
+    final corpo = dados.toJson();
+    if (removerPrecoAlvo) corpo['targetPrice'] = null;
+
+    return Position.fromJson(
+      await _client.put('/api/wallets/$carteiraId/positions/$id', body: corpo)
+          as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> excluirPosicao(String carteiraId, String id) =>
+      _client.delete('/api/wallets/$carteiraId/positions/$id');
+
+  Future<FridgeItem> moverParaGeladeira(
+    String carteiraId,
+    String posicaoId,
+    MoveToFridgeRequest dados,
+  ) async => FridgeItem.fromJson(
+    await _client.post(
+      '/api/wallets/$carteiraId/positions/$posicaoId/move-to-fridge',
+      body: dados.toJson(),
+    ) as Map<String, dynamic>,
+  );
+
+  Future<FridgeItem> criarItemDaGeladeira(
+    String geladeiraId,
+    CreateFridgeItemRequest dados,
+  ) async => FridgeItem.fromJson(
+    await _client.post('/api/fridges/$geladeiraId/items', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  Future<FridgeItem> atualizarItemDaGeladeira(
+    String geladeiraId,
+    String id,
+    UpdateFridgeItemRequest dados,
+  ) async => FridgeItem.fromJson(
+    await _client.put(
+      '/api/fridges/$geladeiraId/items/$id',
+      body: dados.toJson(),
+    ) as Map<String, dynamic>,
+  );
+
+  Future<void> excluirItemDaGeladeira(String geladeiraId, String id) =>
+      _client.delete('/api/fridges/$geladeiraId/items/$id');
+
+  Future<Position> retirarDaGeladeira(
+    String geladeiraId,
+    String id,
+    UnfreezeItemRequest dados,
+  ) async => Position.fromJson(
+    await _client.post(
+      '/api/fridges/$geladeiraId/items/$id/unfreeze',
+      body: dados.toJson(),
+    ) as Map<String, dynamic>,
+  );
+
+  Future<DividendResponse> criarProvento(DividendCreateRequest dados) async =>
+      DividendResponse.fromJson(
+        await _client.post('/api/dividends', body: dados.toJson())
+            as Map<String, dynamic>,
+      );
+
+  Future<DividendResponse> atualizarProvento(
+    String id,
+    DividendCreateRequest dados,
+  ) async => DividendResponse.fromJson(
+    await _client.put('/api/dividends/$id', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  Future<void> excluirProvento(String id) =>
+      _client.delete('/api/dividends/$id');
+
   static List<T> _lista<T>(
     dynamic corpo,
     T Function(Map<String, dynamic>) converter,

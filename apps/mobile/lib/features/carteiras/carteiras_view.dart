@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../contracts/contracts.g.dart';
 import '../../core/data/recurso.dart';
 import '../../core/theme/dindin_tokens.dart';
+import '../../shared/components/acoes_do_item.dart';
 import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_vazio.dart';
 import '../../shared/components/visao_recurso.dart';
@@ -14,11 +15,17 @@ class CarteirasView extends StatelessWidget {
     required this.estado,
     required this.aoRecarregar,
     required this.aoAbrir,
+    this.aoEditar,
+    this.aoExcluir,
   });
 
   final EstadoDoRecurso<List<Wallet>> estado;
   final VoidCallback aoRecarregar;
   final ValueChanged<Wallet> aoAbrir;
+
+  /// Ausentes quando a tela é só de consulta; a linha então não mostra menu.
+  final ValueChanged<Wallet>? aoEditar;
+  final Future<void> Function(Wallet)? aoExcluir;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +74,21 @@ class CarteirasView extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: t.textMuted),
+                if (aoEditar != null || aoExcluir != null)
+                  AcoesDoItem(
+                    aoEditar: aoEditar == null
+                        ? null
+                        : () => aoEditar!(carteira),
+                    aoExcluir: aoExcluir == null
+                        ? null
+                        : () => aoExcluir!(carteira),
+                    tituloDaExclusao: 'Excluir carteira',
+                    mensagemDaExclusao:
+                        'As posições desta carteira serão excluídas junto. '
+                        'Esta ação não pode ser desfeita.',
+                  )
+                else
+                  Icon(Icons.chevron_right, color: t.textMuted),
               ],
             ),
           );

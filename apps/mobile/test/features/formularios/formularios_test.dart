@@ -18,8 +18,10 @@ import 'package:dindin_mobile/features/proventos/provento_form.dart';
 // quando a rede cai.
 // ---------------------------------------------------------------------------
 void main() {
-  Widget emApp(Widget filho) =>
-      MaterialApp(theme: DinDinTheme.claro, home: Scaffold(body: filho));
+  Widget emApp(Widget filho) => MaterialApp(
+    theme: DinDinTheme.claro,
+    home: Scaffold(body: filho),
+  );
 
   Future<void> digitar(WidgetTester tester, String chave, String texto) =>
       tester.enterText(find.byKey(Key(chave)), texto);
@@ -167,8 +169,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(enviou, isFalse);
-      expect(find.text('A quantidade precisa ser maior que zero.'),
-          findsOneWidget);
+      expect(
+        find.text('A quantidade precisa ser maior que zero.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('não envia com preço inválido', (tester) async {
@@ -213,10 +217,13 @@ void main() {
       testWidgets('toque duplo não gera dois registros', (tester) async {
         final resposta = Completer<bool>();
         var envios = 0;
-        await montarPosicao(tester, aoSalvar: (_) {
-          envios++;
-          return resposta.future;
-        });
+        await montarPosicao(
+          tester,
+          aoSalvar: (_) {
+            envios++;
+            return resposta.future;
+          },
+        );
 
         await digitar(tester, 'campo-ticker', 'HGLG11');
         await digitar(tester, 'campo-quantidade', '10');

@@ -5,8 +5,14 @@ import '../../core/auth/auth_service.dart';
 import '../../core/data/cache_local.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/recurso.dart';
+import '../../core/data/envio.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../shared/components/modal_formulario.dart';
 import '../../shared/components/seletor_tema.dart';
+import '../carteiras/carteira_form.dart';
+import '../carteiras/posicao_form.dart';
+import '../geladeira/item_form.dart';
+import '../proventos/provento_form.dart';
 import '../carteiras/carteiras_view.dart';
 import '../carteiras/posicoes_view.dart';
 import '../geladeira/geladeira_view.dart';
@@ -132,6 +138,33 @@ class _InicioScreenState extends State<InicioScreen> {
     super.dispose();
   }
 
+  /// Recarrega o que a operação afetou.
+  ///
+  /// O patrimônio e a projeção são derivados de posição, item e provento:
+  /// sem isso, o usuário cadastraria uma compra e veria o total antigo — e
+  /// concluiria que o app não gravou.
+  Future<void> _recarregarTudo() async {
+    await Future.wait([
+      _patrimonio.carregar(),
+      _carteiras.carregar(),
+      _geladeiras.carregar(),
+      _proventos.carregar(),
+      _projecao.carregar(),
+      if (_itens != null) _itens!.carregar(),
+    ]);
+  }
+
+  /// Executa a operação e, dando certo, fecha o modal e recarrega as telas.
+  ///
+  /// O `Envio` é criado por operação para o erro de uma não aparecer na
+  /// seguinte, e é ele que recusa o segundo toque enquanto o primeiro não
+  /// respondeu.
+  Future<bool> _operar(Envio envio, Future<void> Function() acao) async {
+    final deuCerto = await envio.executar(acao);
+    if (deuCerto) await _recarregarTudo();
+    return deuCerto;
+  }
+
   Future<void> _sair() async {
     // O cache é do usuário autenticado: deixá-lo para trás mostraria a
     // carteira de quem saiu para quem entrar depois no mesmo aparelho.
@@ -154,6 +187,9 @@ class _InicioScreenState extends State<InicioScreen> {
           estado: estado,
           aoRecarregar: _carteiras.carregar,
           aoAbrir: _abrirPosicoes,
+          aoEditar: _editarCarteira,
+          aoExcluir: (carteira) =>
+              _excluir(() => widget.api.excluirCarteira(carteira.id)),
         ),
       ),
       _abaGeladeira(),
@@ -193,6 +229,7 @@ class _InicioScreenState extends State<InicioScreen> {
         ),
       ),
       body: corpos[_aba],
+      floatingActionButton: _botaoDeCriar(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _aba,
         onDestinationSelected: (i) => setState(() => _aba = i),
@@ -214,6 +251,268 @@ class _InicioScreenState extends State<InicioScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------
+  // Operações de escrita (issue #403)
+  // ---------------------------------------------------------------------
+
+  /// Exclusão já confirmada por `AcoesDoItem`: aqui só resta enviar.
+  Future<void> _excluir(Future<void> Function() acao) async {
+    final envio = Envio();
+    final deuCerto = await _operar(envio, acao);
+
+    if (!deuCerto && mounted) _avisar(envio.erro!);
+  }
+
+  void _avisar(String mensagem) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(mensagem)));
+  }
+
+  /// Abre o modal e mantém o formulário aberto e preenchido quando o envio
+  /// falha — refazer tudo no teclado do celular é onde o usuário desiste.
+  Future<void> _abrirFormulario({
+    required String titulo,
+    required Widget Function(
+      BuildContext,
+      Envio,
+      Future<bool> Function(Future<void> Function()),
+    )
+    formulario,
+  }) async {
+    final envio = Envio();
+
+    await ModalFormulario.mostrar<void>(
+      context,
+      titulo: titulo,
+      formulario: (context) => ListenableBuilder(
+        listenable: envio,
+        builder: (context, _) => formulario(context, envio, (acao) async {
+          final deuCerto = await _operar(envio, acao);
+          if (deuCerto && context.mounted) Navigator.of(context).pop();
+          return deuCerto;
+        }),
+      ),
+    );
+  }
+
+  Future<void> _criarCarteira() => _abrirFormulario(
+    titulo: 'Nova carteira',
+    formulario: (context, envio, salvar) => CarteiraForm(
+      erro: envio.erro,
+      aoSalvar: (dados) => salvar(() => widget.api.criarCarteira(dados)),
+    ),
+  );
+
+  Future<void> _editarCarteira(Wallet carteira) => _abrirFormulario(
+    titulo: 'Editar carteira',
+    formulario: (context, envio, salvar) => CarteiraForm(
+      erro: envio.erro,
+      nomeInicial: carteira.name,
+      descricaoInicial: carteira.description,
+      aoSalvar: (dados) => salvar(
+        () => widget.api.atualizarCarteira(
+          carteira.id,
+          UpdateWalletRequest(
+            name: dados.name,
+            currency: dados.currency,
+            description: dados.description,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _criarPosicao(String carteiraId) => _abrirFormulario(
+    titulo: 'Nova posição',
+    formulario: (context, envio, salvar) => PosicaoForm(
+      erro: envio.erro,
+      aoSalvar: (dados) =>
+          salvar(() => widget.api.criarPosicao(carteiraId, dados)),
+    ),
+  );
+
+  Future<void> _editarPosicao(String carteiraId, Position posicao) =>
+      _abrirFormulario(
+        titulo: 'Editar posição',
+        formulario: (context, envio, salvar) => PosicaoForm(
+          erro: envio.erro,
+          posicaoInicial: posicao,
+          aoSalvar: (dados) => salvar(
+            () => widget.api.atualizarPosicao(
+              carteiraId,
+              posicao.id,
+              UpdatePositionRequest(
+                ticker: dados.ticker,
+                assetType: dados.assetType,
+                quantity: dados.quantity,
+                averagePrice: dados.averagePrice,
+              ),
+            ),
+          ),
+        ),
+      );
+
+  /// Move a posição para a geladeira, pedindo o preço-alvo.
+  ///
+  /// O alvo é obrigatório porque é ele que arma o alerta: sem alvo, o item
+  /// ficaria na geladeira sem nunca avisar nada.
+  Future<void> _moverParaGeladeira(String carteiraId, Position posicao) async {
+    final geladeira = _geladeiras.estado.dados?.firstOrNull;
+    if (geladeira == null) {
+      _avisar('Crie uma geladeira antes de mover uma posição para ela.');
+      return;
+    }
+
+    await _abrirFormulario(
+      titulo: 'Mover ${posicao.ticker} para a geladeira',
+      formulario: (context, envio, salvar) => ItemForm(
+        erro: envio.erro,
+        itemInicial: FridgeItem(
+          id: '',
+          fridgeId: geladeira.id,
+          ticker: posicao.ticker,
+          quantity: posicao.quantity,
+          transferredPrice: posicao.currentPrice ?? posicao.averagePrice,
+          targetPrice: posicao.targetPrice ?? posicao.averagePrice,
+          createdAt: '',
+          updatedAt: '',
+        ),
+        aoSalvar: (dados) => salvar(
+          () => widget.api.moverParaGeladeira(
+            carteiraId,
+            posicao.id,
+            MoveToFridgeRequest(
+              fridgeId: geladeira.id,
+              targetPrice: dados.targetPrice,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _criarItem() async {
+    final geladeira = _geladeiras.estado.dados?.firstOrNull;
+    if (geladeira == null) {
+      _avisar('Crie uma geladeira antes de adicionar um ativo.');
+      return;
+    }
+
+    await _abrirFormulario(
+      titulo: 'Novo ativo na geladeira',
+      formulario: (context, envio, salvar) => ItemForm(
+        erro: envio.erro,
+        aoSalvar: (dados) =>
+            salvar(() => widget.api.criarItemDaGeladeira(geladeira.id, dados)),
+      ),
+    );
+  }
+
+  Future<void> _editarItem(FridgeItem item) => _abrirFormulario(
+    titulo: 'Editar ativo',
+    formulario: (context, envio, salvar) => ItemForm(
+      erro: envio.erro,
+      itemInicial: item,
+      aoSalvar: (dados) => salvar(
+        () => widget.api.atualizarItemDaGeladeira(
+          item.fridgeId,
+          item.id,
+          UpdateFridgeItemRequest(
+            ticker: dados.ticker,
+            quantity: dados.quantity,
+            transferredPrice: dados.transferredPrice,
+            targetPrice: dados.targetPrice,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  /// Retira o item da geladeira, devolvendo-o à carteira escolhida.
+  Future<void> _retirarDaGeladeira(FridgeItem item) async {
+    final carteiras = _carteiras.estado.dados ?? const <Wallet>[];
+    if (carteiras.isEmpty) {
+      _avisar('Crie uma carteira antes de retirar um ativo da geladeira.');
+      return;
+    }
+
+    final destino = carteiras.length == 1
+        ? carteiras.single
+        : await showModalBottomSheet<Wallet>(
+            context: context,
+            useSafeArea: true,
+            builder: (context) => SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  const ListTile(title: Text('Devolver para qual carteira?')),
+                  for (final carteira in carteiras)
+                    ListTile(
+                      title: Text(carteira.name),
+                      onTap: () => Navigator.of(context).pop(carteira),
+                    ),
+                ],
+              ),
+            ),
+          );
+
+    if (destino == null) return;
+
+    final envio = Envio();
+    final deuCerto = await _operar(
+      envio,
+      () => widget.api.retirarDaGeladeira(
+        item.fridgeId,
+        item.id,
+        UnfreezeItemRequest(walletId: destino.id),
+      ),
+    );
+
+    if (!deuCerto && mounted) _avisar(envio.erro!);
+  }
+
+  Future<void> _criarProvento() => _abrirFormulario(
+    titulo: 'Novo provento',
+    formulario: (context, envio, salvar) => ProventoForm(
+      erro: envio.erro,
+      aoSalvar: (dados) => salvar(() => widget.api.criarProvento(dados)),
+    ),
+  );
+
+  Future<void> _editarProvento(DividendResponse provento) => _abrirFormulario(
+    titulo: 'Editar provento',
+    formulario: (context, envio, salvar) => ProventoForm(
+      erro: envio.erro,
+      proventoInicial: provento,
+      aoSalvar: (dados) =>
+          salvar(() => widget.api.atualizarProvento(provento.id, dados)),
+    ),
+  );
+
+  /// O botão de criar muda com a aba: o que o usuário quer cadastrar é o que
+  /// ele está olhando.
+  Widget? _botaoDeCriar() => switch (_aba) {
+    1 => FloatingActionButton(
+      key: const Key('criar-carteira'),
+      onPressed: _criarCarteira,
+      tooltip: 'Nova carteira',
+      child: const Icon(Icons.add),
+    ),
+    2 => FloatingActionButton(
+      key: const Key('criar-item'),
+      onPressed: _criarItem,
+      tooltip: 'Novo ativo na geladeira',
+      child: const Icon(Icons.add),
+    ),
+    3 => FloatingActionButton(
+      key: const Key('criar-provento'),
+      onPressed: _criarProvento,
+      tooltip: 'Novo provento',
+      child: const Icon(Icons.add),
+    ),
+    _ => null,
+  };
 
   void _abrirPosicoes(Wallet carteira) {
     final posicoes = Recurso<List<Position>>(
@@ -237,7 +536,30 @@ class _InicioScreenState extends State<InicioScreen> {
                 (estado) => PosicoesView(
                   estado: estado,
                   aoRecarregar: posicoes.carregar,
+                  aoEditar: (posicao) async {
+                    await _editarPosicao(carteira.id, posicao);
+                    await posicoes.carregar();
+                  },
+                  aoExcluir: (posicao) async {
+                    await _excluir(
+                      () => widget.api.excluirPosicao(carteira.id, posicao.id),
+                    );
+                    await posicoes.carregar();
+                  },
+                  aoMoverParaGeladeira: (posicao) async {
+                    await _moverParaGeladeira(carteira.id, posicao);
+                    await posicoes.carregar();
+                  },
                 ),
+              ),
+              floatingActionButton: FloatingActionButton(
+                key: const Key('criar-posicao'),
+                onPressed: () async {
+                  await _criarPosicao(carteira.id);
+                  await posicoes.carregar();
+                },
+                tooltip: 'Nova posição',
+                child: const Icon(Icons.add),
               ),
             ),
           ),
@@ -266,7 +588,15 @@ class _InicioScreenState extends State<InicioScreen> {
 
     return _Observando(
       itens,
-      (estado) => GeladeiraView(estado: estado, aoRecarregar: itens.carregar),
+      (estado) => GeladeiraView(
+        estado: estado,
+        aoRecarregar: itens.carregar,
+        aoEditar: _editarItem,
+        aoExcluir: (item) => _excluir(
+          () => widget.api.excluirItemDaGeladeira(item.fridgeId, item.id),
+        ),
+        aoRetirar: _retirarDaGeladeira,
+      ),
     );
   }
 
@@ -288,6 +618,9 @@ class _InicioScreenState extends State<InicioScreen> {
                 (estado) => ProventosView(
                   estado: estado,
                   aoRecarregar: _proventos.carregar,
+                  aoEditar: _editarProvento,
+                  aoExcluir: (provento) =>
+                      _excluir(() => widget.api.excluirProvento(provento.id)),
                 ),
               ),
               _Observando(

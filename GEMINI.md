@@ -211,6 +211,32 @@ Regras:
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Operações de escrita do app (`apps/mobile`)
+
+- **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de
+  novo quando a resposta demora é o comportamento normal do usuário, e o
+  resultado seria posição duplicada — erro de dado financeiro, não incômodo de
+  interface. A proteção está em dois lugares: o mixin `EnvioDeFormulario`
+  descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
+- **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
+  o que foi digitado permanece. Refazer o preenchimento no teclado do celular
+  é onde o usuário desiste.
+- Validação **antes** do envio, com mensagens em pt-BR; valor monetário aceita
+  vírgula decimal e o ticker é normalizado para maiúsculas — exigir isso do
+  usuário no teclado do celular é pedir erro de digitação.
+- **Exclusão sempre passa por `ConfirmarDialog`** (via `AcoesDoItem`), nunca
+  por diálogo nativo do sistema.
+- Depois de uma operação bem-sucedida, as telas afetadas recarregam sozinhas.
+  Patrimônio e projeção derivam de posição, item e provento: sem a recarga, o
+  usuário cadastraria uma compra, veria o total antigo e concluiria que o app
+  não gravou.
+- Remover o preço-alvo de uma posição exige `targetPrice: null` **explícito**
+  (`atualizarPosicao(..., removerPrecoAlvo: true)`): `toJson` omite o opcional
+  não enviado, e omitir o campo manteria o alvo gravado — são pedidos
+  diferentes.
+- Formulário abre em folha de baixo (`ModalFormulario`), não em diálogo
+  centralizado: com o teclado aberto, o diálogo some atrás dele.
+
 ### Telas de consulta do app (`apps/mobile`)
 
 - As telas consomem a API por `DinDinApi`, que devolve os **modelos gerados**

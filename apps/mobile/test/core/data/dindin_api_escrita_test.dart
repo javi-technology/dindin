@@ -172,10 +172,7 @@ void main() {
         removerPrecoAlvo: true,
       );
 
-      expect(
-        (enviadas.single.$3 as Map).containsKey('targetPrice'),
-        isTrue,
-      );
+      expect((enviadas.single.$3 as Map).containsKey('targetPrice'), isTrue);
       expect((enviadas.single.$3 as Map)['targetPrice'], isNull);
     });
 

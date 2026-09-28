@@ -4,6 +4,7 @@ import '../../contracts/contracts.g.dart';
 import '../../core/data/recurso.dart';
 import '../../core/format/moeda.dart';
 import '../../core/theme/dindin_tokens.dart';
+import '../../shared/components/acoes_do_item.dart';
 import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_vazio.dart';
 import '../../shared/components/valor_ausente.dart';
@@ -18,10 +19,18 @@ class GeladeiraView extends StatelessWidget {
     super.key,
     required this.estado,
     required this.aoRecarregar,
+    this.aoEditar,
+    this.aoExcluir,
+    this.aoRetirar,
   });
 
   final EstadoDoRecurso<List<FridgeItem>> estado;
   final VoidCallback aoRecarregar;
+
+  /// Ausentes quando a tela é só de consulta; a linha então não mostra menu.
+  final ValueChanged<FridgeItem>? aoEditar;
+  final Future<void> Function(FridgeItem)? aoExcluir;
+  final ValueChanged<FridgeItem>? aoRetirar;
 
   @override
   Widget build(BuildContext context) {
@@ -39,16 +48,29 @@ class GeladeiraView extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: itens.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => _LinhaDoItem(item: itens[i]),
+        itemBuilder: (context, i) => _LinhaDoItem(
+          item: itens[i],
+          aoEditar: aoEditar,
+          aoExcluir: aoExcluir,
+          aoRetirar: aoRetirar,
+        ),
       ),
     );
   }
 }
 
 class _LinhaDoItem extends StatelessWidget {
-  const _LinhaDoItem({required this.item});
+  const _LinhaDoItem({
+    required this.item,
+    this.aoEditar,
+    this.aoExcluir,
+    this.aoRetirar,
+  });
 
   final FridgeItem item;
+  final ValueChanged<FridgeItem>? aoEditar;
+  final Future<void> Function(FridgeItem)? aoExcluir;
+  final ValueChanged<FridgeItem>? aoRetirar;
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +136,22 @@ class _LinhaDoItem extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+              if (aoRetirar != null)
+                IconButton(
+                  key: Key('retirar-${item.ticker}'),
+                  onPressed: () => aoRetirar!(item),
+                  icon: const Icon(Icons.unarchive_outlined, size: 20),
+                  tooltip: 'Retirar da geladeira',
+                ),
+              if (aoEditar != null || aoExcluir != null)
+                AcoesDoItem(
+                  aoEditar: aoEditar == null ? null : () => aoEditar!(item),
+                  aoExcluir: aoExcluir == null ? null : () => aoExcluir!(item),
+                  tituloDaExclusao: 'Excluir item',
+                  mensagemDaExclusao:
+                      '${item.ticker} sairá da geladeira e o alerta de '
+                      'preço-alvo deixará de valer.',
                 ),
             ],
           ),

@@ -5,6 +5,7 @@ import '../../core/data/recurso.dart';
 import '../../core/format/data.dart';
 import '../../core/format/moeda.dart';
 import '../../core/theme/dindin_tokens.dart';
+import '../../shared/components/acoes_do_item.dart';
 import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_vazio.dart';
 import '../../shared/components/visao_recurso.dart';
@@ -15,10 +16,16 @@ class ProventosView extends StatelessWidget {
     super.key,
     required this.estado,
     required this.aoRecarregar,
+    this.aoEditar,
+    this.aoExcluir,
   });
 
   final EstadoDoRecurso<List<DividendResponse>> estado;
   final VoidCallback aoRecarregar;
+
+  /// Ausentes quando a tela é só de consulta; a linha então não mostra menu.
+  final ValueChanged<DividendResponse>? aoEditar;
+  final Future<void> Function(DividendResponse)? aoExcluir;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +76,19 @@ class ProventosView extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (aoEditar != null || aoExcluir != null)
+                  AcoesDoItem(
+                    aoEditar: aoEditar == null
+                        ? null
+                        : () => aoEditar!(provento),
+                    aoExcluir: aoExcluir == null
+                        ? null
+                        : () => aoExcluir!(provento),
+                    tituloDaExclusao: 'Excluir provento',
+                    mensagemDaExclusao:
+                        'O provento de ${provento.ticker} será removido do '
+                        'histórico. Esta ação não pode ser desfeita.',
+                  ),
               ],
             ),
           );

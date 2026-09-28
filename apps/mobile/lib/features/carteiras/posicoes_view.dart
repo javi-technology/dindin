@@ -4,6 +4,7 @@ import '../../contracts/contracts.g.dart';
 import '../../core/data/recurso.dart';
 import '../../core/format/moeda.dart';
 import '../../core/theme/dindin_tokens.dart';
+import '../../shared/components/acoes_do_item.dart';
 import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_vazio.dart';
 import '../../shared/components/valor_ausente.dart';
@@ -15,10 +16,18 @@ class PosicoesView extends StatelessWidget {
     super.key,
     required this.estado,
     required this.aoRecarregar,
+    this.aoEditar,
+    this.aoExcluir,
+    this.aoMoverParaGeladeira,
   });
 
   final EstadoDoRecurso<List<Position>> estado;
   final VoidCallback aoRecarregar;
+
+  /// Ausentes quando a tela é só de consulta; a linha então não mostra menu.
+  final ValueChanged<Position>? aoEditar;
+  final Future<void> Function(Position)? aoExcluir;
+  final ValueChanged<Position>? aoMoverParaGeladeira;
 
   @override
   Widget build(BuildContext context) {
@@ -35,16 +44,29 @@ class PosicoesView extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: posicoes.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => _LinhaDaPosicao(posicao: posicoes[i]),
+        itemBuilder: (context, i) => _LinhaDaPosicao(
+          posicao: posicoes[i],
+          aoEditar: aoEditar,
+          aoExcluir: aoExcluir,
+          aoMoverParaGeladeira: aoMoverParaGeladeira,
+        ),
       ),
     );
   }
 }
 
 class _LinhaDaPosicao extends StatelessWidget {
-  const _LinhaDaPosicao({required this.posicao});
+  const _LinhaDaPosicao({
+    required this.posicao,
+    this.aoEditar,
+    this.aoExcluir,
+    this.aoMoverParaGeladeira,
+  });
 
   final Position posicao;
+  final ValueChanged<Position>? aoEditar;
+  final Future<void> Function(Position)? aoExcluir;
+  final ValueChanged<Position>? aoMoverParaGeladeira;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +117,24 @@ class _LinhaDaPosicao extends StatelessWidget {
                 ),
               ),
               if (preco != null) _Variacao(posicao: posicao, preco: preco),
+              if (aoMoverParaGeladeira != null)
+                IconButton(
+                  key: Key('mover-${posicao.ticker}'),
+                  onPressed: () => aoMoverParaGeladeira!(posicao),
+                  icon: const Icon(Icons.ac_unit, size: 20),
+                  tooltip: 'Mover para a geladeira',
+                ),
+              if (aoEditar != null || aoExcluir != null)
+                AcoesDoItem(
+                  aoEditar: aoEditar == null ? null : () => aoEditar!(posicao),
+                  aoExcluir: aoExcluir == null
+                      ? null
+                      : () => aoExcluir!(posicao),
+                  tituloDaExclusao: 'Excluir posição',
+                  mensagemDaExclusao:
+                      'A posição em ${posicao.ticker} será removida da '
+                      'carteira. Esta ação não pode ser desfeita.',
+                ),
             ],
           ),
         ],
