@@ -211,6 +211,24 @@ class DinDinApi {
         as Map<String, dynamic>,
   );
 
+  // -------------------------------------------------------------------------
+  // Notificações push (issue #408)
+  // -------------------------------------------------------------------------
+
+  /// Registra o token deste aparelho.
+  ///
+  /// O app chama isso a cada abertura com permissão concedida; o backend
+  /// atualiza o registro existente em vez de duplicar o aparelho.
+  Future<void> registrarTokenDeNotificacao(String token, String plataforma) =>
+      _client.post(
+        '/api/me/notification-tokens',
+        body: {'token': token, 'platform': plataforma},
+      );
+
+  /// Remove o token — é como o usuário desliga o push dentro do app.
+  Future<void> removerTokenDeNotificacao(String token) =>
+      _client.delete('/api/me/notification-tokens/$token');
+
   static List<T> _lista<T>(
     dynamic corpo,
     T Function(Map<String, dynamic>) converter,

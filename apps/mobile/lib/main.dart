@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -8,6 +9,8 @@ import 'core/auth/auth_service.dart';
 import 'core/auth/firebase_auth_backend.dart';
 import 'core/data/cache_local.dart';
 import 'core/data/dindin_api.dart';
+import 'core/notificacoes/firebase_notificacoes_backend.dart';
+import 'core/notificacoes/notificacoes_service.dart';
 import 'core/theme/theme_controller.dart';
 
 Future<void> main() async {
@@ -28,5 +31,25 @@ Future<void> main() async {
   final auth = AuthService(FirebaseAuthBackend());
   final api = DinDinApi(ApiClient(baseUrl: apiBaseUrl, tokenProvider: auth));
 
-  runApp(DinDinApp(auth: auth, tema: tema, api: api, cache: cache));
+  final notificacoes = await NotificacoesService.carregar(
+    backend: FirebaseNotificacoesBackend(),
+    registrarToken: api.registrarTokenDeNotificacao,
+    removerToken: api.removerTokenDeNotificacao,
+  );
+
+  // O app pode ter subido por um toque na notificação: nesse caso ele abre
+  // direto na geladeira do alerta, e não na tela inicial — o usuário tocou
+  // por causa de um ativo específico.
+  final inicial = await FirebaseMessaging.instance.getInitialMessage();
+
+  runApp(
+    DinDinApp(
+      auth: auth,
+      tema: tema,
+      api: api,
+      cache: cache,
+      notificacoes: notificacoes,
+      geladeiraInicial: inicial?.data['fridgeId'] as String?,
+    ),
+  );
 }

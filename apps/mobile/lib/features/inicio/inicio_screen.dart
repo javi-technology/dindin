@@ -6,6 +6,7 @@ import '../../core/data/cache_local.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/recurso.dart';
 import '../../core/data/envio.dart';
+import '../../core/notificacoes/notificacoes_service.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../shared/components/modal_formulario.dart';
 import '../../shared/components/seletor_tema.dart';
@@ -13,7 +14,9 @@ import '../carteiras/carteira_form.dart';
 import '../carteiras/posicao_form.dart';
 import '../geladeira/item_form.dart';
 import '../proventos/provento_form.dart';
+import '../geladeira/convite_de_notificacao.dart';
 import '../simulacao/simulacao_screen.dart';
+import 'ajustes_de_notificacao.dart';
 import '../carteiras/carteiras_view.dart';
 import '../carteiras/posicoes_view.dart';
 import '../geladeira/geladeira_view.dart';
@@ -32,12 +35,19 @@ class InicioScreen extends StatefulWidget {
     required this.api,
     required this.cache,
     required this.tema,
+    required this.notificacoes,
+    this.geladeiraInicial,
   });
 
   final AuthService auth;
   final DinDinApi api;
   final CacheLocal cache;
   final ThemeController tema;
+  final NotificacoesService notificacoes;
+
+  /// Geladeira a abrir na entrada, quando o app subiu por um toque na
+  /// notificação de preço-alvo (issue #408).
+  final String? geladeiraInicial;
 
   @override
   State<InicioScreen> createState() => _InicioScreenState();
@@ -99,6 +109,11 @@ class _InicioScreenState extends State<InicioScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Tocar na notificação abre a geladeira correspondente, e não a tela
+    // inicial: o usuário tocou por causa de um ativo específico.
+    if (widget.geladeiraInicial != null) _aba = 2;
+
     _patrimonio.carregar();
     _carteiras.carregar();
     _geladeiras.addListener(_abrirPrimeiraGeladeira);
@@ -238,6 +253,8 @@ class _InicioScreenState extends State<InicioScreen> {
                 const Text('Tema'),
                 const SizedBox(height: 8),
                 SeletorTema(controller: widget.tema),
+                const SizedBox(height: 24),
+                AjustesDeNotificacao(notificacoes: widget.notificacoes),
               ],
             ),
           ),
@@ -605,6 +622,18 @@ class _InicioScreenState extends State<InicioScreen> {
       );
     }
 
+    return Column(
+      children: [
+        // O convite fica na geladeira, que é onde o alerta acontece: pedir a
+        // permissão na primeira abertura, sem contexto, é o jeito mais rápido
+        // de receber um "não" definitivo.
+        ConviteDeNotificacao(notificacoes: widget.notificacoes),
+        Expanded(child: _listaDaGeladeira(itens)),
+      ],
+    );
+  }
+
+  Widget _listaDaGeladeira(Recurso<List<FridgeItem>> itens) {
     return _Observando(
       itens,
       (estado) => GeladeiraView(

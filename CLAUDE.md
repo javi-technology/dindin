@@ -211,6 +211,36 @@ Regras:
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Notificação push do alerta de preço-alvo (issue #408)
+
+- O alerta tem **dois canais**, push e e-mail, e o estado de envio é gravado
+  **por canal** (`notifiedPushAt` e `notifiedEmailAt`). Com um campo único, o
+  push que falhasse depois de o e-mail ter ido provocaria reenvio do e-mail, e
+  o e-mail que falhasse depois do push marcaria o alerta como avisado sem ele
+  ter saído. `notifiedAt` continua sendo **lido** para os alertas gravados
+  antes disso — ignorá-lo faria o primeiro job após o deploy reenviar tudo.
+- **Quem não tem token válido ou negou a permissão continua recebendo o
+  e-mail.** Negar é estado normal, não erro.
+- **Token inválido é descartado** (`registration-token-not-registered`,
+  `invalid-registration-token`, `invalid-argument`): o token muda quando o
+  usuário reinstala o app, troca de aparelho ou limpa os dados, e sem
+  descartá-lo o job acumula falhas para sempre. Falha temporária **não**
+  descarta, ou o push sumiria para quem pegou o FCM fora do ar.
+- **O texto da notificação não expõe valores da carteira**: ela aparece na
+  tela bloqueada, e o ativo e o fato bastam. O `fridgeId` vai nos dados, para
+  o toque abrir a geladeira correspondente e não a tela inicial.
+- Os tokens ficam em `users/{uid}/deviceTokens/{token}`, com o **token como id
+  do documento**: o app o registra a cada abertura, e com id gerado cada
+  registro viraria uma duplicata do mesmo aparelho. Um usuário pode ter
+  vários. A coleção é fechada nas regras: o app registra pela API, que valida
+  a plataforma.
+- No app, a permissão é pedida **na geladeira**, onde o alerta acontece, com
+  explicação — pedir na primeira abertura, sem contexto, é o jeito mais rápido
+  de receber um "não" definitivo, porque as plataformas só perguntam uma vez.
+- O usuário **desliga o push dentro do app**, sem ir às configurações do
+  sistema; de lá ele desligaria e provavelmente não voltaria.
+- Log estruturado por canal, **sem o token e sem dados da carteira**.
+
 ### Carteira sugerida e simulação no app (`apps/mobile`)
 
 - A **simulação geral por carteira sugerida é gratuita**; a simulação por

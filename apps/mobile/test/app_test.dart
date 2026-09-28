@@ -6,10 +6,12 @@ import 'package:dindin_mobile/core/auth/auth_service.dart';
 import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
+import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
 import 'package:dindin_mobile/core/theme/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/auth/auth_backend_falso.dart';
+import 'core/notificacoes/notificacoes_backend_falso.dart';
 
 // Esqueleto do app (issue #398): as telas chegam nas issues seguintes. O que
 // se garante aqui é que o app sobe, é um MaterialApp em português do Brasil e
@@ -29,6 +31,11 @@ void main() {
           ),
         ),
         cache: await CacheLocal.abrir(),
+        notificacoes: await NotificacoesService.carregar(
+          backend: NotificacoesBackendFalso(),
+          registrarToken: (_, _) async {},
+          removerToken: (_) async {},
+        ),
       ),
     );
 
@@ -49,6 +56,11 @@ void main() {
           ),
         ),
         cache: await CacheLocal.abrir(),
+        notificacoes: await NotificacoesService.carregar(
+          backend: NotificacoesBackendFalso(),
+          registrarToken: (_, _) async {},
+          removerToken: (_) async {},
+        ),
       ),
     );
 
@@ -69,6 +81,11 @@ void main() {
           ),
         ),
         cache: await CacheLocal.abrir(),
+        notificacoes: await NotificacoesService.carregar(
+          backend: NotificacoesBackendFalso(),
+          registrarToken: (_, _) async {},
+          removerToken: (_) async {},
+        ),
       ),
     );
 

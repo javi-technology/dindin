@@ -1,10 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dindin_mobile/core/notificacoes/notificacoes_backend.dart';
 import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
+
+import 'notificacoes_backend_falso.dart';
 
 // ---------------------------------------------------------------------------
 // Notificações push no app (issue #408).
@@ -13,48 +13,6 @@ import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
 // alerta acontece —, e não na primeira abertura sem contexto. Negar é estado
 // **normal**, não erro: nesse caso o e-mail continua sendo o canal.
 // ---------------------------------------------------------------------------
-
-class _BackendFalso implements NotificacoesBackend {
-  _BackendFalso({
-    this.permissao = PermissaoDeNotificacao.naoPerguntada,
-    this.tokenDoAparelho = 'token-1',
-  });
-
-  PermissaoDeNotificacao permissao;
-  String? tokenDoAparelho;
-
-  int pedidos = 0;
-  final List<String> registrados = [];
-  final List<String> removidos = [];
-  final _renovacoes = StreamController<String>.broadcast();
-
-  @override
-  Future<PermissaoDeNotificacao> permissaoAtual() async => permissao;
-
-  @override
-  Future<PermissaoDeNotificacao> pedirPermissao() async {
-    pedidos++;
-    return permissao;
-  }
-
-  @override
-  Future<String?> token() async => tokenDoAparelho;
-
-  @override
-  Stream<String> get tokensRenovados => _renovacoes.stream;
-
-  void renovar(String token) => _renovacoes.add(token);
-
-  @override
-  String get plataforma => 'android';
-
-  @override
-  Future<void> apagarToken() async {
-    tokenDoAparelho = null;
-  }
-
-  Future<void> fechar() => _renovacoes.close();
-}
 
 class _ApiFalsa {
   final List<(String, String)> registrados = [];
@@ -73,12 +31,12 @@ class _ApiFalsa {
 }
 
 void main() {
-  late _BackendFalso backend;
+  late NotificacoesBackendFalso backend;
   late _ApiFalsa api;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    backend = _BackendFalso();
+    backend = NotificacoesBackendFalso();
     api = _ApiFalsa();
   });
 

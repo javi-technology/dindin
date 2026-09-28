@@ -4,6 +4,7 @@ import 'core/auth/auth_gate.dart';
 import 'core/auth/auth_service.dart';
 import 'core/data/cache_local.dart';
 import 'core/data/dindin_api.dart';
+import 'core/notificacoes/notificacoes_service.dart';
 import 'core/theme/dindin_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/login_screen.dart';
@@ -17,12 +18,19 @@ class DinDinApp extends StatelessWidget {
     required this.tema,
     required this.api,
     required this.cache,
+    required this.notificacoes,
+    this.geladeiraInicial,
   });
 
   final AuthService auth;
   final ThemeController tema;
   final DinDinApi api;
   final CacheLocal cache;
+  final NotificacoesService notificacoes;
+
+  /// Geladeira a abrir na entrada, quando o app subiu por um toque na
+  /// notificação de preço-alvo (issue #408).
+  final String? geladeiraInicial;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +60,8 @@ class DinDinApp extends StatelessWidget {
             api: api,
             cache: cache,
             tema: tema,
+            notificacoes: notificacoes,
+            geladeiraInicial: geladeiraInicial,
           ),
         ),
       ),
