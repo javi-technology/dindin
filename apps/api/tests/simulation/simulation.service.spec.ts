@@ -1,5 +1,6 @@
 const getRecommendedWalletMock = jest.fn();
 const listRecommendedWalletsMock = jest.fn();
+const assetExistsMock = jest.fn();
 const getQuotesByTickerMock = jest.fn();
 
 jest.mock('firebase-admin/app', () => ({ initializeApp: jest.fn() }));
@@ -16,12 +17,17 @@ jest.mock('../../src/recommended-wallet/recommended-wallet.service', () => ({
     listRecommendedWalletsMock(...args),
 }));
 
+jest.mock('../../src/assets/asset.service', () => ({
+  assetExists: (...args: unknown[]) => assetExistsMock(...args),
+}));
+
 jest.mock('../../src/quotes/quote-prices', () => ({
   getQuotesByTicker: (...args: unknown[]) => getQuotesByTickerMock(...args),
 }));
 
 import {
   listSimulationProviders,
+  simulateAsset,
   simulateRecommendedWallet,
 } from '../../src/simulation/simulation.service';
 
@@ -42,6 +48,7 @@ describe('simulation.service', () => {
     jest.clearAllMocks();
     getRecommendedWalletMock.mockResolvedValue(wallet);
     listRecommendedWalletsMock.mockResolvedValue([wallet]);
+    assetExistsMock.mockResolvedValue(true);
     getQuotesByTickerMock.mockResolvedValue(
       new Map([
         [
@@ -169,5 +176,80 @@ describe('simulation.service', () => {
         months: ['2026-09'],
       }),
     ]);
+  });
+});
+
+describe('simulation.service — por ativo', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    assetExistsMock.mockResolvedValue(true);
+    getQuotesByTickerMock.mockResolvedValue(
+      new Map([
+        [
+          'AAAA11',
+          {
+            price: 10,
+            monthlyDividend: 0.1,
+            dividendPaymentDate: '2026-09-15',
+          },
+        ],
+      ]),
+    );
+  });
+
+  it('deve simular o valor inteiro em um único ativo', async () => {
+    const result = await simulateAsset({
+      ticker: 'AAAA11',
+      amount: 1000,
+      months: 1,
+      mode: 'withdraw',
+    });
+
+    expect(assetExistsMock).toHaveBeenCalledWith('AAAA11');
+    expect(result.ticker).toBe('AAAA11');
+    expect(result.byTicker).toHaveLength(1);
+    expect(result.byTicker[0].quantity).toBe(100);
+    expect(result.monthlyIncome).toBe(10);
+  });
+
+  it('deve informar o troco do ativo', async () => {
+    const result = await simulateAsset({
+      ticker: 'AAAA11',
+      amount: 105,
+      months: 1,
+      mode: 'withdraw',
+    });
+
+    expect(result.byTicker[0].quantity).toBe(10);
+    expect(result.unallocatedAmount).toBe(5);
+  });
+
+  it('deve recusar ticker fora do catálogo', async () => {
+    assetExistsMock.mockResolvedValue(false);
+
+    await expect(
+      simulateAsset({
+        ticker: 'XXXX99',
+        amount: 100,
+        months: 1,
+        mode: 'withdraw',
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      message: 'Ativo não encontrado no catálogo',
+    });
+  });
+
+  it('deve recusar ativo sem cotação para simular', async () => {
+    getQuotesByTickerMock.mockResolvedValue(new Map());
+
+    await expect(
+      simulateAsset({
+        ticker: 'AAAA11',
+        amount: 100,
+        months: 1,
+        mode: 'withdraw',
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 });

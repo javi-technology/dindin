@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import type { WalletSimulationResponse } from 'dindin-shared-types';
+import { signal } from '@angular/core';
+import { BillingService } from '../../core/services/billing.service';
 import { SimulationService } from '../../core/services/simulation.service';
 import { SimulationComponent } from './simulation.component';
 
@@ -56,7 +58,14 @@ describe('SimulationComponent', () => {
   let component: SimulationComponent;
   let element: HTMLElement;
   let simulateWallet: ReturnType<typeof vi.fn>;
+  let simulateAsset: ReturnType<typeof vi.fn>;
   let listWallets: ReturnType<typeof vi.fn>;
+  let billingServiceMock: {
+    loadMe: ReturnType<typeof vi.fn>;
+    loaded: ReturnType<typeof signal<boolean>>;
+    hasProjections: ReturnType<typeof signal<boolean>>;
+    subscriptionRequired: ReturnType<typeof signal<boolean>>;
+  };
 
   function setInput(testId: string, value: string): void {
     const input = element.querySelector(
@@ -86,6 +95,15 @@ describe('SimulationComponent', () => {
   beforeEach(async () => {
     listWallets = vi.fn().mockReturnValue(of(wallets));
     simulateWallet = vi.fn().mockReturnValue(of(result));
+    simulateAsset = vi
+      .fn()
+      .mockReturnValue(of({ ...result, ticker: 'MXRF11' }));
+    billingServiceMock = {
+      loadMe: vi.fn().mockReturnValue(of({})),
+      loaded: signal(true),
+      hasProjections: signal(true),
+      subscriptionRequired: signal(false),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SimulationComponent],
@@ -278,6 +296,47 @@ describe('SimulationComponent', () => {
     expect(
       element.querySelector('[data-testid="simulation-error"]')?.textContent,
     ).toContain('Valor a investir é obrigatório');
+  });
+
+  it('deve liberar a simulação por ativo para quem assina', () => {
+    expect(
+      element.querySelector('[data-testid="asset-ticker-input"]'),
+    ).not.toBeNull();
+    expect(element.querySelector('[data-testid="asset-paywall"]')).toBeNull();
+  });
+
+  it('deve bloquear a simulação por ativo para quem não assina', () => {
+    billingServiceMock.hasProjections.set(false);
+    fixture.detectChanges();
+
+    expect(
+      element.querySelector('[data-testid="asset-paywall"]'),
+    ).not.toBeNull();
+    expect(
+      element.querySelector('[data-testid="asset-ticker-input"]'),
+    ).toBeNull();
+    // A simulação geral segue liberada: o bloqueio é só do recurso pago.
+    expect(
+      element.querySelector('[data-testid="simulate-button"]'),
+    ).not.toBeNull();
+  });
+
+  it('deve simular o ativo pedido pelo componente filho', () => {
+    setInput('asset-ticker-input', 'mxrf11');
+    setInput('asset-amount-input', '1000');
+    (
+      element.querySelector(
+        '[data-testid="asset-simulate-button"]',
+      ) as HTMLElement
+    ).click();
+    fixture.detectChanges();
+
+    expect(simulateAsset).toHaveBeenCalledWith({
+      ticker: 'MXRF11',
+      amount: '1000',
+      months: 1,
+      mode: 'withdraw',
+    });
   });
 
   it('deve avisar quando não há carteira sugerida disponível', () => {
