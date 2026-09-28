@@ -38,6 +38,10 @@ function seed(existentes: Record<string, unknown> = {}) {
   const apagados: string[] = [];
 
   const doc = jest.fn((id: string) => ({
+    get: jest.fn(async () => ({
+      exists: id in gravados,
+      data: () => gravados[id],
+    })),
     set: jest.fn(async (dados: unknown, opcoes?: unknown) => {
       gravados[id] =
         opcoes && (opcoes as { merge?: boolean }).merge

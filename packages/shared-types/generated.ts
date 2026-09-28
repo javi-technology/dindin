@@ -13,6 +13,7 @@ import type {
   AiSuggestionTab,
   Asset,
   AssetType,
+  DevicePlatform,
   Fridge,
   FridgeItem,
   PatrimonySnapshot,
@@ -36,6 +37,7 @@ export type {
   AiSuggestionTab,
   Asset,
   AssetType,
+  DevicePlatform,
   Fridge,
   FridgeItem,
   PatrimonySnapshot,
@@ -135,6 +137,15 @@ export type DefaultResource = 'wallet' | 'fridge';
 /** Corpo opcional: pedido explícito pelo fallback. */
 export interface SetupRequest {
   resource?: DefaultResource;
+}
+
+/**
+ * Token de notificação do aparelho (issue #408). O app o registra a cada
+ * abertura; o backend atualiza o existente em vez de duplicar.
+ */
+export interface RegisterDeviceTokenRequest {
+  token: string;
+  platform: DevicePlatform;
 }
 
 export interface SetupResponse {

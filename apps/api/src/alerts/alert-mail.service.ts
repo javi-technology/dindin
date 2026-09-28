@@ -11,7 +11,7 @@ import { logError, logWarn } from '../shared/logger';
  * significaria migrar este envio de novo antes dessa data.
  *
  * O job não trata falha de envio como erro fatal: o alerta fica sem
- * `notifiedAt` e a execução do dia seguinte tenta de novo, sem duplicar o
+ * `notifiedEmailAt` e a execução do dia seguinte tenta de novo, sem duplicar o
  * alerta (a dedup vive em `target-price.service.ts`).
  */
 
@@ -166,7 +166,12 @@ export async function sendAlertEmails(
   alerts: Alert[],
   now = new Date(),
 ): Promise<number> {
-  const pending = alerts.filter((alert) => !alert.notifiedAt);
+  // O estado é por canal desde a #408. `notifiedAt` segue sendo lido para os
+  // alertas gravados antes disso: sem ele, o primeiro job depois do deploy
+  // reenviaria e-mail de tudo o que já tinha sido avisado.
+  const pending = alerts.filter(
+    (alert) => !alert.notifiedEmailAt && !alert.notifiedAt,
+  );
   if (pending.length === 0) return 0;
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -185,14 +190,16 @@ export async function sendAlertEmails(
   }
 
   const userAlerts = alertsCollection(userId);
-  const notifiedAt = now.toISOString();
+  const notifiedEmailAt = now.toISOString();
   let sent = 0;
 
   for (const alert of pending) {
     try {
       if (sent > 0) await wait(SEND_INTERVAL_MS);
       await postEmail(alert, email, apiKey);
-      await userAlerts.doc(alert.id).update({ notifiedAt });
+      // Só o campo do e-mail: marcar um campo único faria a falha do push
+      // parecer aviso entregue, e a falha do e-mail apagar o push que saiu.
+      await userAlerts.doc(alert.id).update({ notifiedEmailAt });
       sent += 1;
     } catch (error) {
       // Uma falha de envio não pode impedir o aviso dos demais ativos.

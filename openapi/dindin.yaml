@@ -516,6 +516,22 @@ components:
       properties:
         resource: { $ref: '#/components/schemas/DefaultResource' }
 
+    DevicePlatform:
+      type: string
+      description: Plataformas que recebem notificação push.
+      enum: [android, ios]
+      x-ts-import: dindin-models
+
+    RegisterDeviceTokenRequest:
+      type: object
+      description: |
+        Token de notificação do aparelho (issue #408). O app o registra a cada
+        abertura; o backend atualiza o existente em vez de duplicar.
+      required: [token, platform]
+      properties:
+        token: { type: string }
+        platform: { $ref: '#/components/schemas/DevicePlatform' }
+
     SetupResponse:
       type: object
       required: [walletCreated, fridgeCreated]
@@ -1131,6 +1147,36 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SetupResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/notification-tokens:
+    post:
+      summary: Registra o token de notificação do aparelho
+      operationId: registerNotificationToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceTokenRequest' }
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/notification-tokens/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Remove o token de notificação
+      description: |
+        É como o usuário desliga as notificações push dentro do app, sem
+        depender das configurações do sistema.
+      operationId: removeNotificationToken
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/billing/webhook:

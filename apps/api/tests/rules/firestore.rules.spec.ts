@@ -449,6 +449,43 @@ describe('Firestore rules – alerts', () => {
 });
 
 // ---------------------------------------------------------------------------
+// deviceTokens (issue #408)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – deviceTokens', () => {
+  const tokenPath = 'users/alice/deviceTokens/token-aparelho-1';
+
+  // O app registra o token pela API, não direto no Firestore: um token
+  // gravado pelo cliente não passaria pela validação de plataforma.
+  it('deve negar que o proprietário escreva o próprio token', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+
+    await assertFails(
+      setDoc(doc(alice.firestore(), tokenPath), {
+        token: 'token-aparelho-1',
+        platform: 'android',
+      }),
+    );
+  });
+
+  // Ler o token de um aparelho permitiria enviar notificação em nome do
+  // usuário para quem tivesse a chave do projeto.
+  it('deve negar que o proprietário leia os próprios tokens', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await seed(tokenPath, { token: 'token-aparelho-1', platform: 'android' });
+
+    await assertFails(getDoc(doc(alice.firestore(), tokenPath)));
+  });
+
+  it('deve negar que outro usuário leia os tokens', async () => {
+    const bob = testEnv.authenticatedContext('bob');
+    await seed(tokenPath, { token: 'token-aparelho-1', platform: 'android' });
+
+    await assertFails(getDoc(doc(bob.firestore(), tokenPath)));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // coleções fora do escopo
 // ---------------------------------------------------------------------------
 

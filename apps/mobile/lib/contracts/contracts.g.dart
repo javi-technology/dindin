@@ -1182,6 +1182,49 @@ class SetupRequest {
   };
 }
 
+/// Plataformas que recebem notificação push.
+enum DevicePlatform {
+  android('android'),
+  ios('ios');
+
+  const DevicePlatform(this.wire);
+
+  /// Valor como a API o transmite.
+  final String wire;
+
+  factory DevicePlatform.fromJson(String valor) =>
+      DevicePlatform.values.firstWhere(
+        (e) => e.wire == valor,
+        orElse: () =>
+            throw ArgumentError('DevicePlatform desconhecido: $valor'),
+      );
+
+  String toJson() => wire;
+}
+
+/// Token de notificação do aparelho (issue #408). O app o registra a cada
+/// abertura; o backend atualiza o existente em vez de duplicar.
+class RegisterDeviceTokenRequest {
+  const RegisterDeviceTokenRequest({
+    required this.token,
+    required this.platform,
+  });
+
+  factory RegisterDeviceTokenRequest.fromJson(Map<String, dynamic> json) =>
+      RegisterDeviceTokenRequest(
+        token: json['token'] as String,
+        platform: DevicePlatform.fromJson(json['platform'] as String),
+      );
+
+  final String token;
+  final DevicePlatform platform;
+
+  Map<String, dynamic> toJson() => {
+    'token': token,
+    'platform': platform.toJson(),
+  };
+}
+
 class SetupResponse {
   const SetupResponse({
     required this.walletCreated,

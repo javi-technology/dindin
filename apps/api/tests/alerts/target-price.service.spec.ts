@@ -469,7 +469,7 @@ describe('TargetPriceService – avisos pendentes de execuções anteriores', ()
     expect(result.pendingNotification[0].id).toBe('fridge-1_HGLG11');
   });
 
-  it('não deve devolver alerta aberto que já foi notificado', async () => {
+  it('não deve devolver alerta aberto já notificado nos dois canais', async () => {
     seedFirestore({
       quotes: { HGLG11: 130 },
       fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
@@ -479,7 +479,8 @@ describe('TargetPriceService – avisos pendentes de execuções anteriores', ()
           data: {
             ticker: 'HGLG11',
             status: 'open',
-            notifiedAt: '2026-09-17T22:16:00Z',
+            notifiedEmailAt: '2026-09-17T22:16:00Z',
+            notifiedPushAt: '2026-09-17T22:16:00Z',
           },
         },
       ],
@@ -488,6 +489,29 @@ describe('TargetPriceService – avisos pendentes de execuções anteriores', ()
     const result = await checkUserTargetPrices('user-1');
 
     expect(result.pendingNotification).toHaveLength(0);
+  });
+
+  // Com dois canais, "avisado" deixou de ser um estado só (issue #408): o
+  // push que falhou ainda precisa sair, mesmo que o e-mail já tenha ido.
+  it('deve devolver alerta que saiu por um canal e não pelo outro', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 130 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: {
+            ticker: 'HGLG11',
+            status: 'open',
+            notifiedEmailAt: '2026-09-17T22:16:00Z',
+          },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(result.pendingNotification).toHaveLength(1);
   });
 });
 
