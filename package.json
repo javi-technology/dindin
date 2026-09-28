@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "eslint": "^9.39.5",
-    "firebase-tools": "^15.30.0",
+    "firebase-tools": "^15.31.0",
     "prettier": "^3.9.6",
     "typescript": "~6.0",
     "typescript-eslint": "^8.70.0"
