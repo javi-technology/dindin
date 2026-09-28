@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import type { WalletSimulationResponse } from 'dindin-shared-types';
 import { SimulationService } from '../../core/services/simulation.service';
 import { SimulationComponent } from './simulation.component';
@@ -144,6 +144,94 @@ describe('SimulationComponent', () => {
     expect(
       element.querySelector('[data-testid="simulation-result"]'),
     ).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Resultado obsoleto (issue #396)
+  //
+  // O resultado na tela vale para os filtros que o geraram. Enquanto a
+  // requisição não era cancelada, trocar de carteira e receber a resposta
+  // antiga em seguida mostrava a simulação da carteira anterior sob os filtros
+  // novos — um número financeiro que o usuário não tem como saber que está
+  // errado.
+  // -------------------------------------------------------------------------
+  describe('resultado obsoleto', () => {
+    function pendingResponse(): Subject<WalletSimulationResponse> {
+      const pending = new Subject<WalletSimulationResponse>();
+      simulateWallet.mockReturnValue(pending);
+      return pending;
+    }
+
+    function hasResult(): boolean {
+      return (
+        element.querySelector('[data-testid="simulation-result"]') !== null
+      );
+    }
+
+    it('não deve exibir a resposta em voo depois de trocar a carteira', () => {
+      setInput('amount-input', '1000');
+      const pending = pendingResponse();
+      submit();
+
+      select('provider-select', 'xp-fii');
+      pending.next(result);
+      pending.complete();
+      fixture.detectChanges();
+
+      expect(hasResult()).toBe(false);
+    });
+
+    it('não deve exibir a resposta em voo depois de trocar o mês', () => {
+      setInput('amount-input', '1000');
+      const pending = pendingResponse();
+      submit();
+
+      select('month-select', '2026-08');
+      pending.next(result);
+      fixture.detectChanges();
+
+      expect(hasResult()).toBe(false);
+    });
+
+    it.each([
+      ['amount-input', '2000'],
+      ['months-input', '24'],
+    ])('deve descartar o resultado ao editar %s', (testId, valor) => {
+      setInput('amount-input', '1000');
+      submit();
+      expect(hasResult()).toBe(true);
+
+      setInput(testId, valor);
+
+      expect(hasResult()).toBe(false);
+    });
+
+    it('deve descartar o resultado ao trocar o modo', () => {
+      setInput('amount-input', '1000');
+      submit();
+      expect(hasResult()).toBe(true);
+
+      select('mode-select', 'reinvest');
+
+      expect(hasResult()).toBe(false);
+    });
+
+    it('deve manter a última resposta pedida quando duas se sobrepõem', () => {
+      setInput('amount-input', '1000');
+      const primeira = pendingResponse();
+      submit();
+
+      const segunda = pendingResponse();
+      submit();
+
+      // A primeira chega depois da segunda ter sido pedida: é a resposta de um
+      // pedido que o usuário já substituiu.
+      segunda.next(result);
+      primeira.next({ ...result, monthlyIncome: 999 });
+      fixture.detectChanges();
+
+      expect(component.result()?.monthlyIncome).toBe(10);
+    });
   });
 
   it('deve recusar valor vazio sem chamar a API', () => {

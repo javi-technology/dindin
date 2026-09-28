@@ -108,6 +108,32 @@ describe('simulation.service', () => {
     expect(result.missingDividendTickers).toEqual(['AAAA11', 'BBBB11']);
   });
 
+  // A Brapi devolve `regularMarketPrice: 0` para ativo sem negócio no dia, e o
+  // mapeamento guarda esse zero. Com `??`, só `undefined` caía no fechamento:
+  // o zero passava adiante e o motor descartava da alocação um ativo cuja
+  // carteira sugerida traz preço de fechamento publicado (issue #396).
+  it.each([0, -1])(
+    'deve usar o preço de fechamento quando a cotação é %p',
+    async (price) => {
+      getQuotesByTickerMock.mockResolvedValue(
+        new Map([
+          ['AAAA11', { price, monthlyDividend: 0.1 }],
+          ['BBBB11', { price: 25, monthlyDividend: 0.2 }],
+        ]),
+      );
+
+      const result = await simulateRecommendedWallet({
+        amount: 1200,
+        months: 1,
+        mode: 'withdraw',
+      });
+
+      const aaaa = result.byTicker.find((item) => item.ticker === 'AAAA11');
+      expect(aaaa?.price).toBe(12);
+      expect(aaaa?.missingPrice).toBeUndefined();
+    },
+  );
+
   it('deve recusar provedor fora do catálogo', async () => {
     await expect(
       simulateRecommendedWallet({
