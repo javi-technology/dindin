@@ -40,8 +40,20 @@ class FirebaseAuthBackend implements AuthBackend {
     () => _auth.createUserWithEmailAndPassword(email: email, password: senha),
   );
 
+  /// Inicialização do pacote, feita uma vez só.
+  ///
+  /// A partir da versão 7 o `google_sign_in` exige `initialize()` antes de
+  /// qualquer outra chamada. Guardar o `Future` — em vez de um booleano —
+  /// resolve também o toque duplo no botão: as duas chamadas esperam a mesma
+  /// inicialização em vez de disparar duas.
+  Future<void>? _googleInicializado;
+
+  Future<void> _inicializarGoogle() =>
+      _googleInicializado ??= _google.initialize();
+
   @override
   Future<void> entrarComGoogle() => _traduzindo(() async {
+    await _inicializarGoogle();
     final conta = await _google.authenticate();
     final autenticacao = conta.authentication;
 
