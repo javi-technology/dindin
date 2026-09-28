@@ -1,0 +1,116 @@
+<section class="mt-8 border-t border-border pt-6">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 class="text-lg font-semibold text-text-primary">
+      Simular um ativo específico
+    </h2>
+    @if (!hasAccess()) {
+      <span
+        class="inline-flex items-center rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-text-primary"
+        data-testid="asset-subscriber-tag"
+      >
+        <svg lucideSparkles [size]="14" class="mr-1 text-action"></svg>
+        Recurso de assinante
+      </span>
+    }
+  </div>
+
+  @if (showPaywall()) {
+    <div
+      class="mt-4 rounded-xl border border-brand-soft bg-brand-soft p-5"
+      data-testid="asset-paywall"
+    >
+      <h3 class="text-base font-semibold text-text-primary">
+        Disponível para assinantes
+      </h3>
+      <p class="mt-2 text-sm text-text-secondary">
+        Assine para simular quanto um valor renderia em um ativo específico. A
+        simulação por carteira sugerida continua gratuita.
+      </p>
+      <a
+        routerLink="/assinatura"
+        class="mt-4 inline-flex items-center rounded-lg bg-action px-4 py-2 font-medium text-on-action hover:bg-action-hover"
+        data-testid="asset-paywall-cta"
+        >Assinar</a
+      >
+    </div>
+  }
+
+  @if (hasAccess()) {
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="text-sm text-text-secondary">
+        Ativo
+        <input
+          type="text"
+          placeholder="MXRF11"
+          class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2 uppercase"
+          [value]="ticker()"
+          (input)="onTickerInput($event)"
+          data-testid="asset-ticker-input"
+        />
+      </label>
+
+      <label class="text-sm text-text-secondary">
+        Valor a investir
+        <input
+          type="text"
+          inputmode="decimal"
+          placeholder="1.000,00"
+          class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+          [value]="amount()"
+          (input)="onAmountInput($event)"
+          data-testid="asset-amount-input"
+        />
+      </label>
+
+      <label class="text-sm text-text-secondary">
+        Horizonte (meses)
+        <input
+          type="number"
+          min="1"
+          max="360"
+          class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+          [value]="months()"
+          (input)="onMonthsInput($event)"
+          data-testid="asset-months-input"
+        />
+      </label>
+
+      <label class="text-sm text-text-secondary">
+        Proventos
+        <select
+          class="mt-1 block w-full rounded-lg border border-border-strong px-3 py-2"
+          [value]="mode()"
+          (change)="selectMode($any($event.target).value)"
+          data-testid="asset-mode-select"
+        >
+          <option value="withdraw">Sacados</option>
+          <option value="reinvest">Reinvestidos</option>
+        </select>
+      </label>
+    </div>
+
+    <button
+      type="button"
+      class="mt-5 inline-flex items-center rounded-lg bg-action px-4 py-2 font-medium text-on-action transition-colors hover:bg-action-hover disabled:opacity-50"
+      [disabled]="loading()"
+      (click)="requestSimulation()"
+      data-testid="asset-simulate-button"
+    >
+      <svg lucideCalculator [size]="18" class="mr-2"></svg>
+      {{ loading() ? 'Simulando…' : 'Simular ativo' }}
+    </button>
+  }
+
+  @if (localError() ?? error(); as message) {
+    <p
+      class="mt-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger-ink"
+      data-testid="asset-simulation-error"
+    >
+      {{ message }}
+    </p>
+  }
+
+  @if (result(); as simulation) {
+    <app-simulation-result [result]="simulation" />
+  }
+</section>

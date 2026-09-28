@@ -1,0 +1,104 @@
+<section class="mt-6" data-testid="simulation-result">
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="rounded-xl bg-surface-sunken p-4">
+      <p class="text-xs text-text-secondary">
+        Renda projetada em {{ horizonLabel() }}
+      </p>
+      <p
+        class="mt-1 text-2xl font-bold text-text-primary"
+        data-testid="total-income"
+      >
+        {{ formatCurrency(result().totalIncome) }}
+      </p>
+    </div>
+    <div class="rounded-xl bg-surface-sunken p-4">
+      <p class="text-xs text-text-secondary">Renda do primeiro mês</p>
+      <p
+        class="mt-1 text-2xl font-bold text-text-primary"
+        data-testid="monthly-income"
+      >
+        {{ formatCurrency(result().monthlyIncome) }}
+      </p>
+    </div>
+    <div class="rounded-xl bg-surface-sunken p-4">
+      <p class="text-xs text-text-secondary">Valor aplicado em cotas</p>
+      <p
+        class="mt-1 text-2xl font-bold text-text-primary"
+        data-testid="allocated-amount"
+      >
+        {{ formatCurrency(result().allocatedAmount) }}
+      </p>
+    </div>
+  </div>
+
+  @if (result().unallocatedAmount > 0) {
+    <p
+      class="mt-3 rounded-lg bg-warning-soft px-4 py-3 text-sm text-warning-ink"
+      data-testid="unallocated-amount"
+    >
+      Sobraram {{ formatCurrency(result().unallocatedAmount) }} sem alocação: o
+      valor não completou mais nenhuma cota inteira e não rende provento.
+    </p>
+  }
+
+  @if (reinvesting() && result().reinvestedAmount > 0) {
+    <p class="mt-3 text-sm text-text-secondary" data-testid="reinvested-amount">
+      {{ formatCurrency(result().reinvestedAmount) }} em proventos viraram novas
+      cotas no período.
+    </p>
+  }
+
+  <ul class="mt-5 space-y-3">
+    @for (item of result().byTicker; track item.ticker) {
+      <li class="rounded-xl border border-border p-4" data-testid="asset-row">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <span class="font-semibold text-text-primary">{{ item.ticker }}</span>
+          <span class="text-sm text-text-secondary">
+            {{ item.quantity }} {{ quantityLabel(item.quantity) }} ·
+            {{ formatCurrency(item.investedAmount) }}
+          </span>
+        </div>
+        <div
+          class="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-sm text-text-secondary"
+        >
+          <span>
+            Provento de {{ formatCurrency(item.monthlyDividend) }} por cota
+          </span>
+          <span class="font-medium text-text-primary">
+            {{ formatCurrency(item.totalIncome) }}
+          </span>
+        </div>
+        @if (reinvesting()) {
+          <p
+            class="mt-1 text-sm text-text-secondary"
+            data-testid="final-quantity"
+          >
+            {{ item.finalQuantity }}
+            {{ quantityLabel(item.finalQuantity) }} ao fim do período
+          </p>
+        }
+        @if (itemWarning(item); as warning) {
+          <p
+            class="mt-2 inline-flex items-center rounded-full bg-warning-soft px-3 py-1 text-xs text-warning-ink"
+            [attr.data-testid]="
+              item.missingDividend ? 'missing-dividend-badge' : 'asset-warning'
+            "
+          >
+            <svg lucideTriangleAlert [size]="14" class="mr-1"></svg>
+            {{ warning }}
+          </p>
+        }
+      </li>
+    }
+  </ul>
+
+  <p
+    class="mt-5 border-t border-border pt-4 text-xs text-text-secondary"
+    data-testid="projection-basis"
+  >
+    A projeção parte do último provento real informado para cada ativo e assume
+    que ele se repete a cada mês. Pagadores trimestrais e FIIs de provento
+    variável não se comportam assim: isto é uma estimativa, não é promessa de
+    rentabilidade.
+  </p>
+</section>
