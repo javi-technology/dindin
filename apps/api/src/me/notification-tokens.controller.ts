@@ -1,6 +1,6 @@
 import { Response } from 'express';
 
-import { DevicePlatform } from 'dindin-models';
+import type { DevicePlatform } from 'dindin-models';
 
 import { asyncHandler } from '../middleware/async-handler';
 import { AuthRequest } from '../middleware/auth.middleware';

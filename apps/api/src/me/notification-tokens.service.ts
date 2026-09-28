@@ -1,7 +1,9 @@
-import { DeviceToken, DevicePlatform, isDevicePlatform } from 'dindin-models';
+import type { DeviceToken, DevicePlatform } from 'dindin-models';
 
 import { deviceTokensCollection } from '../firestore/paths';
 import { HttpError } from '../shared/http-error';
+
+const DEVICE_PLATFORMS = new Set<string>(['android', 'ios']);
 
 /**
  * Tokens de notificação por usuário e aparelho (issue #408).
@@ -20,7 +22,7 @@ export async function registerDeviceToken(
 ): Promise<void> {
   const limpo = token.trim();
   if (!limpo) throw HttpError.badRequest('Token de notificação é obrigatório');
-  if (!isDevicePlatform(platform)) {
+  if (!DEVICE_PLATFORMS.has(platform)) {
     throw HttpError.badRequest('Plataforma não suportada');
   }
 
