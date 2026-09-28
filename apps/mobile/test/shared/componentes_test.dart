@@ -19,8 +19,10 @@ import 'package:dindin_mobile/shared/components/estado_vazio.dart';
 // não o desenho.
 // ---------------------------------------------------------------------------
 
-Widget _emApp(Widget filho) =>
-    MaterialApp(theme: DinDinTheme.claro, home: Scaffold(body: filho));
+Widget _emApp(Widget filho) => MaterialApp(
+  theme: DinDinTheme.claro,
+  home: Scaffold(body: filho),
+);
 
 void main() {
   group('CampoMoeda', () {
@@ -51,7 +53,9 @@ void main() {
     testWidgets('recusa texto que não é número', (tester) async {
       await tester.pumpWidget(
         _emApp(
-          Form(child: CampoMoeda(rotulo: 'Preço', aoMudar: (_) {})),
+          Form(
+            child: CampoMoeda(rotulo: 'Preço', aoMudar: (_) {}),
+          ),
         ),
       );
 
@@ -64,9 +68,7 @@ void main() {
 
     testWidgets('exige valor quando obrigatório', (tester) async {
       await tester.pumpWidget(
-        _emApp(
-          CampoMoeda(rotulo: 'Preço', obrigatorio: true, aoMudar: (_) {}),
-        ),
+        _emApp(CampoMoeda(rotulo: 'Preço', obrigatorio: true, aoMudar: (_) {})),
       );
 
       final campo = tester.widget<TextFormField>(find.byType(TextFormField));
@@ -102,9 +104,7 @@ void main() {
     });
 
     testWidgets('vazio funciona sem ação', (tester) async {
-      await tester.pumpWidget(
-        _emApp(const EstadoVazio(titulo: 'Nada aqui')),
-      );
+      await tester.pumpWidget(_emApp(const EstadoVazio(titulo: 'Nada aqui')));
 
       expect(find.byType(FilledButton), findsNothing);
     });
@@ -158,9 +158,12 @@ void main() {
   // Nunca diálogo nativo do sistema: a confirmação é componente do app, com
   // o mesmo cuidado de foco e fechamento adotado na web.
   group('ConfirmarDialog', () {
-    Future<bool?> abrir(WidgetTester tester) async {
-      late Future<bool?> resposta;
+    // `abrir` não devolve o Future do diálogo: uma função `async` que faz
+    // `return resposta` o aguardaria, e o teste travaria esperando um botão
+    // que ninguém tocou ainda.
+    late Future<bool> resposta;
 
+    Future<void> abrir(WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: DinDinTheme.claro,
@@ -184,7 +187,6 @@ void main() {
 
       await tester.tap(find.text('abrir'));
       await tester.pumpAndSettle();
-      return resposta;
     }
 
     testWidgets('mostra título e mensagem', (tester) async {
@@ -192,10 +194,13 @@ void main() {
 
       expect(find.text('Excluir carteira'), findsOneWidget);
       expect(find.text('Esta ação não pode ser desfeita.'), findsOneWidget);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('confirmar devolve true', (tester) async {
-      final resposta = await abrir(tester);
+      await abrir(tester);
 
       await tester.tap(find.text('Excluir'));
       await tester.pumpAndSettle();
@@ -204,9 +209,20 @@ void main() {
     });
 
     testWidgets('cancelar devolve false', (tester) async {
-      final resposta = await abrir(tester);
+      await abrir(tester);
 
       await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(await resposta, isFalse);
+    });
+
+    // Fechar por fora é "não confirmou": devolver `null` obrigaria quem
+    // chama a tratar dois casos para a mesma resposta.
+    testWidgets('fechar por fora devolve false', (tester) async {
+      await abrir(tester);
+
+      Navigator.of(tester.element(find.text('Excluir'))).pop();
       await tester.pumpAndSettle();
 
       expect(await resposta, isFalse);
@@ -220,9 +236,12 @@ void main() {
       final botao = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Excluir'),
       );
-      final estilo = botao.style!.backgroundColor!.resolve({});
+      final fundo = botao.style!.backgroundColor!.resolve({});
 
-      expect(estilo, DinDinTheme.claro.extension<DinDinTokens>()!.danger);
+      expect(fundo, DinDinTheme.claro.extension<DinDinTokens>()!.danger);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
     });
   });
 }

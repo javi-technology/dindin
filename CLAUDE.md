@@ -211,6 +211,34 @@ Regras:
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Tema e componentes do app (`apps/mobile`)
+
+- A paleta do app é a **mesma da web** (`docs/paleta.md`). As escalas ficam em
+  `lib/core/theme/dindin_colors.dart` e um teste da suíte compara os valores e
+  o mapeamento de papéis com o `@theme` de `apps/web/src/styles.css`: o Flutter
+  não lê CSS, e sem essa conferência o app divergiria na primeira mudança de
+  paleta — divergência que não quebra compilação e só aparece em captura de
+  tela lado a lado.
+- **As telas usam os tokens semânticos por papel** (`context.tokens.action`),
+  nunca o passo da escala (`DinDinColors.jade700`): o passo direto fixa o tema
+  claro na marcação e some no escuro.
+- O tema segue o sistema por padrão e a escolha do usuário é preservada. São
+  **três** estados (`system`, `light`, `dark`), não um interruptor de duas
+  posições: com dois não haveria como voltar a seguir o sistema. "Seguir o
+  sistema" é a ausência de chave guardada.
+- Os limites de contraste da paleta valem nos **dois** temas — 4,5:1 para
+  texto, 3:1 para borda e ícone informativos — e a suíte os calcula. O celular
+  é usado no escuro com muito mais frequência que o desktop.
+- Campos monetários usam `CampoMoeda`/`Moeda`, que aceitam vírgula decimal: é
+  o que o teclado numérico do celular oferece, e ler `1,55` como `155` é erro
+  de dado financeiro.
+- Confirmação de ação destrutiva usa `ConfirmarDialog`, **nunca** diálogo
+  nativo do sistema: o nativo não segue a paleta e dá o mesmo peso visual ao
+  destrutivo e ao cancelar.
+- As telas partem dos componentes de `lib/shared/components/`: cartão, campo,
+  estado vazio, carregando e erro. Um app sem eles acumula variações em cada
+  tela, e padronizar depois custa mais.
+
 ### App Flutter (`apps/mobile`)
 
 - A versão do SDK está fixada em `apps/mobile/.flutter-version`, e o job

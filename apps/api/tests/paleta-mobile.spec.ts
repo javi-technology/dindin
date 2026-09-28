@@ -70,10 +70,10 @@ const papeisDoDart = (bloco: 'claro' | 'escuro'): Record<string, string> => {
   const trecho = fonte.slice(inicio, fonte.indexOf('// fim-paridade', inicio));
 
   const papeis: Record<string, string> = {};
-  for (const [, papel, escala] of trecho.matchAll(
-    /(\w+):\s*DinDinColors\.(\w+?)(\d+|Ink)\b/g,
+  for (const [, papel, familia, passo] of trecho.matchAll(
+    /(\w+):\s*DinDinColors\.([a-z]+)(\d+|Ink)\b/g,
   )) {
-    papeis[papel] = escala;
+    papeis[papel] = `${familia}-${passo === 'Ink' ? 'ink' : passo}`;
   }
 
   // O nome em Dart é camelCase (`surfaceElevated`); o do CSS, kebab

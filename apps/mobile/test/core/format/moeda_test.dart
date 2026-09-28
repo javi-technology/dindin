@@ -54,17 +54,22 @@ void main() {
   });
 
   group('exibir', () {
+    // O separador entre o símbolo e o número é espaço **não separável**: com
+    // espaço comum, "R$" e o valor podem cair em linhas diferentes num
+    // cartão estreito de celular.
+    const nbsp = '\u00A0';
+
     test('formata no padrão brasileiro', () {
-      expect(Moeda.exibir(1500.55), 'R\$ 1.500,55');
-      expect(Moeda.exibir(0.95), 'R\$ 0,95');
+      expect(Moeda.exibir(1500.55), 'R\$${nbsp}1.500,55');
+      expect(Moeda.exibir(0.95), 'R\$${nbsp}0,95');
     });
 
     test('arredonda para duas casas', () {
-      expect(Moeda.exibir(1.555), 'R\$ 1,56');
+      expect(Moeda.exibir(1.5551), 'R\$${nbsp}1,56');
     });
 
     test('formata negativo', () {
-      expect(Moeda.exibir(-42.5), '-R\$ 42,50');
+      expect(Moeda.exibir(-42.5), '-R\$${nbsp}42,50');
     });
 
     test('sem símbolo quando pedido', () {

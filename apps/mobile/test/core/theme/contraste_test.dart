@@ -23,9 +23,7 @@ double _luminancia(Color cor) {
       ? bruto / 12.92
       : math.pow((bruto + 0.055) / 1.055, 2.4).toDouble();
 
-  return 0.2126 * canal(cor.r) +
-      0.7152 * canal(cor.g) +
-      0.0722 * canal(cor.b);
+  return 0.2126 * canal(cor.r) + 0.7152 * canal(cor.g) + 0.0722 * canal(cor.b);
 }
 
 double razao(Color a, Color b) {
