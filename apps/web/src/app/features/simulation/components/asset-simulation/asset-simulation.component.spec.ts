@@ -148,6 +148,47 @@ describe('AssetSimulationComponent', () => {
     ).not.toBeNull();
   });
 
+  // -------------------------------------------------------------------------
+  // Resultado obsoleto (issue #397)
+  //
+  // O resultado vem do pai e fica na tela até a próxima resposta. Sem avisar
+  // que os campos mudaram, a projeção de MXRF11 continuava exibida depois de o
+  // usuário trocar o formulário para outro ativo — número financeiro que não
+  // corresponde ao que está escrito ao lado.
+  // -------------------------------------------------------------------------
+  describe('parâmetros alterados', () => {
+    let changed: number;
+
+    beforeEach(() => {
+      changed = 0;
+      fixture.componentInstance.parametersChanged.subscribe(
+        () => (changed += 1),
+      );
+      render({ hasAccess: true, showPaywall: false });
+    });
+
+    it.each([
+      ['asset-ticker-input', 'HGLG11'],
+      ['asset-amount-input', '2000'],
+      ['asset-months-input', '24'],
+    ])('deve avisar ao editar %s', (testId, valor) => {
+      setInput(testId, valor);
+
+      expect(changed).toBe(1);
+    });
+
+    it('deve avisar ao trocar o modo', () => {
+      const select = element.querySelector(
+        '[data-testid="asset-mode-select"]',
+      ) as HTMLSelectElement;
+      select.value = 'reinvest';
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(changed).toBe(1);
+    });
+  });
+
   it('deve mostrar as cotas, o provento e a premissa do resultado', () => {
     render({ hasAccess: true, showPaywall: false, result });
 

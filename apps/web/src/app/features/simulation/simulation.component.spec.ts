@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
-import type { WalletSimulationResponse } from 'dindin-shared-types';
+import type {
+  AssetSimulationResponse,
+  WalletSimulationResponse,
+} from 'dindin-shared-types';
 import { signal } from '@angular/core';
 import { BillingService } from '../../core/services/billing.service';
 import { SimulationService } from '../../core/services/simulation.service';
@@ -53,6 +56,11 @@ const result = {
   tab: 'renda',
 } as unknown as WalletSimulationResponse;
 
+const assetResponse = {
+  ...result,
+  ticker: 'MXRF11',
+} as unknown as AssetSimulationResponse;
+
 describe('SimulationComponent', () => {
   let fixture: ComponentFixture<SimulationComponent>;
   let component: SimulationComponent;
@@ -95,9 +103,7 @@ describe('SimulationComponent', () => {
   beforeEach(async () => {
     listWallets = vi.fn().mockReturnValue(of(wallets));
     simulateWallet = vi.fn().mockReturnValue(of(result));
-    simulateAsset = vi
-      .fn()
-      .mockReturnValue(of({ ...result, ticker: 'MXRF11' }));
+    simulateAsset = vi.fn().mockReturnValue(of(assetResponse));
     billingServiceMock = {
       loadMe: vi.fn().mockReturnValue(of({})),
       loaded: signal(true),
@@ -337,6 +343,45 @@ describe('SimulationComponent', () => {
       amount: '1000',
       months: 1,
       mode: 'withdraw',
+    });
+  });
+
+  // O resultado do ativo vive no pai e é repassado ao filho. Se os campos
+  // mudam, ele deixou de descrever o que está na tela (issue #397).
+  describe('resultado obsoleto do ativo', () => {
+    function clickAssetSimulate(): void {
+      (
+        element.querySelector(
+          '[data-testid="asset-simulate-button"]',
+        ) as HTMLElement
+      ).click();
+      fixture.detectChanges();
+    }
+
+    it('deve descartar o resultado do ativo ao editar o formulário', () => {
+      setInput('asset-ticker-input', 'mxrf11');
+      setInput('asset-amount-input', '1000');
+      clickAssetSimulate();
+      expect(component.assetResult()).not.toBeNull();
+
+      setInput('asset-ticker-input', 'hglg11');
+
+      expect(component.assetResult()).toBeNull();
+    });
+
+    it('não deve exibir a resposta em voo depois de editar o formulário', () => {
+      const pending = new Subject<AssetSimulationResponse>();
+      simulateAsset.mockReturnValue(pending);
+      setInput('asset-ticker-input', 'mxrf11');
+      setInput('asset-amount-input', '1000');
+      clickAssetSimulate();
+
+      setInput('asset-ticker-input', 'hglg11');
+      pending.next(assetResponse);
+      fixture.detectChanges();
+
+      expect(component.assetResult()).toBeNull();
+      expect(component.assetLoading()).toBe(false);
     });
   });
 
