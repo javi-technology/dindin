@@ -111,8 +111,9 @@ describe('SimulationComponent', () => {
         provideRouter([]),
         {
           provide: SimulationService,
-          useValue: { listWallets, simulateWallet },
+          useValue: { listWallets, simulateWallet, simulateAsset },
         },
+        { provide: BillingService, useValue: billingServiceMock },
       ],
     }).compileComponents();
 

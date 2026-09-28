@@ -126,6 +126,15 @@
       @if (result(); as simulation) {
         <app-simulation-result [result]="simulation" />
       }
+
+      <app-asset-simulation
+        [hasAccess]="hasAssetAccess()"
+        [showPaywall]="showAssetPaywall()"
+        [loading]="assetLoading()"
+        [error]="assetError()"
+        [result]="assetResult()"
+        (simulate)="simulateAsset($event)"
+      />
     </div>
   </div>
 </main>

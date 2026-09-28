@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import type {
+  AssetSimulationRequest,
+  AssetSimulationResponse,
   SimulationWalletOption,
   WalletSimulationRequest,
   WalletSimulationResponse,
@@ -27,6 +29,16 @@ export class SimulationService {
   ): Observable<WalletSimulationResponse> {
     return this.http.post<WalletSimulationResponse>(
       '/api/simulations/wallet',
+      body,
+    );
+  }
+
+  /** Recurso de assinante: a API responde 403 SUBSCRIPTION_REQUIRED (#397). */
+  simulateAsset(
+    body: AssetSimulationRequest,
+  ): Observable<AssetSimulationResponse> {
+    return this.http.post<AssetSimulationResponse>(
+      '/api/simulations/asset',
       body,
     );
   }

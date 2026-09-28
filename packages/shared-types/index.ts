@@ -371,6 +371,19 @@ export interface WalletSimulationRequest {
   tab?: AiSuggestionTab;
 }
 
+export interface AssetSimulationRequest {
+  ticker: string;
+  /** Número ou texto em pt-BR (`1.500,55`); a API converte. */
+  amount: number | string;
+  months: number;
+  mode?: SimulationMode;
+}
+
+/** Recurso de assinante (`projections`); ver `AssetSimulationRequest`. */
+export interface AssetSimulationResponse extends SimulationResult {
+  ticker: string;
+}
+
 export interface WalletSimulationResponse extends SimulationResult {
   provider: Omit<SimulationWalletOption, 'months'>;
   walletMonth: string;

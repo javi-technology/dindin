@@ -4,10 +4,7 @@ import {
   computed,
   input,
 } from '@angular/core';
-import type {
-  SimulationItem,
-  WalletSimulationResponse,
-} from 'dindin-shared-types';
+import type { SimulationItem, SimulationResult } from 'dindin-shared-types';
 import { formatCurrency } from '../../../../shared/utils/format.util';
 import { LucideTriangleAlert } from '@lucide/angular';
 
@@ -27,7 +24,9 @@ import { LucideTriangleAlert } from '@lucide/angular';
   templateUrl: './simulation-result.component.html',
 })
 export class SimulationResultComponent {
-  readonly result = input.required<WalletSimulationResponse>();
+  // O tipo é o resultado base: a mesma exibição serve à simulação por carteira
+  // e à por ativo (#397), que só acrescentam o contexto de onde ela veio.
+  readonly result = input.required<SimulationResult>();
 
   readonly reinvesting = computed(() => this.result().mode === 'reinvest');
   readonly horizonLabel = computed(() => {

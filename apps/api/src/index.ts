@@ -97,6 +97,7 @@ import {
 } from './recommended-wallet/storage.service';
 import {
   listSimulationWallets,
+  simulateAsset,
   simulateWallet,
 } from './simulation/simulation.controller';
 import {
@@ -321,6 +322,13 @@ app.post('/api/patrimony/snapshots', postPatrimonySnapshot);
 // implementação (issue #396).
 app.get('/api/simulations/wallets', listSimulationWallets);
 app.post('/api/simulations/wallet', simulateWallet);
+// Bloqueio total, não recorte: sem o gate na rota, o cálculo continuaria
+// acessível a quem chamasse a API direto (issue #397).
+app.post(
+  '/api/simulations/asset',
+  requireEntitlement('projections'),
+  simulateAsset,
+);
 
 app.get('/api/recommended-wallets/bb-fii', listRecommended);
 app.get('/api/recommended-wallets/bb-fii/latest', getLatestRecommended);

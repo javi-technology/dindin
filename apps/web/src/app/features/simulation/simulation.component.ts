@@ -12,12 +12,18 @@ import { EMPTY, Subject, catchError, of, switchMap } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import type { AiSuggestionTab } from 'dindin-models';
 import type {
+  AssetSimulationResponse,
   SimulationMode,
   SimulationWalletOption,
   WalletSimulationResponse,
 } from 'dindin-shared-types';
 import { SimulationService } from '../../core/services/simulation.service';
+import { BillingService } from '../../core/services/billing.service';
 import { SimulationResultComponent } from './components/simulation-result/simulation-result.component';
+import {
+  AssetSimulationComponent,
+  AssetSimulationRequestEvent,
+} from './components/asset-simulation/asset-simulation.component';
 import { parseBrlNumber } from '../../shared/utils/format.util';
 import { LucideArrowLeft, LucideCalculator } from '@lucide/angular';
 
@@ -27,6 +33,9 @@ import { LucideArrowLeft, LucideCalculator } from '@lucide/angular';
  * A simulação por carteira sugerida é gratuita: a tela não consulta assinatura
  * para liberar o formulário. A carteira é escolhida pelo usuário, e não fixada
  * na do BB, porque está previsto haver mais de uma.
+ *
+ * A simulação por ativo, ao lado, é de assinante (#397) e tem gate próprio: o
+ * bloqueio de uma não pode alcançar a outra.
  */
 @Component({
   selector: 'app-simulation',
@@ -37,11 +46,13 @@ import { LucideArrowLeft, LucideCalculator } from '@lucide/angular';
     LucideArrowLeft,
     LucideCalculator,
     SimulationResultComponent,
+    AssetSimulationComponent,
   ],
   templateUrl: './simulation.component.html',
 })
 export class SimulationComponent implements OnInit {
   private readonly simulationService = inject(SimulationService);
+  private readonly billingService = inject(BillingService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly wallets = signal<SimulationWalletOption[]>([]);
@@ -107,7 +118,23 @@ export class SimulationComponent implements OnInit {
     () => this.selectedWallet()?.months ?? [],
   );
 
+  readonly assetResult = signal<AssetSimulationResponse | null>(null);
+  readonly assetLoading = signal(false);
+  readonly assetError = signal<string | null>(null);
+  readonly hasAssetAccess = computed(
+    () =>
+      this.billingService.hasProjections() &&
+      !this.billingService.subscriptionRequired(),
+  );
+  readonly showAssetPaywall = computed(
+    () => this.billingService.loaded() && !this.hasAssetAccess(),
+  );
+
   ngOnInit(): void {
+    this.billingService
+      .loadMe()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => undefined });
     this.simulationService
       .listWallets()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -162,6 +189,34 @@ export class SimulationComponent implements OnInit {
     this.result.set(null);
     this.loading.set(false);
     this.walletRequest.next(null);
+  }
+
+  simulateAsset(request: AssetSimulationRequestEvent): void {
+    if (!this.hasAssetAccess()) return;
+
+    this.assetError.set(null);
+    this.assetLoading.set(true);
+    this.simulationService
+      .simulateAsset(request)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.assetResult.set(result);
+          this.assetLoading.set(false);
+        },
+        error: (failure: { status?: number; error?: { error?: string } }) => {
+          this.assetLoading.set(false);
+          this.assetResult.set(null);
+          // O 403 já vira paywall pelo interceptor; repetir a mensagem aqui
+          // só empilharia dois avisos do mesmo bloqueio.
+          this.assetError.set(
+            failure?.status === 403
+              ? null
+              : (failure?.error?.error ??
+                  'Não foi possível simular o ativo. Tente novamente.'),
+          );
+        },
+      });
   }
 
   simulate(): void {

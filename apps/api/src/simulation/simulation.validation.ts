@@ -88,3 +88,19 @@ export const walletSimulationSchema = z.object({
 });
 
 export type WalletSimulationInput = z.infer<typeof walletSimulationSchema>;
+
+const TICKER_ERROR = 'Ticker é obrigatório e deve ser um texto não vazio';
+
+export const assetSimulationSchema = z.object({
+  ticker: z
+    .string({ error: TICKER_ERROR })
+    .trim()
+    .min(1, { error: TICKER_ERROR })
+    .max(12, { error: 'Ticker deve ter no máximo 12 caracteres' })
+    .transform((ticker) => ticker.toUpperCase()),
+  amount: amountField,
+  months: monthsField,
+  mode: modeField,
+});
+
+export type AssetSimulationInput = z.infer<typeof assetSimulationSchema>;

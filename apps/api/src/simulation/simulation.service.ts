@@ -1,9 +1,11 @@
 import type { AiSuggestionTab, RecommendedWalletAsset } from 'dindin-models';
 import type {
+  AssetSimulationResponse,
   SimulationMode,
   SimulationWalletOption,
   WalletSimulationResponse,
 } from 'dindin-shared-types';
+import { assetExists } from '../assets/asset.service';
 import { getQuotesByTicker } from '../quotes/quote-prices';
 import { HttpError } from '../shared/http-error';
 import {
@@ -126,4 +128,55 @@ export async function listSimulationProviders(): Promise<
       ),
     })),
   );
+}
+
+export interface AssetSimulationParams {
+  ticker: string;
+  amount: number;
+  months: number;
+  mode: SimulationMode;
+}
+
+/**
+ * Simulação de um ativo isolado (issue #397).
+ *
+ * Recurso de assinante — o gate fica na rota, com `requireEntitlement`, e não
+ * aqui: bloquear só na tela deixaria o cálculo acessível a quem chamasse a API
+ * direto.
+ *
+ * O ticker é conferido contra o catálogo antes da cotação, para que "ativo que
+ * não existe" e "ativo sem cotação" não cheguem ao usuário como a mesma falha.
+ */
+export async function simulateAsset(
+  params: AssetSimulationParams,
+): Promise<AssetSimulationResponse> {
+  const ticker = params.ticker.toUpperCase();
+  if (!(await assetExists(ticker))) {
+    throw HttpError.notFound('Ativo não encontrado no catálogo');
+  }
+
+  const quote = (await getQuotesByTicker([ticker])).get(ticker);
+  if (!quote?.price) {
+    throw HttpError.notFound('Ativo sem cotação para simular');
+  }
+
+  const result = simulateDividendIncome({
+    assets: [
+      {
+        ticker,
+        price: quote.price,
+        ...(quote.monthlyDividend === undefined
+          ? {}
+          : { monthlyDividend: quote.monthlyDividend }),
+        ...(quote.dividendPaymentDate
+          ? { dividendPaymentDate: quote.dividendPaymentDate }
+          : {}),
+      },
+    ],
+    amount: params.amount,
+    months: params.months,
+    mode: params.mode,
+  });
+
+  return { ...result, ticker };
 }
