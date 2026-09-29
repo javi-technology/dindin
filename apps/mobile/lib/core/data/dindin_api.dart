@@ -1,5 +1,6 @@
 import '../../contracts/contracts.g.dart';
 import '../api/api_client.dart';
+import '../api/api_exception.dart';
 
 /// As rotas da API do DinDin, tipadas pelos modelos gerados (issue #402).
 ///
@@ -240,27 +241,40 @@ class DinDinApi {
 
   /// Última sugestão da IA para a carteira, ou `null` se ainda não há (#446).
   ///
-  /// A API devolve a lista das geradas, da mais recente para a mais antiga;
-  /// a tela mostra uma por vez, que é o que cabe no celular.
-  Future<AiSuggestion?> sugestao(String carteiraId) async {
-    final lista = _lista(
-      await _client.get(
+  /// A rota exige `walletId` **e** `month`, e devolve um objeto único — não
+  /// uma lista. O 404 é o estado normal de quem ainda não gerou nenhuma, e
+  /// vira `null` em vez de erro na tela.
+  Future<AiSuggestion?> sugestao({
+    required String carteiraId,
+    required String mes,
+    required AiSuggestionTab aba,
+  }) async {
+    try {
+      final json = await _client.get(
         '/api/recommended-wallets/bb-fii/suggestions',
-        query: {'walletId': carteiraId},
-      ),
-      AiSuggestion.fromJson,
-    );
+        query: {'walletId': carteiraId, 'month': mes, 'tab': aba.toJson()},
+      );
 
-    return lista.isEmpty ? null : lista.first;
+      return AiSuggestion.fromJson(json as Map<String, dynamic>);
+    } on ApiException catch (erro) {
+      if (erro.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   /// Gera uma sugestão nova — recurso de assinante (entitlement `ai`).
   ///
   /// Cada chamada custa uma consulta ao provedor de IA, então a tela bloqueia
   /// o botão enquanto a anterior não responde.
-  Future<AiSuggestion> gerarSugestao() async => AiSuggestion.fromJson(
-    await _client.post('/api/recommended-wallets/bb-fii/suggestions')
-        as Map<String, dynamic>,
+  Future<AiSuggestion> gerarSugestao({
+    required String carteiraId,
+    required String mes,
+    required AiSuggestionTab aba,
+  }) async => AiSuggestion.fromJson(
+    await _client.post(
+      '/api/recommended-wallets/bb-fii/suggestions',
+      body: {'walletId': carteiraId, 'month': mes, 'tab': aba.toJson()},
+    ) as Map<String, dynamic>,
   );
 
   // -------------------------------------------------------------------------

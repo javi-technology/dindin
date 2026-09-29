@@ -248,6 +248,7 @@ class _ComparacaoState extends State<_Comparacao> {
   );
 
   AiSuggestion? _sugestao;
+  bool _buscouSugestao = false;
   bool _gerando = false;
   String? _erroDaSugestao;
 
@@ -256,18 +257,34 @@ class _ComparacaoState extends State<_Comparacao> {
     super.initState();
     _comparacao.addListener(_aoMudar);
     _comparacao.carregar();
-    if (widget.temIa) _carregarSugestao();
+    // A sugestão depende do mês da carteira sugerida, que vem na comparação:
+    // só dá para buscá-la depois que ela chega.
+    _comparacao.addListener(_aoChegarComparacao);
   }
 
   void _aoMudar() {
     if (mounted) setState(() {});
   }
 
+  /// O mês da carteira sugerida, exigido pelas rotas de sugestão.
+  String? get _mes => _comparacao.estado.dados?.recommended.month;
+
+  void _aoChegarComparacao() {
+    if (widget.temIa && _mes != null && !_buscouSugestao) {
+      _buscouSugestao = true;
+      _carregarSugestao();
+    }
+  }
+
   /// Lê a última sugestão já gerada. Falhar aqui é silencioso: a tela ainda
   /// oferece gerar, e um aviso antes de o usuário pedir nada seria ruído.
   Future<void> _carregarSugestao() async {
     try {
-      final ultima = await widget.api.sugestao(widget.carteiraId);
+      final ultima = await widget.api.sugestao(
+        carteiraId: widget.carteiraId,
+        mes: _mes!,
+        aba: AiSuggestionTab.renda,
+      );
       if (mounted) setState(() => _sugestao = ultima);
     } catch (_) {
       // sem sugestão em mãos, o botão de gerar segue disponível
@@ -281,7 +298,11 @@ class _ComparacaoState extends State<_Comparacao> {
     });
 
     try {
-      final nova = await widget.api.gerarSugestao();
+      final nova = await widget.api.gerarSugestao(
+        carteiraId: widget.carteiraId,
+        mes: _mes!,
+        aba: AiSuggestionTab.renda,
+      );
       if (mounted) setState(() => _sugestao = nova);
     } catch (erro) {
       if (mounted) {
@@ -299,6 +320,7 @@ class _ComparacaoState extends State<_Comparacao> {
   @override
   void dispose() {
     _comparacao.removeListener(_aoMudar);
+    _comparacao.removeListener(_aoChegarComparacao);
     _comparacao.dispose();
     super.dispose();
   }
@@ -310,7 +332,9 @@ class _ComparacaoState extends State<_Comparacao> {
     rodape: SugestoesView(
       sugestao: _sugestao,
       temAcesso: widget.temIa,
-      carregando: _gerando,
+      // Sem o mês da carteira sugerida a API recusa o pedido, então o botão
+      // só libera quando a comparação chega.
+      carregando: _gerando || _mes == null,
       erro: _erroDaSugestao,
       aoGerar: _gerarSugestao,
     ),
