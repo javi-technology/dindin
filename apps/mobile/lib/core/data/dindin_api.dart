@@ -238,6 +238,31 @@ class DinDinApi {
         as Map<String, dynamic>,
   );
 
+  /// Última sugestão da IA para a carteira, ou `null` se ainda não há (#446).
+  ///
+  /// A API devolve a lista das geradas, da mais recente para a mais antiga;
+  /// a tela mostra uma por vez, que é o que cabe no celular.
+  Future<AiSuggestion?> sugestao(String carteiraId) async {
+    final lista = _lista(
+      await _client.get(
+        '/api/recommended-wallets/bb-fii/suggestions',
+        query: {'walletId': carteiraId},
+      ),
+      AiSuggestion.fromJson,
+    );
+
+    return lista.isEmpty ? null : lista.first;
+  }
+
+  /// Gera uma sugestão nova — recurso de assinante (entitlement `ai`).
+  ///
+  /// Cada chamada custa uma consulta ao provedor de IA, então a tela bloqueia
+  /// o botão enquanto a anterior não responde.
+  Future<AiSuggestion> gerarSugestao() async => AiSuggestion.fromJson(
+    await _client.post('/api/recommended-wallets/bb-fii/suggestions')
+        as Map<String, dynamic>,
+  );
+
   // -------------------------------------------------------------------------
   // Notificações push (issue #408)
   // -------------------------------------------------------------------------

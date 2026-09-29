@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../contracts/contracts.g.dart';
+import '../../core/api/api_exception.dart';
+import '../../core/assinatura/assinatura_service.dart';
 import '../../core/data/cache_local.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/envio.dart';
 import '../../core/data/recurso.dart';
 import '../../core/theme/dindin_tokens.dart';
 import '../../shared/components/estado_erro.dart';
-import '../../core/assinatura/assinatura_service.dart';
 import '../../shared/components/selo_assinante.dart';
 import '../../shared/components/visao_recurso.dart';
 import 'comparacao_view.dart';
 import 'resultado_view.dart';
 import 'simulacao_form.dart';
+import 'sugestoes_view.dart';
 
 /// Carteira sugerida e simulação (issue #404).
 ///
@@ -210,6 +212,7 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
       api: widget.api,
       cache: widget.cache,
       carteiraId: carteira.id,
+      temIa: widget.assinatura.temIa,
     );
   }
 }
@@ -220,11 +223,15 @@ class _Comparacao extends StatefulWidget {
     required this.api,
     required this.cache,
     required this.carteiraId,
+    required this.temIa,
   });
 
   final DinDinApi api;
   final CacheLocal cache;
   final String carteiraId;
+
+  /// Entitlement `ai`, que libera as sugestões (#446).
+  final bool temIa;
 
   @override
   State<_Comparacao> createState() => _ComparacaoState();
@@ -240,15 +247,53 @@ class _ComparacaoState extends State<_Comparacao> {
         RecommendedWalletComparison.fromJson(json as Map<String, dynamic>),
   );
 
+  AiSuggestion? _sugestao;
+  bool _gerando = false;
+  String? _erroDaSugestao;
+
   @override
   void initState() {
     super.initState();
     _comparacao.addListener(_aoMudar);
     _comparacao.carregar();
+    if (widget.temIa) _carregarSugestao();
   }
 
   void _aoMudar() {
     if (mounted) setState(() {});
+  }
+
+  /// Lê a última sugestão já gerada. Falhar aqui é silencioso: a tela ainda
+  /// oferece gerar, e um aviso antes de o usuário pedir nada seria ruído.
+  Future<void> _carregarSugestao() async {
+    try {
+      final ultima = await widget.api.sugestao(widget.carteiraId);
+      if (mounted) setState(() => _sugestao = ultima);
+    } catch (_) {
+      // sem sugestão em mãos, o botão de gerar segue disponível
+    }
+  }
+
+  Future<void> _gerarSugestao() async {
+    setState(() {
+      _gerando = true;
+      _erroDaSugestao = null;
+    });
+
+    try {
+      final nova = await widget.api.gerarSugestao();
+      if (mounted) setState(() => _sugestao = nova);
+    } catch (erro) {
+      if (mounted) {
+        setState(
+          () => _erroDaSugestao = erro is ApiException
+              ? erro.message
+              : 'Não foi possível gerar a sugestão. Tente de novo.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _gerando = false);
+    }
   }
 
   @override
@@ -262,5 +307,12 @@ class _ComparacaoState extends State<_Comparacao> {
   Widget build(BuildContext context) => ComparacaoView(
     estado: _comparacao.estado,
     aoRecarregar: _comparacao.carregar,
+    rodape: SugestoesView(
+      sugestao: _sugestao,
+      temAcesso: widget.temIa,
+      carregando: _gerando,
+      erro: _erroDaSugestao,
+      aoGerar: _gerarSugestao,
+    ),
   );
 }
