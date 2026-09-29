@@ -239,6 +239,10 @@ jobs:
   # outras camadas — formatação, análise estática e suíte (issue #398).
   build-and-test-mobile:
     name: Build and Test Mobile
+    # Como api e web: o `version` abre a cadeia que o deploy exige, e o mobile
+    # é o segundo job mais lento — rodá-lo antes de saber se a versão fecha
+    # gasta o minuto mais caro do CI à toa.
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

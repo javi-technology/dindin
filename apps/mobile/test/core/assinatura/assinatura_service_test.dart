@@ -65,6 +65,26 @@ void main() {
       expect(service.temProjecoes, isTrue);
     });
 
+    // `ai` e `projections` são concessões diferentes na mesma assinatura: as
+    // sugestões da carteira recomendada (#446) exigem a primeira, e a
+    // simulação por ativo, a segunda.
+    test('libera a IA para quem tem o entitlement de IA', () async {
+      final service = AssinaturaService(apiQue(['ai']));
+
+      await service.carregar();
+
+      expect(service.temIa, isTrue);
+      expect(service.temProjecoes, isFalse);
+    });
+
+    test('mantém a IA bloqueada para quem só tem projeções', () async {
+      final service = AssinaturaService(apiQue(['projections']));
+
+      await service.carregar();
+
+      expect(service.temIa, isFalse);
+    });
+
     test('mantém bloqueado quem não tem o entitlement', () async {
       final service = AssinaturaService(apiQue(['ai']));
 

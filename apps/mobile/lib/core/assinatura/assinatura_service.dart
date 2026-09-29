@@ -24,6 +24,13 @@ class AssinaturaService extends ChangeNotifier {
   bool get temProjecoes =>
       _perfil?.entitlements.contains(Entitlement.projections) ?? false;
 
+  /// Acesso à IA, que é o que libera as sugestões da carteira recomendada.
+  ///
+  /// É uma concessão **diferente** de [temProjecoes]: as duas vivem na mesma
+  /// assinatura, mas a API cobra cada uma na sua rota, e tratar as duas como
+  /// uma só liberaria tela que o backend recusa com 402.
+  bool get temIa => _perfil?.entitlements.contains(Entitlement.ai) ?? false;
+
   /// Se o usuário é administrador, como o web também deriva de `/api/me`.
   bool get admin => _perfil?.admin ?? false;
 
