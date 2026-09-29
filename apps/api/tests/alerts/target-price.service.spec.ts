@@ -491,6 +491,31 @@ describe('TargetPriceService – avisos pendentes de execuções anteriores', ()
     expect(result.pendingNotification).toHaveLength(0);
   });
 
+  // Alerta gravado antes da separação por canal tem `notifiedAt` e nenhum dos
+  // dois campos novos. Olhar só `notifiedPushAt` faria o primeiro job após o
+  // deploy mandar push de tudo que já havia sido avisado por e-mail — o
+  // reenvio em massa que `notifiedAt` existe para evitar.
+  it('não deve reavisar alerta antigo marcado só com notifiedAt', async () => {
+    seedFirestore({
+      quotes: { HGLG11: 130 },
+      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      openAlerts: [
+        {
+          id: 'fridge-1_HGLG11',
+          data: {
+            ticker: 'HGLG11',
+            status: 'open',
+            notifiedAt: '2026-09-17T22:16:00Z',
+          },
+        },
+      ],
+    });
+
+    const result = await checkUserTargetPrices('user-1');
+
+    expect(result.pendingNotification).toHaveLength(0);
+  });
+
   // Com dois canais, "avisado" deixou de ser um estado só (issue #408): o
   // push que falhou ainda precisa sair, mesmo que o e-mail já tenha ido.
   it('deve devolver alerta que saiu por um canal e não pelo outro', async () => {
