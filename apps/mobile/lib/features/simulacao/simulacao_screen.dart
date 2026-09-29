@@ -7,6 +7,7 @@ import '../../core/data/envio.dart';
 import '../../core/data/recurso.dart';
 import '../../core/theme/dindin_tokens.dart';
 import '../../shared/components/estado_erro.dart';
+import '../../core/assinatura/assinatura_service.dart';
 import '../../shared/components/selo_assinante.dart';
 import '../../shared/components/visao_recurso.dart';
 import 'comparacao_view.dart';
@@ -25,6 +26,7 @@ class SimulacaoScreen extends StatefulWidget {
     required this.api,
     required this.carteiras,
     required this.cache,
+    required this.assinatura,
   });
 
   final DinDinApi api;
@@ -32,6 +34,10 @@ class SimulacaoScreen extends StatefulWidget {
   /// Cache das consultas da tela (#404): o app mostra o último estado
   /// conhecido enquanto busca o atual, como as demais telas já fazem.
   final CacheLocal cache;
+
+  /// Status da assinatura (#442). A simulação por ativo é paga; quem já assina
+  /// pela web precisa encontrá-la liberada aqui.
+  final AssinaturaService assinatura;
 
   /// Carteiras do usuário, para a comparação. Vazia enquanto não carregaram.
   final List<Wallet> carteiras;
@@ -170,9 +176,10 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
               resultado: resultado,
               aoSimularAtivo: _avisarRecursoDeAssinante,
             ),
-          ] else ...[
+          ] else if (!widget.assinatura.temProjecoes) ...[
             const SizedBox(height: 24),
             Row(
+              key: const Key('selo-simulacao-ativo'),
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 SeloAssinante(),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../contracts/contracts.g.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/data/cache_local.dart';
+import '../../core/assinatura/assinatura_service.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/recurso.dart';
 import '../../core/data/envio.dart';
@@ -37,6 +38,7 @@ class InicioScreen extends StatefulWidget {
     required this.cache,
     required this.tema,
     required this.notificacoes,
+    required this.assinatura,
     this.geladeiraInicial,
   });
 
@@ -45,6 +47,9 @@ class InicioScreen extends StatefulWidget {
   final CacheLocal cache;
   final ThemeController tema;
   final NotificacoesService notificacoes;
+
+  /// Status da assinatura, para as telas que têm recurso pago (#442).
+  final AssinaturaService assinatura;
 
   /// Geladeira a abrir na entrada, quando o app subiu por um toque na
   /// notificação de preço-alvo (issue #408).
@@ -226,6 +231,7 @@ class _InicioScreenState extends State<InicioScreen> {
           api: widget.api,
           carteiras: estado.dados ?? const [],
           cache: widget.cache,
+          assinatura: widget.assinatura,
         ),
       ),
     ];

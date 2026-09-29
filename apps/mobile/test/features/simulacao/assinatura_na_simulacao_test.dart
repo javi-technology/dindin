@@ -41,7 +41,7 @@ void main() {
               jsonEncode([
                 {
                   'slug': 'bb-fii',
-                  'label': 'BB — FIIs',
+                  'label': 'BB FIIs',
                   'provider': 'BB',
                   'months': ['2026-09'],
                 },
@@ -57,23 +57,37 @@ void main() {
 
   Widget tela(AssinaturaService assinatura) => MaterialApp(
     theme: DinDinTheme.claro,
-    home: SimulacaoScreen(
-      api: apiFalsa(),
-      carteiras: const [],
-      assinatura: assinatura,
+    // A tela vive dentro de um Scaffold no app; sem ele os campos de texto
+    // não encontram o Material ancestral e o build falha.
+    home: Scaffold(
+      body: SimulacaoScreen(
+        api: apiFalsa(),
+        carteiras: const [],
+        assinatura: assinatura,
+      ),
     ),
   );
+
+  // O selo fica abaixo do formulário, fora da primeira tela do celular: sem
+  // rolar, o widget nem chega a ser construído pela lista.
+  Future<void> rolarAteOFim(WidgetTester tester) async {
+    await tester.drag(find.byType(ListView).first, const Offset(0, -600));
+    await tester.pumpAndSettle();
+  }
 
   testWidgets('sem assinatura, a simulação por ativo segue marcada', (
     tester,
   ) async {
-    final api = apiFalsa();
-    final assinatura = AssinaturaService(api);
+    final assinatura = AssinaturaService(apiFalsa());
 
     await tester.pumpWidget(tela(assinatura));
     await tester.pumpAndSettle();
+    await rolarAteOFim(tester);
 
-    expect(find.byKey(const Key('selo-simulacao-ativo')), findsOneWidget);
+    expect(
+      find.byKey(const Key('selo-simulacao-ativo'), skipOffstage: false),
+      findsOneWidget,
+    );
   });
 
   testWidgets('com assinatura, o recurso deixa de ser marcado como pago', (
@@ -83,8 +97,12 @@ void main() {
 
     await tester.pumpWidget(tela(assinatura));
     await tester.pumpAndSettle();
+    await rolarAteOFim(tester);
 
-    expect(find.byKey(const Key('selo-simulacao-ativo')), findsNothing);
+    expect(
+      find.byKey(const Key('selo-simulacao-ativo'), skipOffstage: false),
+      findsNothing,
+    );
   });
 }
 

@@ -5,6 +5,7 @@ import 'core/auth/auth_service.dart';
 import 'core/data/cache_local.dart';
 import 'core/data/dindin_api.dart';
 import 'core/notificacoes/notificacoes_service.dart';
+import 'core/assinatura/assinatura_service.dart';
 import 'core/setup/setup_service.dart';
 import 'core/theme/dindin_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -21,6 +22,7 @@ class DinDinApp extends StatelessWidget {
     required this.cache,
     required this.notificacoes,
     required this.setup,
+    required this.assinatura,
     this.geladeiraInicial,
   });
 
@@ -34,6 +36,10 @@ class DinDinApp extends StatelessWidget {
   /// tela (#440). Entra pelo gate, e não pela tela inicial, porque a tela já
   /// carrega as geladeiras ao montar.
   final SetupService setup;
+
+  /// Status da assinatura, lido uma vez por sessão junto do provisionamento
+  /// (#442).
+  final AssinaturaService assinatura;
 
   /// Geladeira a abrir na entrada, quando o app subiu por um toque na
   /// notificação de preço-alvo (issue #408).
@@ -57,7 +63,14 @@ class DinDinApp extends StatelessWidget {
         themeMode: tema.modo,
         home: AuthGate(
           sessoes: auth.sessoes,
-          aoAutenticar: (sessao) => setup.garantirPadroes(sessao.uid),
+          aoAutenticar: (sessao) async {
+            // As duas leituras são do mesmo momento — entrar — e nenhuma
+            // depende da outra, então vão juntas em vez de em série.
+            await Future.wait([
+              setup.garantirPadroes(sessao.uid),
+              assinatura.carregar(),
+            ]);
+          },
           login: LoginScreen(
             aoEntrarComEmail: auth.entrarComEmail,
             aoEntrarComGoogle: auth.entrarComGoogle,
@@ -69,6 +82,7 @@ class DinDinApp extends StatelessWidget {
             cache: cache,
             tema: tema,
             notificacoes: notificacoes,
+            assinatura: assinatura,
             geladeiraInicial: geladeiraInicial,
           ),
         ),

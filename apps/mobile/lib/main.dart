@@ -10,6 +10,7 @@ import 'core/auth/auth_service.dart';
 import 'core/auth/firebase_auth_backend.dart';
 import 'core/data/cache_local.dart';
 import 'core/data/dindin_api.dart';
+import 'core/assinatura/assinatura_service.dart';
 import 'core/setup/setup_service.dart';
 import 'core/notificacoes/firebase_notificacoes_backend.dart';
 import 'core/notificacoes/notificacoes_service.dart';
@@ -60,6 +61,7 @@ Future<void> main() async {
       cache: cache,
       notificacoes: notificacoes,
       setup: SetupService(api),
+      assinatura: AssinaturaService(api),
       geladeiraInicial: inicial?.data['fridgeId'] as String?,
     ),
   );
