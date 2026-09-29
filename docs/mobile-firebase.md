@@ -51,6 +51,27 @@ o erro que aparece (`sign_in_failed`) não diz qual.
    devolve o resultado do login ao app.
 6. **Auth** → _Sign-in method_: habilite **E-mail/senha** e **Google**.
 
+## Notificações push no iOS
+
+O app pode abrir sem token APNs, mas só recebe push no iOS depois que o
+registro com a Apple e o FCM estiver configurado:
+
+1. Abra `apps/mobile/ios/Runner.xcworkspace` no Xcode. No target `Runner`, em
+   _Signing & Capabilities_, selecione a equipe Apple e adicione **Push
+   Notifications**.
+2. Adicione **Background Modes** e marque **Background fetch** e **Remote
+   notifications**.
+3. No Firebase Console, em _Project settings → Cloud Messaging_, envie uma
+   chave de autenticação APNs (`.p8`) com o _Key ID_ e o _Team ID_ da equipe.
+4. Conceda a permissão de notificações na geladeira do app e valide a entrega
+   em um dispositivo iOS configurado para receber push.
+
+O `firebase_messaging` usa o _method swizzling_ para associar o token APNs ao
+token FCM; não desative `FirebaseAppDelegateProxyEnabled` no `Info.plist`.
+Se o APNs ainda não estiver disponível na abertura, o app continua iniciando
+e o registro de push é tentado novamente quando o FCM renovar o token ou na
+próxima abertura.
+
 ## Apontar o app para os emuladores
 
 Com os emuladores ativos na raiz do repositório, um único define aponta a API
