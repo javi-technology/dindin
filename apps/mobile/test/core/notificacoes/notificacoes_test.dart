@@ -48,6 +48,47 @@ void main() {
     removerToken: api.remover,
   );
 
+  // -------------------------------------------------------------------------
+  // Registro na abertura (issue #408)
+  //
+  // O token muda quando o usuário reinstala, troca de aparelho ou limpa os
+  // dados — e isso acontece com o app fechado. Registrando só ao conceder a
+  // permissão, o token novo nunca chegava à API e o push parava de funcionar
+  // em silêncio, sem nada na tela que indicasse o motivo.
+  // -------------------------------------------------------------------------
+  group('abertura do app', () {
+    test('registra o token atual de quem já concedeu a permissão', () async {
+      backend.permissao = PermissaoDeNotificacao.concedida;
+      backend.tokenDoAparelho = 'token-novo';
+
+      final service = await abrir();
+
+      expect(api.registrados.map((r) => r.$1).toList(), ['token-novo']);
+      expect(service.ativas, isTrue);
+    });
+
+    test('não registra quem não concedeu a permissão', () async {
+      backend.permissao = PermissaoDeNotificacao.negada;
+
+      await abrir();
+
+      expect(api.registrados, isEmpty);
+    });
+
+    // Desligar dentro do app precisa continuar valendo na próxima abertura:
+    // registrar de novo faria o push voltar sozinho.
+    test('não registra quem desligou o push no app', () async {
+      SharedPreferences.setMockInitialValues({
+        NotificacoesService.chaveDesligado: true,
+      });
+      backend.permissao = PermissaoDeNotificacao.concedida;
+
+      await abrir();
+
+      expect(api.registrados, isEmpty);
+    });
+  });
+
   group('permissão', () {
     test('começa sem ter perguntado', () async {
       final service = await abrir();

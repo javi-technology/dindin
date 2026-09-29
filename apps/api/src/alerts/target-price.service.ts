@@ -105,8 +105,13 @@ export async function checkUserTargetPrices(
       // Reprocessa o alerta aberto que ficou sem aviso em **algum** canal:
       // com o estado por canal (#408), o push que falhou ainda precisa sair
       // mesmo que o e-mail tenha ido, e vice-versa.
+      // `notifiedAt` é a marca dos alertas gravados antes da separação por
+      // canal, e vale para os **dois**: ele foi escrito quando havia um só.
+      // Cobrar `notifiedPushAt` desses faria o primeiro job após o deploy
+      // mandar push de tudo que já tinha saído por e-mail.
       const semEmail = !openAlert.notifiedEmailAt && !openAlert.notifiedAt;
-      if (semEmail || !openAlert.notifiedPushAt) {
+      const semPush = !openAlert.notifiedPushAt && !openAlert.notifiedAt;
+      if (semEmail || semPush) {
         pendingNotification.push(openAlert);
       }
       continue;
