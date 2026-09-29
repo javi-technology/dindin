@@ -176,6 +176,32 @@ void main() {
   });
 
   group('resultado', () {
+    // ---------------------------------------------------------------------
+    // O resultado é embutido na lista da tela (issue #404)
+    //
+    // Sendo ele próprio rolável, vira viewport sem altura definida dentro de
+    // outra e o Flutter lança em tempo de execução. Não aparece na análise
+    // estática nem nos testes que o montam sozinho — só na tela real, logo
+    // depois de a simulação dar certo.
+    // ---------------------------------------------------------------------
+    testWidgets('cabe dentro de uma lista rolável', (tester) async {
+      await tester.pumpWidget(
+        emApp(
+          ListView(
+            children: [
+              ResultadoView(
+                resultado: resultado(byTicker: [item()]),
+                aoSimularAtivo: null,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('HGLG11'), findsOneWidget);
+    });
+
     testWidgets('mostra renda projetada, cotas e troco', (tester) async {
       await tester.pumpWidget(
         emApp(
