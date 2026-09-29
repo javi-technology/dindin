@@ -94,8 +94,9 @@ Por isso:
 Nas duas lojas o **primeiro** envio é manual:
 
 - **Google Play**: a API só publica em app que já tem uma versão enviada pelo
-  console. Gere o `.aab` localmente ou peça um run do workflow que falhe no
-  upload, baixe o build e suba a primeira versão na faixa interna à mão.
+  console. Rode o workflow: o passo de envio falha, mas o bundle assinado fica
+  como artefato da execução (`android-bundle-<tag>`, guardado por 3 dias).
+  Baixe-o e suba a primeira versão na faixa interna pelo console.
 - **App Store Connect**: o app precisa existir (`docs/publicacao-lojas.md`)
   antes de o `altool` conseguir enviar o build.
 

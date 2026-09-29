@@ -74,6 +74,22 @@ describe('.github/workflows/mobile-release.yml', () => {
     }
   });
 
+  // O archive é assinado antes da exportação: só o ExportOptions.plist não
+  // basta, e o `flutter build ipa` num runner novo não acha equipe nem perfil.
+  it('deve assinar o archive do iOS com equipe e perfil explícitos', () => {
+    expect(workflow).toMatch(/xcodebuild[\s\S]*archive/);
+    expect(workflow).toContain('DEVELOPMENT_TEAM=');
+    expect(workflow).toContain('PROVISIONING_PROFILE_SPECIFIER=');
+    expect(workflow).toContain('CODE_SIGN_STYLE=Manual');
+    expect(workflow).toMatch(/xcodebuild[\s\S]*-exportArchive/);
+    expect(workflow).not.toContain('flutter build ipa');
+  });
+
+  it('deve guardar o bundle Android como artefato, para o primeiro envio manual', () => {
+    expect(workflow).toContain('actions/upload-artifact');
+    expect(workflow).toContain('app-release.aab');
+  });
+
   it('deve falhar cedo quando faltar o segredo de assinatura', () => {
     expect(workflow).toMatch(/::error::[^\n]*(faltando|não configurado)/);
   });

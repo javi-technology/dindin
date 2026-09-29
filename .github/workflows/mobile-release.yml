@@ -112,6 +112,16 @@ jobs:
             --build-name "${{ steps.versao.outputs.name }}" \
             --build-number "${{ steps.versao.outputs.number }}"
 
+      # Guardado antes do envio: o primeiro upload para o Play é manual
+      # (docs/mobile-release.md) e precisa deste arquivo. Retenção curta, por
+      # ser um bundle assinado.
+      - name: Guardar o bundle assinado
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-bundle-${{ inputs.tag }}
+          path: apps/mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 3
+
       - name: Publicar na faixa interna do Google Play
         uses: r0adkll/upload-google-play@v1
         with:
@@ -235,12 +245,33 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build do IPA assinado
+      # O archive é assinado aqui, com equipe e perfil explícitos: o
+      # `ExportOptions.plist` só vale na exportação, depois. Num runner novo o
+      # projeto não define equipe nem perfil de Release, e o archive falharia.
+      # `flutter build ios` gera a configuração e os pods, e leva o nome e o
+      # número do build para o archive.
+      - name: Build do archive assinado
+        env:
+          TEAM_ID: ${{ vars.IOS_TEAM_ID }}
         run: |
-          flutter build ipa --release \
+          set -euo pipefail
+          flutter build ios --release --no-codesign \
             --build-name "${{ steps.versao.outputs.name }}" \
-            --build-number "${{ steps.versao.outputs.number }}" \
-            --export-options-plist ios/ExportOptions.plist
+            --build-number "${{ steps.versao.outputs.number }}"
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+            -configuration Release -archivePath build/ios/Runner.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
+
+      - name: Exportar o IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/ios/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ios/ipa
 
       # A chave de API da App Store Connect vai para o diretório que o altool
       # procura (`AuthKey_<id>.p8`), e é removida no fim.
