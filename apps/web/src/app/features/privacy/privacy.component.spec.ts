@@ -29,6 +29,21 @@ describe('PrivacyComponent', () => {
     expect(texto).toContain('token de notificação');
   });
 
+  // O prompt da IA leva a carteira do usuário (issue #406): a política que
+  // vai às declarações das lojas precisa dizer o que de fato é enviado.
+  it('deve informar quais dados financeiros seguem ao provedor de IA', () => {
+    const texto = render().textContent ?? '';
+    for (const dado of [
+      'valor total da carteira',
+      'aporte',
+      'proventos',
+      'quantidades',
+      'valores de cada ativo',
+    ]) {
+      expect(texto).toContain(dado);
+    }
+  });
+
   it('deve ser rota pública, sem guard de autenticação', () => {
     const rota = routes.find((r) => r.path === 'privacidade');
     expect(rota).toBeTruthy();
