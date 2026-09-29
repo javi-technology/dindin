@@ -160,6 +160,9 @@ class _InicioScreenState extends State<InicioScreen> {
     _proventos.carregar();
     _projecao.carregar();
     _catalogo.carregar();
+    // O histórico chega depois do resumo, e a tela precisa redesenhar: sem
+    // escutar, o gráfico ficava com os pontos que tinha na montagem.
+    _historico.addListener(_aoMudarHistorico);
     _historico.carregar();
   }
 
@@ -193,6 +196,10 @@ class _InicioScreenState extends State<InicioScreen> {
     _itens!.carregar();
   }
 
+  void _aoMudarHistorico() {
+    if (mounted) setState(() {});
+  }
+
   void _aoMudarGeladeiras() {
     if (mounted) setState(() {});
   }
@@ -211,6 +218,7 @@ class _InicioScreenState extends State<InicioScreen> {
     _patrimonio.dispose();
     _carteiras.dispose();
     _catalogo.dispose();
+    _historico.removeListener(_aoMudarHistorico);
     _historico.dispose();
     _geladeiras.dispose();
     _proventos.dispose();

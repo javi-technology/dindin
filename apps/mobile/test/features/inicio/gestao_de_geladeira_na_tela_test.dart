@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -40,12 +41,14 @@ void main() {
   late List<(String, String, Object?)> enviadas;
   late List<Map<String, dynamic>> geladeirasDaApi;
   late List<Map<String, dynamic>> historicoDaApi;
+  Completer<void>? historicoPendente;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     enviadas = [];
     geladeirasDaApi = [geladeira('g1', 'Primeira'), geladeira('g2', 'Segunda')];
     historicoDaApi = [];
+    historicoPendente = null;
   });
 
   DinDinApi apiFalsa() => DinDinApi(
@@ -59,10 +62,27 @@ void main() {
           req.body.isEmpty ? null : jsonDecode(req.body),
         ));
 
+        if (req.url.path == '/api/dashboard/summary') {
+          return http.Response(
+            jsonEncode({
+              'totalWallet': 1000.0,
+              'totalFridge': 0.0,
+              'total': 1000.0,
+              'monthlyIncomeTotal': 8.0,
+              'composition': [
+                {'ticker': 'HGLG11', 'value': 1000.0},
+              ],
+            }),
+            200,
+          );
+        }
         if (req.url.path == '/api/fridges' && req.method == 'GET') {
           return http.Response(jsonEncode(geladeirasDaApi), 200);
         }
         if (req.url.path == '/api/patrimony/history') {
+          // A resposta pode ficar pendente, para o teste controlar quando o
+          // histórico chega — que é o caso do defeito.
+          await historicoPendente?.future;
           return http.Response(jsonEncode(historicoDaApi), 200);
         }
         if (req.url.path.endsWith('/items') && req.method == 'GET') {
@@ -178,32 +198,25 @@ void main() {
   testWidgets('mostra o gráfico quando o histórico chega depois', (
     tester,
   ) async {
-    historicoDaApi = [];
+    historicoPendente = Completer<void>();
+    historicoDaApi = [
+      for (final total in [100.0, 200.0])
+        {
+          'id': '$total',
+          'userId': 'u1',
+          'date': '2026-08-01',
+          'totalWallet': total,
+          'totalFridge': 0.0,
+          'total': total,
+          'createdAt': '2026-08-01T00:00:00Z',
+        },
+    ];
 
     await abrirTela(tester);
+    // Enquanto o histórico não chega, o gráfico diz o que falta.
     expect(find.byKey(const Key('grafico-patrimonio-vazio')), findsOneWidget);
 
-    historicoDaApi = [
-      {
-        'id': '1',
-        'userId': 'u1',
-        'date': '2026-08-01',
-        'totalWallet': 100.0,
-        'totalFridge': 0.0,
-        'total': 100.0,
-        'createdAt': '2026-08-01T00:00:00Z',
-      },
-      {
-        'id': '2',
-        'userId': 'u1',
-        'date': '2026-09-01',
-        'totalWallet': 200.0,
-        'totalFridge': 0.0,
-        'total': 200.0,
-        'createdAt': '2026-09-01T00:00:00Z',
-      },
-    ];
-    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
+    historicoPendente!.complete();
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('grafico-patrimonio-vazio')), findsNothing);
