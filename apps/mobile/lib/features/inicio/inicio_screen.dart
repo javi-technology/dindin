@@ -20,7 +20,10 @@ import '../simulacao/simulacao_screen.dart';
 import 'ajustes_de_notificacao.dart';
 import '../carteiras/carteiras_view.dart';
 import '../carteiras/posicoes_view.dart';
+import '../../shared/components/confirmar_dialog.dart';
 import '../geladeira/geladeira_view.dart';
+import '../geladeira/seletor_de_geladeira.dart';
+import '../geladeira/geladeira_form.dart';
 import 'geladeira_inicial.dart';
 import '../patrimonio/patrimonio_view.dart';
 import '../proventos/projecao_view.dart';
@@ -92,6 +95,7 @@ class _InicioScreenState extends State<InicioScreen> {
   );
 
   Recurso<List<FridgeItem>>? _itens;
+  String? _abertaId;
 
   /// Catálogo de ativos, para sugerir o ticker nos formulários (#443).
   ///
@@ -152,7 +156,14 @@ class _InicioScreenState extends State<InicioScreen> {
     final escolhida = escolherGeladeira(geladeiras, widget.geladeiraInicial);
     if (escolhida == null) return;
 
-    final id = escolhida.id;
+    _abrirGeladeira(escolhida);
+  }
+
+  /// Troca a geladeira em tela, recriando o recurso dos itens: a chave do
+  /// cache inclui o id, então cada geladeira guarda a própria lista.
+  void _abrirGeladeira(Fridge geladeira) {
+    _abertaId = geladeira.id;
+    final id = geladeira.id;
     _itens = Recurso<List<FridgeItem>>(
       chave: 'itens-$id',
       cache: widget.cache,
@@ -164,6 +175,13 @@ class _InicioScreenState extends State<InicioScreen> {
     );
     setState(() {});
     _itens!.carregar();
+  }
+
+  /// Geladeira em tela, ou a primeira quando a aberta deixou de existir.
+  Fridge? get _geladeiraAberta {
+    final geladeiras = _geladeiras.estado.dados;
+    if (geladeiras == null || geladeiras.isEmpty) return null;
+    return escolherGeladeira(geladeiras, _abertaId);
   }
 
   @override
@@ -384,6 +402,62 @@ class _InicioScreenState extends State<InicioScreen> {
       ),
     ),
   );
+
+  Future<void> _criarGeladeira() async {
+    await _abrirFormulario(
+      titulo: 'Nova geladeira',
+      formulario: (context, envio, salvar) => GeladeiraForm(
+        erro: envio.erro,
+        aoSalvar: (dados) => salvar(() => widget.api.criarGeladeira(dados)),
+      ),
+    );
+    await _geladeiras.carregar();
+  }
+
+  Future<void> _renomearGeladeira(Fridge geladeira) async {
+    await _abrirFormulario(
+      titulo: 'Renomear geladeira',
+      formulario: (context, envio, salvar) => GeladeiraForm(
+        erro: envio.erro,
+        nomeInicial: geladeira.name,
+        descricaoInicial: geladeira.description,
+        aoSalvar: (dados) => salvar(
+          () => widget.api.atualizarGeladeira(
+            geladeira.id,
+            UpdateFridgeRequest(
+              name: dados.name,
+              description: dados.description,
+            ),
+          ),
+        ),
+      ),
+    );
+    await _geladeiras.carregar();
+  }
+
+  /// A API apaga os itens junto com a geladeira, e o aviso diz isso: o
+  /// usuário não tem como adivinhar que perde o que estava lá dentro.
+  Future<void> _excluirGeladeira(Fridge geladeira) async {
+    final quantos = _itens?.estado.dados?.length ?? 0;
+    final confirmou = await ConfirmarDialog.mostrar(
+      context,
+      titulo: 'Excluir ${geladeira.name}?',
+      mensagem: quantos == 0
+          ? 'A geladeira será excluída.'
+          : 'Os $quantos ativos que estão nela serão excluídos junto.',
+      rotuloConfirmar: 'Excluir',
+    );
+    if (!confirmou) return;
+
+    await _excluir(() => widget.api.excluirGeladeira(geladeira.id));
+
+    // A geladeira aberta deixou de existir: a próxima carga escolhe outra.
+    setState(() {
+      _abertaId = null;
+      _itens = null;
+    });
+    await _geladeiras.carregar();
+  }
 
   Future<void> _criarPosicao(String carteiraId) => _abrirFormulario(
     titulo: 'Nova posição',
@@ -653,8 +727,22 @@ class _InicioScreenState extends State<InicioScreen> {
       );
     }
 
+    final aberta = _geladeiraAberta;
+
     return Column(
       children: [
+        if (aberta != null)
+          SeletorDeGeladeira(
+            geladeiras: _geladeiras.estado.dados ?? [aberta],
+            aberta: aberta,
+            aoTrocar: (geladeira) {
+              setState(() => _abrirGeladeira(geladeira));
+              _itens!.carregar();
+            },
+            aoCriar: _criarGeladeira,
+            aoRenomear: () => _renomearGeladeira(aberta),
+            aoExcluir: () => _excluirGeladeira(aberta),
+          ),
         // O convite fica na geladeira, que é onde o alerta acontece: pedir a
         // permissão na primeira abertura, sem contexto, é o jeito mais rápido
         // de receber um "não" definitivo.
