@@ -20,6 +20,7 @@ import 'ajustes_de_notificacao.dart';
 import '../carteiras/carteiras_view.dart';
 import '../carteiras/posicoes_view.dart';
 import '../geladeira/geladeira_view.dart';
+import 'geladeira_inicial.dart';
 import '../patrimonio/patrimonio_view.dart';
 import '../proventos/projecao_view.dart';
 import '../proventos/proventos_view.dart';
@@ -116,19 +117,22 @@ class _InicioScreenState extends State<InicioScreen> {
 
     _patrimonio.carregar();
     _carteiras.carregar();
-    _geladeiras.addListener(_abrirPrimeiraGeladeira);
+    _geladeiras.addListener(_abrirGeladeiraInicial);
     _geladeiras.carregar();
     _proventos.carregar();
     _projecao.carregar();
   }
 
-  /// Na prática o usuário tem uma geladeira; abrir a primeira poupa um toque
-  /// no caso comum.
-  void _abrirPrimeiraGeladeira() {
+  /// Abre a geladeira do alerta quando o app subiu por uma notificação, e a
+  /// primeira no caso comum de quem tem uma só.
+  void _abrirGeladeiraInicial() {
     final geladeiras = _geladeiras.estado.dados;
-    if (geladeiras == null || geladeiras.isEmpty || _itens != null) return;
+    if (geladeiras == null || _itens != null) return;
 
-    final id = geladeiras.first.id;
+    final escolhida = escolherGeladeira(geladeiras, widget.geladeiraInicial);
+    if (escolhida == null) return;
+
+    final id = escolhida.id;
     _itens = Recurso<List<FridgeItem>>(
       chave: 'itens-$id',
       cache: widget.cache,
@@ -144,7 +148,7 @@ class _InicioScreenState extends State<InicioScreen> {
 
   @override
   void dispose() {
-    _geladeiras.removeListener(_abrirPrimeiraGeladeira);
+    _geladeiras.removeListener(_abrirGeladeiraInicial);
     _patrimonio.dispose();
     _carteiras.dispose();
     _geladeiras.dispose();
