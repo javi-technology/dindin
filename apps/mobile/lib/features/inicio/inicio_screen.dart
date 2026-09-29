@@ -141,6 +141,9 @@ class _InicioScreenState extends State<InicioScreen> {
     _patrimonio.carregar();
     _carteiras.carregar();
     _geladeiras.addListener(_abrirGeladeiraInicial);
+    // Sem isto, renomear ou criar não chegava ao cabeçalho: a aba observava
+    // só os itens, e a lista de geladeiras mudava em silêncio.
+    _geladeiras.addListener(_aoMudarGeladeiras);
     _geladeiras.carregar();
     _proventos.carregar();
     _projecao.carregar();
@@ -177,6 +180,10 @@ class _InicioScreenState extends State<InicioScreen> {
     _itens!.carregar();
   }
 
+  void _aoMudarGeladeiras() {
+    if (mounted) setState(() {});
+  }
+
   /// Geladeira em tela, ou a primeira quando a aberta deixou de existir.
   Fridge? get _geladeiraAberta {
     final geladeiras = _geladeiras.estado.dados;
@@ -187,6 +194,7 @@ class _InicioScreenState extends State<InicioScreen> {
   @override
   void dispose() {
     _geladeiras.removeListener(_abrirGeladeiraInicial);
+    _geladeiras.removeListener(_aoMudarGeladeiras);
     _patrimonio.dispose();
     _carteiras.dispose();
     _catalogo.dispose();
@@ -496,7 +504,9 @@ class _InicioScreenState extends State<InicioScreen> {
   /// O alvo é obrigatório porque é ele que arma o alerta: sem alvo, o item
   /// ficaria na geladeira sem nunca avisar nada.
   Future<void> _moverParaGeladeira(String carteiraId, Position posicao) async {
-    final geladeira = _geladeiras.estado.dados?.firstOrNull;
+    // A geladeira aberta, e não a primeira da lista: depois de trocar no
+    // seletor, o ativo ia parar na geladeira errada.
+    final geladeira = _geladeiraAberta;
     if (geladeira == null) {
       _avisar('Crie uma geladeira antes de mover uma posição para ela.');
       return;
@@ -532,7 +542,7 @@ class _InicioScreenState extends State<InicioScreen> {
   }
 
   Future<void> _criarItem() async {
-    final geladeira = _geladeiras.estado.dados?.firstOrNull;
+    final geladeira = _geladeiraAberta;
     if (geladeira == null) {
       _avisar('Crie uma geladeira antes de adicionar um ativo.');
       return;
@@ -638,6 +648,14 @@ class _InicioScreenState extends State<InicioScreen> {
       key: const Key('criar-carteira'),
       onPressed: _criarCarteira,
       tooltip: 'Nova carteira',
+      child: const Icon(Icons.add),
+    ),
+    // Sem geladeira nenhuma, "novo ativo" só sabe avisar que falta uma — e
+    // não havia por onde criá-la depois de excluir a última.
+    2 when _geladeiraAberta == null => FloatingActionButton(
+      key: const Key('criar-geladeira'),
+      onPressed: _criarGeladeira,
+      tooltip: 'Nova geladeira',
       child: const Icon(Icons.add),
     ),
     2 => FloatingActionButton(

@@ -112,6 +112,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('campo-ticker')), 'HGLG11');
     await tester.enterText(find.byKey(const Key('campo-quantidade')), '10');
+    await tester.enterText(
+      find.byKey(const Key('campo-preco-transferencia')),
+      '150,00',
+    );
+    await tester.enterText(find.byKey(const Key('campo-preco-alvo')), '160,00');
     await tester.tap(find.byKey(const Key('botao-salvar')));
     await tester.pumpAndSettle();
 

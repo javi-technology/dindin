@@ -46,11 +46,11 @@ class _GeladeiraFormState extends State<GeladeiraForm>
   Future<void> _salvar() => enviar(
     _formulario,
     () => widget.aoSalvar(
+      // String vazia, e não `null`: `toJson` omite o nulo, e o backend
+      // manteria a descrição anterior — limpar o campo não apagava nada.
       CreateFridgeRequest(
         name: _nome.text.trim(),
-        description: _descricao.text.trim().isEmpty
-            ? null
-            : _descricao.text.trim(),
+        description: _descricao.text.trim(),
       ),
     ),
   );
