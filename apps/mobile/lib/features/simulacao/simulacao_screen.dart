@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../contracts/contracts.g.dart';
-import '../../core/api/api_exception.dart';
+import '../../core/data/cache_local.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/envio.dart';
 import '../../core/data/recurso.dart';
 import '../../core/theme/dindin_tokens.dart';
-import '../../shared/components/estado_carregando.dart';
 import '../../shared/components/estado_erro.dart';
 import '../../shared/components/selo_assinante.dart';
+import '../../shared/components/visao_recurso.dart';
 import 'comparacao_view.dart';
 import 'resultado_view.dart';
 import 'simulacao_form.dart';
@@ -24,9 +24,14 @@ class SimulacaoScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.carteiras,
+    required this.cache,
   });
 
   final DinDinApi api;
+
+  /// Cache das consultas da tela (#404): o app mostra o último estado
+  /// conhecido enquanto busca o atual, como as demais telas já fazem.
+  final CacheLocal cache;
 
   /// Carteiras do usuário, para a comparação. Vazia enquanto não carregaram.
   final List<Wallet> carteiras;
@@ -38,37 +43,38 @@ class SimulacaoScreen extends StatefulWidget {
 class _SimulacaoScreenState extends State<SimulacaoScreen> {
   final _envio = Envio();
 
-  List<SimulationWalletOption>? _disponiveis;
-  String? _erroAoCarregar;
+  late final _carteirasSugeridas = Recurso<List<SimulationWalletOption>>(
+    chave: 'simulacao-carteiras',
+    cache: widget.cache,
+    buscar: widget.api.carteirasParaSimular,
+    serializar: (lista) => lista.map((opcao) => opcao.toJson()).toList(),
+    desserializar: (json) => (json as List<dynamic>)
+        .map(
+          (item) =>
+              SimulationWalletOption.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(),
+  );
+
   WalletSimulationResponse? _resultado;
 
   @override
   void initState() {
     super.initState();
-    _carregarDisponiveis();
+    _carteirasSugeridas.addListener(_aoMudar);
+    _carteirasSugeridas.carregar();
+  }
+
+  void _aoMudar() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _carteirasSugeridas.removeListener(_aoMudar);
+    _carteirasSugeridas.dispose();
     _envio.dispose();
     super.dispose();
-  }
-
-  Future<void> _carregarDisponiveis() async {
-    setState(() => _erroAoCarregar = null);
-
-    try {
-      final opcoes = await widget.api.carteirasParaSimular();
-      if (mounted) setState(() => _disponiveis = opcoes);
-    } catch (erro) {
-      if (mounted) {
-        setState(
-          () => _erroAoCarregar = erro is ApiException
-              ? erro.message
-              : 'Não foi possível carregar as carteiras sugeridas.',
-        );
-      }
-    }
   }
 
   Future<bool> _simular(WalletSimulationRequest dados) async {
@@ -97,16 +103,6 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_erroAoCarregar != null) {
-      return EstadoErro(
-        mensagem: _erroAoCarregar!,
-        aoTentarDeNovo: _carregarDisponiveis,
-      );
-    }
-
-    final disponiveis = _disponiveis;
-    if (disponiveis == null) return const EstadoCarregando();
-
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -119,7 +115,14 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
           ),
           Expanded(
             child: TabBarView(
-              children: [_abaSimular(disponiveis), _abaComparar()],
+              children: [
+                VisaoRecurso<List<SimulationWalletOption>>(
+                  estado: _carteirasSugeridas.estado,
+                  aoRecarregar: _carteirasSugeridas.carregar,
+                  conteudo: (context, disponiveis) => _abaSimular(disponiveis),
+                ),
+                _abaComparar(),
+              ],
             ),
           ),
         ],
@@ -196,15 +199,24 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
       );
     }
 
-    return _Comparacao(api: widget.api, carteiraId: carteira.id);
+    return _Comparacao(
+      api: widget.api,
+      cache: widget.cache,
+      carteiraId: carteira.id,
+    );
   }
 }
 
 /// Carrega e mostra a comparação de uma carteira.
 class _Comparacao extends StatefulWidget {
-  const _Comparacao({required this.api, required this.carteiraId});
+  const _Comparacao({
+    required this.api,
+    required this.cache,
+    required this.carteiraId,
+  });
 
   final DinDinApi api;
+  final CacheLocal cache;
   final String carteiraId;
 
   @override
@@ -212,40 +224,36 @@ class _Comparacao extends StatefulWidget {
 }
 
 class _ComparacaoState extends State<_Comparacao> {
-  EstadoDoRecurso<RecommendedWalletComparison> _estado = const EstadoDoRecurso(
-    carregando: true,
+  late final _comparacao = Recurso<RecommendedWalletComparison>(
+    chave: 'comparacao-${widget.carteiraId}',
+    cache: widget.cache,
+    buscar: () => widget.api.compararComSugerida(widget.carteiraId),
+    serializar: (comparacao) => comparacao.toJson(),
+    desserializar: (json) =>
+        RecommendedWalletComparison.fromJson(json as Map<String, dynamic>),
   );
 
   @override
   void initState() {
     super.initState();
-    _carregar();
+    _comparacao.addListener(_aoMudar);
+    _comparacao.carregar();
   }
 
-  Future<void> _carregar() async {
-    setState(() => _estado = const EstadoDoRecurso(carregando: true));
-
-    try {
-      final comparacao = await widget.api.compararComSugerida(
-        widget.carteiraId,
-      );
-      if (mounted) setState(() => _estado = EstadoDoRecurso(dados: comparacao));
-    } catch (erro) {
-      if (mounted) {
-        setState(
-          () => _estado = EstadoDoRecurso(
-            erro: erro is ApiException
-                ? erro.message
-                : erro is NetworkException
-                ? erro.message
-                : 'Não foi possível carregar a comparação.',
-          ),
-        );
-      }
-    }
+  void _aoMudar() {
+    if (mounted) setState(() {});
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ComparacaoView(estado: _estado, aoRecarregar: _carregar);
+  void dispose() {
+    _comparacao.removeListener(_aoMudar);
+    _comparacao.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ComparacaoView(
+    estado: _comparacao.estado,
+    aoRecarregar: _comparacao.carregar,
+  );
 }

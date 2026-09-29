@@ -11,6 +11,7 @@ import 'package:dindin_mobile/core/auth/token_provider.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
+import 'package:dindin_mobile/features/simulacao/simulacao_form.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -66,8 +67,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // O conteúdo continua em tela: com cache em mãos, a falha vira aviso e
-    // não apaga o que o usuário já via.
-    expect(find.textContaining('BB FIIs'), findsWidgets);
+    // não apaga o que o usuário já via. O formulário só monta com a lista de
+    // carteiras em mãos, então encontrá-lo prova que ela veio do cache.
+    expect(find.byType(SimulacaoForm), findsOneWidget);
   });
 
   testWidgets('guarda as carteiras buscadas para a próxima abertura', (

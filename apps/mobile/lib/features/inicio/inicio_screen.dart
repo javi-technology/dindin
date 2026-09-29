@@ -206,6 +206,7 @@ class _InicioScreenState extends State<InicioScreen> {
         (estado) => SimulacaoScreen(
           api: widget.api,
           carteiras: estado.dados ?? const [],
+          cache: widget.cache,
         ),
       ),
     ];
