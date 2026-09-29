@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
@@ -20,6 +21,14 @@ Future<void> main() async {
   // Android e `GoogleService-Info.plist` no iOS —, que não são versionados
   // por trazerem chave de API. Ver `docs/mobile-firebase.md`.
   await Firebase.initializeApp();
+
+  // API e Auth precisam apontar para o mesmo projeto local: um token emitido
+  // pelo Auth de produção não é aceito pelo Functions emulator. A flag só é
+  // definida em desenvolvimento, portanto builds publicados continuam usando
+  // a infraestrutura Firebase real.
+  if (firebaseEmulatorHost.isNotEmpty) {
+    await FirebaseAuth.instance.useAuthEmulator(firebaseEmulatorHost, 9099);
+  }
 
   // O tema e o cache são lidos antes do primeiro quadro: subir no claro e
   // trocar depois faria a tela piscar a cada abertura para quem escolheu o

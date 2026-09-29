@@ -53,14 +53,31 @@ o erro que aparece (`sign_in_failed`) não diz qual.
 
 ## Apontar o app para os emuladores
 
-O endereço da API é decidido em tempo de build e o padrão é produção:
+Com os emuladores ativos na raiz do repositório, um único define aponta a API
+(via Hosting, porta `5002`) e o Firebase Auth (porta `9099`) para a mesma
+máquina. Assim, o token usado nas requisições é aceito pelo Functions emulator:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:5001
+firebase emulators:start
 ```
 
-No emulador de Android, `localhost` é o próprio aparelho virtual: use
-`http://10.0.2.2:5001`.
+Em outro terminal, para o simulador iOS:
+
+```bash
+cd apps/mobile
+flutter run --dart-define=FIREBASE_EMULATOR_HOST=127.0.0.1
+```
+
+No emulador Android, use `10.0.2.2`; em um aparelho físico, use o IP local do
+Mac (por exemplo, o resultado de `ipconfig getifaddr en0`):
+
+```bash
+flutter run --dart-define=FIREBASE_EMULATOR_HOST=192.168.1.20
+```
+
+`API_BASE_URL` continua disponível para apontar somente a API a outro ambiente,
+mas não configura o Firebase Auth e, portanto, não é o comando adequado para
+os emuladores.
 
 ## O que fica de fora
 
