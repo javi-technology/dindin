@@ -39,11 +39,13 @@ Map<String, dynamic> geladeira(String id, String nome) => {
 void main() {
   late List<(String, String, Object?)> enviadas;
   late List<Map<String, dynamic>> geladeirasDaApi;
+  late List<Map<String, dynamic>> historicoDaApi;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     enviadas = [];
     geladeirasDaApi = [geladeira('g1', 'Primeira'), geladeira('g2', 'Segunda')];
+    historicoDaApi = [];
   });
 
   DinDinApi apiFalsa() => DinDinApi(
@@ -60,6 +62,9 @@ void main() {
         if (req.url.path == '/api/fridges' && req.method == 'GET') {
           return http.Response(jsonEncode(geladeirasDaApi), 200);
         }
+        if (req.url.path == '/api/patrimony/history') {
+          return http.Response(jsonEncode(historicoDaApi), 200);
+        }
         if (req.url.path.endsWith('/items') && req.method == 'GET') {
           return http.Response('[]', 200);
         }
@@ -71,6 +76,28 @@ void main() {
       }),
     ),
   );
+
+  Future<void> abrirTela(WidgetTester tester) async {
+    final api = apiFalsa();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DinDinTheme.claro,
+        home: InicioScreen(
+          auth: AuthService(AuthBackendFalso()),
+          api: api,
+          cache: await CacheLocal.abrir(),
+          tema: await ThemeController.carregar(),
+          notificacoes: await NotificacoesService.carregar(
+            backend: NotificacoesBackendFalso(),
+            registrarToken: (_, _) async {},
+            removerToken: (_) async {},
+          ),
+          assinatura: AssinaturaService(api),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
 
   Future<void> abrirGeladeira(WidgetTester tester) async {
     final api = apiFalsa();
@@ -144,6 +171,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Renomeada'), findsOneWidget);
+  });
+
+  // O histórico chega depois do resumo, e a tela precisa redesenhar: o
+  // `Recurso` avisa quem o escuta, e ninguém escutava (#454).
+  testWidgets('mostra o gráfico quando o histórico chega depois', (
+    tester,
+  ) async {
+    historicoDaApi = [];
+
+    await abrirTela(tester);
+    expect(find.byKey(const Key('grafico-patrimonio-vazio')), findsOneWidget);
+
+    historicoDaApi = [
+      {
+        'id': '1',
+        'userId': 'u1',
+        'date': '2026-08-01',
+        'totalWallet': 100.0,
+        'totalFridge': 0.0,
+        'total': 100.0,
+        'createdAt': '2026-08-01T00:00:00Z',
+      },
+      {
+        'id': '2',
+        'userId': 'u1',
+        'date': '2026-09-01',
+        'totalWallet': 200.0,
+        'totalFridge': 0.0,
+        'total': 200.0,
+        'createdAt': '2026-09-01T00:00:00Z',
+      },
+    ];
+    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grafico-patrimonio-vazio')), findsNothing);
   });
 
   // Sem geladeira nenhuma, o botão de "novo ativo" só sabe avisar que falta
