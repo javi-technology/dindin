@@ -215,6 +215,13 @@ class DinDinApi {
   // Notificações push (issue #408)
   // -------------------------------------------------------------------------
 
+  /// Catálogo de ativos aceitos pela API (#443).
+  ///
+  /// A criação de posição e de item recusa ticker fora dele, então é o que
+  /// permite sugerir em vez de deixar o usuário adivinhar a grafia.
+  Future<List<Asset>> ativos() async =>
+      _lista(await _client.get('/api/assets'), Asset.fromJson);
+
   /// Perfil do usuário: assinatura, concessões e se é administrador (#442).
   Future<MeResponse> perfil() async =>
       MeResponse.fromJson(await _client.get('/api/me') as Map<String, dynamic>);

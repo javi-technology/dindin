@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../contracts/contracts.g.dart';
 import '../../core/format/moeda.dart';
+import '../../shared/components/campo_ativo.dart';
 import '../../shared/components/campo_texto.dart';
 import '../../shared/components/envio_de_formulario.dart';
 import '../../shared/components/rodape_formulario.dart';
@@ -11,11 +12,16 @@ class ItemForm extends StatefulWidget {
   const ItemForm({
     super.key,
     required this.aoSalvar,
+    this.catalogo = const [],
     this.itemInicial,
     this.erro,
   });
 
   final Future<bool> Function(CreateFridgeItemRequest) aoSalvar;
+
+  /// Ativos do catálogo, para sugerir o ticker (#443).
+  final List<Asset> catalogo;
+
   final FridgeItem? itemInicial;
   final String? erro;
 
@@ -79,14 +85,7 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CampoTexto(
-            chave: 'campo-ticker',
-            rotulo: 'Ticker',
-            controller: _ticker,
-            maiusculas: true,
-            validador: (valor) =>
-                (valor ?? '').trim().isEmpty ? 'Informe o ticker.' : null,
-          ),
+          CampoAtivo(controller: _ticker, catalogo: widget.catalogo),
           const SizedBox(height: 16),
           CampoTexto(
             chave: 'campo-quantidade',

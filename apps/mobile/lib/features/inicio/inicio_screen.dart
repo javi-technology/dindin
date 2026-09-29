@@ -93,6 +93,20 @@ class _InicioScreenState extends State<InicioScreen> {
 
   Recurso<List<FridgeItem>>? _itens;
 
+  /// Catálogo de ativos, para sugerir o ticker nos formulários (#443).
+  ///
+  /// Passa pelo `Recurso` como as demais consultas: o catálogo muda pouco, e
+  /// o do cache serve perfeitamente enquanto o atual não chega.
+  late final _catalogo = Recurso<List<Asset>>(
+    chave: 'catalogo-ativos',
+    cache: widget.cache,
+    buscar: widget.api.ativos,
+    serializar: (lista) => lista.map((a) => a.toJson()).toList(),
+    desserializar: (json) => (json as List<dynamic>)
+        .map((e) => Asset.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+
   late final _proventos = Recurso<List<DividendResponse>>(
     chave: 'proventos',
     cache: widget.cache,
@@ -126,6 +140,7 @@ class _InicioScreenState extends State<InicioScreen> {
     _geladeiras.carregar();
     _proventos.carregar();
     _projecao.carregar();
+    _catalogo.carregar();
   }
 
   /// Abre a geladeira do alerta quando o app subiu por uma notificação, e a
@@ -156,6 +171,7 @@ class _InicioScreenState extends State<InicioScreen> {
     _geladeiras.removeListener(_abrirGeladeiraInicial);
     _patrimonio.dispose();
     _carteiras.dispose();
+    _catalogo.dispose();
     _geladeiras.dispose();
     _proventos.dispose();
     _projecao.dispose();
@@ -372,6 +388,7 @@ class _InicioScreenState extends State<InicioScreen> {
   Future<void> _criarPosicao(String carteiraId) => _abrirFormulario(
     titulo: 'Nova posição',
     formulario: (context, envio, salvar) => PosicaoForm(
+      catalogo: _catalogo.estado.dados ?? const [],
       erro: envio.erro,
       aoSalvar: (dados) =>
           salvar(() => widget.api.criarPosicao(carteiraId, dados)),
@@ -382,6 +399,7 @@ class _InicioScreenState extends State<InicioScreen> {
       _abrirFormulario(
         titulo: 'Editar posição',
         formulario: (context, envio, salvar) => PosicaoForm(
+          catalogo: _catalogo.estado.dados ?? const [],
           erro: envio.erro,
           posicaoInicial: posicao,
           aoSalvar: (dados) => salvar(
@@ -413,6 +431,7 @@ class _InicioScreenState extends State<InicioScreen> {
     await _abrirFormulario(
       titulo: 'Mover ${posicao.ticker} para a geladeira',
       formulario: (context, envio, salvar) => ItemForm(
+        catalogo: _catalogo.estado.dados ?? const [],
         erro: envio.erro,
         itemInicial: FridgeItem(
           id: '',
@@ -448,6 +467,7 @@ class _InicioScreenState extends State<InicioScreen> {
     await _abrirFormulario(
       titulo: 'Novo ativo na geladeira',
       formulario: (context, envio, salvar) => ItemForm(
+        catalogo: _catalogo.estado.dados ?? const [],
         erro: envio.erro,
         aoSalvar: (dados) =>
             salvar(() => widget.api.criarItemDaGeladeira(geladeira.id, dados)),
@@ -458,6 +478,7 @@ class _InicioScreenState extends State<InicioScreen> {
   Future<void> _editarItem(FridgeItem item) => _abrirFormulario(
     titulo: 'Editar ativo',
     formulario: (context, envio, salvar) => ItemForm(
+      catalogo: _catalogo.estado.dados ?? const [],
       erro: envio.erro,
       itemInicial: item,
       aoSalvar: (dados) => salvar(
