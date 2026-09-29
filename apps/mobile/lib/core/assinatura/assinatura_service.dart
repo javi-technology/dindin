@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../contracts/contracts.g.dart';
 import '../data/dindin_api.dart';
+import 'loja_service.dart';
 
 /// Status da assinatura do usuário (issue #442).
 ///
@@ -10,9 +11,13 @@ import '../data/dindin_api.dart';
 /// (#405) e depende de conta de loja; reconhecer quem já assina não depende
 /// de nada disso.
 class AssinaturaService extends ChangeNotifier {
-  AssinaturaService(this._api);
+  AssinaturaService(this._api, {this.loja});
 
   final DinDinApi _api;
+
+  /// Compra in-app (#405). Ausente onde a loja não está configurada, como nos
+  /// testes: as telas só oferecem a compra quando ela existe.
+  final LojaService? loja;
 
   MeResponse? _perfil;
 

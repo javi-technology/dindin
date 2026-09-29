@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -11,6 +13,8 @@ import 'core/auth/firebase_auth_backend.dart';
 import 'core/data/cache_local.dart';
 import 'core/data/dindin_api.dart';
 import 'core/assinatura/assinatura_service.dart';
+import 'core/assinatura/in_app_loja_backend.dart';
+import 'core/assinatura/loja_service.dart';
 import 'core/setup/setup_service.dart';
 import 'core/notificacoes/firebase_notificacoes_backend.dart';
 import 'core/notificacoes/notificacoes_service.dart';
@@ -53,6 +57,17 @@ Future<void> main() async {
   // por causa de um ativo específico.
   final inicial = await FirebaseMessaging.instance.getInitialMessage();
 
+  // A compra só concede acesso depois de o backend validar o recibo; o perfil
+  // recarregado é quem libera o recurso (#405).
+  late final AssinaturaService assinatura;
+  final loja = LojaService(
+    backend: InAppLojaBackend(),
+    registrar: api.registrarCompra,
+    recarregar: () => assinatura.carregar(),
+  );
+  assinatura = AssinaturaService(api, loja: loja);
+  unawaited(loja.iniciar());
+
   runApp(
     DinDinApp(
       auth: auth,
@@ -61,7 +76,7 @@ Future<void> main() async {
       cache: cache,
       notificacoes: notificacoes,
       setup: SetupService(api),
-      assinatura: AssinaturaService(api),
+      assinatura: assinatura,
       geladeiraInicial: inicial?.data['fridgeId'] as String?,
     ),
   );
