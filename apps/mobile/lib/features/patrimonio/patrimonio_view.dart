@@ -6,6 +6,8 @@ import '../../core/format/moeda.dart';
 import '../../core/theme/dindin_tokens.dart';
 import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_vazio.dart';
+import '../../shared/components/grafico_composicao.dart';
+import '../../shared/components/grafico_patrimonio.dart';
 import '../../shared/components/visao_recurso.dart';
 
 /// Resumo do patrimônio (issue #402).
@@ -17,10 +19,15 @@ class PatrimonioView extends StatelessWidget {
     super.key,
     required this.estado,
     required this.aoRecarregar,
+    this.historico = const [],
   });
 
   final EstadoDoRecurso<DashboardSummaryResponse> estado;
   final VoidCallback aoRecarregar;
+
+  /// Snapshots para a evolução (#445). Vazio enquanto não chegam, e aí o
+  /// gráfico diz o que falta em vez de mostrar uma caixa vazia.
+  final List<PatrimonySnapshot> historico;
 
   @override
   Widget build(BuildContext context) {
@@ -61,17 +68,14 @@ class PatrimonioView extends StatelessWidget {
             rotulo: 'Renda mensal projetada',
             valor: resumo.monthlyIncomeTotal,
           ),
-          if (resumo.composition.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text('Composição', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            // A API já devolve em ordem decrescente de valor e com a
-            // geladeira contada uma única vez; reordenar aqui reaplicaria
-            // regra de negócio no cliente, que foi o que a #300 tirou da web.
-            ...resumo.composition.map(
-              (item) => _LinhaDaComposicao(item: item, total: resumo.total),
-            ),
-          ],
+          const SizedBox(height: 24),
+          Text('Evolução', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          GraficoPatrimonio(historico: historico),
+          const SizedBox(height: 24),
+          Text('Composição', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          GraficoComposicao(composicao: resumo.composition),
         ],
       ),
     );
@@ -128,39 +132,6 @@ class _Numero extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LinhaDaComposicao extends StatelessWidget {
-  const _LinhaDaComposicao({required this.item, required this.total});
-
-  final TickerValue item;
-  final double total;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final fatia = total == 0 ? 0.0 : item.value / total;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(item.ticker, style: TextStyle(color: t.textPrimary)),
-          ),
-          Text(
-            Moeda.percentual(fatia),
-            style: TextStyle(color: t.textMuted, fontSize: 13),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            Moeda.exibir(item.value),
-            style: TextStyle(color: t.textSecondary),
           ),
         ],
       ),

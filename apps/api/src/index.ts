@@ -419,6 +419,16 @@ export const api = onRequest(
       'STRIPE_WEBHOOK_SECRET',
     ],
     timeoutSeconds: 180,
+    // Sem `memory` declarado a function ficava nos 256 MiB padrão do
+    // Functions v2 e estourava por pouco em produção — 17 ocorrências entre
+    // 22/09 e 29/09/2026, com picos de 256 a 260 MiB (issue #453). Estourar
+    // mata a instância: a requisição em voo morre com ela, e numa rota de
+    // escrita o usuário vê a operação falhar sem saber se o dado foi gravado.
+    // O valor acompanha o das functions que processam o PDF do BB. A `api`
+    // carrega Express, firebase-admin, Stripe e o cliente de IA no mesmo
+    // processo, então o patamar alto é esperado; se o estouro voltar em
+    // 512 MiB, aí é retenção de memória e não dimensionamento.
+    memory: '512MiB',
   },
   app,
 );

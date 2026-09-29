@@ -21,10 +21,17 @@ class ComparacaoView extends StatelessWidget {
     super.key,
     required this.estado,
     required this.aoRecarregar,
+    this.rodape,
   });
 
   final EstadoDoRecurso<RecommendedWalletComparison> estado;
   final VoidCallback aoRecarregar;
+
+  /// O que vem depois da comparação — hoje, as sugestões da IA (#446).
+  ///
+  /// Entra na mesma lista, e não numa área rolável própria: duas viewports
+  /// empilhadas disputariam o gesto de rolar.
+  final Widget? rodape;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +54,7 @@ class ComparacaoView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ...comparacao.items.map(_LinhaDaComparacao.new),
+          if (rodape != null) ...[const SizedBox(height: 24), rodape!],
         ],
       ),
     );

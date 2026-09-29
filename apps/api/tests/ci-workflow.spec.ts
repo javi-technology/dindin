@@ -98,6 +98,19 @@ describe('.github/workflows/ci-cd.yml', () => {
     expect(jobBlock('deploy')).toMatch(/needs:[\s\S]*- build-and-test-api/);
   });
 
+  // #458: o `version` calcula a versão que o deploy exige, e é o primeiro
+  // job da cadeia. O mobile é o segundo mais lento do pipeline: rodá-lo antes
+  // de saber se a versão fecha gasta o minuto mais caro do CI à toa — e no
+  // grafo do Actions ele aparecia solto, fora da cadeia que os demais builds
+  // já seguiam.
+  it.each([
+    'build-and-test-api',
+    'build-and-test-web',
+    'build-and-test-mobile',
+  ])('deve calcular a versão antes de %s', (job) => {
+    expect(jobBlock(job)).toMatch(/needs:[\s\S]*version/);
+  });
+
   // #322: a chave JSON de longa duração no secret dá acesso ao projeto até
   // ser revogada à mão. O Workload Identity Federation troca por um token
   // efêmero, emitido pelo próprio GitHub e trocado no GCP.

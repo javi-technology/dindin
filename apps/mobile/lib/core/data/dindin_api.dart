@@ -1,5 +1,6 @@
 import '../../contracts/contracts.g.dart';
 import '../api/api_client.dart';
+import '../api/api_exception.dart';
 
 /// As rotas da API do DinDin, tipadas pelos modelos gerados (issue #402).
 ///
@@ -17,6 +18,12 @@ class DinDinApi {
         await _client.get('/api/dashboard/summary') as Map<String, dynamic>,
       );
 
+  /// Histórico de patrimônio, para a evolução no tempo (#445).
+  Future<List<PatrimonySnapshot>> historicoDePatrimonio() async => _lista(
+    await _client.get('/api/patrimony/history'),
+    PatrimonySnapshot.fromJson,
+  );
+
   Future<List<Wallet>> carteiras() async =>
       _lista(await _client.get('/api/wallets'), Wallet.fromJson);
 
@@ -27,6 +34,27 @@ class DinDinApi {
 
   Future<List<Fridge>> geladeiras() async =>
       _lista(await _client.get('/api/fridges'), Fridge.fromJson);
+
+  /// Cria uma geladeira (#444).
+  Future<Fridge> criarGeladeira(CreateFridgeRequest dados) async =>
+      Fridge.fromJson(
+        await _client.post('/api/fridges', body: dados.toJson())
+            as Map<String, dynamic>,
+      );
+
+  /// Renomeia ou redescreve a geladeira (#444).
+  Future<Fridge> atualizarGeladeira(
+    String id,
+    UpdateFridgeRequest dados,
+  ) async => Fridge.fromJson(
+    await _client.put('/api/fridges/$id', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  /// Exclui a geladeira. A API apaga os itens em cascata, então a tela
+  /// precisa avisar disso antes de confirmar.
+  Future<void> excluirGeladeira(String id) =>
+      _client.delete('/api/fridges/$id');
 
   Future<List<FridgeItem>> itensDaGeladeira(String geladeiraId) async => _lista(
     await _client.get('/api/fridges/$geladeiraId/items'),
@@ -211,9 +239,54 @@ class DinDinApi {
         as Map<String, dynamic>,
   );
 
+  /// Última sugestão da IA para a carteira, ou `null` se ainda não há (#446).
+  ///
+  /// A rota exige `walletId` **e** `month`, e devolve um objeto único — não
+  /// uma lista. O 404 é o estado normal de quem ainda não gerou nenhuma, e
+  /// vira `null` em vez de erro na tela.
+  Future<AiSuggestion?> sugestao({
+    required String carteiraId,
+    required String mes,
+    required AiSuggestionTab aba,
+  }) async {
+    try {
+      final json = await _client.get(
+        '/api/recommended-wallets/bb-fii/suggestions',
+        query: {'walletId': carteiraId, 'month': mes, 'tab': aba.toJson()},
+      );
+
+      return AiSuggestion.fromJson(json as Map<String, dynamic>);
+    } on ApiException catch (erro) {
+      if (erro.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// Gera uma sugestão nova — recurso de assinante (entitlement `ai`).
+  ///
+  /// Cada chamada custa uma consulta ao provedor de IA, então a tela bloqueia
+  /// o botão enquanto a anterior não responde.
+  Future<AiSuggestion> gerarSugestao({
+    required String carteiraId,
+    required String mes,
+    required AiSuggestionTab aba,
+  }) async => AiSuggestion.fromJson(
+    await _client.post(
+      '/api/recommended-wallets/bb-fii/suggestions',
+      body: {'walletId': carteiraId, 'month': mes, 'tab': aba.toJson()},
+    ) as Map<String, dynamic>,
+  );
+
   // -------------------------------------------------------------------------
   // Notificações push (issue #408)
   // -------------------------------------------------------------------------
+
+  /// Catálogo de ativos aceitos pela API (#443).
+  ///
+  /// A criação de posição e de item recusa ticker fora dele, então é o que
+  /// permite sugerir em vez de deixar o usuário adivinhar a grafia.
+  Future<List<Asset>> ativos() async =>
+      _lista(await _client.get('/api/assets'), Asset.fromJson);
 
   /// Perfil do usuário: assinatura, concessões e se é administrador (#442).
   Future<MeResponse> perfil() async =>

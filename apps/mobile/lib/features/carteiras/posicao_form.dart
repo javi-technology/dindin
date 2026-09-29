@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../contracts/contracts.g.dart';
 import '../../core/format/moeda.dart';
+import '../../shared/components/campo_ativo.dart';
 import '../../shared/components/campo_texto.dart';
 import '../../shared/components/envio_de_formulario.dart';
 import '../../shared/components/rodape_formulario.dart';
@@ -15,12 +16,17 @@ class PosicaoForm extends StatefulWidget {
   const PosicaoForm({
     super.key,
     required this.aoSalvar,
+    this.catalogo = const [],
     this.posicaoInicial,
     this.erro,
   });
 
   /// Devolve se o envio deu certo; `false` mantém o formulário preenchido.
   final Future<bool> Function(CreatePositionRequest) aoSalvar;
+
+  /// Ativos do catálogo, para sugerir o ticker (#443). Vazio sem rede nem
+  /// cache, e aí o campo segue aceitando digitação.
+  final List<Asset> catalogo;
 
   final Position? posicaoInicial;
   final String? erro;
@@ -93,13 +99,12 @@ class _PosicaoFormState extends State<PosicaoForm>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CampoTexto(
-            chave: 'campo-ticker',
-            rotulo: 'Ticker',
+          CampoAtivo(
             controller: _ticker,
-            maiusculas: true,
-            validador: (valor) =>
-                (valor ?? '').trim().isEmpty ? 'Informe o ticker.' : null,
+            catalogo: widget.catalogo,
+            // O tipo vem junto do ativo escolhido: pedir que o usuário o
+            // repita é convite a registrar FII como ação.
+            aoEscolher: (ativo) => setState(() => _tipo = ativo.assetType),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<AssetType>(
