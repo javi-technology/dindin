@@ -61,7 +61,7 @@ class NotificacoesService extends ChangeNotifier {
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    return NotificacoesService._(
+    final service = NotificacoesService._(
       prefs,
       backend,
       registrarToken,
@@ -69,6 +69,24 @@ class NotificacoesService extends ChangeNotifier {
       await backend.permissaoAtual(),
       prefs.getBool(chaveDesligado) ?? false,
     );
+
+    // O token muda quando o usuário reinstala o app, troca de aparelho ou
+    // limpa os dados — e isso acontece com o app fechado. Registrando só ao
+    // conceder a permissão, o token novo nunca chegaria à API e o push
+    // pararia em silêncio. O backend atualiza o registro existente, então
+    // repetir a cada abertura não duplica aparelho.
+    await service._registrarSeJaAutorizado();
+
+    return service;
+  }
+
+  Future<void> _registrarSeJaAutorizado() async {
+    if (_permissao != PermissaoDeNotificacao.concedida) return;
+    // Quem desligou dentro do app continua desligado: registrar de novo faria
+    // o push voltar sozinho, sem o usuário pedir.
+    if (_desligadoPeloUsuario) return;
+
+    await _registrarTokenAtual();
   }
 
   /// Pede a permissão, uma vez só.
@@ -134,6 +152,10 @@ class NotificacoesService extends ChangeNotifier {
     token ??= await _backend.token();
     // Sem token não há o que registrar — e o e-mail cobre o usuário.
     if (token == null) return;
+    // O mesmo token já registrado nesta sessão não volta à API: a abertura
+    // do app já o envia, e conceder a permissão em seguida repetiria a
+    // chamada sem nada de novo para contar.
+    if (token == _tokenRegistrado) return;
 
     try {
       await _registrar(token, _backend.plataforma);
