@@ -28,8 +28,12 @@ class ResultadoView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    // Coluna, e não lista: o resultado é embutido na lista da tela, e uma
+    // área rolável dentro de outra não tem altura definida — o Flutter lança
+    // "Vertical viewport was given unbounded height" assim que a simulação dá
+    // certo.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Cartao(
           child: Column(
