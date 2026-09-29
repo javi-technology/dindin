@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 
 import 'package:dindin_mobile/contracts/contracts.g.dart';
 import 'package:dindin_mobile/core/api/api_client.dart';
+import 'package:dindin_mobile/core/api/api_exception.dart';
 import 'package:dindin_mobile/core/auth/token_provider.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
@@ -155,53 +156,98 @@ void main() {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Contrato real da API (achado P1 do review)
+  //
+  // A primeira versão destes testes inventou a resposta no mock — lista, sem
+  // `month`, sem 404 — e por isso passava enquanto o app falhava contra a API
+  // de verdade. O controller exige `walletId` **e** `month` no GET, devolve um
+  // objeto único, responde 404 quando não há sugestão, e o POST espera
+  // `walletId`, `month` e `tab` no corpo.
+  // -------------------------------------------------------------------------
   group('DinDinApi', () {
-    late List<String> pedidos;
+    late List<(String, String, Object?)> pedidos;
 
-    DinDinApi apiFalsa({List<Map<String, dynamic>>? lista}) {
+    DinDinApi apiFalsa({int status = 200}) {
       pedidos = [];
       return DinDinApi(
         ApiClient(
           baseUrl: 'https://api.exemplo',
           tokenProvider: _ComToken(),
           httpClient: MockClient((req) async {
-            pedidos.add('${req.method} ${req.url.path}?${req.url.query}');
-            final corpo = req.method == 'GET'
-                ? lista ?? [sugestao().toJson()]
-                : sugestao().toJson();
-            return http.Response(jsonEncode(corpo), 200);
+            pedidos.add((
+              '${req.method} ${req.url.path}',
+              req.url.query,
+              req.body.isEmpty ? null : jsonDecode(req.body),
+            ));
+            if (status != 200) {
+              return http.Response(
+                '{"error":"Sugestão não encontrada"}',
+                status,
+              );
+            }
+            return http.Response(jsonEncode(sugestao().toJson()), 200);
           }),
         ),
       );
     }
 
-    test('lê a última sugestão da carteira', () async {
+    test('consulta com walletId, month e tab', () async {
       final api = apiFalsa();
 
-      final ultima = await api.sugestao('w1');
-
-      expect(
-        pedidos.single,
-        'GET /api/recommended-wallets/bb-fii/suggestions?walletId=w1',
+      final ultima = await api.sugestao(
+        carteiraId: 'w1',
+        mes: '2026-09',
+        aba: AiSuggestionTab.renda,
       );
+
+      final (rota, query, _) = pedidos.single;
+      expect(rota, 'GET /api/recommended-wallets/bb-fii/suggestions');
+      expect(query, contains('walletId=w1'));
+      expect(query, contains('month=2026-09'));
+      expect(query, contains('tab=renda'));
       expect(ultima?.id, 's1');
     });
 
-    test('devolve nulo quando ainda não há sugestão', () async {
-      final api = apiFalsa(lista: []);
+    // 404 é o estado normal de quem ainda não gerou nenhuma, e não um erro
+    // para mostrar na tela.
+    test('devolve nulo no 404', () async {
+      final api = apiFalsa(status: 404);
 
-      expect(await api.sugestao('w1'), isNull);
+      final ultima = await api.sugestao(
+        carteiraId: 'w1',
+        mes: '2026-09',
+        aba: AiSuggestionTab.renda,
+      );
+
+      expect(ultima, isNull);
     });
 
-    test('gera uma sugestão nova', () async {
-      final api = apiFalsa();
-
-      final nova = await api.gerarSugestao();
+    test('propaga os demais erros', () async {
+      final api = apiFalsa(status: 500);
 
       expect(
-        pedidos.single,
-        'POST /api/recommended-wallets/bb-fii/suggestions?',
+        () => api.sugestao(
+          carteiraId: 'w1',
+          mes: '2026-09',
+          aba: AiSuggestionTab.renda,
+        ),
+        throwsA(isA<ApiException>()),
       );
+    });
+
+    test('gera enviando walletId, month e tab no corpo', () async {
+      final api = apiFalsa();
+
+      final nova = await api.gerarSugestao(
+        carteiraId: 'w1',
+        mes: '2026-09',
+        aba: AiSuggestionTab.ganho,
+      );
+
+      final (rota, _, corpo) = pedidos.single;
+      expect(rota, 'POST /api/recommended-wallets/bb-fii/suggestions');
+      expect(corpo, {'walletId': 'w1', 'month': '2026-09', 'tab': 'ganho'});
       expect(nova.id, 's1');
     });
   });
