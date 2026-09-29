@@ -28,6 +28,27 @@ class DinDinApi {
   Future<List<Fridge>> geladeiras() async =>
       _lista(await _client.get('/api/fridges'), Fridge.fromJson);
 
+  /// Cria uma geladeira (#444).
+  Future<Fridge> criarGeladeira(CreateFridgeRequest dados) async =>
+      Fridge.fromJson(
+        await _client.post('/api/fridges', body: dados.toJson())
+            as Map<String, dynamic>,
+      );
+
+  /// Renomeia ou redescreve a geladeira (#444).
+  Future<Fridge> atualizarGeladeira(
+    String id,
+    UpdateFridgeRequest dados,
+  ) async => Fridge.fromJson(
+    await _client.put('/api/fridges/$id', body: dados.toJson())
+        as Map<String, dynamic>,
+  );
+
+  /// Exclui a geladeira. A API apaga os itens em cascata, então a tela
+  /// precisa avisar disso antes de confirmar.
+  Future<void> excluirGeladeira(String id) =>
+      _client.delete('/api/fridges/$id');
+
   Future<List<FridgeItem>> itensDaGeladeira(String geladeiraId) async => _lista(
     await _client.get('/api/fridges/$geladeiraId/items'),
     FridgeItem.fromJson,
