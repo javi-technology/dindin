@@ -1,0 +1,266 @@
+name: Mobile Release
+
+# Build assinado e envio para o canal de teste das lojas (issue #407).
+#
+# Manual de propósito: a publicação passa por credenciais próprias e por
+# revisão de loja, e não pode acontecer a cada push. O build parte de uma tag
+# `vX.Y.Z` — a versão que o pipeline de deploy já calculou e publicou —, então
+# o que está na loja é rastreável até um commit. Procedimento completo, secrets
+# e resguardo da keystore: docs/mobile-release.md.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de versão a publicar (ex.: v1.4.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android (Google Play, faixa interna)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Aprovação manual do ambiente antes de tocar em qualquer secret.
+    environment: mobile-release
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Ler versão do Flutter
+        id: sdk
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.sdk.outputs.version }}
+          channel: stable
+          cache: true
+
+      # nome = X.Y.Z da tag; número = execução do workflow, que só cresce. O
+      # par identifica a execução, e a execução identifica o commit.
+      - name: Derivar versão do build
+        id: versao
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::A tag '$TAG' não é uma versão vX.Y.Z"
+            exit 1
+          fi
+          echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # `google-services.json` fica fora do repositório (docs/mobile-firebase.md).
+      - name: Conferir segredos de assinatura
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          for nome in KEYSTORE STORE_PASSWORD KEY_ALIAS KEY_PASSWORD PLAY_JSON GOOGLE_SERVICES; do
+            if [ -z "${!nome}" ]; then
+              echo "::error::Secret do Android não configurado: $nome"
+              exit 1
+            fi
+          done
+
+      - name: Gravar keystore e google-services.json
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "$GOOGLE_SERVICES" | base64 --decode > android/app/google-services.json
+          {
+            echo "storeFile=$RUNNER_TEMP/release.keystore"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build do bundle assinado
+        run: |
+          flutter build appbundle --release \
+            --build-name "${{ steps.versao.outputs.name }}" \
+            --build-number "${{ steps.versao.outputs.number }}"
+
+      - name: Publicar na faixa interna do Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: tech.javi.dindin
+          releaseFiles: apps/mobile/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+      # A keystore não pode sobrar no runner nem em artefato.
+      - name: Remover credenciais do runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore" android/key.properties android/app/google-services.json
+
+  ios:
+    name: iOS (TestFlight)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    environment: mobile-release
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Ler versão do Flutter
+        id: sdk
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.sdk.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Derivar versão do build
+        id: versao
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::A tag '$TAG' não é uma versão vX.Y.Z"
+            exit 1
+          fi
+          echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Conferir segredos de assinatura
+        env:
+          CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for nome in CERT CERT_PASSWORD PROFILE KEY_ID ISSUER_ID API_KEY PLIST TEAM_ID; do
+            if [ -z "${!nome}" ]; then
+              echo "::error::Secret ou variável do iOS não configurado: $nome"
+              exit 1
+            fi
+          done
+
+      # Keychain temporária: o certificado vive só durante o job.
+      - name: Instalar certificado e perfil de provisionamento
+        env:
+          CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/certificado.p12"
+          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/perfil.mobileprovision"
+          echo "$PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificado.p12" -P "$CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+
+          PERFIS="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PERFIS"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/perfil.mobileprovision")")
+          NOME=$(/usr/libexec/PlistBuddy -c 'Print Name' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/perfil.mobileprovision")")
+          cp "$RUNNER_TEMP/perfil.mobileprovision" "$PERFIS/$UUID.mobileprovision"
+          echo "PROFILE_NAME=$NOME" >> "$GITHUB_ENV"
+
+      - name: Gerar ExportOptions.plist
+        env:
+          TEAM_ID: ${{ vars.IOS_TEAM_ID }}
+        run: |
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>tech.javi.dindin</key><string>$PROFILE_NAME</string></dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build do IPA assinado
+        run: |
+          flutter build ipa --release \
+            --build-name "${{ steps.versao.outputs.name }}" \
+            --build-number "${{ steps.versao.outputs.number }}" \
+            --export-options-plist ios/ExportOptions.plist
+
+      # A chave de API da App Store Connect vai para o diretório que o altool
+      # procura (`AuthKey_<id>.p8`), e é removida no fim.
+      - name: Enviar para o TestFlight
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$API_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
+          xcrun altool --upload-app --type ios \
+            --file build/ios/ipa/*.ipa \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+
+      - name: Remover credenciais do runner
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
+          rm -f "$RUNNER_TEMP/certificado.p12" "$RUNNER_TEMP/perfil.mobileprovision" \
+            ios/ExportOptions.plist ios/Runner/GoogleService-Info.plist \
+            "$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8
