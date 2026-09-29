@@ -261,18 +261,36 @@ describe('AlertMailService', () => {
     expect(body.html).toContain('https://dindin-4e720.web.app/geladeira');
   });
 
-  it('deve marcar notifiedAt no alerta após o envio', async () => {
+  // O estado passou a ser por canal na issue #408: marcar um campo único
+  // faria a falha do push parecer aviso entregue, e a falha do e-mail apagar
+  // o push que já tinha saído.
+  it('deve marcar notifiedEmailAt no alerta após o envio', async () => {
     const { alertUpdate, alertDoc } = seedFirestore();
 
     await sendAlertEmails('user-1', [alert()]);
 
     expect(alertDoc).toHaveBeenCalledWith('fridge-1_HGLG11');
     expect(alertUpdate).toHaveBeenCalledWith({
-      notifiedAt: expect.any(String),
+      notifiedEmailAt: expect.any(String),
     });
   });
 
-  it('não deve reenviar alerta que já tem notifiedAt', async () => {
+  it('não deve reenviar alerta que já tem notifiedEmailAt', async () => {
+    const { alertUpdate } = seedFirestore();
+
+    const sent = await sendAlertEmails('user-1', [
+      alert({ notifiedEmailAt: '2026-09-18T22:16:00Z' }),
+    ]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(alertUpdate).not.toHaveBeenCalled();
+    expect(sent).toBe(0);
+  });
+
+  // Alertas gravados antes da #408 só têm `notifiedAt`. Ignorá-lo faria o
+  // primeiro job depois do deploy reenviar e-mail de tudo o que já foi
+  // avisado.
+  it('não deve reenviar alerta legado, marcado só com notifiedAt', async () => {
     const { alertUpdate } = seedFirestore();
 
     const sent = await sendAlertEmails('user-1', [
@@ -284,7 +302,7 @@ describe('AlertMailService', () => {
     expect(sent).toBe(0);
   });
 
-  it('não deve marcar notifiedAt quando o Resend recusa o envio', async () => {
+  it('não deve marcar notifiedEmailAt quando o Resend recusa o envio', async () => {
     const { alertUpdate } = seedFirestore();
     fetchMock.mockResolvedValue(errorResponse());
 

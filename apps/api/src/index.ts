@@ -63,6 +63,10 @@ import {
 } from './dividend/dividend.controller';
 import { updateAllQuotes } from './quotes/update-quotes.handler';
 import { reconcileClosingQuotes } from './quotes/reconcile-quotes.handler';
+import {
+  deleteNotificationToken,
+  postNotificationToken,
+} from './me/notification-tokens.controller';
 import { setupDefaults } from './me/setup.controller';
 import {
   getDividendHistory,
@@ -230,6 +234,11 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
 });
 
 app.post('/api/me/setup', setupDefaults);
+
+// Tokens de notificação push (issue #408). Remover é como o usuário desliga
+// as notificações dentro do app, sem depender das configurações do sistema.
+app.post('/api/me/notification-tokens', postNotificationToken);
+app.delete('/api/me/notification-tokens/:token', deleteNotificationToken);
 
 app.post('/api/billing/checkout-session', createCheckoutSession);
 app.post('/api/billing/portal-session', createPortalSession);

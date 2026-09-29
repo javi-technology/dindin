@@ -317,6 +317,52 @@ export interface Alert {
   currentPrice: number;
   status: 'open' | 'cleared';
   createdAt: string; // ISO-8601
-  notifiedAt?: string; // ISO-8601 — preenchido pelo envio do e-mail
+  /**
+   * ISO-8601 — preenchido pelo envio do e-mail antes da issue #408.
+   *
+   * Continua sendo lido para os alertas gravados antes dos campos por canal:
+   * sem isso, o primeiro job depois do deploy reenviaria e-mail de tudo o que
+   * já tinha sido avisado.
+   *
+   * @deprecated Use `notifiedEmailAt` e `notifiedPushAt`.
+   */
+  notifiedAt?: string;
+  /** ISO-8601 — quando o e-mail saiu (issue #408). */
+  notifiedEmailAt?: string;
+  /** ISO-8601 — quando o push saiu (issue #408). */
+  notifiedPushAt?: string;
   clearedAt?: string; // ISO-8601 — quando o alerta foi rearmado
+}
+
+/**
+ * Plataformas que recebem notificação push.
+ *
+ * As duas exigem permissão explícita do usuário, e negá-la é estado normal —
+ * nesse caso o e-mail segue sendo o canal.
+ */
+export const DEVICE_PLATFORMS = ['android', 'ios'] as const;
+
+export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
+
+export function isDevicePlatform(value: unknown): value is DevicePlatform {
+  return (
+    typeof value === 'string' &&
+    (DEVICE_PLATFORMS as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Token de notificação de um aparelho — subcoleção
+ * `users/{uid}/deviceTokens/{token}` (issue #408).
+ *
+ * O id do documento é o próprio token, e não um id gerado: o app o registra a
+ * cada abertura, e com id gerado cada registro criaria uma duplicata do mesmo
+ * aparelho. Um usuário pode ter vários — celular e tablet —, e o token muda
+ * quando ele reinstala o app, troca de aparelho ou limpa os dados.
+ */
+export interface DeviceToken {
+  token: string;
+  platform: DevicePlatform;
+  createdAt: string; // ISO-8601
+  updatedAt: string; // ISO-8601
 }

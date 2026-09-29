@@ -12,3 +12,22 @@ service-account*.json
 *-sa-key.json
 .gemini/
 .antigravitycli/
+
+# App Flutter (apps/mobile) — artefatos de build, regeneráveis, e o
+# `.dart_tool`, que guarda caminhos absolutos da máquina que o gerou.
+apps/mobile/build/
+apps/mobile/.dart_tool/
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Configuração do Firebase no app: traz identificadores do projeto e chaves
+# de API, então segue a regra de nunca versionar credencial (#400).
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+apps/mobile/firebase.json
+apps/mobile/ios/Runner.xcworkspace/xcshareddata/swiftpm/
