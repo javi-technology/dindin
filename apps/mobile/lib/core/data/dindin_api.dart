@@ -215,6 +215,10 @@ class DinDinApi {
   // Notificações push (issue #408)
   // -------------------------------------------------------------------------
 
+  /// Perfil do usuário: assinatura, concessões e se é administrador (#442).
+  Future<MeResponse> perfil() async =>
+      MeResponse.fromJson(await _client.get('/api/me') as Map<String, dynamic>);
+
   /// Cria a Carteira Principal e a Geladeira Principal, se faltarem (#275).
   ///
   /// A API é idempotente: roda em transação, só cria com a coleção vazia e

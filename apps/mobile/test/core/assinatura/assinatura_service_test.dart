@@ -37,7 +37,7 @@ void main() {
             jsonEncode({
               'uid': 'u1',
               'admin': false,
-              'subscription': {'status': 'active'},
+              'subscription': {'status': 'active', 'cancelAtPeriodEnd': false},
               'entitlements': entitlements,
             }),
             status,
