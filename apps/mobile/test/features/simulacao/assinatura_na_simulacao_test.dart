@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/assinatura/assinatura_service.dart';
 import 'package:dindin_mobile/core/auth/token_provider.dart';
+import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_screen.dart';
@@ -27,6 +29,12 @@ class _ComToken implements TokenProvider {
 
 void main() {
   late List<String> caminhos;
+  late CacheLocal cache;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    cache = await CacheLocal.abrir();
+  });
 
   DinDinApi apiFalsa() {
     caminhos = [];
@@ -63,6 +71,7 @@ void main() {
       body: SimulacaoScreen(
         api: apiFalsa(),
         carteiras: const [],
+        cache: cache,
         assinatura: assinatura,
       ),
     ),

@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dindin_mobile/core/api/api_client.dart';
+import 'package:dindin_mobile/core/assinatura/assinatura_service.dart';
 import 'package:dindin_mobile/core/auth/token_provider.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
@@ -56,7 +57,12 @@ void main() {
   Widget tela(DinDinApi api) => MaterialApp(
     theme: DinDinTheme.claro,
     home: Scaffold(
-      body: SimulacaoScreen(api: api, carteiras: const [], cache: cache),
+      body: SimulacaoScreen(
+        api: api,
+        carteiras: const [],
+        cache: cache,
+        assinatura: AssinaturaService(api),
+      ),
     ),
   );
 
