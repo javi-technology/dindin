@@ -97,6 +97,18 @@ class _InicioScreenState extends State<InicioScreen> {
   Recurso<List<FridgeItem>>? _itens;
   String? _abertaId;
 
+  /// Evolução do patrimônio (#445). Passa pelo `Recurso` como as demais: o
+  /// gráfico do cache já diz a tendência enquanto o atual não chega.
+  late final _historico = Recurso<List<PatrimonySnapshot>>(
+    chave: 'historico-patrimonio',
+    cache: widget.cache,
+    buscar: widget.api.historicoDePatrimonio,
+    serializar: (lista) => lista.map((s) => s.toJson()).toList(),
+    desserializar: (json) => (json as List<dynamic>)
+        .map((e) => PatrimonySnapshot.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+
   /// Catálogo de ativos, para sugerir o ticker nos formulários (#443).
   ///
   /// Passa pelo `Recurso` como as demais consultas: o catálogo muda pouco, e
@@ -148,6 +160,7 @@ class _InicioScreenState extends State<InicioScreen> {
     _proventos.carregar();
     _projecao.carregar();
     _catalogo.carregar();
+    _historico.carregar();
   }
 
   /// Abre a geladeira do alerta quando o app subiu por uma notificação, e a
@@ -198,6 +211,7 @@ class _InicioScreenState extends State<InicioScreen> {
     _patrimonio.dispose();
     _carteiras.dispose();
     _catalogo.dispose();
+    _historico.dispose();
     _geladeiras.dispose();
     _proventos.dispose();
     _projecao.dispose();
@@ -251,8 +265,14 @@ class _InicioScreenState extends State<InicioScreen> {
     final corpos = [
       _Observando(
         _patrimonio,
-        (estado) =>
-            PatrimonioView(estado: estado, aoRecarregar: _patrimonio.carregar),
+        (estado) => PatrimonioView(
+          estado: estado,
+          aoRecarregar: () {
+            _patrimonio.carregar();
+            _historico.carregar();
+          },
+          historico: _historico.estado.dados ?? const [],
+        ),
       ),
       _Observando(
         _carteiras,

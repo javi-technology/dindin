@@ -68,10 +68,7 @@ void main() {
 
     testWidgets('funciona no tema escuro', (tester) async {
       await tester.pumpWidget(
-        emApp(
-          GraficoPatrimonio(historico: historico),
-          brilho: Brightness.dark,
-        ),
+        emApp(GraficoPatrimonio(historico: historico), brilho: Brightness.dark),
       );
 
       expect(tester.takeException(), isNull);
@@ -86,13 +83,11 @@ void main() {
     ];
 
     testWidgets('lista os ativos com o percentual de cada um', (tester) async {
-      await tester.pumpWidget(
-        emApp(GraficoComposicao(composicao: composicao)),
-      );
+      await tester.pumpWidget(emApp(GraficoComposicao(composicao: composicao)));
 
       expect(find.text('HGLG11'), findsOneWidget);
-      expect(find.textContaining('60,0%'), findsOneWidget);
-      expect(find.textContaining('30,0%'), findsOneWidget);
+      expect(find.textContaining('60,00%'), findsOneWidget);
+      expect(find.textContaining('30,00%'), findsOneWidget);
     });
 
     // Numa tela de celular, uma legenda com trinta ativos empurra o resto da
@@ -109,9 +104,7 @@ void main() {
     });
 
     testWidgets('avisa quando não há composição', (tester) async {
-      await tester.pumpWidget(
-        emApp(const GraficoComposicao(composicao: [])),
-      );
+      await tester.pumpWidget(emApp(const GraficoComposicao(composicao: [])));
 
       expect(find.byKey(const Key('grafico-composicao-vazio')), findsOneWidget);
     });

@@ -17,6 +17,12 @@ class DinDinApi {
         await _client.get('/api/dashboard/summary') as Map<String, dynamic>,
       );
 
+  /// Histórico de patrimônio, para a evolução no tempo (#445).
+  Future<List<PatrimonySnapshot>> historicoDePatrimonio() async => _lista(
+    await _client.get('/api/patrimony/history'),
+    PatrimonySnapshot.fromJson,
+  );
+
   Future<List<Wallet>> carteiras() async =>
       _lista(await _client.get('/api/wallets'), Wallet.fromJson);
 
