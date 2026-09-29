@@ -1,0 +1,2092 @@
+# ---------------------------------------------------------------------------
+# Descrição única dos contratos da API do DinDin (issue #399).
+#
+# Esta é a FONTE dos contratos. Dela saem, por `npm run contracts:gen`:
+#
+#   packages/shared-types/generated.ts       tipos de api e web
+#   apps/mobile/lib/contracts/contracts.g.dart   modelos do app Flutter
+#
+# Não edite os gerados: rode o gerador. O CI roda `npm run contracts:check`
+# e reprova quando o gerado está diferente do que esta descrição produz —
+# antes, um campo renomeado na API só aparecia em produção, no celular do
+# usuário, porque o app repetia o contrato à mão.
+#
+# `x-ts-import` marca os schemas que já existem em `dindin-models`: o TS os
+# importa e reexporta em vez de redeclará-los (duas verdades sobre os tipos
+# de ativo aceitos foi o problema que a issue #303 resolveu), enquanto o
+# Dart, que não tem esse pacote, gera a classe.
+# ---------------------------------------------------------------------------
+openapi: '3.1.0'
+
+info:
+  title: DinDin API
+  version: '1.0.0'
+  description: |
+    API do DinDin — carteiras, posições, geladeira, proventos, patrimônio,
+    carteira sugerida, simulação e cobrança.
+
+servers:
+  - url: https://dindin-4e720.web.app
+    description: Produção
+  - url: http://localhost:5001
+    description: Emuladores
+
+security:
+  - firebaseIdToken: []
+
+components:
+  securitySchemes:
+    firebaseIdToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: ID token do Firebase Auth, enviado em toda requisição.
+
+  responses:
+    Unauthorized:
+      description: Sem ID token válido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso inexistente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Requisição inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NoContent:
+      description: Sem corpo.
+
+  schemas:
+    # -----------------------------------------------------------------------
+    # Erro
+    # -----------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      description: |
+        Corpo de erro produzido pelo `asyncHandler` a partir do `HttpError`.
+        A mensagem de 4xx é escrita para a tela e vem em pt-BR; a de 5xx não
+        é exposta.
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Código de contrato lido pelo frontend, como `SUBSCRIPTION_REQUIRED`.
+
+    # -----------------------------------------------------------------------
+    # Enums que vivem em dindin-models (issue #303)
+    # -----------------------------------------------------------------------
+    AssetType:
+      type: string
+      description: Tipos de ativo suportados em uma posição.
+      enum: [FII, STOCK, ETF, REIT, OTHER]
+      x-ts-import: dindin-models
+
+    AiSuggestionTab:
+      type: string
+      enum: [renda, ganho]
+      x-ts-import: dindin-models
+
+    RecommendedWalletProvider:
+      type: string
+      description: Instituição que publica a carteira sugerida.
+      enum: [BB]
+      x-ts-import: dindin-models
+
+    RecommendedWalletStatus:
+      type: string
+      enum: [pending_review, confirmed]
+      x-ts-import: dindin-models
+
+    # -----------------------------------------------------------------------
+    # Documentos do Firestore (dindin-models)
+    # -----------------------------------------------------------------------
+    Wallet:
+      type: object
+      description: Carteira de investimentos.
+      required: [id, ownerId, name, currency, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        currency:
+          type: string
+          description: 'BRL-only por decisão de produto (#266).'
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    Asset:
+      type: object
+      description: Ativo do catálogo — fonte única sobre quais tickers podem ser cadastrados.
+      required: [ticker, name, assetType, active, createdAt, updatedAt]
+      properties:
+        ticker: { type: string }
+        name: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        active: { type: boolean }
+        qualifiedInvestor: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    Position:
+      type: object
+      description: Posição de um ativo na carteira.
+      required:
+        [
+          id,
+          walletId,
+          ticker,
+          assetType,
+          quantity,
+          averagePrice,
+          inFridge,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string }
+        walletId: { type: string }
+        ticker: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        quantity: { type: number }
+        averagePrice: { type: number }
+        currentPrice:
+          type: number
+          description: Último preço conhecido; ausente quando não há cotação.
+        currentPriceQuotedAt:
+          type: string
+          format: date-time
+          description: 'Quando o `currentPrice` foi apurado na fonte (#390).'
+        inFridge: { type: boolean }
+        targetPrice: { type: number }
+        sector: { type: string }
+        notes: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    Fridge:
+      type: object
+      description: Geladeira — acompanhamento de oportunidades.
+      required: [id, ownerId, name, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    FridgeItem:
+      type: object
+      required:
+        [
+          id,
+          fridgeId,
+          ticker,
+          quantity,
+          transferredPrice,
+          targetPrice,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string }
+        fridgeId: { type: string }
+        ticker: { type: string }
+        quantity: { type: number }
+        transferredPrice: { type: number }
+        targetPrice: { type: number }
+        currentPrice: { type: number }
+        currentPriceQuotedAt: { type: string, format: date-time }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        notes: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    PatrimonySnapshot:
+      type: object
+      description: Snapshot diário do patrimônio.
+      required: [id, userId, date, totalWallet, totalFridge, total, createdAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        date: { type: string, format: date }
+        totalWallet: { type: number }
+        totalFridge: { type: number }
+        total: { type: number }
+        createdAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    RecommendedWalletAsset:
+      type: object
+      required: [ticker, segment, weight, closePrice, ifixWeight, inCatalog]
+      properties:
+        ticker: { type: string }
+        segment: { type: string }
+        weight: { type: number }
+        closePrice: { type: number }
+        ifixWeight: { type: number }
+        inCatalog: { type: boolean }
+      x-ts-import: dindin-models
+
+    RecommendedWallet:
+      type: object
+      required:
+        [
+          id,
+          provider,
+          month,
+          revision,
+          publishedAt,
+          sourceFile,
+          status,
+          renda,
+          ganho,
+          parsedAt,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string }
+        provider: { $ref: '#/components/schemas/RecommendedWalletProvider' }
+        providerSlug:
+          type: string
+          description: 'Ausente nos documentos anteriores à #395; a leitura o deriva do id.'
+        month: { type: string }
+        revision: { type: integer }
+        publishedAt: { type: string }
+        sourceFile: { type: string }
+        status: { $ref: '#/components/schemas/RecommendedWalletStatus' }
+        renda:
+          type: array
+          items: { $ref: '#/components/schemas/RecommendedWalletAsset' }
+        ganho:
+          type: array
+          items: { $ref: '#/components/schemas/RecommendedWalletAsset' }
+        parsedAt: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    RecommendedWalletComparisonItem:
+      type: object
+      required:
+        [
+          ticker,
+          recommendedWeight,
+          currentWeight,
+          quantity,
+          currentValue,
+          status,
+        ]
+      properties:
+        ticker: { type: string }
+        recommendedWeight: { type: [number, 'null'] }
+        currentWeight: { type: [number, 'null'] }
+        quantity: { type: number }
+        currentValue: { type: number }
+        status:
+          type: string
+          enum: [match, missing, extra]
+      x-ts-import: dindin-models
+
+    RecommendedWalletComparison:
+      type: object
+      required: [recommended, items, totalValue]
+      properties:
+        recommended: { $ref: '#/components/schemas/RecommendedWallet' }
+        items:
+          type: array
+          items:
+            { $ref: '#/components/schemas/RecommendedWalletComparisonItem' }
+        totalValue: { type: number }
+      x-ts-import: dindin-models
+
+    AiSuggestionFallbackAllocation:
+      type: object
+      required: [ticker, amount]
+      properties:
+        ticker: { type: string }
+        amount: { type: number }
+        suggestedQuantity: { type: number }
+        referencePrice: { type: number }
+      x-ts-import: dindin-models
+
+    AiSuggestionItem:
+      type: object
+      required: [ticker, action, priority, rationale]
+      properties:
+        ticker: { type: string }
+        action:
+          type: string
+          enum: [buy, hold, reduce]
+        priority: { type: integer }
+        rationale: { type: string }
+        suggestedAmount: { type: number }
+        suggestedQuantity: { type: number }
+        referencePrice: { type: number }
+        qualifiedInvestor: { type: boolean }
+        fallbackAllocations:
+          type: array
+          items: { $ref: '#/components/schemas/AiSuggestionFallbackAllocation' }
+      x-ts-import: dindin-models
+
+    AiSuggestionAppliedItem:
+      type: object
+      description: 'Compra da sugestão já lançada na carteira pelo usuário (#276).'
+      required: [ticker, quantity, price, appliedAt]
+      properties:
+        ticker: { type: string }
+        fallbackFor:
+          type: string
+          description: FII de origem, quando o item é alternativa de redistribuição.
+        quantity: { type: number }
+        price: { type: number }
+        appliedAt: { type: string, format: date-time }
+      x-ts-import: dindin-models
+
+    AiSuggestion:
+      type: object
+      required:
+        [id, walletId, month, tab, model, summary, items, disclaimer, createdAt]
+      properties:
+        id: { type: string }
+        walletId: { type: string }
+        month: { type: string }
+        tab: { $ref: '#/components/schemas/AiSuggestionTab' }
+        model: { type: string }
+        summary: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AiSuggestionItem' }
+        disclaimer: { type: string }
+        createdAt: { type: string, format: date-time }
+        contribution: { type: number }
+        projectedDividends: { type: number }
+        historyMonths:
+          type: array
+          items: { type: string }
+        appliedItems:
+          type: array
+          items: { $ref: '#/components/schemas/AiSuggestionAppliedItem' }
+      x-ts-import: dindin-models
+
+    # -----------------------------------------------------------------------
+    # Saúde, usuário e assinatura
+    # -----------------------------------------------------------------------
+    HealthResponse:
+      type: object
+      required: [status, project]
+      properties:
+        status: { type: string }
+        project: { type: string }
+
+    SubscriptionStatus:
+      type: string
+      description: 'Estado da assinatura do usuário (#147).'
+      enum: [none, trialing, active, past_due, canceled]
+
+    Entitlement:
+      type: string
+      description: |
+        Recursos liberados mediante assinatura. `ai` cobre sugestão, chat e
+        futuras features de IA; `projections` cobre a projeção completa por
+        ativo e a agenda de pagamentos (#262).
+      enum: [ai, projections]
+
+    SubscriptionPlan:
+      type: string
+      enum: [basic]
+
+    SubscriptionInterval:
+      type: string
+      enum: [month, year]
+
+    SubscriptionProvider:
+      type: string
+      enum: [stripe, manual]
+
+    StripeSubscriptionState:
+      type: object
+      description: 'Último estado da assinatura Stripe recebido pelo webhook (#171).'
+      required:
+        [status, interval, currentPeriodEnd, cancelAtPeriodEnd, updatedAt]
+      properties:
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        interval:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionInterval'
+            - type: 'null'
+        providerSubscriptionId: { type: string }
+        currentPeriodEnd: { type: [string, 'null'], format: date-time }
+        cancelAtPeriodEnd: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+
+    UserSubscription:
+      type: object
+      description: "Documento `users/{uid}/billing/subscription`. Ausência equivale a `status: 'none'`."
+      required:
+        [
+          status,
+          plan,
+          interval,
+          provider,
+          currentPeriodEnd,
+          cancelAtPeriodEnd,
+          updatedAt,
+        ]
+      properties:
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        plan:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionPlan'
+            - type: 'null'
+        interval:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionInterval'
+            - type: 'null'
+        provider:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionProvider'
+            - type: 'null'
+        providerCustomerId: { type: string }
+        providerSubscriptionId: { type: string }
+        providerEventCreated:
+          type: integer
+          description: '`event.created` do último evento aplicado — protege contra webhooks fora de ordem.'
+        currentPeriodEnd: { type: [string, 'null'], format: date-time }
+        cancelAtPeriodEnd: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+        stripe:
+          allOf: [{ $ref: '#/components/schemas/StripeSubscriptionState' }]
+          description: 'Ausente em docs anteriores à #171.'
+
+    PublicSubscription:
+      type: object
+      description: Visão pública da assinatura em `GET /api/me`, sem ids do provedor.
+      required: [status, plan, interval, currentPeriodEnd, cancelAtPeriodEnd]
+      properties:
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        plan:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionPlan'
+            - type: 'null'
+        interval:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionInterval'
+            - type: 'null'
+        currentPeriodEnd: { type: [string, 'null'], format: date-time }
+        cancelAtPeriodEnd: { type: boolean }
+
+    MeResponse:
+      type: object
+      required: [uid, admin, subscription, entitlements]
+      properties:
+        uid: { type: string }
+        admin: { type: boolean }
+        subscription: { $ref: '#/components/schemas/PublicSubscription' }
+        entitlements:
+          type: array
+          items: { $ref: '#/components/schemas/Entitlement' }
+
+    DefaultResource:
+      type: string
+      description: 'Recurso padrão que `POST /api/me/setup` pode criar (#275).'
+      enum: [wallet, fridge]
+
+    SetupRequest:
+      type: object
+      description: 'Corpo opcional: pedido explícito pelo fallback.'
+      properties:
+        resource: { $ref: '#/components/schemas/DefaultResource' }
+
+    DevicePlatform:
+      type: string
+      description: Plataformas que recebem notificação push.
+      enum: [android, ios]
+      x-ts-import: dindin-models
+
+    RegisterDeviceTokenRequest:
+      type: object
+      description: |
+        Token de notificação do aparelho (issue #408). O app o registra a cada
+        abertura; o backend atualiza o existente em vez de duplicar.
+      required: [token, platform]
+      properties:
+        token: { type: string }
+        platform: { $ref: '#/components/schemas/DevicePlatform' }
+
+    SetupResponse:
+      type: object
+      required: [walletCreated, fridgeCreated]
+      properties:
+        walletCreated: { type: boolean }
+        fridgeCreated: { type: boolean }
+
+    AdminSubscriptionView:
+      type: object
+      description: 'Pública + provedor (#150) + status da Stripe guardada (#171).'
+      required:
+        [
+          status,
+          plan,
+          interval,
+          currentPeriodEnd,
+          cancelAtPeriodEnd,
+          provider,
+          stripeStatus,
+        ]
+      properties:
+        status: { $ref: '#/components/schemas/SubscriptionStatus' }
+        plan:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionPlan'
+            - type: 'null'
+        interval:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionInterval'
+            - type: 'null'
+        currentPeriodEnd: { type: [string, 'null'], format: date-time }
+        cancelAtPeriodEnd: { type: boolean }
+        provider:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionProvider'
+            - type: 'null'
+        stripeStatus:
+          oneOf:
+            - $ref: '#/components/schemas/SubscriptionStatus'
+            - type: 'null'
+
+    AdminUser:
+      type: object
+      required: [uid, email, admin, subscription, entitlements]
+      properties:
+        uid: { type: string }
+        email: { type: [string, 'null'] }
+        admin: { type: boolean }
+        subscription: { $ref: '#/components/schemas/AdminSubscriptionView' }
+        entitlements:
+          type: array
+          items: { $ref: '#/components/schemas/Entitlement' }
+
+    GrantSubscriptionRequest:
+      type: object
+      description: '`currentPeriodEnd: null` = sem validade.'
+      required: [plan, currentPeriodEnd]
+      properties:
+        plan: { $ref: '#/components/schemas/SubscriptionPlan' }
+        currentPeriodEnd: { type: [string, 'null'], format: date-time }
+
+    CheckoutSessionRequest:
+      type: object
+      properties:
+        interval: { $ref: '#/components/schemas/SubscriptionInterval' }
+
+    CheckoutSessionResponse:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+
+    PortalSessionResponse:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+
+    # -----------------------------------------------------------------------
+    # Catálogo de ativos
+    # -----------------------------------------------------------------------
+    CreateAssetRequest:
+      type: object
+      required: [ticker, name, assetType]
+      properties:
+        ticker: { type: string }
+        name: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        active: { type: boolean }
+        qualifiedInvestor: { type: boolean }
+
+    UpdateAssetRequest:
+      type: object
+      properties:
+        name: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        active: { type: boolean }
+        qualifiedInvestor: { type: boolean }
+
+    # -----------------------------------------------------------------------
+    # Carteira, posição, geladeira (issue #313)
+    # -----------------------------------------------------------------------
+    CreateWalletRequest:
+      type: object
+      required: [name, currency]
+      properties:
+        name: { type: string }
+        currency:
+          type: string
+          description: 'BRL-only por decisão de produto (#266).'
+        description: { type: string }
+
+    UpdateWalletRequest:
+      type: object
+      properties:
+        name: { type: string }
+        currency: { type: string }
+        description: { type: string }
+
+    CreatePositionRequest:
+      type: object
+      required: [ticker, assetType, quantity, averagePrice]
+      properties:
+        ticker: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        quantity: { type: number }
+        averagePrice: { type: number }
+        inFridge: { type: boolean }
+        targetPrice: { type: number }
+
+    UpdatePositionRequest:
+      type: object
+      description: '`targetPrice: null` remove o preço-alvo gravado.'
+      properties:
+        ticker: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        quantity: { type: number }
+        averagePrice: { type: number }
+        inFridge: { type: boolean }
+        targetPrice: { type: [number, 'null'] }
+
+    MoveToFridgeRequest:
+      type: object
+      required: [fridgeId, targetPrice]
+      properties:
+        fridgeId: { type: string }
+        targetPrice: { type: number }
+
+    CreateFridgeRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+
+    UpdateFridgeRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+
+    CreateFridgeItemRequest:
+      type: object
+      required: [ticker, quantity, transferredPrice, targetPrice]
+      properties:
+        ticker: { type: string }
+        quantity: { type: number }
+        transferredPrice: { type: number }
+        targetPrice: { type: number }
+
+    UpdateFridgeItemRequest:
+      type: object
+      properties:
+        ticker: { type: string }
+        quantity: { type: number }
+        transferredPrice: { type: number }
+        targetPrice: { type: number }
+
+    UnfreezeItemRequest:
+      type: object
+      required: [walletId]
+      properties:
+        walletId: { type: string }
+
+    ApplySuggestionItemRequest:
+      type: object
+      required: [ticker, quantity, price]
+      properties:
+        ticker: { type: string }
+        fallbackFor: { type: string }
+        quantity: { type: number }
+        price: { type: number }
+
+    # -----------------------------------------------------------------------
+    # Proventos, renda e patrimônio
+    # -----------------------------------------------------------------------
+    DividendCreateRequest:
+      type: object
+      description: Payload para criação/edição de um provento.
+      required: [ticker, amountPerShare, quantity, paymentDate]
+      properties:
+        ticker: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        amountPerShare: { type: number }
+        quantity: { type: number }
+        paymentDate: { type: string, format: date }
+
+    DividendResponse:
+      type: object
+      description: Representação de um provento já persistido.
+      required:
+        [
+          ticker,
+          amountPerShare,
+          quantity,
+          paymentDate,
+          id,
+          userId,
+          totalAmount,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        ticker: { type: string }
+        assetType: { $ref: '#/components/schemas/AssetType' }
+        amountPerShare: { type: number }
+        quantity: { type: number }
+        paymentDate: { type: string, format: date }
+        id: { type: string }
+        userId: { type: string }
+        totalAmount: { type: number }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MonthlyIncomeItem:
+      type: object
+      description: 'Projeção de renda de um ativo, pelo último provento informado (#290).'
+      required: [ticker, quantity, monthlyDividend, monthlyIncome]
+      properties:
+        ticker: { type: string }
+        quantity: { type: number }
+        monthlyDividend: { type: number }
+        monthlyIncome: { type: number }
+        paymentDate: { type: string, format: date }
+
+    ScheduleTotals:
+      type: object
+      description: Totais da agenda, sobre todos os ativos da carteira.
+      required: [upcomingTotal, paidTotal]
+      properties:
+        upcomingTotal: { type: number }
+        paidTotal: { type: number }
+
+    MonthlyIncomeResponse:
+      type: object
+      required: [byTicker, total, totalFromFridge]
+      properties:
+        byTicker:
+          type: array
+          items: { $ref: '#/components/schemas/MonthlyIncomeItem' }
+        total: { type: number }
+        totalFromFridge: { type: number }
+        limited:
+          type: boolean
+          description: 'Recorte gratuito aplicado pela API (#262).'
+        scheduleItems:
+          type: array
+          description: Ativos das datas de pagamento liberadas; ausente sem recorte.
+          items: { $ref: '#/components/schemas/MonthlyIncomeItem' }
+        scheduleTotals: { $ref: '#/components/schemas/ScheduleTotals' }
+        hiddenTickers:
+          type: array
+          description: Tickers omitidos em `byTicker` pelo recorte gratuito.
+          items: { type: string }
+        hiddenPaymentDates:
+          type: array
+          description: Datas de pagamento omitidas na agenda pelo recorte gratuito.
+          items: { type: string }
+        hiddenScheduleTickers:
+          type: array
+          description: Tickers sem data anunciada omitidos da agenda pelo recorte.
+          items: { type: string }
+
+    TickerDividendYield:
+      type: object
+      required: [ticker, annualIncome, currentValue, yield]
+      properties:
+        ticker: { type: string }
+        annualIncome: { type: number }
+        currentValue: { type: number }
+        yield: { type: number }
+
+    DividendYieldTotal:
+      type: object
+      required: [annualIncome, currentValue, yield]
+      properties:
+        annualIncome: { type: number }
+        currentValue: { type: number }
+        yield: { type: number }
+
+    DividendYieldResponse:
+      type: object
+      required: [byTicker, total]
+      properties:
+        byTicker:
+          type: array
+          items: { $ref: '#/components/schemas/TickerDividendYield' }
+        total: { $ref: '#/components/schemas/DividendYieldTotal' }
+
+    TickerTotal:
+      type: object
+      required: [ticker, total]
+      properties:
+        ticker: { type: string }
+        total: { type: number }
+
+    MonthlyDividendReportMonth:
+      type: object
+      required: [month, total, byTicker]
+      properties:
+        month: { type: string }
+        total: { type: number }
+        byTicker:
+          type: array
+          items: { $ref: '#/components/schemas/TickerTotal' }
+
+    MonthlyDividendReport:
+      type: object
+      required: [year, months, byTicker, total, availableYears]
+      properties:
+        year: { type: integer }
+        months:
+          type: array
+          items: { $ref: '#/components/schemas/MonthlyDividendReportMonth' }
+        byTicker:
+          type: array
+          items: { $ref: '#/components/schemas/TickerTotal' }
+        total: { type: number }
+        availableYears:
+          type: array
+          items: { type: integer }
+
+    DividendHistoryEntry:
+      type: object
+      description: 'Provento mensal de um ticker; `date` é `YYYY-MM`.'
+      required: [date, monthlyDividend]
+      properties:
+        date: { type: string }
+        monthlyDividend: { type: number }
+
+    DividendHistoryResponse:
+      type: object
+      required: [ticker, history]
+      properties:
+        ticker: { type: string }
+        history:
+          type: array
+          items: { $ref: '#/components/schemas/DividendHistoryEntry' }
+
+    DividendHistoryBatchResponse:
+      type: object
+      required: [byTicker]
+      properties:
+        byTicker:
+          type: object
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/DividendHistoryEntry' }
+
+    TickerValue:
+      type: object
+      description: Valor consolidado de um ticker, para a composição da carteira.
+      required: [ticker, value]
+      properties:
+        ticker: { type: string }
+        value: { type: number }
+
+    DashboardSummaryResponse:
+      type: object
+      description: |
+        Resumo do dashboard (#300). Antes a tela montava esses números com uma
+        requisição por carteira e uma por geladeira, e reaplicava regra de
+        negócio no cliente.
+      required:
+        [totalWallet, totalFridge, total, monthlyIncomeTotal, composition]
+      properties:
+        totalWallet: { type: number }
+        totalFridge: { type: number }
+        total: { type: number }
+        monthlyIncomeTotal:
+          type: number
+          description: Renda mensal projetada, com a geladeira contada uma única vez.
+        composition:
+          type: array
+          description: Composição consolidada por ticker, em ordem decrescente de valor.
+          items: { $ref: '#/components/schemas/TickerValue' }
+
+    PatrimonySnapshotRequest:
+      type: object
+      description: Data do snapshot; o padrão é hoje.
+      properties:
+        date: { type: string, format: date }
+
+    # -----------------------------------------------------------------------
+    # Simulação de proventos (issues #395 e #396)
+    # -----------------------------------------------------------------------
+    SimulationMode:
+      type: string
+      description: Proventos reinvestidos em novas cotas ou sacados.
+      enum: [reinvest, withdraw]
+
+    SimulationBasis:
+      type: object
+      description: |
+        Premissa da projeção, explícita no resultado: parte do último provento
+        real e assume que ele se repete. Não vale para pagador trimestral nem
+        para FII de provento variável, e a tela precisa dizer isso.
+      required: [source, assumesRepetition, staleAfterDays]
+      properties:
+        source:
+          type: string
+          enum: [monthlyDividend]
+        assumesRepetition:
+          type: boolean
+          const: true
+        staleAfterDays: { type: integer }
+
+    SimulationItem:
+      type: object
+      required:
+        [
+          ticker,
+          price,
+          monthlyDividend,
+          quantity,
+          finalQuantity,
+          investedAmount,
+          monthlyIncome,
+          totalIncome,
+        ]
+      properties:
+        ticker: { type: string }
+        price: { type: number }
+        monthlyDividend: { type: number }
+        quantity:
+          type: number
+          description: Cotas compradas com o aporte inicial.
+        finalQuantity:
+          type: number
+          description: 'Cotas ao fim do horizonte; difere de `quantity` no reinvestimento.'
+        investedAmount: { type: number }
+        monthlyIncome: { type: number }
+        totalIncome: { type: number }
+        missingPrice:
+          type: boolean
+          const: true
+          description: 'Sem cotação utilizável: ficou fora da alocação.'
+        missingDividend:
+          type: boolean
+          const: true
+          description: 'Sem último provento real conhecido: entrou com renda zero, declarada.'
+        staleDividend:
+          type: boolean
+          const: true
+          description: Último provento real além de `basis.staleAfterDays`.
+
+    SimulationResult:
+      type: object
+      required:
+        [
+          amount,
+          months,
+          mode,
+          allocatedAmount,
+          unallocatedAmount,
+          monthlyIncome,
+          totalIncome,
+          reinvestedAmount,
+          uninvestedIncome,
+          byTicker,
+          missingDividendTickers,
+          staleDividendTickers,
+          basis,
+        ]
+      properties:
+        amount: { type: number }
+        months: { type: integer }
+        mode: { $ref: '#/components/schemas/SimulationMode' }
+        allocatedAmount: { type: number }
+        unallocatedAmount:
+          type: number
+          description: 'Troco do aporte: não comprou cota inteira e não rende.'
+        monthlyIncome: { type: number }
+        totalIncome: { type: number }
+        reinvestedAmount: { type: number }
+        uninvestedIncome: { type: number }
+        byTicker:
+          type: array
+          items: { $ref: '#/components/schemas/SimulationItem' }
+        missingDividendTickers:
+          type: array
+          items: { type: string }
+        staleDividendTickers:
+          type: array
+          items: { type: string }
+        basis: { $ref: '#/components/schemas/SimulationBasis' }
+
+    SimulationWalletOption:
+      type: object
+      description: Provedor de carteira sugerida e os meses que ele tem publicados.
+      required: [slug, label, provider, months]
+      properties:
+        slug: { type: string }
+        label: { type: string }
+        provider: { $ref: '#/components/schemas/RecommendedWalletProvider' }
+        months:
+          type: array
+          items: { type: string }
+
+    SimulationWalletProvider:
+      type: object
+      description: O provedor no resultado, sem a lista de meses.
+      required: [slug, label, provider]
+      properties:
+        slug: { type: string }
+        label: { type: string }
+        provider: { $ref: '#/components/schemas/RecommendedWalletProvider' }
+
+    WalletSimulationRequest:
+      type: object
+      required: [amount, months]
+      properties:
+        amount:
+          type: [number, string]
+          description: 'Número ou texto em pt-BR (`1.500,55`); a API converte.'
+        months: { type: integer }
+        mode: { $ref: '#/components/schemas/SimulationMode' }
+        provider:
+          type: string
+          description: 'Provedor da carteira sugerida; o padrão é o primeiro do catálogo.'
+        month:
+          type: string
+          description: 'Mês da carteira; o padrão é a mais recente do provedor.'
+        tab: { $ref: '#/components/schemas/AiSuggestionTab' }
+
+    AssetSimulationRequest:
+      type: object
+      required: [ticker, amount, months]
+      properties:
+        ticker: { type: string }
+        amount:
+          type: [number, string]
+          description: 'Número ou texto em pt-BR (`1.500,55`); a API converte.'
+        months: { type: integer }
+        mode: { $ref: '#/components/schemas/SimulationMode' }
+
+    AssetSimulationResponse:
+      allOf:
+        - $ref: '#/components/schemas/SimulationResult'
+        - type: object
+          required: [ticker]
+          properties:
+            ticker: { type: string }
+      description: 'Recurso de assinante (`projections`).'
+
+    WalletSimulationResponse:
+      allOf:
+        - $ref: '#/components/schemas/SimulationResult'
+        - type: object
+          required: [provider, walletMonth, tab]
+          properties:
+            provider: { $ref: '#/components/schemas/SimulationWalletProvider' }
+            walletMonth: { type: string }
+            tab: { $ref: '#/components/schemas/AiSuggestionTab' }
+
+paths:
+  /api/health:
+    get:
+      summary: Saúde da API
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+
+  /api/me:
+    get:
+      summary: Usuário autenticado, assinatura e entitlements
+      operationId: getMe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/setup:
+    post:
+      summary: Cria os recursos padrão do usuário
+      operationId: setupDefaults
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupRequest' }
+      responses:
+        '200':
+          description: O que foi criado nesta chamada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/notification-tokens:
+    post:
+      summary: Registra o token de notificação do aparelho
+      operationId: registerNotificationToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceTokenRequest' }
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/notification-tokens/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Remove o token de notificação
+      description: |
+        É como o usuário desliga as notificações push dentro do app, sem
+        depender das configurações do sistema.
+      operationId: removeNotificationToken
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/billing/webhook:
+    post:
+      summary: Webhook da Stripe
+      operationId: stripeWebhook
+      security: []
+      responses:
+        '200': { description: Evento recebido }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/billing/checkout-session:
+    post:
+      summary: Abre a sessão de checkout da assinatura
+      operationId: createCheckoutSession
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutSessionRequest' }
+      responses:
+        '200':
+          description: URL do checkout
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutSessionResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/billing/portal-session:
+    post:
+      summary: Abre o portal de gestão da assinatura
+      operationId: createPortalSession
+      responses:
+        '200':
+          description: URL do portal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PortalSessionResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/assets:
+    get:
+      summary: Catálogo de ativos ativos
+      operationId: listAssets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Asset' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/assets:
+    get:
+      summary: Catálogo completo (admin)
+      operationId: adminListAssets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Asset' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Cadastra um ativo (admin)
+      operationId: adminCreateAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAssetRequest' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/admin/assets/{ticker}:
+    parameters:
+      - name: ticker
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      summary: Atualiza um ativo (admin)
+      operationId: adminUpdateAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAssetRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/admin/users:
+    get:
+      summary: Usuários e assinaturas (admin)
+      operationId: adminListUsers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AdminUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/users/{uid}/subscription:
+    parameters:
+      - name: uid
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      summary: Concede assinatura manual (admin)
+      operationId: adminGrantSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GrantSubscriptionRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      summary: Revoga a concessão manual (admin)
+      operationId: adminRevokeSubscription
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUser' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/quotes/dividend-history:
+    get:
+      summary: Histórico de proventos de vários tickers
+      operationId: getDividendHistoryBatch
+      parameters:
+        - name: tickers
+          in: query
+          required: true
+          schema: { type: string }
+          description: Tickers separados por vírgula.
+        - name: months
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                { $ref: '#/components/schemas/DividendHistoryBatchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/quotes/{ticker}/dividend-history:
+    get:
+      summary: Histórico de proventos de um ticker
+      operationId: getDividendHistory
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema: { type: string }
+        - name: months
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendHistoryResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/wallets:
+    get:
+      summary: Carteiras do usuário
+      operationId: listWallets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Wallet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Cria uma carteira
+      operationId: createWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWalletRequest' }
+      responses:
+        '201':
+          description: Criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wallet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/wallets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Uma carteira
+      operationId: getWallet
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wallet' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Atualiza a carteira
+      operationId: updateWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWalletRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wallet' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Exclui a carteira
+      operationId: deleteWallet
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/monthly-income:
+    get:
+      summary: Renda mensal projetada consolidada
+      operationId: getConsolidatedMonthlyIncome
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyIncomeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/dashboard/summary:
+    get:
+      summary: Resumo do patrimônio e da composição
+      operationId: getDashboardSummary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/wallets/{walletId}/dividend-yield:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Dividend yield da carteira
+      operationId: getDividendYield
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendYieldResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/wallets/{walletId}/monthly-income:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Renda mensal projetada da carteira
+      operationId: getMonthlyIncome
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyIncomeResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/wallets/{walletId}/positions:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Posições da carteira
+      operationId: listPositions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Position' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      summary: Cria uma posição
+      operationId: createPosition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePositionRequest' }
+      responses:
+        '201':
+          description: Criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/wallets/{walletId}/positions/{id}:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Uma posição
+      operationId: getPosition
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Atualiza a posição
+      operationId: updatePosition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePositionRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Exclui a posição
+      operationId: deletePosition
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/wallets/{walletId}/positions/{id}/move-to-fridge:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Move a posição para a geladeira
+      operationId: moveToFridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MoveToFridgeRequest' }
+      responses:
+        '201':
+          description: Item criado na geladeira
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FridgeItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/fridges:
+    get:
+      summary: Geladeiras do usuário
+      operationId: listFridges
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Fridge' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Cria uma geladeira
+      operationId: createFridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateFridgeRequest' }
+      responses:
+        '201':
+          description: Criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fridge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/fridges/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Uma geladeira
+      operationId: getFridge
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fridge' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Atualiza a geladeira
+      operationId: updateFridge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateFridgeRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Fridge' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Exclui a geladeira
+      operationId: deleteFridge
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/fridges/{fridgeId}/items:
+    parameters:
+      - name: fridgeId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Itens da geladeira
+      operationId: listItems
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FridgeItem' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      summary: Cria um item na geladeira
+      operationId: createItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateFridgeItemRequest' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FridgeItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/fridges/{fridgeId}/items/{id}:
+    parameters:
+      - name: fridgeId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Um item da geladeira
+      operationId: getItem
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FridgeItem' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Atualiza o item
+      operationId: updateItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateFridgeItemRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FridgeItem' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Exclui o item
+      operationId: deleteItem
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/fridges/{fridgeId}/items/{id}/unfreeze:
+    parameters:
+      - name: fridgeId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Retira o item da geladeira e devolve à carteira
+      operationId: unfreezeItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UnfreezeItemRequest' }
+      responses:
+        '201':
+          description: Posição criada na carteira
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/dividends:
+    get:
+      summary: Proventos recebidos
+      operationId: listDividends
+      parameters:
+        - name: ticker
+          in: query
+          schema: { type: string }
+        - name: year
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DividendResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Registra um provento
+      operationId: createDividend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DividendCreateRequest' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/dividends/projection:
+    get:
+      summary: Projeção de proventos
+      operationId: getDividendProjection
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyIncomeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/dividends/monthly-report:
+    get:
+      summary: Relatório mensal de proventos
+      operationId: getMonthlyDividendReport
+      parameters:
+        - name: year
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyDividendReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/dividends/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Um provento
+      operationId: getDividend
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Atualiza o provento
+      operationId: updateDividend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DividendCreateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Exclui o provento
+      operationId: deleteDividend
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/patrimony/history:
+    get:
+      summary: Histórico de patrimônio
+      operationId: getPatrimonyHistory
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PatrimonySnapshot' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/patrimony/snapshots:
+    post:
+      summary: Grava o snapshot do dia
+      operationId: postPatrimonySnapshot
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatrimonySnapshotRequest' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatrimonySnapshot' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/simulations/wallets:
+    get:
+      summary: Carteiras sugeridas disponíveis para simulação
+      operationId: listSimulationWallets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SimulationWalletOption' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/simulations/wallet:
+    post:
+      summary: Simulação geral por carteira sugerida
+      description: Gratuita, sem assinatura.
+      operationId: simulateWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WalletSimulationRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WalletSimulationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/simulations/asset:
+    post:
+      summary: Simulação por ativo específico
+      description: 'Recurso de assinante: exige o entitlement `projections`.'
+      operationId: simulateAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssetSimulationRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssetSimulationResponse' }
+        '402':
+          description: 'Sem assinatura (`code: SUBSCRIPTION_REQUIRED`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/recommended-wallets/bb-fii:
+    get:
+      summary: Carteiras sugeridas publicadas
+      operationId: listRecommended
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RecommendedWallet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/recommended-wallets/bb-fii/latest:
+    get:
+      summary: Carteira sugerida mais recente
+      operationId: getLatestRecommended
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendedWallet' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/recommended-wallets/bb-fii/compare/{walletId}:
+    parameters:
+      - name: walletId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Comparação da carteira do usuário com a sugerida
+      operationId: compareRecommended
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                { $ref: '#/components/schemas/RecommendedWalletComparison' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/recommended-wallets/bb-fii/suggestions:
+    get:
+      summary: Sugestões de IA já geradas
+      operationId: listSuggestions
+      parameters:
+        - name: walletId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AiSuggestion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Gera uma sugestão de IA
+      description: 'Recurso de assinante: exige o entitlement `ai`.'
+      operationId: createSuggestion
+      responses:
+        '201':
+          description: Criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSuggestion' }
+        '402':
+          description: 'Sem assinatura (`code: SUBSCRIPTION_REQUIRED`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/recommended-wallets/bb-fii/suggestions/{id}/applied:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Marca as compras da sugestão já lançadas na carteira
+      operationId: applySuggestionItems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/ApplySuggestionItemRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/admin/recommended-wallets/bb-fii/import:
+    post:
+      summary: Importa a carteira sugerida a partir do arquivo publicado (admin)
+      operationId: adminImportRecommended
+      responses:
+        '201':
+          description: Importada, pendente de revisão
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendedWallet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/admin/recommended-wallets/bb-fii/{id}/confirm:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      summary: Confirma a carteira sugerida importada (admin)
+      operationId: adminConfirmRecommended
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendedWallet' }
+        '404': { $ref: '#/components/responses/NotFound' }

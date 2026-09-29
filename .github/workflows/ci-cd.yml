@@ -128,6 +128,12 @@ jobs:
       - name: Verificar formatação
         run: npm run format:check
 
+      # Contrato e código gerado não podem divergir em silêncio (issue #399).
+      # Aqui não há SDK do Dart, então este passo confere o TypeScript; o
+      # Dart é conferido no job `build-and-test-mobile`, que tem o Flutter.
+      - name: Verificar contratos
+        run: npm run contracts:check
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -227,6 +233,85 @@ jobs:
           path: apps/web/dist/dindin-web
           retention-days: 3
 
+  # O app Flutter não é alcançado pelas verificações de Node: `npm run lint`
+  # roda `--workspaces --if-present` e o Prettier não formata `.dart`. Este job
+  # é o equivalente em Dart das três exigências que o repositório já faz das
+  # outras camadas — formatação, análise estática e suíte (issue #398).
+  build-and-test-mobile:
+    name: Build and Test Mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # A versão vem de `apps/mobile/.flutter-version`, o mesmo arquivo que o
+      # desenvolvedor usa: um número escrito só aqui divergiria da máquina
+      # local na primeira atualização do SDK.
+      - name: Ler versão do Flutter
+        id: sdk
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Conferir a versão fixada
+        run: |
+          set -euo pipefail
+          FIXADA="${{ steps.sdk.outputs.version }}"
+          if [ "$FIXADA" != "3.47.5" ]; then
+            echo "::error::.flutter-version diz $FIXADA, mas o job instala 3.47.5"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # O gerador de contratos é Node e roda da raiz; o job precisa dele para
+      # conferir o modelo Dart gerado (issue #399).
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (raiz)
+        run: npm ci
+        working-directory: .
+
+      # Equivale ao `npm run format:check`: um arquivo fora do padrão reprova
+      # o pipeline, em vez de depender de disciplina manual.
+      - name: Verificar formatação
+        run: dart format --output=none --set-exit-if-changed .
+
+      # Com o SDK do Dart disponível, este é o passo que confere o modelo
+      # Dart gerado a partir de `openapi/dindin.yaml` (issue #399).
+      - name: Verificar contratos
+        run: npm run contracts:check
+        working-directory: .
+
+      - name: Analisar
+        run: flutter analyze --fatal-infos
+
+      - name: Testar
+        run: flutter test --coverage
+
+      - name: Upload Mobile coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-mobile
+          path: apps/mobile/coverage
+          retention-days: 7
+
   deploy:
     name: Deploy to Firebase
     needs:
@@ -235,6 +320,7 @@ jobs:
       - lint
       - build-and-test-api
       - build-and-test-web
+      - build-and-test-mobile
     # Executa apenas em push direto na main, após CI passar.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest

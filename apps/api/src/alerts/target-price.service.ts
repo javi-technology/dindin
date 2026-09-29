@@ -4,6 +4,7 @@ import { loadAllQuotePrices } from '../quotes/quote-prices';
 import { validPositivePrice } from '../shared/numbers';
 import { getAllUserFridgeItemsWithFridge } from '../wallet/fridge-reader';
 import { sendAlertEmails } from './alert-mail.service';
+import { sendAlertPushes } from './alert-push.service';
 import { logError, logInfo } from '../shared/logger';
 
 const BATCH_SIZE = 10;
@@ -101,7 +102,18 @@ export async function checkUserTargetPrices(
 
     const openAlert = openAlerts.get(id);
     if (openAlert) {
-      if (!openAlert.notifiedAt) pendingNotification.push(openAlert);
+      // Reprocessa o alerta aberto que ficou sem aviso em **algum** canal:
+      // com o estado por canal (#408), o push que falhou ainda precisa sair
+      // mesmo que o e-mail tenha ido, e vice-versa.
+      // `notifiedAt` é a marca dos alertas gravados antes da separação por
+      // canal, e vale para os **dois**: ele foi escrito quando havia um só.
+      // Cobrar `notifiedPushAt` desses faria o primeiro job após o deploy
+      // mandar push de tudo que já tinha saído por e-mail.
+      const semEmail = !openAlert.notifiedEmailAt && !openAlert.notifiedAt;
+      const semPush = !openAlert.notifiedPushAt && !openAlert.notifiedAt;
+      if (semEmail || semPush) {
+        pendingNotification.push(openAlert);
+      }
       continue;
     }
 
@@ -174,7 +186,23 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
   // A checagem é paralela porque só toca no Firestore. O envio é serial: o
   // Resend limita requisições por segundo e um 429 adiaria o aviso em um dia.
   let notified = 0;
+  let pushed = 0;
   for (const { userId, alerts } of toNotify) {
+    // O push vai primeiro por ser o canal rápido, e é tentado **sempre**: o
+    // e-mail continua valendo para quem não tem token válido ou negou a
+    // permissão, que é estado normal e não falha.
+    try {
+      pushed += await sendAlertPushes(userId, alerts, now);
+    } catch (error) {
+      failed += 1;
+      logError('checkAllTargetPrices.pushFailed', {
+        uid: userId,
+        message: (error as Error).message,
+      });
+    }
+
+    // Cada canal responde por si: a falha de um não impede nem duplica o
+    // outro, porque o estado de envio é gravado em campos separados.
     try {
       notified += await sendAlertEmails(userId, alerts, now);
     } catch (error) {
@@ -186,5 +214,5 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
     }
   }
 
-  logInfo('checkAllTargetPrices.done', { created, notified, failed });
+  logInfo('checkAllTargetPrices.done', { created, notified, pushed, failed });
 }

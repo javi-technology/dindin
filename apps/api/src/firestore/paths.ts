@@ -45,6 +45,16 @@ export function alertsCollection(userId: string) {
   return userDocument(userId).collection('alerts');
 }
 
+/**
+ * Tokens de notificação do usuário, um documento por aparelho (issue #408).
+ *
+ * O id do documento é o próprio token: o app o registra a cada abertura, e
+ * com id gerado cada registro viraria uma duplicata do mesmo aparelho.
+ */
+export function deviceTokensCollection(userId: string) {
+  return userDocument(userId).collection('deviceTokens');
+}
+
 export function dividendsCollection(userId: string) {
   return userDocument(userId).collection('dividends');
 }

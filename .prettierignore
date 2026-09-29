@@ -8,3 +8,8 @@ lib
 coverage
 public
 .angular
+
+# App Flutter: formatado por `dart format` no job `build-and-test-mobile`
+# (issue #398). Deixar o Prettier reformatar o `pubspec.yaml` e os assets do
+# Xcode colocaria as duas ferramentas para brigar pelos mesmos arquivos.
+apps/mobile/

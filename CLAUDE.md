@@ -10,7 +10,7 @@
 
 ## Visão Geral
 
-Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
+Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend), Cloud Functions + Express + Node 22 (backend), Flutter 3.47 (app iOS e Android), Firestore, Firebase Auth/Hosting. Projeto Firebase: `dindin-4e720`.
 
 ### Estrutura do Repositório
 
@@ -18,6 +18,7 @@ Monorepo de app financeiro pessoal. Stack: Angular 22 + Tailwind CSS 4 (frontend
 apps/
   api/    # Cloud Functions (Express + TypeScript) — regras de negócio e APIs; src/ e tests/
   web/    # Angular + Tailwind — src/app/{core,features,shared}/
+  mobile/ # App Flutter (Dart) para iOS e Android — lib/ e test/
 packages/
   models/        # Models do Firestore (User, Wallet, Position, Fridge, FridgeItem)
   shared-types/  # Tipos TypeScript compartilhados entre frontend e backend
@@ -32,9 +33,15 @@ npm run api:build                              # build da API
 npm run build --workspace=apps/web             # build do frontend
 npm run test --workspace=apps/api              # testes da API (Jest)
 npm run test --workspace=apps/web              # testes do frontend (Vitest)
+npm run mobile:test                            # testes do app (flutter test)
+npm run mobile:lint                            # análise estática do app (flutter analyze)
+npm run mobile:format                          # formatar o app (dart format)
+npm run mobile:format:check                    # verificar a formatação do app
 npm run lint                                   # análise estática (ESLint)
 npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
+npm run contracts:gen                          # regerar os contratos (TS e Dart) do OpenAPI
+npm run contracts:check                        # verificar se o código gerado está em dia
 npm run docs:rules                             # regerar os guias a partir deste arquivo
 firebase deploy                                # deploy completo
 ```
@@ -171,10 +178,203 @@ Regras:
 
 ## Testes
 
-| Camada   | Ferramenta | Localização                   |
-| -------- | ---------- | ----------------------------- |
-| API      | Jest       | `apps/api/tests/**/*.spec.ts` |
-| Frontend | Vitest     | `apps/web/src/**/*.spec.ts`   |
+| Camada   | Ferramenta   | Localização                       |
+| -------- | ------------ | --------------------------------- |
+| API      | Jest         | `apps/api/tests/**/*.spec.ts`     |
+| Frontend | Vitest       | `apps/web/src/**/*.spec.ts`       |
+| Mobile   | flutter test | `apps/mobile/test/**/*_test.dart` |
+
+### Contratos da API (`openapi/dindin.yaml`)
+
+**A descrição OpenAPI é a fonte dos contratos.** Dela saem, por
+`npm run contracts:gen`:
+
+| Gerado                                       | Consumidor     |
+| -------------------------------------------- | -------------- |
+| `packages/shared-types/generated.ts`         | API e frontend |
+| `apps/mobile/lib/contracts/contracts.g.dart` | App Flutter    |
+
+- **Não edite os gerados**: a alteração é perdida na próxima geração e o CI
+  reprova. `packages/shared-types/index.ts` apenas reexporta o gerado.
+- Para **alterar ou adicionar uma rota**: escreva a rota, descreva-a no
+  `openapi/dindin.yaml` (path e schemas), rode `npm run contracts:gen` e
+  commite os gerados junto. Passa a existir esse passo entre escrever a rota
+  e usá-la — sem ele, o app repetiria o contrato à mão e um campo renomeado
+  só apareceria no celular do usuário, depois do deploy (issue #399).
+- Um teste compara as rotas registradas no Express com os paths do YAML:
+  rota fora da descrição, ou descrição sem rota, reprova a suíte.
+- `npm run contracts:check` roda em **dois** jobs do CI: no `lint`, que não
+  tem SDK do Dart e confere o TypeScript, e no `build-and-test-mobile`, que
+  tem o Flutter e confere o modelo Dart.
+- `x-ts-import: dindin-models` marca o schema que já existe em
+  `packages/models`: o TypeScript importa e reexporta de lá, em vez de criar
+  uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
+  que não tem esse pacote, gera a classe.
+
+### Notificação push do alerta de preço-alvo (issue #408)
+
+- O alerta tem **dois canais**, push e e-mail, e o estado de envio é gravado
+  **por canal** (`notifiedPushAt` e `notifiedEmailAt`). Com um campo único, o
+  push que falhasse depois de o e-mail ter ido provocaria reenvio do e-mail, e
+  o e-mail que falhasse depois do push marcaria o alerta como avisado sem ele
+  ter saído. `notifiedAt` continua sendo **lido** para os alertas gravados
+  antes disso — ignorá-lo faria o primeiro job após o deploy reenviar tudo.
+- **Quem não tem token válido ou negou a permissão continua recebendo o
+  e-mail.** Negar é estado normal, não erro.
+- **Token inválido é descartado** (`registration-token-not-registered`,
+  `invalid-registration-token`, `invalid-argument`): o token muda quando o
+  usuário reinstala o app, troca de aparelho ou limpa os dados, e sem
+  descartá-lo o job acumula falhas para sempre. Falha temporária **não**
+  descarta, ou o push sumiria para quem pegou o FCM fora do ar.
+- **O texto da notificação não expõe valores da carteira**: ela aparece na
+  tela bloqueada, e o ativo e o fato bastam. O `fridgeId` vai nos dados, para
+  o toque abrir a geladeira correspondente e não a tela inicial.
+- Os tokens ficam em `users/{uid}/deviceTokens/{token}`, com o **token como id
+  do documento**: o app o registra a cada abertura, e com id gerado cada
+  registro viraria uma duplicata do mesmo aparelho. Um usuário pode ter
+  vários. A coleção é fechada nas regras: o app registra pela API, que valida
+  a plataforma.
+- No app, a permissão é pedida **na geladeira**, onde o alerta acontece, com
+  explicação — pedir na primeira abertura, sem contexto, é o jeito mais rápido
+  de receber um "não" definitivo, porque as plataformas só perguntam uma vez.
+- O usuário **desliga o push dentro do app**, sem ir às configurações do
+  sistema; de lá ele desligaria e provavelmente não voltaria.
+- Log estruturado por canal, **sem o token e sem dados da carteira**.
+
+### Carteira sugerida e simulação no app (`apps/mobile`)
+
+- A **simulação geral por carteira sugerida é gratuita**; a simulação por
+  ativo específico é recurso de assinante. No app, a liberação do pago depende
+  de compra in-app (issue #405): até lá o ponto de entrada existe, marcado com
+  `SeloAssinante`. Escondê-lo faria o assinante da web não encontrá-lo no app.
+- A tela **permite escolher a carteira sugerida** quando há mais de uma. O
+  sistema prevê outras além da do BB, e assumir uma só quebraria na segunda.
+- O valor a investir vai para a API **como o usuário digitou**: a API converte
+  o texto em pt-BR, e converter dos dois lados é convidar os dois a
+  discordarem sobre o que `1.500` significa.
+- A **premissa da projeção fica visível** no resultado (parte do último
+  provento real, assumindo repetição), e o **troco não alocado** aparece: sem
+  ele, a conta do usuário não fecha com o aporte que ele informou.
+- A comparação com a carteira sugerida é **cartão por ativo**, não tabela: em
+  tela de celular, quatro colunas viram rolagem horizontal, que esconde
+  justamente a coluna da comparação. Ativo ausente na carteira é sinalizado,
+  não zerado — "não está" e "está com peso nenhum" são coisas diferentes.
+
+### Operações de escrita do app (`apps/mobile`)
+
+- **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de
+  novo quando a resposta demora é o comportamento normal do usuário, e o
+  resultado seria posição duplicada — erro de dado financeiro, não incômodo de
+  interface. A proteção está em dois lugares: o mixin `EnvioDeFormulario`
+  descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
+- **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
+  o que foi digitado permanece. Refazer o preenchimento no teclado do celular
+  é onde o usuário desiste.
+- Validação **antes** do envio, com mensagens em pt-BR; valor monetário aceita
+  vírgula decimal e o ticker é normalizado para maiúsculas — exigir isso do
+  usuário no teclado do celular é pedir erro de digitação.
+- **Exclusão sempre passa por `ConfirmarDialog`** (via `AcoesDoItem`), nunca
+  por diálogo nativo do sistema.
+- Depois de uma operação bem-sucedida, as telas afetadas recarregam sozinhas.
+  Patrimônio e projeção derivam de posição, item e provento: sem a recarga, o
+  usuário cadastraria uma compra, veria o total antigo e concluiria que o app
+  não gravou.
+- Remover o preço-alvo de uma posição exige `targetPrice: null` **explícito**
+  (`atualizarPosicao(..., removerPrecoAlvo: true)`): `toJson` omite o opcional
+  não enviado, e omitir o campo manteria o alvo gravado — são pedidos
+  diferentes.
+- Formulário abre em folha de baixo (`ModalFormulario`), não em diálogo
+  centralizado: com o teclado aberto, o diálogo some atrás dele.
+
+### Telas de consulta do app (`apps/mobile`)
+
+- As telas consomem a API por `DinDinApi`, que devolve os **modelos gerados**
+  da descrição OpenAPI. Nenhuma tela lê `Map<String, dynamic>`: um campo
+  renomeado na API faz o app parar de compilar, em vez de virar zero no
+  celular do usuário depois do deploy.
+- Toda consulta passa por `Recurso`, que guarda a resposta em `CacheLocal` e
+  mostra o último estado conhecido enquanto busca o atual. Uma lista que só
+  aparece depois de a rede responder deixa o app inutilizável no elevador ou
+  no metrô — restrição que o web não tem.
+- **Dado do cache é sempre sinalizado** (`VisaoRecurso` mostra a faixa com a
+  hora da última atualização). Sem o aviso, o cache vira armadilha: o usuário
+  decidiria uma compra sobre a cotação de ontem achando que é a de agora.
+- Falha de rede **com** cache em mãos não apaga a tela: o erro vira aviso e o
+  conteúdo continua. Sem cache, vira `EstadoErro` com nova tentativa.
+- Lista vazia e falha de carregamento são estados **diferentes** e parecem
+  diferentes: tratar as duas como tela em branco faz o usuário achar que
+  perdeu dado quando só não cadastrou nada.
+- **Ativo sem cotação ou sem provento conhecido usa `ValorAusente`, nunca
+  zero**: num app financeiro zero é um número, e o usuário o lê como um —
+  concluiria que o ativo não vale nada ou não paga nada, quando o app é que
+  não sabe.
+- Valorização e desvalorização usam `positive` e `danger`, nunca o token da
+  marca.
+- O logout limpa o cache (`CacheLocal.limpar`): o dado é do usuário
+  autenticado, e deixá-lo para trás mostraria a carteira de quem saiu para
+  quem entrar depois no mesmo aparelho. A escolha de tema não é dado de
+  usuário e permanece.
+- O conteúdo passado a `VisaoRecurso` **precisa ser rolável**: é o que habilita
+  o puxar-para-atualizar, o gesto que o usuário tenta antes de procurar botão.
+
+### Tema e componentes do app (`apps/mobile`)
+
+- A paleta do app é a **mesma da web** (`docs/paleta.md`). As escalas ficam em
+  `lib/core/theme/dindin_colors.dart` e um teste da suíte compara os valores e
+  o mapeamento de papéis com o `@theme` de `apps/web/src/styles.css`: o Flutter
+  não lê CSS, e sem essa conferência o app divergiria na primeira mudança de
+  paleta — divergência que não quebra compilação e só aparece em captura de
+  tela lado a lado.
+- **As telas usam os tokens semânticos por papel** (`context.tokens.action`),
+  nunca o passo da escala (`DinDinColors.jade700`): o passo direto fixa o tema
+  claro na marcação e some no escuro.
+- O tema segue o sistema por padrão e a escolha do usuário é preservada. São
+  **três** estados (`system`, `light`, `dark`), não um interruptor de duas
+  posições: com dois não haveria como voltar a seguir o sistema. "Seguir o
+  sistema" é a ausência de chave guardada.
+- Os limites de contraste da paleta valem nos **dois** temas — 4,5:1 para
+  texto, 3:1 para borda e ícone informativos — e a suíte os calcula. O celular
+  é usado no escuro com muito mais frequência que o desktop.
+- Campos monetários usam `CampoMoeda`/`Moeda`, que aceitam vírgula decimal: é
+  o que o teclado numérico do celular oferece, e ler `1,55` como `155` é erro
+  de dado financeiro.
+- Confirmação de ação destrutiva usa `ConfirmarDialog`, **nunca** diálogo
+  nativo do sistema: o nativo não segue a paleta e dá o mesmo peso visual ao
+  destrutivo e ao cancelar.
+- As telas partem dos componentes de `lib/shared/components/`: cartão, campo,
+  estado vazio, carregando e erro. Um app sem eles acumula variações em cada
+  tela, e padronizar depois custa mais.
+
+### App Flutter (`apps/mobile`)
+
+- A versão do SDK está fixada em `apps/mobile/.flutter-version`, e o job
+  `build-and-test-mobile` do CI usa **a mesma**. O job confere as duas e
+  reprova quando divergem — SDK diferente do validado no pipeline é a origem
+  clássica de "na minha máquina funciona".
+- O job roda formatação (`dart format --set-exit-if-changed`), análise
+  (`flutter analyze --fatal-infos`) e a suíte, e **bloqueia o deploy**, como já
+  fazem `lint` e as duas suítes de Node.
+- Os workspaces npm **não** usam o glob `apps/*`: listam `apps/api` e
+  `apps/web` um a um. Uma pasta sem `package.json` dentro de `apps/` quebraria
+  o `npm ci`, e o glob a abarcaria em silêncio.
+- Prettier e ESLint não alcançam `.dart`: use os comandos `mobile:*` antes de
+  commitar código do app, do mesmo modo que `format` e `lint` para o resto.
+- `google-services.json`, `GoogleService-Info.plist` e `firebase_options.dart`
+  ficam fora do versionamento, como qualquer credencial. Como obtê-los está em
+  `docs/mobile-firebase.md` (issue #400).
+- O identificador de pacote é **`tech.javi.dindin`** nas duas plataformas, e
+  precisa bater com o registrado no Firebase: mudar um e esquecer o outro
+  derruba o login com Google só numa delas, com um erro que não diz qual.
+- O app **não guarda token por conta própria**: o `firebase_auth` restaura a
+  sessão na abertura e renova o ID token. O `ApiClient` manda o token em toda
+  requisição e, num 401, renova à força e repete a requisição **uma vez** —
+  repetir sem limite viraria laço quando a sessão realmente acabou.
+- Toda conversa com o SDK do Firebase passa por `AuthBackend`. É o que permite
+  testar o fluxo de login sem rede nem emulador, como a regra de testes
+  browserless já exige do frontend.
+- Erro de login vira mensagem em pt-BR no `AuthService`; código desconhecido
+  cai numa mensagem genérica, porque `invalid-credential` na tela não diz ao
+  usuário o que fazer.
 
 ### Frontend: testes unitários browserless
 
