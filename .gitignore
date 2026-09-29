@@ -29,3 +29,5 @@ apps/mobile/android/local.properties
 google-services.json
 GoogleService-Info.plist
 firebase_options.dart
+apps/mobile/firebase.json
+apps/mobile/ios/Runner.xcworkspace/xcshareddata/swiftpm/
