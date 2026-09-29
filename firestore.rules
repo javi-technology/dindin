@@ -106,5 +106,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Vínculo recibo da loja → usuário (#405) — exclusivo do Admin SDK.
+    match /storeSubscriptions/{id} {
+      allow read, write: if false;
+    }
+
   }
 }
