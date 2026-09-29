@@ -7,6 +7,7 @@ import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
+import 'package:dindin_mobile/core/setup/setup_service.dart';
 import 'package:dindin_mobile/core/theme/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,6 +37,14 @@ void main() {
           registrarToken: (_, _) async {},
           removerToken: (_) async {},
         ),
+        setup: SetupService(
+          DinDinApi(
+            ApiClient(
+              baseUrl: 'https://api.exemplo',
+              tokenProvider: AuthService(AuthBackendFalso()),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -61,6 +70,14 @@ void main() {
           registrarToken: (_, _) async {},
           removerToken: (_) async {},
         ),
+        setup: SetupService(
+          DinDinApi(
+            ApiClient(
+              baseUrl: 'https://api.exemplo',
+              tokenProvider: AuthService(AuthBackendFalso()),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -85,6 +102,14 @@ void main() {
           backend: NotificacoesBackendFalso(),
           registrarToken: (_, _) async {},
           removerToken: (_) async {},
+        ),
+        setup: SetupService(
+          DinDinApi(
+            ApiClient(
+              baseUrl: 'https://api.exemplo',
+              tokenProvider: AuthService(AuthBackendFalso()),
+            ),
+          ),
         ),
       ),
     );

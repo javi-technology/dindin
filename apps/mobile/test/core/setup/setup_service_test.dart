@@ -53,7 +53,12 @@ void main() {
 
       await api.provisionarPadroes();
 
-      expect(enviadas, [('POST', '/api/me/setup', <String, dynamic>{})]);
+      expect(enviadas, hasLength(1));
+      final (metodo, caminho, corpo) = enviadas.single;
+      expect(metodo, 'POST');
+      expect(caminho, '/api/me/setup');
+      // Corpo vazio: o pedido sem `resource` provisiona o que faltar.
+      expect(corpo, isEmpty);
     });
   });
 

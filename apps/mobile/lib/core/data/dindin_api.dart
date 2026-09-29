@@ -215,6 +215,14 @@ class DinDinApi {
   // Notificações push (issue #408)
   // -------------------------------------------------------------------------
 
+  /// Cria a Carteira Principal e a Geladeira Principal, se faltarem (#275).
+  ///
+  /// A API é idempotente: roda em transação, só cria com a coleção vazia e
+  /// marca o usuário como provisionado. Chamar de quem já usou o web não
+  /// duplica nada.
+  Future<void> provisionarPadroes() =>
+      _client.post('/api/me/setup', body: const <String, dynamic>{});
+
   /// Registra o token deste aparelho.
   ///
   /// O app chama isso a cada abertura com permissão concedida; o backend
