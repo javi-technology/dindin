@@ -121,4 +121,56 @@ void main() {
 
     expect(enviado?.ticker, 'MXRF11');
   });
+
+  testesDeCursor();
+}
+
+// ---------------------------------------------------------------------------
+// Cursor preservado ao reconstruir (issue #448, achado do review)
+//
+// O campo copiava o valor entre dois controllers a cada `build`, o que joga o
+// cursor para o fim: corrigir uma letra no meio do ticker ficava impossível,
+// porque a próxima reconstrução movia o ponto de inserção.
+// ---------------------------------------------------------------------------
+void testesDeCursor() {
+  testWidgets('mantém o cursor onde o usuário o deixou', (tester) async {
+    final catalogo = [ativo('HGLG11', 'CSHG Logística', AssetType.fii)];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DinDinTheme.claro,
+        home: Scaffold(
+          body: PosicaoForm(aoSalvar: (_) async => true, catalogo: catalogo),
+        ),
+      ),
+    );
+
+    final campo = find.byKey(const Key('campo-ticker'));
+    await tester.enterText(campo, 'HGLG11');
+    await tester.pumpAndSettle();
+
+    // Cursor no meio do texto, como quem volta para corrigir uma letra.
+    final estado = tester.widget<TextFormField>(campo);
+    estado.controller!.selection = const TextSelection.collapsed(offset: 2);
+    await tester.pump();
+
+    // Qualquer reconstrução: mudar o catálogo basta.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: DinDinTheme.claro,
+        home: Scaffold(
+          body: PosicaoForm(
+            aoSalvar: (_) async => true,
+            catalogo: [...catalogo, ativo('MXRF11', 'Maxi', AssetType.fii)],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<TextFormField>(campo).controller!.selection.baseOffset,
+      2,
+    );
+  });
 }

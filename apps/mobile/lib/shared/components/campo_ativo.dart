@@ -50,11 +50,19 @@ class CampoAtivo extends StatelessWidget {
         aoEscolher?.call(ativo);
       },
       fieldViewBuilder: (context, textController, focusNode, aoEnviar) {
-        // O Autocomplete mantém o próprio controller; o do formulário é a
-        // fonte da verdade, e os dois precisam andar juntos para o texto
-        // digitado valer mesmo sem nenhuma escolha na lista.
-        textController.value = controller.value;
-        textController.addListener(() => controller.text = textController.text);
+        // O Autocomplete mantém o próprio controller e é ele que o campo usa;
+        // o do formulário só precisa espelhar o texto para o `aoSalvar`.
+        //
+        // Copiar o `value` inteiro a cada `build` — como esta função fazia —
+        // reescreve também a seleção e joga o cursor para o fim: corrigir uma
+        // letra no meio do ticker ficava impossível. Sincronizar só quando o
+        // texto de fato difere preserva onde o usuário deixou o cursor.
+        if (textController.text != controller.text) {
+          textController.value = TextEditingValue(
+            text: controller.text,
+            selection: TextSelection.collapsed(offset: controller.text.length),
+          );
+        }
 
         return TextFormField(
           key: const Key('campo-ticker'),
@@ -62,6 +70,8 @@ class CampoAtivo extends StatelessWidget {
           focusNode: focusNode,
           decoration: const InputDecoration(labelText: 'Ticker'),
           textCapitalization: TextCapitalization.characters,
+          // Sem escolher nada na lista, é isto que leva o texto ao formulário.
+          onChanged: (texto) => controller.text = texto,
           validator: (valor) =>
               (valor ?? '').trim().isEmpty ? 'Informe o ticker.' : null,
         );
