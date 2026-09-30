@@ -402,7 +402,10 @@ class _InicioScreenState extends State<InicioScreen> {
       context,
       titulo: titulo,
       formulario: (context) => ListenableBuilder(
-        listenable: envio,
+        // O catálogo entra na escuta: o formulário aberto enquanto ele
+        // carrega precisa receber a lista quando ela chegar, senão o campo
+        // fica em texto livre até o envio.
+        listenable: Listenable.merge([envio, _catalogo]),
         builder: (context, _) => formulario(context, envio, (acao) async {
           final deuCerto = await _operar(envio, acao);
           if (deuCerto && context.mounted) Navigator.of(context).pop();
@@ -516,12 +519,7 @@ class _InicioScreenState extends State<InicioScreen> {
             () => widget.api.atualizarPosicao(
               carteiraId,
               posicao.id,
-              UpdatePositionRequest(
-                ticker: dados.ticker,
-                assetType: dados.assetType,
-                quantity: dados.quantity,
-                averagePrice: dados.averagePrice,
-              ),
+              pedidoDeAtualizacaoDePosicao(posicao, dados),
             ),
           ),
         ),
@@ -597,12 +595,7 @@ class _InicioScreenState extends State<InicioScreen> {
         () => widget.api.atualizarItemDaGeladeira(
           item.fridgeId,
           item.id,
-          UpdateFridgeItemRequest(
-            ticker: dados.ticker,
-            quantity: dados.quantity,
-            transferredPrice: dados.transferredPrice,
-            targetPrice: dados.targetPrice,
-          ),
+          pedidoDeAtualizacaoDeItem(item, dados),
         ),
       ),
     ),

@@ -8,8 +8,9 @@ import '../../contracts/contracts.g.dart';
 /// depois do envio — no teclado do celular, errar o ticker é fácil e a
 /// correção custava uma ida e volta à rede.
 ///
-/// O catálogo é **ajuda, não barreira**: sem ele em mãos — sem rede e sem
-/// cache — o campo continua aceitando o que o usuário digitar, porque um
+/// Com o catálogo em mãos, só ativo dele vale (issue #467), como no select
+/// fechado do web: o erro aparece no campo, antes do envio. Sem ele — sem rede
+/// e sem cache — o campo continua aceitando o que o usuário digitar, porque um
 /// formulário que trava por falta de lista é pior que um erro da API.
 class CampoAtivo extends StatelessWidget {
   const CampoAtivo({
@@ -17,6 +18,7 @@ class CampoAtivo extends StatelessWidget {
     required this.controller,
     required this.catalogo,
     this.aoEscolher,
+    this.tickerAtual,
   });
 
   final TextEditingController controller;
@@ -25,13 +27,64 @@ class CampoAtivo extends StatelessWidget {
   /// Avisa qual ativo foi escolhido, para o formulário preencher o tipo.
   final ValueChanged<Asset>? aoEscolher;
 
+  /// Ticker já gravado, na edição. Continua valendo mesmo que saia do
+  /// catálogo: bloquear a correção da quantidade de uma posição antiga por
+  /// causa do ticker que o usuário nem está mexendo seria um beco.
+  final String? tickerAtual;
+
+  static Asset? _buscar(List<Asset> catalogo, String texto) {
+    final ticker = texto.trim().toUpperCase();
+    for (final ativo in catalogo) {
+      if (ativo.ticker.toUpperCase() == ticker) return ativo;
+    }
+    return null;
+  }
+
+  Asset? _doCatalogo(String texto) => _buscar(catalogo, texto);
+
+  /// Mensagem de erro do ticker, ou `null` quando ele vale.
+  ///
+  /// Pública e estática para o formulário saber, enquanto o usuário digita, se
+  /// deve deixar o botão de salvar disponível: a mensagem no campo e o botão
+  /// desligado têm de concordar.
+  static String? erroDoTicker(
+    String? valor, {
+    required List<Asset> catalogo,
+    String? tickerAtual,
+  }) {
+    final texto = (valor ?? '').trim();
+    if (texto.isEmpty) return 'Informe o ticker.';
+    if (catalogo.isEmpty) return null;
+    if (_buscar(catalogo, texto) != null) return null;
+    if (texto.toUpperCase() == tickerAtual?.toUpperCase()) return null;
+    return 'Escolha um ativo da lista.';
+  }
+
+  /// O usuário digitou algo que o catálogo não reconhece.
+  ///
+  /// Campo vazio **não** conta: um botão desligado sem explicação deixaria o
+  /// usuário sem saber o que falta, e tocar em salvar mostra "Informe o
+  /// ticker.".
+  static bool tickerRecusado(
+    String? valor, {
+    required List<Asset> catalogo,
+    String? tickerAtual,
+  }) =>
+      (valor ?? '').trim().isNotEmpty &&
+      erroDoTicker(valor, catalogo: catalogo, tickerAtual: tickerAtual) != null;
+
+  String? _validar(String? valor) =>
+      erroDoTicker(valor, catalogo: catalogo, tickerAtual: tickerAtual);
+
   /// Ativos cujo ticker ou nome contêm o texto digitado.
   ///
   /// O nome entra na busca porque nem todo mundo lembra o ticker de cabeça,
   /// e "itaú" é o que a pessoa tem em mente ao procurar ITUB4.
   Iterable<Asset> _sugestoes(String texto) {
     final busca = texto.trim().toLowerCase();
-    if (busca.isEmpty) return const [];
+    // Campo vazio lista tudo: é o select do web, e quem não lembra o ticker
+    // precisa enxergar as opções antes de digitar.
+    if (busca.isEmpty) return catalogo;
 
     return catalogo.where(
       (ativo) =>
@@ -71,9 +124,18 @@ class CampoAtivo extends StatelessWidget {
           decoration: const InputDecoration(labelText: 'Ticker'),
           textCapitalization: TextCapitalization.characters,
           // Sem escolher nada na lista, é isto que leva o texto ao formulário.
-          onChanged: (texto) => controller.text = texto,
-          validator: (valor) =>
-              (valor ?? '').trim().isEmpty ? 'Informe o ticker.' : null,
+          onChanged: (texto) {
+            controller.text = texto;
+            // Ticker digitado por inteiro também traz o tipo, sem exigir o
+            // toque na sugestão.
+            final ativo = _doCatalogo(texto);
+            if (ativo != null) aoEscolher?.call(ativo);
+          },
+          validator: _validar,
+          // A mensagem aparece enquanto o usuário digita, e não só ao tocar
+          // em salvar: o botão já está desligado e o motivo precisa estar à
+          // vista.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
         );
       },
       optionsViewBuilder: (context, aoSelecionar, sugestoes) => Align(
