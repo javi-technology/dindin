@@ -22,7 +22,9 @@
     "mobile:format": "cd apps/mobile && dart format .",
     "mobile:format:check": "cd apps/mobile && dart format --output=none --set-exit-if-changed .",
     "mobile:lint": "cd apps/mobile && flutter analyze --fatal-infos",
-    "mobile:test": "cd apps/mobile && flutter test"
+    "mobile:test": "cd apps/mobile && flutter test",
+    "mobile:ios": "cd apps/mobile && flutter run --dart-define=FIREBASE_EMULATOR_HOST=127.0.1",
+    "mobile:android": "cd apps/mobile && flutter run --dart-define=FIREBASE_EMULATOR_HOST=10.0.2.2"
   },
   "devDependencies": {
     "eslint": "^10.11.0",
@@ -40,6 +42,9 @@
     "vite@6": "^6.4.3",
     "esbuild@0.28": "^0.28.2",
     "@babel/core@<7.29.6": "^7.29.7",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.5"
+    },
     "@angular/fire": {
       "firebase-tools": "$firebase-tools"
     }

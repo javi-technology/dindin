@@ -131,3 +131,38 @@ describe('.github/workflows/ci-cd.yml', () => {
     expect(workflow).not.toContain('FIREBASE_SERVICE_ACCOUNT');
   });
 });
+
+// O `npm audit` do CI reprovou por `@grpc/grpc-js <=1.13.5` (issue #487): o
+// `@firebase/firestore` do app web o fixa em `~1.9.0`, e o `firebase` já estava
+// na última versão, então só um `override` resolve. A auditoria roda na rede e
+// só acusa depois de o alerta sair; este teste confere o lockfile e acusa na
+// suíte, sem rede, se uma cópia na faixa vulnerável voltar.
+describe('package-lock.json', () => {
+  const lock = JSON.parse(
+    readFileSync(
+      join(__dirname, '..', '..', '..', 'package-lock.json'),
+      'utf-8',
+    ),
+  ) as { packages: Record<string, { version?: string }> };
+
+  const VULNERAVEL_ATE = [1, 13, 5];
+
+  const aoMenosTaoAntigaQue = (versao: string, limite: number[]): boolean => {
+    const partes = versao.split('-')[0].split('.').map(Number);
+    for (let i = 0; i < limite.length; i++) {
+      if (partes[i] !== limite[i]) return partes[i] < limite[i];
+    }
+    return true;
+  };
+
+  it('não deve resolver @grpc/grpc-js na faixa vulnerável (<=1.13.5)', () => {
+    const vulneraveis = Object.entries(lock.packages)
+      .filter(([caminho]) => caminho.endsWith('node_modules/@grpc/grpc-js'))
+      .filter(([, pacote]) =>
+        aoMenosTaoAntigaQue(pacote.version ?? '0.0.0', VULNERAVEL_ATE),
+      )
+      .map(([caminho, pacote]) => `${caminho}@${pacote.version}`);
+
+    expect(vulneraveis).toEqual([]);
+  });
+});
