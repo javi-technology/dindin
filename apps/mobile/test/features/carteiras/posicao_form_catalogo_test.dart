@@ -122,6 +122,81 @@ void main() {
     expect(enviado?.ticker, 'MXRF11');
   });
 
+  // ---- Catálogo obrigatório (issue #467) ----
+  //
+  // Sugerir não bastava: o campo seguia aceitando qualquer texto, e o erro só
+  // voltava da API depois do envio. O web usa um select fechado; o app faz o
+  // mesmo quando tem o catálogo em mãos.
+
+  testWidgets('ao focar o campo vazio, lista o catálogo inteiro', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      emApp(PosicaoForm(aoSalvar: (_) async => true, catalogo: catalogo)),
+    );
+
+    await tester.tap(find.byKey(const Key('campo-ticker')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HGLG11'), findsOneWidget);
+    expect(find.text('HGRU11'), findsOneWidget);
+    expect(find.text('ITUB4'), findsOneWidget);
+  });
+
+  testWidgets('ticker fora do catálogo é recusado antes do envio', (
+    tester,
+  ) async {
+    var chamadas = 0;
+    await tester.pumpWidget(
+      emApp(
+        PosicaoForm(
+          aoSalvar: (_) async {
+            chamadas++;
+            return true;
+          },
+          catalogo: catalogo,
+        ),
+      ),
+    );
+
+    await digitarTicker(tester, 'ZZZZ11');
+    await tester.enterText(find.byKey(const Key('campo-quantidade')), '5');
+    await tester.enterText(find.byKey(const Key('campo-preco')), '9,18');
+    await tester.tap(find.byKey(const Key('botao-salvar')));
+    await tester.pumpAndSettle();
+
+    expect(chamadas, 0);
+    expect(find.text('Escolha um ativo da lista.'), findsOneWidget);
+  });
+
+  // Quem digita o ticker inteiro sem tocar na sugestão não pode ficar sem o
+  // tipo do ativo nem ser barrado por causa das maiúsculas.
+  testWidgets('ticker digitado igual ao do catálogo vale e traz o tipo', (
+    tester,
+  ) async {
+    CreatePositionRequest? enviado;
+    await tester.pumpWidget(
+      emApp(
+        PosicaoForm(
+          aoSalvar: (dados) async {
+            enviado = dados;
+            return true;
+          },
+          catalogo: catalogo,
+        ),
+      ),
+    );
+
+    await digitarTicker(tester, 'itub4');
+    await tester.enterText(find.byKey(const Key('campo-quantidade')), '10');
+    await tester.enterText(find.byKey(const Key('campo-preco')), '34,12');
+    await tester.tap(find.byKey(const Key('botao-salvar')));
+    await tester.pumpAndSettle();
+
+    expect(enviado?.ticker, 'ITUB4');
+    expect(enviado?.assetType, AssetType.stock);
+  });
+
   testesDeCursor();
 }
 
