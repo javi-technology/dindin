@@ -1,7 +1,7 @@
 # DinDin — Frontend
 
 Aplicação Angular 22 com Tailwind CSS 4 do DinDin. As diretrizes do projeto
-estão no [`CLAUDE.md`](../../CLAUDE.md), na raiz do monorepo — este README cobre
+estão no [`AGENTS.md`](../../AGENTS.md), na raiz do monorepo — este README cobre
 só o que é específico deste workspace.
 
 ## Estrutura
