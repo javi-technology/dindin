@@ -89,8 +89,18 @@ cd apps/mobile
 flutter run --dart-define=FIREBASE_EMULATOR_HOST=127.0.0.1
 ```
 
-No emulador Android, use `10.0.2.2`; em um aparelho físico, use o IP local do
-Mac (por exemplo, o resultado de `ipconfig getifaddr en0`):
+No emulador Android, o Mac é visto como `10.0.2.2`, que já alcança os
+emuladores porque eles atendem em `localhost`:
+
+```bash
+flutter run --dart-define=FIREBASE_EMULATOR_HOST=10.0.2.2
+```
+
+Em um aparelho físico, use o IP local do Mac (por exemplo, o resultado de
+`ipconfig getifaddr en0`). Com o `firebase.json` atual, os emuladores atendem
+só em `localhost` e não respondem pelo IP da rede: para esse caso, defina
+localmente `"host": "0.0.0.0"` em `auth`, `hosting` e `functions` em
+`emulators`, sem commitar, porque isso expõe os emuladores à rede:
 
 ```bash
 flutter run --dart-define=FIREBASE_EMULATOR_HOST=192.168.1.20
@@ -98,10 +108,13 @@ flutter run --dart-define=FIREBASE_EMULATOR_HOST=192.168.1.20
 
 Os emuladores só falam HTTP, e o Android 9 ou superior bloqueia HTTP sem TLS
 por padrão (`Cleartext HTTP traffic to 10.0.2.2 not permitted`). Por isso o
-manifesto de **debug** (`android/app/src/debug/AndroidManifest.xml`) declara
-`android:usesCleartextTraffic="true"`. O de `main` não declara, então o build
-de release segue bloqueando HTTP sem TLS. Mudança de manifesto não entra por
-hot reload nem hot restart: pare o app e rode `flutter run` de novo.
+manifesto de **debug** (`android/app/src/debug/AndroidManifest.xml`) substitui
+o valor por `android:usesCleartextTraffic="true"`. O manifesto de `main` declara
+`android:usesCleartextTraffic="false"` de forma explícita: o app aceita Android
+a partir da API 24, e até o Android 8.1 o padrão da plataforma é permitir HTTP
+sem TLS, então só deixar de declarar não bloquearia o release. Mudança de
+manifesto não entra por hot reload nem hot restart: pare o app e rode
+`flutter run` de novo.
 
 `API_BASE_URL` continua disponível para apontar somente a API a outro ambiente,
 mas não configura o Firebase Auth e, portanto, não é o comando adequado para
