@@ -25,7 +25,7 @@
     "mobile:test": "cd apps/mobile && flutter test"
   },
   "devDependencies": {
-    "eslint": "^9.39.5",
+    "eslint": "^10.11.0",
     "firebase-tools": "^15.31.0",
     "prettier": "^3.9.9",
     "yaml": "^2.9.1",
