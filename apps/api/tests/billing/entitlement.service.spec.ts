@@ -412,3 +412,44 @@ describe('entitlement.service – projections (#262)', () => {
     expect(isEntitled(NO_SUBSCRIPTION, 'projections', true, NOW)).toBe(true);
   });
 });
+
+// Assinatura de loja vence no fim do período (issue #405): se a notificação de
+// expiração falhar ou não chegar, o acesso não pode durar para sempre.
+describe('entitlement.service – assinatura de loja', () => {
+  it.each(['apple', 'google'] as const)(
+    'deve liberar %s dentro do período',
+    (provider) => {
+      expect(
+        isEntitled(
+          sub({ status: 'active', provider, currentPeriodEnd: FUTURE }),
+          'ai',
+          false,
+          NOW,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    ['período vencido', PAST],
+    ['sem data de fim', null],
+  ])('deve negar assinatura de loja com %s', (_label, currentPeriodEnd) => {
+    expect(
+      isEntitled(
+        sub({ status: 'active', provider: 'apple', currentPeriodEnd }),
+        'projections',
+        false,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it('deve tratar assinatura de loja vencida como canceled', () => {
+    expect(
+      effectiveStatus(
+        sub({ status: 'active', provider: 'google', currentPeriodEnd: PAST }),
+        NOW,
+      ),
+    ).toBe('canceled');
+  });
+});

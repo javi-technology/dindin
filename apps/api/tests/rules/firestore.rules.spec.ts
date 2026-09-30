@@ -565,3 +565,30 @@ describe('Firestore rules – billingEvents', () => {
     await assertFails(getDoc(doc(unauth.firestore(), path)));
   });
 });
+
+// ---------------------------------------------------------------------------
+// storeSubscriptions (vínculo recibo → usuário — somente Admin SDK)
+// ---------------------------------------------------------------------------
+
+describe('Firestore rules – storeSubscriptions', () => {
+  const path = 'storeSubscriptions/apple_orig-1';
+
+  it('deve negar leitura para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await testEnv.withSecurityRulesDisabled((context) =>
+      setDoc(doc(context.firestore(), path), { uid: 'alice' }),
+    );
+
+    await assertFails(getDoc(doc(alice.firestore(), path)));
+  });
+
+  it('deve negar escrita para usuário autenticado', async () => {
+    const alice = testEnv.authenticatedContext('alice');
+    await assertFails(setDoc(doc(alice.firestore(), path), { uid: 'alice' }));
+  });
+
+  it('deve negar acesso não autenticado', async () => {
+    const unauth = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(unauth.firestore(), path)));
+  });
+});

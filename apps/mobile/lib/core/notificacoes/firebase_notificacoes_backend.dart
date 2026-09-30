@@ -9,13 +9,17 @@ import 'notificacoes_backend.dart';
 /// É a única parte do app que conhece o SDK de notificações, como
 /// `FirebaseAuthBackend` é para a autenticação.
 class FirebaseNotificacoesBackend implements NotificacoesBackend {
-  FirebaseNotificacoesBackend({FirebaseMessaging? messaging})
-    : _messaging = messaging ?? FirebaseMessaging.instance;
+  FirebaseNotificacoesBackend({
+    FirebaseMessaging? messaging,
+    String? plataforma,
+  }) : _messaging = messaging ?? FirebaseMessaging.instance,
+       _plataforma = plataforma ?? (Platform.isIOS ? 'ios' : 'android');
 
   final FirebaseMessaging _messaging;
+  final String _plataforma;
 
   @override
-  String get plataforma => Platform.isIOS ? 'ios' : 'android';
+  String get plataforma => _plataforma;
 
   @override
   Future<PermissaoDeNotificacao> permissaoAtual() async =>
@@ -34,7 +38,12 @@ class FirebaseNotificacoesBackend implements NotificacoesBackend {
       };
 
   @override
-  Future<String?> token() => _messaging.getToken();
+  Future<String?> token() async {
+    if (_plataforma == 'ios' && await _messaging.getAPNSToken() == null) {
+      return null;
+    }
+    return _messaging.getToken();
+  }
 
   @override
   Stream<String> get tokensRenovados => _messaging.onTokenRefresh;

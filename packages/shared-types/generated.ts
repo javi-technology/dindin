@@ -82,7 +82,7 @@ export type SubscriptionPlan = 'basic';
 
 export type SubscriptionInterval = 'month' | 'year';
 
-export type SubscriptionProvider = 'stripe' | 'manual';
+export type SubscriptionProvider = 'stripe' | 'manual' | 'apple' | 'google';
 
 /** Último estado da assinatura Stripe recebido pelo webhook (#171). */
 export interface StripeSubscriptionState {
@@ -113,6 +113,16 @@ export interface UserSubscription {
   updatedAt: string;
   /** Ausente em docs anteriores à #171. */
   stripe?: StripeSubscriptionState;
+}
+
+/**
+ * Compra feita na loja; o backend valida `credential` com a loja antes de conceder o acesso.
+ */
+export interface StorePurchaseRequest {
+  platform: 'apple' | 'google';
+  productId: string;
+  /** Recibo da App Store ou `purchaseToken` do Google Play. */
+  credential: string;
 }
 
 /** Visão pública da assinatura em `GET /api/me`, sem ids do provedor. */

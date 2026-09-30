@@ -25,3 +25,12 @@ String get apiBaseUrl {
   }
   return 'https://dindin-4e720.web.app';
 }
+
+/// Liga a compra in-app (issue #405).
+///
+/// Desligada por padrão: enquanto o backend não tem os validadores de recibo
+/// das lojas configurados, toda compra responde 503. Oferecer o botão assim
+/// deixaria o usuário pagar na loja e ficar sem acesso. Liga-se no build com
+/// `--dart-define=COMPRA_IN_APP=true`, depois de cumprida a seção "Compra
+/// in-app" de `docs/mobile-release.md`.
+const bool compraInAppHabilitada = bool.fromEnvironment('COMPRA_IN_APP');

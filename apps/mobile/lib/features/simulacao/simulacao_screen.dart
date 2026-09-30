@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../contracts/contracts.g.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/assinatura/assinatura_service.dart';
+import '../assinatura/planos_da_loja.dart';
 import '../../core/data/cache_local.dart';
 import '../../core/data/dindin_api.dart';
 import '../../core/data/envio.dart';
@@ -183,15 +184,21 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
             Row(
               key: const Key('selo-simulacao-ativo'),
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                SeloAssinante(),
-                SizedBox(width: 8),
-                Flexible(
+              children: [
+                const SeloAssinante(),
+                const SizedBox(width: 8),
+                const Flexible(
                   child: Text(
                     'Simular um ativo isoladamente é recurso de assinante.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
+                if (widget.assinatura.loja case final loja?)
+                  TextButton(
+                    key: const Key('ver-planos'),
+                    onPressed: () => abrirPlanosDaLoja(context, loja),
+                    child: const Text('Ver planos'),
+                  ),
               ],
             ),
           ],

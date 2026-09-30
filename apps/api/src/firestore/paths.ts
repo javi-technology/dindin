@@ -76,6 +76,18 @@ export function subscriptionDocument(userId: string) {
   return userDocument(userId).collection('billing').doc('subscription');
 }
 
+/**
+ * Vínculo entre a compra na loja e o usuário (issue #405), com id
+ * `<plataforma>_<id original>`. É por ele que a notificação da loja, que só
+ * traz o id da compra, chega ao `uid`, e que um recibo é impedido de valer
+ * para dois usuários.
+ */
+export function storeSubscriptionDocument(platform: string, id: string) {
+  return getFirestore()
+    .collection('storeSubscriptions')
+    .doc(`${platform}_${id}`);
+}
+
 /** Catálogo de ativos suportados. */
 export function assetsCollection() {
   return getFirestore().collection('assets');

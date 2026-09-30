@@ -149,15 +149,15 @@ class NotificacoesService extends ChangeNotifier {
   Future<void> _registrarTokenAtual({String? token}) async {
     if (_desligadoPeloUsuario) return;
 
-    token ??= await _backend.token();
-    // Sem token não há o que registrar — e o e-mail cobre o usuário.
-    if (token == null) return;
-    // O mesmo token já registrado nesta sessão não volta à API: a abertura
-    // do app já o envia, e conceder a permissão em seguida repetiria a
-    // chamada sem nada de novo para contar.
-    if (token == _tokenRegistrado) return;
-
     try {
+      token ??= await _backend.token();
+      // Sem token não há o que registrar — e o e-mail cobre o usuário.
+      if (token == null) return;
+      // O mesmo token já registrado nesta sessão não volta à API: a abertura
+      // do app já o envia, e conceder a permissão em seguida repetiria a
+      // chamada sem nada de novo para contar.
+      if (token == _tokenRegistrado) return;
+
       await _registrar(token, _backend.plataforma);
       _tokenRegistrado = token;
       _erro = null;

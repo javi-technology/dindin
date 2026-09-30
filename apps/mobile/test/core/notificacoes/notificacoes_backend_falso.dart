@@ -17,6 +17,7 @@ class NotificacoesBackendFalso implements NotificacoesBackend {
   PermissaoDeNotificacao? respostaAoPedir;
 
   String? tokenDoAparelho = 'token-1';
+  Object? erroAoObterToken;
 
   int pedidos = 0;
   final _renovacoes = StreamController<String>.broadcast();
@@ -32,7 +33,10 @@ class NotificacoesBackendFalso implements NotificacoesBackend {
   }
 
   @override
-  Future<String?> token() async => tokenDoAparelho;
+  Future<String?> token() async {
+    if (erroAoObterToken != null) throw erroAoObterToken!;
+    return tokenDoAparelho;
+  }
 
   @override
   Stream<String> get tokensRenovados => _renovacoes.stream;

@@ -292,6 +292,15 @@ class DinDinApi {
   Future<MeResponse> perfil() async =>
       MeResponse.fromJson(await _client.get('/api/me') as Map<String, dynamic>);
 
+  /// Repassa a compra da loja ao backend, que valida o recibo antes de
+  /// conceder o acesso (#405). Também serve à restauração.
+  Future<PublicSubscription> registrarCompra(
+    StorePurchaseRequest pedido,
+  ) async => PublicSubscription.fromJson(
+    await _client.post('/api/billing/store/purchase', body: pedido.toJson())
+        as Map<String, dynamic>,
+  );
+
   /// Cria a Carteira Principal e a Geladeira Principal, se faltarem (#275).
   ///
   /// A API é idempotente: roda em transação, só cria com a coleção vazia e

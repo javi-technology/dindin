@@ -57,6 +57,17 @@ void main() {
   // em silêncio, sem nada na tela que indicasse o motivo.
   // -------------------------------------------------------------------------
   group('abertura do app', () {
+    test('falha ao obter token não impede a abertura', () async {
+      backend
+        ..permissao = PermissaoDeNotificacao.concedida
+        ..erroAoObterToken = Exception('APNs ainda indisponível');
+
+      final service = await abrir();
+
+      expect(service.ativas, isFalse);
+      expect(api.registrados, isEmpty);
+    });
+
     test('registra o token atual de quem já concedeu a permissão', () async {
       backend.permissao = PermissaoDeNotificacao.concedida;
       backend.tokenDoAparelho = 'token-novo';
