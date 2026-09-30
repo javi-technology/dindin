@@ -42,6 +42,9 @@
     "vite@6": "^6.4.3",
     "esbuild@0.28": "^0.28.2",
     "@babel/core@<7.29.6": "^7.29.7",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.5"
+    },
     "@angular/fire": {
       "firebase-tools": "$firebase-tools"
     }
