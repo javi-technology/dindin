@@ -148,11 +148,10 @@ describe('app Flutter em apps/mobile', () => {
     });
   });
 
-  // O CLAUDE.md é a fonte primária das regras: um app numa linguagem nova que
-  // não aparece ali deixa a regra do projeto incompleta, e os guias gerados
-  // saem desatualizados.
-  describe('CLAUDE.md', () => {
-    const guia = (): string => conteudo('CLAUDE.md');
+  // O AGENTS.md é a fonte única das regras: um app numa linguagem nova que
+  // não aparece ali deixa a regra do projeto incompleta.
+  describe('AGENTS.md', () => {
+    const guia = (): string => conteudo('AGENTS.md');
 
     it('deve descrever a pasta do app', () => {
       expect(guia()).toContain('apps/mobile');

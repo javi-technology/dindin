@@ -1,8 +1,8 @@
 # DinDin — Diretrizes do Projeto
 
-> **Arquivo gerado.** A fonte é o `CLAUDE.md`; edite lá e rode
-> `npm run docs:rules`. Alteração feita direto aqui é perdida na próxima
-> geração e reprovada pela suíte.
+> **Fonte única das regras do projeto.** Este é o único arquivo de diretrizes:
+> `CLAUDE.md`, `GEMINI.md` e `.github/copilot-instructions.md` não existem mais,
+> e a suíte reprova a volta de qualquer um deles. Altere a regra aqui.
 
 ## Idioma
 
@@ -42,7 +42,6 @@ npm run format                                 # formatar com Prettier
 npm run format:check                           # verificar formatação
 npm run contracts:gen                          # regerar os contratos (TS e Dart) do OpenAPI
 npm run contracts:check                        # verificar se o código gerado está em dia
-npm run docs:rules                             # regerar os guias a partir deste arquivo
 firebase deploy                                # deploy completo
 ```
 
