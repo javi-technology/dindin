@@ -107,6 +107,53 @@ describe('registerStorePurchase', () => {
     expect(result).toMatchObject({ status: 'active', interval: 'month' });
   });
 
+  // A Stripe compara `providerEventCreated` em segundos; gravar milissegundos
+  // faria todo evento dela parecer antigo (issue #405).
+  it('grava providerEventCreated em segundos', async () => {
+    validateMock.mockResolvedValue({ ...valid, eventTime: 1_700_000_123_456 });
+    await registerStorePurchase(input);
+    const [, gravado] = txSetMock.mock.calls.find(
+      ([ref]) => ref.path === 'sub/alice',
+    )!;
+    expect(gravado.providerEventCreated).toBe(1_700_000_123);
+  });
+
+  it('não deixa um recibo antigo cancelado sobrescrever a assinatura vigente', async () => {
+    stubStorage({
+      status: 'active',
+      provider: 'apple',
+      providerSubscriptionId: 'orig-novo',
+      interval: 'year',
+      currentPeriodEnd: FUTURE,
+      providerEventCreated: 5000,
+    });
+    validateMock.mockResolvedValue({
+      ...valid,
+      originalId: 'orig-antigo',
+      status: 'canceled',
+      eventTime: 1_000_000,
+    });
+
+    const result = await registerStorePurchase(input);
+
+    expect(
+      txSetMock.mock.calls.find(([ref]) => ref.path === 'sub/alice'),
+    ).toBeUndefined();
+    expect(result).toMatchObject({ status: 'active', interval: 'year' });
+  });
+
+  it('aceita recibo de outra compra quando a atual já não vale', async () => {
+    stubStorage({
+      status: 'canceled',
+      provider: 'apple',
+      providerSubscriptionId: 'orig-antigo',
+      currentPeriodEnd: null,
+    });
+    validateMock.mockResolvedValue({ ...valid, originalId: 'orig-novo' });
+    const result = await registerStorePurchase(input);
+    expect(result.status).toBe('active');
+  });
+
   it('mapeia o produto anual para o intervalo year', async () => {
     validateMock.mockResolvedValue({
       ...valid,
@@ -265,6 +312,29 @@ describe('applyStoreNotification', () => {
     await applyStoreNotification({
       ...base,
       info: { ...valid, status: 'canceled', eventTime: 1000 },
+    });
+    expect(txSetMock).not.toHaveBeenCalled();
+  });
+
+  it('ignora notificação de uma compra antiga quando há outra vigente', async () => {
+    stubStorage(
+      {
+        status: 'active',
+        provider: 'google',
+        providerSubscriptionId: 'orig-novo',
+        currentPeriodEnd: FUTURE,
+      },
+      { uid: 'alice' },
+    );
+    await applyStoreNotification({
+      ...base,
+      originalId: 'orig-antigo',
+      info: {
+        ...valid,
+        originalId: 'orig-antigo',
+        status: 'canceled',
+        eventTime: 9_000_000,
+      },
     });
     expect(txSetMock).not.toHaveBeenCalled();
   });

@@ -58,15 +58,18 @@ Future<void> main() async {
   final inicial = await FirebaseMessaging.instance.getInitialMessage();
 
   // A compra só concede acesso depois de o backend validar o recibo; o perfil
-  // recarregado é quem libera o recurso (#405).
+  // recarregado é quem libera o recurso (#405). Só existe com
+  // `COMPRA_IN_APP=true`: sem validadores no backend a compra responderia 503.
   late final AssinaturaService assinatura;
-  final loja = LojaService(
-    backend: InAppLojaBackend(),
-    registrar: api.registrarCompra,
-    recarregar: () => assinatura.carregar(),
-  );
+  final loja = compraInAppHabilitada
+      ? LojaService(
+          backend: InAppLojaBackend(),
+          registrar: api.registrarCompra,
+          recarregar: () => assinatura.carregar(),
+        )
+      : null;
   assinatura = AssinaturaService(api, loja: loja);
-  unawaited(loja.iniciar());
+  if (loja != null) unawaited(loja.iniciar());
 
   runApp(
     DinDinApp(

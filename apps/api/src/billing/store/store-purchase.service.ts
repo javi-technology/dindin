@@ -8,7 +8,7 @@ import {
   storeSubscriptionDocument,
   subscriptionDocument,
 } from '../../firestore/paths';
-import { toPublicSubscription } from '../entitlement.service';
+import { NO_SUBSCRIPTION, toPublicSubscription } from '../entitlement.service';
 import { isInForce } from '../checkout-session.service';
 import { logInfo, logWarn } from '../../shared/logger';
 import { StoreBillingError } from './store-errors';
@@ -31,6 +31,17 @@ const PRODUCTS: Record<string, SubscriptionInterval> = {
   dindin_basic_yearly: 'year',
 };
 
+/**
+ * O evento da loja chega em milissegundos, mas `providerEventCreated` é
+ * comparado pelo webhook da Stripe em segundos: gravar milissegundos faria
+ * todo evento da Stripe parecer antigo.
+ */
+function eventSeconds(info: StoreSubscriptionInfo): number {
+  return Math.floor(info.eventTime / 1000);
+}
+
+const IN_FORCE_STATUS = ['active', 'trialing', 'past_due'];
+
 function toSubscription(
   platform: StorePlatform,
   interval: SubscriptionInterval,
@@ -42,7 +53,7 @@ function toSubscription(
     interval,
     provider: platform,
     providerSubscriptionId: info.originalId,
-    providerEventCreated: info.eventTime,
+    providerEventCreated: eventSeconds(info),
     currentPeriodEnd: info.currentPeriodEnd,
     cancelAtPeriodEnd: info.cancelAtPeriodEnd,
     updatedAt: new Date().toISOString(),
@@ -84,7 +95,9 @@ export async function registerStorePurchase(input: {
   const subRef = subscriptionDocument(uid);
   const linkRef = storeSubscriptionDocument(platform, info.originalId);
 
+  let kept: UserSubscription | undefined;
   await getFirestore().runTransaction(async (tx) => {
+    kept = undefined;
     const [subSnap, linkSnap] = await Promise.all([
       tx.get(subRef),
       tx.get(linkRef),
@@ -108,18 +121,38 @@ export async function registerStorePurchase(input: {
       );
     }
 
-    tx.set(subRef, subscription, { merge: true });
+    // Recibo de outra compra da mesma loja (restaurar um mensal antigo depois
+    // de assinar o anual): só vale se estiver em vigor e for mais novo. Um
+    // recibo cancelado não pode derrubar o plano ativo.
+    const supersedes =
+      !!current &&
+      current.provider === platform &&
+      !!current.providerSubscriptionId &&
+      current.providerSubscriptionId !== info.originalId &&
+      isInForce(current) &&
+      !(
+        IN_FORCE_STATUS.includes(info.status) &&
+        eventSeconds(info) > (current.providerEventCreated ?? 0)
+      );
+
     tx.set(linkRef, { uid, platform, updatedAt: subscription.updatedAt });
+    if (supersedes) {
+      kept = { ...NO_SUBSCRIPTION, ...current };
+      return;
+    }
+    tx.set(subRef, subscription, { merge: true });
   });
 
   // Sem o recibo nem o id da compra: bastam usuário, loja e o estado.
+  const result = kept ?? subscription;
   logInfo('billing.store.purchase', {
     uid,
     platform,
     productId,
-    status: subscription.status,
+    status: result.status,
+    kept: kept !== undefined,
   });
-  return toPublicSubscription(subscription);
+  return toPublicSubscription(result);
 }
 
 /**
@@ -151,9 +184,19 @@ export async function applyStoreNotification(input: {
       logWarn('billing.store.otherProviderKept', { uid, platform });
       return;
     }
+    // Notificação de uma compra antiga não pode mexer na assinatura que já
+    // vale por outra compra.
+    if (
+      current?.providerSubscriptionId &&
+      current.providerSubscriptionId !== originalId &&
+      isInForce(current)
+    ) {
+      logWarn('billing.store.supersededPurchase', { uid, platform });
+      return;
+    }
     if (
       typeof current?.providerEventCreated === 'number' &&
-      current.providerEventCreated > info.eventTime
+      current.providerEventCreated > eventSeconds(info)
     ) {
       logWarn('billing.store.staleEvent', { uid, platform });
       return;

@@ -121,14 +121,26 @@ export function effectiveStatus(
   subscription: UserSubscription,
   now: Date = new Date(),
 ): SubscriptionStatus {
-  const expiredManual =
-    subscription.provider === 'manual' &&
+  const ended =
     subscription.currentPeriodEnd !== null &&
     new Date(subscription.currentPeriodEnd).getTime() <= now.getTime();
-  return expiredManual &&
+  // Concessão manual sem data não expira; assinatura de loja sem data não vale
+  // (#405): a data é o que a loja confirmou ter sido pago.
+  const expired =
+    (subscription.provider === 'manual' && ended) ||
+    (isStoreProvider(subscription.provider) &&
+      (ended || subscription.currentPeriodEnd === null));
+  return expired &&
     (subscription.status === 'active' || subscription.status === 'trialing')
     ? 'canceled'
     : subscription.status;
+}
+
+/** App Store e Google Play: o acesso dura até o fim do período confirmado. */
+export function isStoreProvider(
+  provider: UserSubscription['provider'] | undefined,
+): provider is 'apple' | 'google' {
+  return provider === 'apple' || provider === 'google';
 }
 
 /** Recursos que o plano básico (e o admin) libera. */
@@ -156,6 +168,9 @@ export function isEntitled(
   switch (subscription.status) {
     case 'trialing':
     case 'active':
+      // Loja vence no fim do período, mesmo que a notificação de expiração
+      // nunca chegue (#405). Manual sem data não expira.
+      if (isStoreProvider(subscription.provider)) return withinPeriod;
       return (
         subscription.provider !== 'manual' ||
         subscription.currentPeriodEnd === null ||

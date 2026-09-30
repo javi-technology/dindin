@@ -144,15 +144,17 @@ class LojaService extends ChangeNotifier {
   Future<void> _tratarRecusa(CompraDaLoja compra, ApiException falha) async {
     switch (falha.code) {
       case 'ALREADY_SUBSCRIBED':
-        // O acesso já existe; concluir evita a loja reentregar para sempre.
-        await compra.concluir();
+        // O acesso já existe, mas a loja cobrou esta compra também. Não
+        // conclui: a cobrança duplicada precisa ser resolvida, e concluir
+        // encerraria a reentrega sem ninguém saber.
         await _recarregar();
         _erro =
-            'Você já tem uma assinatura ativa. Confira em Assinatura se '
-            'a cobrança da loja não é duplicada.';
+            'Você já tem uma assinatura ativa e a loja cobrou esta compra '
+            'também. Fale com o suporte para resolver a cobrança duplicada.';
       case 'RECEIPT_ALREADY_USED':
-        await compra.concluir();
-        _erro = 'Esta compra já está vinculada a outra conta.';
+        _erro =
+            'Esta compra já está vinculada a outra conta. Fale com o suporte '
+            'para resolver.';
       case 'INVALID_RECEIPT':
         _erro =
             'Sua compra foi feita, mas não foi possível confirmar com a '

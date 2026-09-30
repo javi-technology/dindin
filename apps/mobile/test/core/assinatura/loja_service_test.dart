@@ -156,17 +156,38 @@ void main() {
     expect(concluidas, isEmpty);
   });
 
-  test('já assinante: conclui a compra e recarrega o acesso', () async {
+  // Concluir encerra a reentrega da loja sem resolver a cobrança: o usuário
+  // pagaria duas vezes ou pagaria sem acesso, e o app pararia de lembrar.
+  test(
+    'já assinante: recarrega o acesso, NÃO conclui e orienta o suporte',
+    () async {
+      falha = const ApiException(
+        statusCode: 409,
+        message: 'Assinatura já ativa',
+        code: 'ALREADY_SUBSCRIBED',
+      );
+      await service.iniciar();
+      await chega(_compra(EstadoDaCompra.comprada, concluidas: concluidas));
+
+      expect(service.erro, contains('já tem uma assinatura'));
+      expect(service.erro, contains('suporte'));
+      expect(concluidas, isEmpty);
+      expect(recargas, 1);
+    },
+  );
+
+  test('recibo de outra conta: NÃO conclui e orienta o suporte', () async {
     falha = const ApiException(
       statusCode: 409,
-      message: 'Assinatura já ativa',
-      code: 'ALREADY_SUBSCRIBED',
+      message: 'vinculada',
+      code: 'RECEIPT_ALREADY_USED',
     );
     await service.iniciar();
     await chega(_compra(EstadoDaCompra.comprada, concluidas: concluidas));
 
-    expect(service.erro, contains('já tem uma assinatura'));
-    expect(recargas, 1);
+    expect(service.erro, contains('outra conta'));
+    expect(service.erro, contains('suporte'));
+    expect(concluidas, isEmpty);
   });
 
   test(

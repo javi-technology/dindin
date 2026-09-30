@@ -5,6 +5,7 @@ import { getStripe } from './stripe.client';
 import { mapSubscription, resolveUid } from './subscription-mapper';
 import {
   isEntitled,
+  isStoreProvider,
   subscriptionDoc,
   toStripeState,
 } from './entitlement.service';
@@ -38,7 +39,11 @@ async function upsert(
   await getFirestore().runTransaction(async (tx) => {
     const snapshot = await tx.get(ref);
     const current = snapshot.data() as UserSubscription | undefined;
-    const stored = current?.providerEventCreated;
+    // `providerEventCreated` da loja é outro relógio: a ordenação da Stripe só
+    // vale entre eventos da própria Stripe (#405).
+    const stored = isStoreProvider(current?.provider)
+      ? undefined
+      : current?.providerEventCreated;
     if (
       typeof eventCreated === 'number' &&
       typeof stored === 'number' &&

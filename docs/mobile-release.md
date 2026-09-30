@@ -131,3 +131,26 @@ A partir daí o workflow cuida da faixa interna e do TestFlight.
 Motivos frequentes neste app: compra digital fora do fluxo in-app (issue
 #405), declaração de dados diferente do comportamento e ausência de caminho
 de exclusão de conta.
+
+## Compra in-app
+
+A compra pelo app (issue #405) vem **desligada**: o backend só concede acesso
+depois de validar o recibo com a loja, e enquanto os validadores não estão
+registrados (`registerStoreValidator` e `registerStoreNotificationVerifier`,
+em `apps/api/src/billing/store/`) toda compra responde 503
+`STORE_NOT_CONFIGURED`. Com o botão à mostra, o usuário pagaria na loja e
+ficaria sem acesso.
+
+Para ligar, nesta ordem:
+
+1. Registre os validadores da App Store e do Google Play e os verificadores
+   das notificações de servidor, com as credenciais das contas, e cadastre as
+   URLs `/api/billing/store/apple-notifications` e
+   `/api/billing/store/google-notifications` nas lojas.
+2. Teste em sandbox: compra, renovação, cancelamento, reembolso e restauração.
+3. Só então construa o app com `--dart-define=COMPRA_IN_APP=true` (no workflow
+   de release, acrescente o define aos comandos de build).
+
+O acesso de uma assinatura de loja vale até o fim do período confirmado
+(`currentPeriodEnd`): se uma notificação de expiração falhar, o acesso termina
+sozinho na data.

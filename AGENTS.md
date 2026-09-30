@@ -294,13 +294,23 @@ Regras:
   compra é **recusada** (503 `STORE_NOT_CONFIGURED`), nunca aceita.
 - O app **só conclui a compra na loja depois** de o backend validar. Concluir
   antes faria a loja dar a compra por entregue mesmo com o acesso não
-  concedido: o usuário pagaria sem receber. Falha de rede não conclui — a loja
-  reentrega na próxima abertura.
+  concedido: o usuário pagaria sem receber. Falha de rede **e recusa do
+  backend** (`ALREADY_SUBSCRIBED`, `RECEIPT_ALREADY_USED`, `INVALID_RECEIPT`)
+  não concluem — a loja reentrega, e a cobrança duplicada ou sem acesso
+  precisa ser resolvida, não silenciada.
+- A compra in-app **só é oferecida com `COMPRA_IN_APP=true`** no build, e isso só
+  se liga depois de os validadores estarem registrados no backend: sem eles toda
+  compra responde 503 e o usuário pagaria sem acesso.
 - O entitlement é **um só** para Stripe, App Store e Google Play
   (`provider: stripe | manual | apple | google`): quem assinou na web tem
   acesso no app, e o contrário. Assinatura vigente de outro provedor recusa a
   compra (409 `ALREADY_SUBSCRIBED`), e um recibo não vale para dois usuários
   (409 `RECEIPT_ALREADY_USED`, pelo vínculo em `storeSubscriptions`).
+  Recibo ou notificação de **outra compra da mesma loja** não sobrescreve a
+  assinatura vigente (restaurar um mensal cancelado não derruba o anual).
+- **Assinatura de loja vale até `currentPeriodEnd`**, mesmo sem notificação de
+  expiração. `providerEventCreated` é sempre em **segundos** e a ordenação de
+  eventos da Stripe só vale entre eventos da própria Stripe.
 - As notificações de servidor das lojas (`/api/billing/store/*-notifications`)
   ficam fora do `authMiddleware`: quem autentica é o
   `StoreNotificationVerifier`, nunca o corpo. Notificação mais antiga que o
