@@ -929,7 +929,9 @@ enum SubscriptionInterval {
 
 enum SubscriptionProvider {
   stripe('stripe'),
-  manual('manual');
+  manual('manual'),
+  apple('apple'),
+  google('google');
 
   const SubscriptionProvider(this.wire);
 
@@ -1070,6 +1072,34 @@ class UserSubscription {
     'cancelAtPeriodEnd': cancelAtPeriodEnd,
     'updatedAt': updatedAt,
     if (stripe != null) 'stripe': stripe?.toJson(),
+  };
+}
+
+/// Compra feita na loja; o backend valida `credential` com a loja antes de conceder o acesso.
+class StorePurchaseRequest {
+  const StorePurchaseRequest({
+    required this.platform,
+    required this.productId,
+    required this.credential,
+  });
+
+  factory StorePurchaseRequest.fromJson(Map<String, dynamic> json) =>
+      StorePurchaseRequest(
+        platform: json['platform'] as String,
+        productId: json['productId'] as String,
+        credential: json['credential'] as String,
+      );
+
+  final String platform;
+  final String productId;
+
+  /// Recibo da App Store ou `purchaseToken` do Google Play.
+  final String credential;
+
+  Map<String, dynamic> toJson() => {
+    'platform': platform,
+    'productId': productId,
+    'credential': credential,
   };
 }
 

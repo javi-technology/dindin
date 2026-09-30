@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/assinatura/assinatura_service.dart';
+import 'package:dindin_mobile/core/assinatura/loja_backend.dart';
+import 'package:dindin_mobile/core/assinatura/loja_service.dart';
 import 'package:dindin_mobile/core/auth/token_provider.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
@@ -99,6 +101,44 @@ void main() {
     );
   });
 
+  // Issue #405: o ponto de entrada marcado passa a levar à compra in-app.
+  testWidgets('sem assinatura e com loja, "Ver planos" abre a compra', (
+    tester,
+  ) async {
+    final loja = LojaService(
+      backend: _LojaMinima(),
+      registrar: (_) async {},
+      recarregar: () async {},
+    );
+    await loja.iniciar();
+    final assinatura = AssinaturaService(apiFalsa(), loja: loja);
+
+    await tester.pumpWidget(tela(assinatura));
+    await tester.pumpAndSettle();
+    await rolarAteOFim(tester);
+    await tester.tap(find.byKey(const Key('ver-planos')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('assinar-dindin_basic_monthly')),
+      findsOneWidget,
+    );
+    loja.dispose();
+  });
+
+  testWidgets('sem a compra in-app configurada, não há "Ver planos"', (
+    tester,
+  ) async {
+    await tester.pumpWidget(tela(AssinaturaService(apiFalsa())));
+    await tester.pumpAndSettle();
+    await rolarAteOFim(tester);
+
+    expect(
+      find.byKey(const Key('ver-planos'), skipOffstage: false),
+      findsNothing,
+    );
+  });
+
   testWidgets('com assinatura, o recurso deixa de ser marcado como pago', (
     tester,
   ) async {
@@ -129,4 +169,25 @@ class _AssinaturaLiberada extends AssinaturaService {
 
   @override
   bool get temProjecoes => true;
+}
+
+class _LojaMinima implements LojaBackend {
+  @override
+  String get plataforma => 'apple';
+  @override
+  Future<bool> disponivel() async => true;
+  @override
+  Future<List<ProdutoDaLoja>> produtos() async => const [
+    ProdutoDaLoja(
+      id: 'dindin_basic_monthly',
+      titulo: 'Mensal',
+      preco: 'R\$ 19,90',
+    ),
+  ];
+  @override
+  Stream<CompraDaLoja> get compras => const Stream.empty();
+  @override
+  Future<void> comprar(String produtoId) async {}
+  @override
+  Future<void> restaurar() async {}
 }

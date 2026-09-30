@@ -14,6 +14,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/login/login.component').then((m) => m.LoginComponent),
   },
+  // Pública: as lojas exigem a política acessível sem login (issue #406).
+  {
+    path: 'privacidade',
+    loadComponent: () =>
+      import('./features/privacy/privacy.component').then(
+        (m) => m.PrivacyComponent,
+      ),
+  },
   {
     path: '',
     canActivate: [authGuard],

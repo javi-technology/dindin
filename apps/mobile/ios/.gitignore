@@ -32,3 +32,10 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Credenciais de assinatura (issue #407): nunca versionar.
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+ExportOptions.plist

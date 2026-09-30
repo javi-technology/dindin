@@ -458,6 +458,33 @@ describe('processStripeEvent', () => {
       expect(txSetMock).not.toHaveBeenCalled();
     });
 
+    // A loja também grava `providerEventCreated`; a ordenação da Stripe só vale
+    // entre eventos da própria Stripe (issue #405).
+    it.each(['apple', 'google'] as const)(
+      'não descarta evento da Stripe por causa do relógio de %s',
+      async (provider) => {
+        txGetMock.mockResolvedValue({
+          exists: true,
+          data: () => ({
+            status: 'canceled',
+            provider,
+            currentPeriodEnd: PAST,
+            providerEventCreated: 9_999_999_999,
+          }),
+        });
+
+        await processStripeEvent(
+          makeEvent('customer.subscription.updated', makeSubscription(), 3000),
+        );
+
+        expect(txSetMock).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ provider: 'stripe', status: 'active' }),
+          { merge: true },
+        );
+      },
+    );
+
     it('sobrescreve concessão manual expirada', async () => {
       txGetMock.mockResolvedValue(manual('active', PAST));
 

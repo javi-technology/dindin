@@ -115,6 +115,10 @@ import {
   handleWebhook,
 } from './billing/billing.controller';
 import {
+  handleStoreNotification,
+  registerStorePurchaseHandler,
+} from './billing/store/store-billing.controller';
+import {
   importBbWallet,
   syncBbWallet,
 } from './recommended-wallet/recommended-wallet.service';
@@ -164,6 +168,19 @@ app.post(
   '/api/billing/webhook',
   express.raw({ type: 'application/json' }),
   handleWebhook,
+);
+
+// Notificações de servidor das lojas (#405): sem authMiddleware, porque quem
+// autentica é o verificador de cada loja (JWS da Apple, Pub/Sub do Google).
+app.post(
+  '/api/billing/store/apple-notifications',
+  express.json(),
+  handleStoreNotification('apple'),
+);
+app.post(
+  '/api/billing/store/google-notifications',
+  express.json(),
+  handleStoreNotification('google'),
 );
 
 app.get('/api/health', (req: Request, res: Response) => {
@@ -242,6 +259,7 @@ app.delete('/api/me/notification-tokens/:token', deleteNotificationToken);
 
 app.post('/api/billing/checkout-session', createCheckoutSession);
 app.post('/api/billing/portal-session', createPortalSession);
+app.post('/api/billing/store/purchase', registerStorePurchaseHandler);
 
 app.get('/api/assets', listAssets);
 app.get(

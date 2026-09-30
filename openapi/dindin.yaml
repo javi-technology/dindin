@@ -420,7 +420,7 @@ components:
 
     SubscriptionProvider:
       type: string
-      enum: [stripe, manual]
+      enum: [stripe, manual, apple, google]
 
     StripeSubscriptionState:
       type: object
@@ -476,6 +476,17 @@ components:
         stripe:
           allOf: [{ $ref: '#/components/schemas/StripeSubscriptionState' }]
           description: 'Ausente em docs anteriores à #171.'
+
+    StorePurchaseRequest:
+      type: object
+      description: 'Compra feita na loja; o backend valida `credential` com a loja antes de conceder o acesso.'
+      required: [platform, productId, credential]
+      properties:
+        platform: { type: string, enum: [apple, google] }
+        productId: { type: string }
+        credential:
+          type: string
+          description: 'Recibo da App Store ou `purchaseToken` do Google Play.'
 
     PublicSubscription:
       type: object
@@ -1216,6 +1227,46 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PortalSessionResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/billing/store/purchase:
+    post:
+      summary: Valida a compra na loja e concede a assinatura (também restaura)
+      operationId: registerStorePurchase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StorePurchaseRequest' }
+      responses:
+        '200':
+          description: Assinatura depois da validação do recibo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicSubscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: 'Assinatura já ativa (`ALREADY_SUBSCRIBED`) ou recibo de outra conta (`RECEIPT_ALREADY_USED`)'
+        '503':
+          description: 'Loja não configurada (`STORE_NOT_CONFIGURED`)'
+
+  /api/billing/store/apple-notifications:
+    post:
+      summary: Notificação de servidor da App Store
+      operationId: appleStoreNotification
+      security: []
+      responses:
+        '200': { description: Notificação recebida }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/billing/store/google-notifications:
+    post:
+      summary: Notificação de servidor do Google Play (RTDN)
+      operationId: googleStoreNotification
+      security: []
+      responses:
+        '200': { description: Notificação recebida }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   /api/assets:
     get:
