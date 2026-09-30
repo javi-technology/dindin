@@ -28,18 +28,23 @@ export function recommendedWalletId(
 }
 
 /**
- * Carteiras de um provedor, da mais recente para a mais antiga (issue #395).
+ * Carteiras de um provedor, da mais antiga para a mais recente (issue #395).
  *
  * O recorte é pelo prefixo do id (`bb-fii_2026-09`), não por um campo: o id
  * já carrega o provedor e o mês em ordem lexicográfica, então a consulta não
  * depende de índice composto nem de reescrever os documentos existentes para
  * ganhar um campo novo.
+ *
+ * A consulta é crescente de propósito (issue #485): o emulador do Firestore
+ * recusa varredura decrescente por chave (`FAILED_PRECONDITION`), e a tela de
+ * simulação quebrava em desenvolvimento. Há um documento por mês, então
+ * inverter a ordem em memória custa pouco.
  */
 function providerQuery(slug: string): Query {
   return recommendedWalletsCollection()
-    .orderBy(FieldPath.documentId(), 'desc')
-    .startAt(`${slug}_\uf8ff`)
-    .endAt(`${slug}_`);
+    .orderBy(FieldPath.documentId())
+    .startAt(`${slug}_`)
+    .endAt(`${slug}_\uf8ff`);
 }
 
 /** O `providerSlug` dos documentos anteriores à #395 sai do próprio id. */
@@ -162,8 +167,8 @@ export async function getRecommendedWallet(
       .get();
     return doc.exists ? toWallet(doc) : null;
   }
-  const snapshot = await providerQuery(slug).limit(1).get();
-  const [doc] = snapshot.docs;
+  const snapshot = await providerQuery(slug).get();
+  const doc = snapshot.docs[snapshot.docs.length - 1];
   return doc ? toWallet(doc) : null;
 }
 
@@ -171,7 +176,7 @@ export async function listRecommendedWallets(
   slug: string = DEFAULT_RECOMMENDED_WALLET_SLUG,
 ): Promise<RecommendedWallet[]> {
   const snapshot = await providerQuery(slug).get();
-  return snapshot.docs.map(toWallet);
+  return snapshot.docs.map(toWallet).reverse();
 }
 
 export async function confirmRecommendedWallet(
