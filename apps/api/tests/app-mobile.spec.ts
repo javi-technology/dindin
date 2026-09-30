@@ -193,6 +193,56 @@ describe('app Flutter em apps/mobile', () => {
 // o que precisa estar versionado é o caminho para obtê-la. Sem isso, o
 // próximo a clonar descobre o passo pelo erro em tempo de execução.
 // ---------------------------------------------------------------------------
+// Os emuladores do Firebase só falam HTTP, e o Android 9 ou superior bloqueia
+// HTTP sem TLS por padrão (issue #483). A liberação vale só no build de debug:
+// no de release, o tráfego financeiro do usuário seguiria sem criptografia.
+//
+// Só deixar de declarar o atributo não basta: o app aceita Android a partir da
+// API 24, e até o Android 8.1 o padrão da plataforma é permitir HTTP sem TLS.
+// O bloqueio precisa ser explícito no manifesto de main.
+describe('HTTP sem TLS no Android', () => {
+  const manifesto = (variante: string): string =>
+    conteudo(`apps/mobile/android/app/src/${variante}/AndroidManifest.xml`);
+
+  it('deve ser bloqueado de forma explícita no manifesto de main', () => {
+    expect(manifesto('main')).toContain('android:usesCleartextTraffic="false"');
+  });
+
+  it('deve ser permitido no build de debug, para alcançar os emuladores', () => {
+    expect(manifesto('debug')).toContain('android:usesCleartextTraffic="true"');
+  });
+
+  // Sem `tools:replace`, o valor de debug conflita com o de main e o build
+  // falha na mesclagem dos manifestos.
+  it('deve substituir o bloqueio de main no debug', () => {
+    const debug = manifesto('debug');
+
+    expect(debug).toContain('xmlns:tools="http://schemas.android.com/tools"');
+    expect(debug).toContain('tools:replace="android:usesCleartextTraffic"');
+  });
+
+  it('não deve ser permitido no manifesto de profile', () => {
+    expect(manifesto('profile')).not.toMatch(/usesCleartextTraffic="true"/);
+    expect(manifesto('profile')).not.toContain('networkSecurityConfig');
+  });
+
+  describe('guia do Firebase', () => {
+    const guia = (): string => conteudo('docs/mobile-firebase.md');
+
+    it('deve explicar a liberação', () => {
+      expect(guia()).toContain('usesCleartextTraffic');
+    });
+
+    // O aparelho físico não alcança os emuladores pelo IP da rede local com o
+    // `firebase.json` atual, que não define `host`.
+    it('deve trazer um comando para o emulador Android e outro para o aparelho físico', () => {
+      expect(guia()).toContain('FIREBASE_EMULATOR_HOST=10.0.2.2');
+      expect(guia()).toContain('FIREBASE_EMULATOR_HOST=192.168.1.20');
+      expect(guia()).toContain('0.0.0.0');
+    });
+  });
+});
+
 describe('Firebase no app', () => {
   const doc = (): string => conteudo('docs/mobile-firebase.md');
 
