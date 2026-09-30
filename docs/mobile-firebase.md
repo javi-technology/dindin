@@ -96,6 +96,13 @@ Mac (por exemplo, o resultado de `ipconfig getifaddr en0`):
 flutter run --dart-define=FIREBASE_EMULATOR_HOST=192.168.1.20
 ```
 
+Os emuladores só falam HTTP, e o Android 9 ou superior bloqueia HTTP sem TLS
+por padrão (`Cleartext HTTP traffic to 10.0.2.2 not permitted`). Por isso o
+manifesto de **debug** (`android/app/src/debug/AndroidManifest.xml`) declara
+`android:usesCleartextTraffic="true"`. O de `main` não declara, então o build
+de release segue bloqueando HTTP sem TLS. Mudança de manifesto não entra por
+hot reload nem hot restart: pare o app e rode `flutter run` de novo.
+
 `API_BASE_URL` continua disponível para apontar somente a API a outro ambiente,
 mas não configura o Firebase Auth e, portanto, não é o comando adequado para
 os emuladores.
