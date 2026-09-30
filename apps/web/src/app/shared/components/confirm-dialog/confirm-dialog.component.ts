@@ -14,7 +14,7 @@ import {
 /**
  * Modal de confirmação compartilhado (issue #223).
  *
- * O `CLAUDE.md` proíbe `window.confirm` e exige modal customizado para ação
+ * O `AGENTS.md` proíbe `window.confirm` e exige modal customizado para ação
  * destrutiva. A regra era seguida, mas cada feature reimplementou o seu: o
  * mesmo markup aparecia em quatro templates, divergindo em espaçamento, e
  * nenhum era acessível — sem `role`, sem `aria-modal`, sem Esc e sem controle

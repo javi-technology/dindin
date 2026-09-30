@@ -185,8 +185,8 @@ describe('contratos da API', () => {
       expect(scripts['contracts:check']).toContain('--check');
     });
 
-    // O mesmo contrato de `docs:rules --check`: o que o `--check` reprova é
-    // exatamente o que uma nova geração produziria de diferente.
+    // O que o `--check` reprova é exatamente o que uma nova geração produziria
+    // de diferente.
     it('deve reprovar quando o código gerado está desatualizado', () => {
       expect(() =>
         execFileSync('node', ['scripts/gen-contracts.mjs', '--check'], {
@@ -209,7 +209,7 @@ describe('contratos da API', () => {
     // Passa a existir um passo entre escrever a rota e usá-la; sem isso
     // registrado, o próximo a mexer numa rota descobre o passo pelo CI.
     it('deve explicar o fluxo de alteração de contrato', () => {
-      const guia = conteudo('CLAUDE.md');
+      const guia = conteudo('AGENTS.md');
 
       expect(guia).toContain(ESPECIFICACAO);
       expect(guia).toContain('npm run contracts:gen');
