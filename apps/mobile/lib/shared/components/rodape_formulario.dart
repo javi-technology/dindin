@@ -12,6 +12,7 @@ class RodapeFormulario extends StatelessWidget {
     required this.enviando,
     required this.aoSalvar,
     this.erro,
+    this.podeSalvar = true,
     this.rotulo = 'Salvar',
     this.chaveDoBotao = const Key('botao-salvar'),
   });
@@ -19,6 +20,10 @@ class RodapeFormulario extends StatelessWidget {
   final bool enviando;
   final VoidCallback aoSalvar;
   final String? erro;
+
+  /// `false` quando o formulário já sabe que o envio seria recusado, como um
+  /// ticker fora do catálogo: o botão desligado evita a ida e volta.
+  final bool podeSalvar;
   final String rotulo;
 
   /// Chave do botão, para a tela poder apontá-la nos testes.
@@ -50,7 +55,7 @@ class RodapeFormulario extends StatelessWidget {
           key: chaveDoBotao,
           // Indisponível durante o envio: é a metade visível da proteção
           // contra o toque duplo, e a que o usuário entende.
-          onPressed: enviando ? null : aoSalvar,
+          onPressed: enviando || !podeSalvar ? null : aoSalvar,
           child: Text(enviando ? '$rotulo…' : rotulo),
         ),
       ],

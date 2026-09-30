@@ -82,4 +82,118 @@ void main() {
 
     expect(enviado?.ticker, 'MXRF11');
   });
+
+  // ---- Botão e mensagem enquanto digita; ticker inalterado (review da #468) ----
+
+  Widget itemForm(List<Asset> ativos, {FridgeItem? inicial}) => emApp(
+    ItemForm(
+      catalogo: ativos,
+      itemInicial: inicial,
+      aoSalvar: (_) async => true,
+    ),
+  );
+
+  bool salvarDisponivel(WidgetTester tester) =>
+      tester
+          .widget<FilledButton>(find.byKey(const Key('botao-salvar')))
+          .onPressed !=
+      null;
+
+  testWidgets('ticker inválido digitado desabilita Salvar e avisa no campo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(itemForm(catalogo));
+    await tester.enterText(find.byKey(const Key('campo-ticker')), 'ZZZZ11');
+    await tester.pumpAndSettle();
+
+    expect(salvarDisponivel(tester), isFalse);
+    expect(find.text('Escolha um ativo da lista.'), findsOneWidget);
+  });
+
+  testWidgets('ticker do catálogo mantém Salvar disponível', (tester) async {
+    await tester.pumpWidget(itemForm(catalogo));
+    await tester.enterText(find.byKey(const Key('campo-ticker')), 'hglg11');
+    await tester.pumpAndSettle();
+
+    expect(salvarDisponivel(tester), isTrue);
+  });
+
+  testWidgets('campo vazio não desabilita Salvar', (tester) async {
+    await tester.pumpWidget(itemForm(catalogo));
+
+    expect(salvarDisponivel(tester), isTrue);
+  });
+
+  testWidgets('edição de ativo removido do catálogo mantém Salvar disponível', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      itemForm(
+        catalogo,
+        inicial: const FridgeItem(
+          id: 'i1',
+          fridgeId: 'g1',
+          ticker: 'OLDD11',
+          quantity: 3,
+          transferredPrice: 10,
+          targetPrice: 9,
+          createdAt: '2026-09-01T00:00:00Z',
+          updatedAt: '2026-09-01T00:00:00Z',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(salvarDisponivel(tester), isTrue);
+  });
+
+  test('atualização omite o ticker quando ele não mudou', () {
+    const original = FridgeItem(
+      id: 'i1',
+      fridgeId: 'g1',
+      ticker: 'OLDD11',
+      quantity: 3,
+      transferredPrice: 10,
+      targetPrice: 9,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+    );
+    final pedido = pedidoDeAtualizacaoDeItem(
+      original,
+      const CreateFridgeItemRequest(
+        ticker: 'OLDD11',
+        quantity: 4,
+        transferredPrice: 10,
+        targetPrice: 9,
+      ),
+    );
+
+    expect(pedido.ticker, isNull);
+    expect(pedido.toJson().containsKey('ticker'), isFalse);
+    expect(pedido.quantity, 4);
+  });
+
+  test('atualização envia o ticker quando ele mudou', () {
+    const original = FridgeItem(
+      id: 'i1',
+      fridgeId: 'g1',
+      ticker: 'OLDD11',
+      quantity: 3,
+      transferredPrice: 10,
+      targetPrice: 9,
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-01T00:00:00Z',
+    );
+    final pedido = pedidoDeAtualizacaoDeItem(
+      original,
+      const CreateFridgeItemRequest(
+        ticker: 'HGLG11',
+        quantity: 3,
+        transferredPrice: 10,
+        targetPrice: 9,
+      ),
+    );
+
+    expect(pedido.ticker, 'HGLG11');
+  });
 }

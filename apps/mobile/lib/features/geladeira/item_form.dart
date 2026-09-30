@@ -50,7 +50,17 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    // O botão de salvar depende do ticker digitado.
+    _ticker.addListener(_aoMudarTicker);
+  }
+
+  void _aoMudarTicker() => setState(() {});
+
+  @override
   void dispose() {
+    _ticker.removeListener(_aoMudarTicker);
     _ticker.dispose();
     _quantidade.dispose();
     _precoTransferencia.dispose();
@@ -119,6 +129,11 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
           const SizedBox(height: 24),
           RodapeFormulario(
             enviando: enviando,
+            podeSalvar: !CampoAtivo.tickerRecusado(
+              _ticker.text,
+              catalogo: widget.catalogo,
+              tickerAtual: widget.itemInicial?.ticker,
+            ),
             erro: widget.erro,
             aoSalvar: _salvar,
           ),
@@ -127,3 +142,20 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
     );
   }
 }
+
+/// Pedido de atualização a partir do que o formulário devolveu.
+///
+/// O ticker só vai quando mudou: a API valida contra os ativos **ativos** todo
+/// ticker recebido, então reenviar o inalterado faria a correção de quantidade
+/// de um item cujo ativo saiu do catálogo terminar em 400.
+UpdateFridgeItemRequest pedidoDeAtualizacaoDeItem(
+  FridgeItem original,
+  CreateFridgeItemRequest dados,
+) => UpdateFridgeItemRequest(
+  ticker: dados.ticker.toUpperCase() == original.ticker.toUpperCase()
+      ? null
+      : dados.ticker,
+  quantity: dados.quantity,
+  transferredPrice: dados.transferredPrice,
+  targetPrice: dados.targetPrice,
+);

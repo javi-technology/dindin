@@ -56,7 +56,17 @@ class _PosicaoFormState extends State<PosicaoForm>
   late AssetType _tipo = widget.posicaoInicial?.assetType ?? AssetType.fii;
 
   @override
+  void initState() {
+    super.initState();
+    // O botão de salvar depende do ticker digitado.
+    _ticker.addListener(_aoMudarTicker);
+  }
+
+  void _aoMudarTicker() => setState(() {});
+
+  @override
   void dispose() {
+    _ticker.removeListener(_aoMudarTicker);
     _ticker.dispose();
     _quantidade.dispose();
     _preco.dispose();
@@ -138,6 +148,11 @@ class _PosicaoFormState extends State<PosicaoForm>
           const SizedBox(height: 24),
           RodapeFormulario(
             enviando: enviando,
+            podeSalvar: !CampoAtivo.tickerRecusado(
+              _ticker.text,
+              catalogo: widget.catalogo,
+              tickerAtual: widget.posicaoInicial?.ticker,
+            ),
             erro: widget.erro,
             aoSalvar: _salvar,
           ),
@@ -146,3 +161,20 @@ class _PosicaoFormState extends State<PosicaoForm>
     );
   }
 }
+
+/// Pedido de atualização a partir do que o formulário devolveu.
+///
+/// O ticker só vai quando mudou: a API valida contra os ativos **ativos** todo
+/// ticker recebido, então reenviar o inalterado faria a correção de quantidade
+/// de uma posição cujo ativo saiu do catálogo terminar em 400.
+UpdatePositionRequest pedidoDeAtualizacaoDePosicao(
+  Position original,
+  CreatePositionRequest dados,
+) => UpdatePositionRequest(
+  ticker: dados.ticker.toUpperCase() == original.ticker.toUpperCase()
+      ? null
+      : dados.ticker,
+  assetType: dados.assetType,
+  quantity: dados.quantity,
+  averagePrice: dados.averagePrice,
+);
