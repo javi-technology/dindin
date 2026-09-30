@@ -76,19 +76,43 @@ describe('carteiras sugeridas por provedor', () => {
     expect(docMock).toHaveBeenCalledWith('xp-fii_2026-09');
   });
 
-  it('deve buscar a mais recente dentro do provedor informado', async () => {
-    await getRecommendedWallet(undefined, 'xp-fii');
+  // O emulador do Firestore não executa varredura decrescente por chave
+  // (`FAILED_PRECONDITION`, issue #485): a consulta é crescente e a ordem
+  // "mais recente primeiro" sai em memória.
+  it('deve consultar o provedor em ordem crescente, sem varredura decrescente', async () => {
+    await listRecommendedWallets('xp-fii');
 
-    expect(startAtMock).toHaveBeenCalledWith('xp-fii_');
-    expect(endAtMock).toHaveBeenCalledWith('xp-fii_');
-    expect(limitMock).toHaveBeenCalledWith(1);
+    expect(orderByMock).toHaveBeenCalledTimes(1);
+    expect(orderByMock.mock.calls[0]).toHaveLength(1);
+    expect(startAtMock).toHaveBeenCalledWith('xp-fii_');
+    expect(endAtMock).toHaveBeenCalledWith('xp-fii_\uf8ff');
+    expect(limitMock).not.toHaveBeenCalled();
+  });
+
+  it('deve buscar a mais recente dentro do provedor informado', async () => {
+    rangeGetMock.mockResolvedValue({
+      docs: [
+        { id: 'xp-fii_2026-07', data: () => ({ month: '2026-07' }) },
+        { id: 'xp-fii_2026-09', data: () => ({ month: '2026-09' }) },
+      ],
+    });
+
+    const wallet = await getRecommendedWallet(undefined, 'xp-fii');
+
+    expect(startAtMock).toHaveBeenCalledWith('xp-fii_');
+    expect(endAtMock).toHaveBeenCalledWith('xp-fii_\uf8ff');
+    expect(wallet).toEqual(expect.objectContaining({ id: 'xp-fii_2026-09' }));
+  });
+
+  it('deve devolver nulo quando o provedor não tem carteira', async () => {
+    expect(await getRecommendedWallet(undefined, 'xp-fii')).toBeNull();
   });
 
   it('deve usar o provedor padrão quando nenhum é informado', async () => {
     await getRecommendedWallet();
 
-    expect(startAtMock).toHaveBeenCalledWith('bb-fii_');
-    expect(endAtMock).toHaveBeenCalledWith('bb-fii_');
+    expect(startAtMock).toHaveBeenCalledWith('bb-fii_');
+    expect(endAtMock).toHaveBeenCalledWith('bb-fii_\uf8ff');
   });
 
   it('deve listar apenas as carteiras do provedor informado', async () => {
@@ -98,9 +122,27 @@ describe('carteiras sugeridas por provedor', () => {
 
     const wallets = await listRecommendedWallets('xp-fii');
 
-    expect(startAtMock).toHaveBeenCalledWith('xp-fii_');
+    expect(startAtMock).toHaveBeenCalledWith('xp-fii_');
     expect(wallets).toEqual([
       expect.objectContaining({ id: 'xp-fii_2026-09' }),
+    ]);
+  });
+
+  it('deve listar da mais recente para a mais antiga', async () => {
+    rangeGetMock.mockResolvedValue({
+      docs: [
+        { id: 'xp-fii_2026-07', data: () => ({ month: '2026-07' }) },
+        { id: 'xp-fii_2026-08', data: () => ({ month: '2026-08' }) },
+        { id: 'xp-fii_2026-09', data: () => ({ month: '2026-09' }) },
+      ],
+    });
+
+    const wallets = await listRecommendedWallets('xp-fii');
+
+    expect(wallets.map((w) => w.month)).toEqual([
+      '2026-09',
+      '2026-08',
+      '2026-07',
     ]);
   });
 });
