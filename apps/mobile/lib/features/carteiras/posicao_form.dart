@@ -102,6 +102,7 @@ class _PosicaoFormState extends State<PosicaoForm>
           CampoAtivo(
             controller: _ticker,
             catalogo: widget.catalogo,
+            tickerAtual: widget.posicaoInicial?.ticker,
             // O tipo vem junto do ativo escolhido: pedir que o usuário o
             // repita é convite a registrar FII como ação.
             aoEscolher: (ativo) => setState(() => _tipo = ativo.assetType),

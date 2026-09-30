@@ -85,7 +85,11 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CampoAtivo(controller: _ticker, catalogo: widget.catalogo),
+          CampoAtivo(
+            controller: _ticker,
+            catalogo: widget.catalogo,
+            tickerAtual: widget.itemInicial?.ticker,
+          ),
           const SizedBox(height: 16),
           CampoTexto(
             chave: 'campo-quantidade',
