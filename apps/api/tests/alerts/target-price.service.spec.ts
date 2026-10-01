@@ -10,11 +10,11 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 jest.mock('../../src/alerts/alert-mail.service', () => ({
-  sendAlertEmails: jest.fn().mockResolvedValue(0),
+  sendAlertEmails: jest.fn().mockResolvedValue({ sent: 0, failed: 0 }),
 }));
 
 jest.mock('../../src/alerts/alert-push.service', () => ({
-  sendAlertPushes: jest.fn().mockResolvedValue(0),
+  sendAlertPushes: jest.fn().mockResolvedValue({ sent: 0, failed: 0 }),
 }));
 
 jest.mock('firebase-functions/logger', () => ({
@@ -709,6 +709,53 @@ describe('TargetPriceService – notificação dos alertas criados', () => {
       await expect(checkAllTargetPrices()).rejects.toThrow(/4 falha/);
     });
 
+    // Os envios absorvem a falha de cada alerta e devolvem a contagem: é ela
+    // que faz o job falhar quando o Resend responde 500 ou o FCM não entrega
+    // (revisão do PR #519).
+    it('deve sinalizar a falha que o envio de e-mail devolve sem lançar', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertEmails as jest.Mock).mockResolvedValueOnce({
+        sent: 0,
+        failed: 1,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/1 falha/);
+    });
+
+    it('deve sinalizar a falha que o envio de push devolve sem lançar', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertPushes as jest.Mock).mockResolvedValueOnce({
+        sent: 0,
+        failed: 2,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/2 falha/);
+    });
+
+    it('deve contar o que foi enviado mesmo quando há falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertEmails as jest.Mock).mockResolvedValueOnce({
+        sent: 3,
+        failed: 1,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow();
+
+      expect(functionsLogger.info).toHaveBeenCalledWith(
+        'checkAllTargetPrices.done',
+        expect.objectContaining({ notified: 3, failed: 1 }),
+      );
+    });
+
     it('deve terminar sem erro quando tudo dá certo', async () => {
       seedFirestore({
         quotes: { HGLG11: 125 },
@@ -792,7 +839,7 @@ describe('TargetPriceService – envio dos avisos pelo job', () => {
       maxConcurrent = Math.max(maxConcurrent, running);
       await new Promise((resolve) => setImmediate(resolve));
       running -= 1;
-      return 1;
+      return { sent: 1, failed: 0 };
     });
 
     await checkAllTargetPrices();
