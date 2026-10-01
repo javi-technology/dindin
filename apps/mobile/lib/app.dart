@@ -64,6 +64,10 @@ class DinDinApp extends StatelessWidget {
         home: AuthGate(
           sessoes: auth.sessoes,
           aoAutenticar: (sessao) async {
+            // O cache passa a ser deste usuário antes de qualquer tela o ler:
+            // o que era do usuário anterior sai aqui (issue #498).
+            await cache.vincularA(sessao.uid);
+
             // As duas leituras são do mesmo momento — entrar — e nenhuma
             // depende da outra, então vão juntas em vez de em série.
             await Future.wait([
@@ -71,6 +75,7 @@ class DinDinApp extends StatelessWidget {
               assinatura.carregar(),
             ]);
           },
+          aoEncerrar: () => cache.vincularA(null),
           login: LoginScreen(
             aoEntrarComEmail: auth.entrarComEmail,
             aoEntrarComGoogle: auth.entrarComGoogle,

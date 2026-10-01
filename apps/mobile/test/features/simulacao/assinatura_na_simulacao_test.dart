@@ -16,6 +16,8 @@ import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_screen.dart';
 
+import '../../support/cache_de_teste.dart';
+
 // ---------------------------------------------------------------------------
 // Liberação do recurso de assinante na simulação (issue #442).
 //
@@ -35,7 +37,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    cache = await CacheLocal.abrir();
+    cache = await cacheDeTeste();
   });
 
   DinDinApi apiFalsa() {

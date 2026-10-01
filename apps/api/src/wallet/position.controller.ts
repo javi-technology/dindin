@@ -22,6 +22,7 @@ import {
   walletsCollection,
 } from '../firestore/paths';
 import { routeParam } from '../shared/route-params';
+import { addUnlessRecentDuplicate } from '../shared/recent-duplicate';
 
 /**
  * Resolve o `currentPrice` de cada posição a partir da collection `quotes`
@@ -125,10 +126,13 @@ export const createPosition = asyncHandler(
       positionData.targetPrice = body.targetPrice;
     }
 
-    const docRef = await positionsCollection(userId, walletId).add(
+    // Recusa com 409 o envio idêntico ao que acabou de ser gravado: o toque
+    // repetido dobraria a quantidade da carteira (issue #497).
+    const id = await addUnlessRecentDuplicate(
+      positionsCollection(userId, walletId),
       positionData,
     );
-    res.status(201).json({ id: docRef.id, ...positionData });
+    res.status(201).json({ id, ...positionData });
   },
 );
 

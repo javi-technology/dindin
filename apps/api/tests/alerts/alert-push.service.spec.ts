@@ -118,7 +118,7 @@ describe('AlertPushService', () => {
       seedFirestore([token(), token({ token: 'token-aparelho-2' })]);
       sendEachForMulticastMock.mockResolvedValue(sucesso(2));
 
-      const enviados = await sendAlertPushes('user-1', [alerta()]);
+      const { sent: enviados } = await sendAlertPushes('user-1', [alerta()]);
 
       expect(sendEachForMulticastMock).toHaveBeenCalledTimes(1);
       expect(sendEachForMulticastMock.mock.calls[0][0].tokens).toEqual([
@@ -145,7 +145,7 @@ describe('AlertPushService', () => {
     it('não deve reenviar alerta já notificado por push', async () => {
       seedFirestore();
 
-      const enviados = await sendAlertPushes('user-1', [
+      const { sent: enviados } = await sendAlertPushes('user-1', [
         alerta({ notifiedPushAt: '2026-09-18T23:00:00Z' }),
       ]);
 
@@ -156,7 +156,7 @@ describe('AlertPushService', () => {
     it('não deve tentar enviar sem token registrado', async () => {
       seedFirestore([]);
 
-      const enviados = await sendAlertPushes('user-1', [alerta()]);
+      const { sent: enviados } = await sendAlertPushes('user-1', [alerta()]);
 
       expect(sendEachForMulticastMock).not.toHaveBeenCalled();
       expect(enviados).toBe(0);
@@ -241,7 +241,7 @@ describe('AlertPushService', () => {
         falhaDeToken('messaging/registration-token-not-registered'),
       );
 
-      const enviados = await sendAlertPushes('user-1', [alerta()]);
+      const { sent: enviados } = await sendAlertPushes('user-1', [alerta()]);
 
       expect(alertUpdate).not.toHaveBeenCalled();
       expect(enviados).toBe(0);
@@ -266,10 +266,91 @@ describe('AlertPushService', () => {
       sendEachForMulticastMock.mockRejectedValue(new Error('fcm fora do ar'));
       const error = jest.spyOn(functionsLogger, 'error');
 
-      const enviados = await sendAlertPushes('user-1', [alerta()]);
+      const { sent: enviados } = await sendAlertPushes('user-1', [alerta()]);
 
       expect(enviados).toBe(0);
       expect(JSON.stringify(error.mock.calls)).toContain('sendAlertPushes');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Falha de envio visível para o job (revisão do PR #519)
+  // -------------------------------------------------------------------------
+  describe('falhas devolvidas ao job', () => {
+    const semEntrega = (codigo: string) => ({
+      successCount: 0,
+      failureCount: 1,
+      responses: [{ success: false, error: { code: codigo } }],
+    });
+
+    it('deve devolver o envio bem-sucedido sem falha', async () => {
+      seedFirestore();
+
+      expect(await sendAlertPushes('user-1', [alerta()])).toEqual({
+        sent: 1,
+        failed: 0,
+      });
+    });
+
+    // O FCM respondeu, mas nenhum aparelho recebeu por falha temporária: o
+    // alerta segue sem push e o job precisa tentar de novo.
+    it('deve contar como falha a resposta do FCM sem entrega por falha temporária', async () => {
+      seedFirestore();
+      sendEachForMulticastMock.mockResolvedValue(
+        semEntrega('messaging/internal-error'),
+      );
+
+      expect(await sendAlertPushes('user-1', [alerta()])).toEqual({
+        sent: 0,
+        failed: 1,
+      });
+    });
+
+    it('deve contar como falha o envio que lança', async () => {
+      seedFirestore();
+      sendEachForMulticastMock.mockRejectedValue(new Error('fcm fora do ar'));
+
+      expect(await sendAlertPushes('user-1', [alerta()])).toEqual({
+        sent: 0,
+        failed: 1,
+      });
+    });
+
+    // Token inválido é estado normal (reinstalou o app, trocou de aparelho): o
+    // token é descartado, o e-mail cobre o usuário e não há o que repetir.
+    it('não deve contar como falha quando só havia token inválido', async () => {
+      seedFirestore();
+      sendEachForMulticastMock.mockResolvedValue(
+        semEntrega('messaging/registration-token-not-registered'),
+      );
+
+      expect(await sendAlertPushes('user-1', [alerta()])).toEqual({
+        sent: 0,
+        failed: 0,
+      });
+    });
+
+    it('não deve contar como falha o usuário sem aparelho registrado', async () => {
+      seedFirestore([]);
+
+      expect(await sendAlertPushes('user-1', [alerta()])).toEqual({
+        sent: 0,
+        failed: 0,
+      });
+    });
+
+    it('deve contar cada alerta que falha', async () => {
+      seedFirestore();
+      sendEachForMulticastMock
+        .mockResolvedValueOnce(sucesso(1))
+        .mockRejectedValueOnce(new Error('fcm'));
+
+      const resultado = await sendAlertPushes('user-1', [
+        alerta(),
+        alerta({ id: 'fridge-1_MXRF11', ticker: 'MXRF11' }),
+      ]);
+
+      expect(resultado).toEqual({ sent: 1, failed: 1 });
     });
   });
 });

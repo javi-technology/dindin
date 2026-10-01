@@ -192,7 +192,10 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
     // e-mail continua valendo para quem não tem token válido ou negou a
     // permissão, que é estado normal e não falha.
     try {
-      pushed += await sendAlertPushes(userId, alerts, now);
+      const push = await sendAlertPushes(userId, alerts, now);
+      pushed += push.sent;
+      // Falha que o envio absorve (FCM sem entrega) também faz o job falhar.
+      failed += push.failed;
     } catch (error) {
       failed += 1;
       logError('checkAllTargetPrices.pushFailed', {
@@ -204,7 +207,10 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
     // Cada canal responde por si: a falha de um não impede nem duplica o
     // outro, porque o estado de envio é gravado em campos separados.
     try {
-      notified += await sendAlertEmails(userId, alerts, now);
+      const email = await sendAlertEmails(userId, alerts, now);
+      notified += email.sent;
+      // Falha que o envio absorve (Resend 500) também faz o job falhar.
+      failed += email.failed;
     } catch (error) {
       failed += 1;
       logError('checkAllTargetPrices.notifyFailed', {
@@ -215,4 +221,17 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
   }
 
   logInfo('checkAllTargetPrices.done', { created, notified, pushed, failed });
+
+  // Sinaliza a falha **depois** de percorrer todos os usuários e registrar o
+  // resultado (issue #501): os demais jobs agendados lançam ao falhar, e é o
+  // erro que aciona o `retryCount` e deixa rastro no Cloud Logging. Terminar
+  // com sucesso falhando para todos fazia o usuário deixar de ser avisado sem
+  // que ninguém percebesse. O retry é seguro: o estado de envio é gravado por
+  // canal (#408), então o que já saiu não sai de novo.
+  if (failed > 0) {
+    throw new Error(
+      `[checkAllTargetPrices] ${failed} falha(s) ao verificar ou avisar ` +
+        `(${userDocuments.length} usuário(s))`,
+    );
+  }
 }

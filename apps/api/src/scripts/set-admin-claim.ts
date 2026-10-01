@@ -7,8 +7,9 @@
  *   FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
  *     npm run set:admin-claim -- UID_DO_USUARIO
  *
- * Em produção, remova a variável FIREBASE_AUTH_EMULATOR_HOST e use
- * GOOGLE_APPLICATION_CREDENTIALS com uma service account.
+ * Em produção, remova a variável FIREBASE_AUTH_EMULATOR_HOST e use as
+ * Application Default Credentials, sem chave de service account: ver
+ * docs/credenciais-locais.md.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';

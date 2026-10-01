@@ -65,7 +65,7 @@
     <button
       type="submit"
       class="px-4 py-2 rounded-lg text-sm font-medium bg-action text-on-action hover:bg-action-hover disabled:opacity-50"
-      [disabled]="form.invalid"
+      [disabled]="form.invalid || submitting()"
     >
       Mover
     </button>

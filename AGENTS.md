@@ -369,10 +369,16 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ### Operações de escrita do app (`apps/mobile`)
 
-- **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de
+- **Envio duplicado não pode gerar registro duplicado — no web, no app e na
+  API.** O web reserva o envio com `Submission` (`shared/utils/submission.util.ts`)
+  e deixa o botão indisponível até a resposta, inclusive em falha. A API também
+  recusa, com **409**, a criação de posição ou de item idêntica a uma gravada
+  há menos de 10 segundos (`addUnlessRecentDuplicate`, em transação): o
+  cliente não é a única proteção, porque um app antigo, um retry de rede e um
+  segundo dispositivo não passam por ela (issue #497). No celular, tocar de
   novo quando a resposta demora é o comportamento normal do usuário, e o
   resultado seria posição duplicada — erro de dado financeiro, não incômodo de
-  interface. A proteção está em dois lugares: o mixin `EnvioDeFormulario`
+  interface. No app, a proteção está em dois lugares: o mixin `EnvioDeFormulario`
   descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
 - **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
   o que foi digitado permanece. Refazer o preenchimento no teclado do celular
@@ -451,10 +457,22 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   não sabe.
 - Valorização e desvalorização usam `positive` e `danger`, nunca o token da
   marca.
-- O logout limpa o cache (`CacheLocal.limpar`): o dado é do usuário
-  autenticado, e deixá-lo para trás mostraria a carteira de quem saiu para
-  quem entrar depois no mesmo aparelho. A escolha de tema não é dado de
-  usuário e permanece.
+- **O cache é do usuário que o gravou** (issue #498). O `CacheLocal` só lê e
+  grava para o usuário vinculado (`vincularA(uid)`), e o uid vai na chave de
+  cada entrada. O vínculo acompanha a **sessão**, e não o botão de sair: o
+  `AuthGate` vincula ao autenticar (`aoAutenticar`) e desvincula, apagando
+  tudo, quando a sessão termina por qualquer caminho (`aoEncerrar`), inclusive
+  ao abrir o app sem sessão. Token revogado, conta removida e 401 que
+  sobrevive à renovação não passam pelo botão, e quem entrar depois no mesmo
+  aparelho veria a carteira de quem saiu. A resposta que chega depois de trocar
+  de usuário não é gravada (`Recurso`). A escolha de tema não é dado de usuário
+  e permanece.
+- **O cache fica no armazenamento seguro do sistema** (Keychain no iOS,
+  Keystore no Android, via `flutter_secure_storage`), nunca nas preferências em
+  texto puro: patrimônio, carteiras e proventos são dado financeiro. O item
+  não migra para outro aparelho nem entra em backup. Ao abrir, o cache apaga o
+  que as versões anteriores deixaram nas preferências. Os testes usam
+  `ArmazenamentoEmMemoria`, em `test/support/`.
 - O conteúdo passado a `VisaoRecurso` **precisa ser rolável**: é o que habilita
   o puxar-para-atualizar, o gesto que o usuário tenta antes de procurar botão.
 
