@@ -15,6 +15,8 @@ import 'package:dindin_mobile/core/theme/dindin_theme.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_form.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_screen.dart';
 
+import '../../support/cache_de_teste.dart';
+
 // ---------------------------------------------------------------------------
 // Cache nas consultas da simulação (issue #404).
 //
@@ -41,7 +43,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    cache = await CacheLocal.abrir();
+    cache = await cacheDeTeste();
   });
 
   DinDinApi apiQueFalha() => DinDinApi(

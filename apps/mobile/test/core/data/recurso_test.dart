@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:dindin_mobile/core/api/api_exception.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/recurso.dart';
+
+import '../../support/cache_de_teste.dart';
 
 // ---------------------------------------------------------------------------
 // Ciclo de vida de uma consulta (issue #402).
@@ -18,7 +22,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    cache = await CacheLocal.abrir();
+    cache = await cacheDeTeste();
   });
 
   Recurso<int> recurso({
@@ -149,5 +153,19 @@ void main() {
       expect(r.estado.dados, 42);
       expect(tentativas, 2);
     });
+  });
+
+  // A resposta de quem saiu pode chegar depois de outro usuário entrar no
+  // mesmo aparelho: gravá-la mostraria a carteira do primeiro ao segundo.
+  test('não grava a resposta que chega depois de trocar de usuário', () async {
+    final resposta = Completer<int>();
+    final r = recurso(buscar: () => resposta.future);
+
+    final carregando = r.carregar();
+    await cache.vincularA('outro-usuario');
+    resposta.complete(42);
+    await carregando;
+
+    expect(cache.ler('numero'), isNull);
   });
 }
