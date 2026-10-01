@@ -175,6 +175,54 @@ Regras:
 4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão
 
+### Jev (TypeSafe) como apoio a decisões
+
+O Jev é um modelo que devolve **probabilidades**, não texto: recebe um `state`
+(JSON) e perguntas tipadas (`noul`, `choice`, `score`) e responde com a opção
+mais provável, a distribuição e a `confidence`. Ele **apoia** a decisão; quem
+decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo.
+
+- **Como chamar:** `POST https://api.typesafe.ai/v1/systemone` com
+  `{ state, model: "jev-latest", questions }`. A chave fica na variável
+  `TYPESAFE_API_KEY` do shell de cada pessoa — nunca no repositório. O script
+  de apoio é `~/.claude/scripts/jev.mjs` (local da máquina, fora do repo): lê o
+  JSON da entrada padrão e imprime as respostas.
+- **Perguntas estreitas e independentes**, todas numa só chamada (rodam em
+  paralelo). O `state` leva só o contexto necessário: o trecho da regra e as
+  alternativas. As opções de um `choice` precisam de critério por opção, e o
+  texto da pergunta carrega todo o significado (o id não é enviado ao modelo).
+- **Não enviar** dado de usuário do app, credenciais nem o conteúdo de
+  `.env*`. Texto de regra, de issue e de código sem segredo é o limite.
+- **Regra de ação:**
+  - confiança alta, decisão reversível e dentro das regras deste arquivo →
+    seguir e **avisar** o usuário do que foi decidido;
+  - confiança abaixo de 0,7, ou probabilidade dividida → **perguntar** ao
+    usuário;
+  - decisão que toca dado financeiro, billing/assinatura, `firestore.rules`,
+    segurança ou prioridade P0/P1 → **perguntar sempre**, mesmo com confiança
+    alta.
+- **Conferir aderência a uma regra deste arquivo** é o uso mais seguro: a
+  regra vai no `state` e a pergunta é um `noul` ("a proposta respeita a
+  regra?"). Foi testado em um caso (diálogo nativo de exclusão contra
+  `ConfirmarDialog`: 0,02 de aderência, `ajustar` com confiança 1). Amostra
+  pequena — não tratar como garantia.
+- **Triagem de issue (`Priority`, `Size`, `Estimate`) é só segunda opinião, nunca
+  preenchimento automático.** Calibragem com 45 issues fechadas (sorteio com
+  semente fixa; critérios escritos a partir deste arquivo), comparando com o que
+  foi definido à mão:
+
+  | Campo      | Acerto exato | Dentro de ±1 nível | Observação                              |
+  | ---------- | ------------ | ------------------ | --------------------------------------- |
+  | `Priority` | 51%          | 89%                | tende a elevar P2/P3 para P1 (12 casos) |
+  | `Size`     | 38%          | 89%                | tende a subestimar; só serve como faixa |
+  | `Estimate` | 27%          | 71%                | converge para 5; **não usar**           |
+
+  A confiança ajuda pouco: em `Priority`, 67% de acerto com confiança ≥ 0,9
+  contra 32% abaixo de 0,7. Também rebaixou 5 de 12 issues P1 reais para P2
+  (ex.: tela branca no iOS, #461), o que é o erro caro. Por isso o Jev **não
+  define** `Priority`: vale como alerta ("isto parece P1?"), e a decisão fica
+  com o usuário. Refazer a calibragem se os critérios de `Priority` mudarem.
+
 ## Testes
 
 | Camada   | Ferramenta   | Localização                       |
