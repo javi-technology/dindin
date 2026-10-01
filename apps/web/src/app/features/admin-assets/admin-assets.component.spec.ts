@@ -5,7 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { AdminAssetsComponent } from './admin-assets.component';
 import { AssetService } from '../../core/services/asset.service';
 import { Asset } from 'dindin-models';
@@ -160,4 +160,43 @@ describe('AdminAssetsComponent', () => {
     expect(component.formError()).toBe('Asset already exists');
     expect(component.successMessage()).toBeNull();
   }));
+
+  it('deve criar o ativo uma única vez quando o envio é repetido (issue #497)', () => {
+    assetServiceMock.create.and.returnValue(new Subject<Asset>());
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.form.setValue({
+      ticker: 'ITUB4',
+      name: 'Itaú Unibanco',
+      assetType: 'STOCK',
+      active: true,
+      qualifiedInvestor: false,
+    });
+
+    component.saveAsset();
+    component.saveAsset();
+
+    expect(assetServiceMock.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('deve deixar o botão de envio indisponível enquanto o ativo é salvo (issue #497)', () => {
+    assetServiceMock.create.and.returnValue(new Subject<Asset>());
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.form.setValue({
+      ticker: 'ITUB4',
+      name: 'Itaú Unibanco',
+      assetType: 'STOCK',
+      active: true,
+      qualifiedInvestor: false,
+    });
+
+    component.saveAsset();
+    fixture.detectChanges();
+
+    const botao = (fixture.nativeElement as HTMLElement).querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    expect(botao.disabled).toBe(true);
+  });
 });

@@ -647,4 +647,32 @@ describe('FridgeComponent', () => {
       'item-3',
     ]);
   });
+
+  describe('envio duplicado (issue #497)', () => {
+    it('deve criar o item uma única vez quando o envio é repetido', () => {
+      fridgeServiceMock.createItem.and.returnValue(new Subject<FridgeItem>());
+
+      openItemForm();
+      itemForm().form.patchValue({
+        ticker: 'MXRF11',
+        quantity: 15,
+        transferredPrice: '9,80',
+        targetPrice: '10',
+      });
+      itemForm().submit();
+      itemForm().submit();
+
+      expect(fridgeServiceMock.createItem).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve descongelar o item uma única vez quando a confirmação é repetida', () => {
+      fridgeServiceMock.unfreezeItem.and.returnValue(new Subject<never>());
+
+      fixture.componentInstance.openUnfreeze(items[0]);
+      fixture.componentInstance.confirmUnfreeze('wallet-1');
+      fixture.componentInstance.confirmUnfreeze('wallet-1');
+
+      expect(fridgeServiceMock.unfreezeItem).toHaveBeenCalledTimes(1);
+    });
+  });
 });

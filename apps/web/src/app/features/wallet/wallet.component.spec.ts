@@ -5,7 +5,7 @@ import {
   tick,
 } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of, throwError, delay } from 'rxjs';
+import { Subject, of, throwError, delay } from 'rxjs';
 import { SetupService } from '../../core/services/setup.service';
 import { WalletComponent } from './wallet.component';
 import { PositionFormComponent } from './components/position-form/position-form.component';
@@ -1499,6 +1499,71 @@ describe('WalletComponent', () => {
       // A tabela é um subcomponente (#309) e guarda a própria ordenação:
       // trocar de carteira não a recria, então a escolha sobrevive.
       expect(header('total').getAttribute('aria-sort')).toBe('descending');
+    });
+  });
+
+  describe('envio duplicado (issue #497)', () => {
+    const payload = {
+      ticker: 'MXRF11',
+      assetType: 'FII',
+      quantity: 15,
+      averagePrice: 9.8,
+    };
+
+    it('deve criar a posição uma única vez quando o envio é repetido', () => {
+      positionServiceMock.create.and.returnValue(new Subject<Position>());
+
+      openPositionForm();
+      positionForm().form.patchValue(payload);
+      positionForm().submit();
+      positionForm().submit();
+
+      expect(positionServiceMock.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve deixar o botão indisponível enquanto a criação não responde', () => {
+      positionServiceMock.create.and.returnValue(new Subject<Position>());
+
+      openPositionForm();
+      positionForm().form.patchValue(payload);
+      positionForm().submit();
+      fixture.detectChanges();
+
+      const botao = (fixture.nativeElement as HTMLElement).querySelector(
+        'app-position-form button[type="submit"]',
+      ) as HTMLButtonElement;
+      expect(botao.disabled).toBe(true);
+    });
+
+    it('deve aceitar um novo envio depois que a criação falha', fakeAsync(() => {
+      positionServiceMock.create.and.returnValue(
+        throwError(() => new Error('Server error')),
+      );
+
+      openPositionForm();
+      positionForm().form.patchValue(payload);
+      positionForm().submit();
+      tick();
+      positionForm().submit();
+      tick();
+
+      expect(positionServiceMock.create).toHaveBeenCalledTimes(2);
+    }));
+
+    it('deve mover para a geladeira uma única vez quando o envio é repetido', () => {
+      positionServiceMock.moveToFridge.and.returnValue(
+        new Subject<FridgeItem>(),
+      );
+
+      openMoveToFridge(positions[0]);
+      moveToFridgeForm().form.patchValue({
+        fridgeId: 'fridge-1',
+        targetPrice: '120',
+      });
+      moveToFridgeForm().submit();
+      moveToFridgeForm().submit();
+
+      expect(positionServiceMock.moveToFridge).toHaveBeenCalledTimes(1);
     });
   });
 });
