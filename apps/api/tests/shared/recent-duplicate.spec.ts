@@ -144,4 +144,40 @@ describe('addUnlessRecentDuplicate', () => {
     expect(recusados[0].reason).toMatchObject({ statusCode: 409 });
     expect(await total()).toBe(1);
   });
+
+  // O campo que só existe no registro anterior também diferencia: uma posição
+  // com preço-alvo e outra, igual no resto, sem preço-alvo, são pedidos
+  // diferentes (revisão do PR #517).
+  it('deve aceitar o envio sem um campo que o registro anterior tem', async () => {
+    await addUnlessRecentDuplicate(collection, posicao({ targetPrice: 120 }));
+
+    await addUnlessRecentDuplicate(
+      collection,
+      posicao({ createdAt: iso(1_000) }),
+    );
+
+    expect(await total()).toBe(2);
+  });
+
+  it('deve aceitar o envio com um campo que o registro anterior não tem', async () => {
+    await addUnlessRecentDuplicate(collection, posicao());
+
+    await addUnlessRecentDuplicate(
+      collection,
+      posicao({ targetPrice: 120, createdAt: iso(1_000) }),
+    );
+
+    expect(await total()).toBe(2);
+  });
+
+  it('deve recusar quando os campos extras dos dois lados são iguais', async () => {
+    await addUnlessRecentDuplicate(collection, posicao({ targetPrice: 120 }));
+
+    await expect(
+      addUnlessRecentDuplicate(
+        collection,
+        posicao({ targetPrice: 120, createdAt: iso(1_000) }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
 });

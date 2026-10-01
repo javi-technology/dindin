@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ComponentFixture,
   TestBed,
@@ -674,5 +675,52 @@ describe('FridgeComponent', () => {
 
       expect(fridgeServiceMock.unfreezeItem).toHaveBeenCalledTimes(1);
     });
+  });
+
+  describe('409 da criação repetida (issue #497)', () => {
+    const conflito = () =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { error: 'Um registro idêntico foi enviado há instantes.' },
+          }),
+      );
+
+    function enviarItem(): void {
+      openItemForm();
+      itemForm().form.patchValue({
+        ticker: 'MXRF11',
+        quantity: 15,
+        transferredPrice: '9,80',
+        targetPrice: '10',
+      });
+      itemForm().submit();
+    }
+
+    it('deve recarregar os itens, porque o item já foi gravado', fakeAsync(() => {
+      fridgeServiceMock.createItem.and.returnValue(conflito());
+      fridgeServiceMock.listItems.calls.reset();
+
+      enviarItem();
+      tick();
+
+      expect(fridgeServiceMock.listItems).toHaveBeenCalledWith('fridge-1');
+    }));
+
+    it('deve fechar o formulário e avisar que o registro já existe', fakeAsync(() => {
+      fridgeServiceMock.createItem.and.returnValue(conflito());
+
+      enviarItem();
+      tick();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="form-error"]')).toBeNull();
+      expect(fixture.componentInstance.formVisible()).toBe(false);
+      expect(
+        compiled.querySelector('[data-testid="notice-message"]')?.textContent,
+      ).toContain('idêntico');
+    }));
   });
 });

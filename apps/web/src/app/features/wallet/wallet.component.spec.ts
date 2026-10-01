@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ComponentFixture,
   TestBed,
@@ -1565,5 +1566,65 @@ describe('WalletComponent', () => {
 
       expect(positionServiceMock.moveToFridge).toHaveBeenCalledTimes(1);
     });
+  });
+
+  // O 409 de um retry significa que a posição já foi gravada (a resposta
+  // anterior se perdeu): a tela não pode dizer que falhou (revisão do PR #517).
+  describe('409 da criação repetida (issue #497)', () => {
+    const conflito = () =>
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { error: 'Um registro idêntico foi enviado há instantes.' },
+          }),
+      );
+
+    function enviarPosicao(): void {
+      openPositionForm();
+      positionForm().form.patchValue({
+        ticker: 'MXRF11',
+        assetType: 'FII',
+        quantity: 15,
+        averagePrice: 9.8,
+      });
+      positionForm().submit();
+    }
+
+    it('deve recarregar a lista, porque a posição já foi gravada', fakeAsync(() => {
+      positionServiceMock.create.and.returnValue(conflito());
+      positionServiceMock.list.calls.reset();
+
+      enviarPosicao();
+      tick();
+
+      expect(positionServiceMock.list).toHaveBeenCalledWith('wallet-1');
+    }));
+
+    it('deve fechar o formulário em vez de mostrar erro de criação', fakeAsync(() => {
+      positionServiceMock.create.and.returnValue(conflito());
+
+      enviarPosicao();
+      tick();
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="form-error"]')).toBeNull();
+      expect(fixture.componentInstance.formVisible()).toBe(false);
+    }));
+
+    it('deve avisar que o registro já existe, sem chamá-lo de falha', fakeAsync(() => {
+      positionServiceMock.create.and.returnValue(conflito());
+
+      enviarPosicao();
+      tick();
+      fixture.detectChanges();
+
+      const aviso = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="notice-message"]',
+      );
+      expect(aviso?.textContent).toContain('idêntico');
+      expect(aviso?.textContent).not.toContain('Erro ao criar');
+    }));
   });
 });
