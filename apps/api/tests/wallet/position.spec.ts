@@ -21,7 +21,18 @@ jest.mock('firebase-admin/firestore', () => ({
   },
 }));
 
+// A proteção contra envio idêntico em sequência (issue #497) é testada contra o
+// emulador em `tests/shared/recent-duplicate.spec.ts`. Aqui ela é um dublê que
+// grava como antes, para os testes da rota seguirem exercitando o `add`.
+const addUnlessRecentDuplicateMock = jest.fn();
+
+jest.mock('../../src/shared/recent-duplicate', () => ({
+  addUnlessRecentDuplicate: (...args: unknown[]) =>
+    addUnlessRecentDuplicateMock(...args),
+}));
+
 import { app } from '../../src/index';
+import { HttpError } from '../../src/shared/http-error';
 import { Position, AssetType, Fridge } from 'dindin-models';
 
 function createPositionSnapshot(position: Position) {
@@ -442,6 +453,13 @@ describe('Position CRUD', () => {
   beforeEach(() => {
     verifyIdTokenMock.mockReset();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
+    addUnlessRecentDuplicateMock.mockReset();
+    addUnlessRecentDuplicateMock.mockImplementation(
+      async (
+        collection: { add: (data: unknown) => Promise<{ id: string }> },
+        data: unknown,
+      ) => (await collection.add(data)).id,
+    );
   });
 
   describe('GET /api/wallets/:walletId/positions', () => {
@@ -676,6 +694,51 @@ describe('Position CRUD', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.currentPrice).toBeUndefined();
+    });
+  });
+
+  describe('POST /api/wallets/:walletId/positions: envio repetido (issue #497)', () => {
+    const corpo = {
+      ticker: 'HGLG11',
+      quantity: 10,
+      averagePrice: 110.5,
+      assetType: 'FII',
+    };
+
+    it('deve gravar pela proteção contra envio idêntico em sequência', async () => {
+      firestoreMock = createFirestoreMock([]);
+
+      await request(app)
+        .post('/api/wallets/wallet-1/positions')
+        .set('Authorization', authHeader)
+        .send(corpo);
+
+      expect(addUnlessRecentDuplicateMock).toHaveBeenCalledTimes(1);
+      expect(addUnlessRecentDuplicateMock.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          walletId: 'wallet-1',
+          ticker: 'HGLG11',
+          quantity: 10,
+          averagePrice: 110.5,
+        }),
+      );
+    });
+
+    it('deve retornar 409 quando a mesma posição acaba de ser enviada', async () => {
+      firestoreMock = createFirestoreMock([]);
+      addUnlessRecentDuplicateMock.mockRejectedValue(
+        HttpError.conflict('Um registro idêntico foi enviado há instantes.'),
+      );
+
+      const response = await request(app)
+        .post('/api/wallets/wallet-1/positions')
+        .set('Authorization', authHeader)
+        .send(corpo);
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe(
+        'Um registro idêntico foi enviado há instantes.',
+      );
     });
   });
 
