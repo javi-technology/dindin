@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -230,6 +232,97 @@ void main() {
 
       // O cache é conveniência: perder a gravação custa uma espera.
       expect(comFalha.ler('resumo'), isNull);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Vínculos que se atropelam (revisão do PR #518)
+  //
+  // A sessão pode mudar mais depressa do que o armazenamento responde (sair e
+  // entrar logo em seguida). A leitura iniciada para o primeiro usuário que
+  // termina depois do vínculo do segundo não pode pôr a carteira dele no cache
+  // de quem está na frente.
+  // -------------------------------------------------------------------------
+  group('vínculos simultâneos', () {
+    String entrada(Object dados) => jsonEncode({
+      'dados': dados,
+      'gravadoEm': DateTime(2026, 10, 1).toIso8601String(),
+    });
+
+    late ArmazenamentoEmMemoria disco;
+    late CacheLocal aberto;
+
+    setUp(() async {
+      disco = ArmazenamentoEmMemoria();
+      await disco.gravar(
+        CacheLocal.chaveNoArmazenamento('A', 'carteiras'),
+        entrada(['carteira de A']),
+      );
+      await disco.gravar(
+        CacheLocal.chaveNoArmazenamento('B', 'carteiras'),
+        entrada(['carteira de B']),
+      );
+      aberto = await CacheLocal.abrir(armazenamento: disco);
+      disco.segurarLeituras = true;
+    });
+
+    test('a leitura de A que termina depois do vínculo de B não entra no '
+        'cache de B', () async {
+      final vincularA = aberto.vincularA('A');
+      final vincularB = aberto.vincularA('B');
+
+      // B termina primeiro; a leitura de A volta depois, já com B na frente.
+      disco.liberarLeitura(1);
+      await vincularB;
+      disco.liberarLeitura(0);
+      await vincularA;
+
+      expect(aberto.dono, 'B');
+      expect(aberto.ler('carteiras')!.dados, ['carteira de B']);
+    });
+
+    test('o vínculo atrasado de A não apaga o que é de B', () async {
+      final vincularA = aberto.vincularA('A');
+      final vincularB = aberto.vincularA('B');
+
+      disco.liberarLeitura(1);
+      await vincularB;
+      disco.liberarLeitura(0);
+      await vincularA;
+
+      disco.segurarLeituras = false;
+      expect(
+        (await disco.lerTudo()).keys,
+        contains(CacheLocal.chaveNoArmazenamento('B', 'carteiras')),
+      );
+    });
+
+    test(
+      'encerrar a sessão invalida o vínculo que ainda estava lendo',
+      () async {
+        final vincularA = aberto.vincularA('A');
+        final encerrar = aberto.vincularA(null);
+
+        disco.liberarLeitura(1);
+        await encerrar;
+        disco.liberarLeitura(0);
+        await vincularA;
+
+        expect(aberto.dono, isNull);
+        expect(aberto.ler('carteiras'), isNull);
+      },
+    );
+
+    test('na ordem natural, o último vínculo continua valendo', () async {
+      final vincularA = aberto.vincularA('A');
+      final vincularB = aberto.vincularA('B');
+
+      disco.liberarLeitura(0);
+      await vincularA;
+      disco.liberarLeitura(1);
+      await vincularB;
+
+      expect(aberto.ler('carteiras')!.dados, ['carteira de B']);
     });
   });
 }
