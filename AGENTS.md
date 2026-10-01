@@ -457,10 +457,22 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   não sabe.
 - Valorização e desvalorização usam `positive` e `danger`, nunca o token da
   marca.
-- O logout limpa o cache (`CacheLocal.limpar`): o dado é do usuário
-  autenticado, e deixá-lo para trás mostraria a carteira de quem saiu para
-  quem entrar depois no mesmo aparelho. A escolha de tema não é dado de
-  usuário e permanece.
+- **O cache é do usuário que o gravou** (issue #498). O `CacheLocal` só lê e
+  grava para o usuário vinculado (`vincularA(uid)`), e o uid vai na chave de
+  cada entrada. O vínculo acompanha a **sessão**, e não o botão de sair: o
+  `AuthGate` vincula ao autenticar (`aoAutenticar`) e desvincula, apagando
+  tudo, quando a sessão termina por qualquer caminho (`aoEncerrar`), inclusive
+  ao abrir o app sem sessão. Token revogado, conta removida e 401 que
+  sobrevive à renovação não passam pelo botão, e quem entrar depois no mesmo
+  aparelho veria a carteira de quem saiu. A resposta que chega depois de trocar
+  de usuário não é gravada (`Recurso`). A escolha de tema não é dado de usuário
+  e permanece.
+- **O cache fica no armazenamento seguro do sistema** (Keychain no iOS,
+  Keystore no Android, via `flutter_secure_storage`), nunca nas preferências em
+  texto puro: patrimônio, carteiras e proventos são dado financeiro. O item
+  não migra para outro aparelho nem entra em backup. Ao abrir, o cache apaga o
+  que as versões anteriores deixaram nas preferências. Os testes usam
+  `ArmazenamentoEmMemoria`, em `test/support/`.
 - O conteúdo passado a `VisaoRecurso` **precisa ser rolável**: é o que habilita
   o puxar-para-atualizar, o gesto que o usuário tenta antes de procurar botão.
 

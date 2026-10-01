@@ -14,6 +14,7 @@ class AuthGate extends StatefulWidget {
     required this.login,
     required this.autenticado,
     this.aoAutenticar,
+    this.aoEncerrar,
   });
 
   final Stream<Sessao?> sessoes;
@@ -28,6 +29,15 @@ class AuthGate extends StatefulWidget {
   /// beco de "crie uma geladeira" com o provisionamento ainda a caminho.
   final Future<void> Function(Sessao sessao)? aoAutenticar;
 
+  /// Trabalho de quando a sessão termina, por qualquer caminho: hoje, apagar o
+  /// cache do usuário que saiu (issue #498).
+  ///
+  /// No celular a sessão acaba sem o botão de sair — token revogado, conta
+  /// removida, 401 que sobrevive à renovação —, e é aqui, e não no botão, que
+  /// o que era do usuário precisa ir embora. Também roda quando o app abre sem
+  /// sessão, caso do token revogado com o app fechado.
+  final Future<void> Function()? aoEncerrar;
+
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
@@ -35,6 +45,20 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   String? _preparando;
   String? _preparado;
+  bool _encerrada = false;
+
+  void _encerrar() {
+    if (_encerrada) return;
+    _encerrada = true;
+
+    // Quem voltar a entrar, mesmo o mesmo usuário, precisa ser preparado de
+    // novo: o que o encerramento apagou (o cache) não volta sozinho.
+    _preparando = null;
+    _preparado = null;
+
+    // Uma falha aqui não pode prender o login: o cache é conveniência.
+    widget.aoEncerrar?.call().catchError((_) {});
+  }
 
   void _prepararPara(Sessao sessao) {
     if (_preparando == sessao.uid) return;
@@ -60,7 +84,11 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         final sessao = snapshot.data;
-        if (sessao == null) return widget.login;
+        if (sessao == null) {
+          _encerrar();
+          return widget.login;
+        }
+        _encerrada = false;
         if (widget.aoAutenticar == null) return widget.autenticado;
 
         _prepararPara(sessao);
