@@ -1,3 +1,4 @@
+import { SendResult } from './send-result';
 import { Alert, DeviceToken } from 'dindin-models';
 import { getMessaging } from 'firebase-admin/messaging';
 
@@ -36,7 +37,9 @@ const CODIGOS_DE_TOKEN_INVALIDO = new Set([
 /**
  * Envia um push por alerta ainda não notificado nesse canal.
  *
- * Devolve quantos alertas foram avisados. O estado é gravado em
+ * Devolve quantos alertas foram avisados e quantos falharam (ver
+ * `SendResult`): o job precisa da contagem para falhar e acionar o retry. O
+ * estado é gravado em
  * `notifiedPushAt`, separado do e-mail: com um único campo, o push que
  * falhasse depois de o e-mail ter ido provocaria reenvio do e-mail, e o
  * e-mail que falhasse depois do push marcaria o alerta como avisado sem ele
@@ -46,9 +49,9 @@ export async function sendAlertPushes(
   userId: string,
   alerts: Alert[],
   now = new Date(),
-): Promise<number> {
+): Promise<SendResult> {
   const pending = alerts.filter((alert) => !alert.notifiedPushAt);
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { sent: 0, failed: 0 };
 
   const tokens = await listDeviceTokens(userId);
   if (tokens.length === 0) {
@@ -58,12 +61,13 @@ export async function sendAlertPushes(
       uid: userId,
       pending: pending.length,
     });
-    return 0;
+    return { sent: 0, failed: 0 };
   }
 
   const userAlerts = alertsCollection(userId);
   const notifiedPushAt = now.toISOString();
   let sent = 0;
+  let failed = 0;
 
   for (const alert of pending) {
     try {
@@ -90,10 +94,18 @@ export async function sendAlertPushes(
       if (resposta.successCount > 0) {
         await userAlerts.doc(alert.id).update({ notifiedPushAt });
         sent += 1;
+      } else if (temFalhaTemporaria(resposta)) {
+        // O FCM respondeu, mas nenhum aparelho recebeu e o motivo não foi
+        // token inválido: o alerta segue sem push e vale tentar de novo.
+        // Só token inválido não conta, porque já foi descartado e o e-mail
+        // cobre o usuário.
+        failed += 1;
       }
     } catch (error) {
       // Uma falha de envio não pode impedir o aviso dos demais ativos, nem
-      // afetar o e-mail: o canal é registrado por conta própria.
+      // afetar o e-mail: o canal é registrado por conta própria. É contada,
+      // porque é ela que faz o job falhar e acionar o retry.
+      failed += 1;
       logError('sendAlertPushes.sendFailed', {
         uid: userId,
         ticker: alert.ticker,
@@ -106,10 +118,22 @@ export async function sendAlertPushes(
     uid: userId,
     pending: pending.length,
     sent,
+    failed,
     devices: tokens.length,
   });
 
-  return sent;
+  return { sent, failed };
+}
+
+/** Alguma resposta falhou por motivo que não é token inválido. */
+function temFalhaTemporaria(resposta: {
+  responses: { success: boolean; error?: { code?: string } }[];
+}): boolean {
+  return resposta.responses.some(
+    (resultado) =>
+      !resultado.success &&
+      !CODIGOS_DE_TOKEN_INVALIDO.has(resultado.error?.code ?? ''),
+  );
 }
 
 /** Apaga os tokens que a plataforma recusou por não valerem mais. */
