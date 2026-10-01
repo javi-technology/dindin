@@ -221,23 +221,27 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   tabela leria como "não respeita"). Amostra pequena — não tratar como
   garantia.
 - **Triagem de issue (`Priority`, `Size`, `Estimate`) é só segunda opinião, nunca
-  preenchimento automático.** Calibragem com 45 issues fechadas, comparando
-  com o que foi definido à mão. A amostra, o procedimento e as respostas estão
-  em `docs/jev-calibragem.md` e `docs/jev-calibragem.json` (os critérios foram
-  escritos a partir deste arquivo):
+  preenchimento automático.** Calibragem com as 50 issues fechadas mais
+  recentes (fechadas de 23 a 30/09/2026), comparando com os valores do
+  Project. A amostra, o procedimento, os limites e as respostas estão em
+  `docs/jev-calibragem.md` e `docs/jev-calibragem.json`; para repetir:
+  `node ~/.agents/scripts/jev-calibragem.mjs 50 saida.json`.
 
-  | Campo      | Acerto exato | Dentro de ±1 nível | Observação                              |
-  | ---------- | ------------ | ------------------ | --------------------------------------- |
-  | `Priority` | 51%          | 89%                | tende a elevar P2/P3 para P1 (12 casos) |
-  | `Size`     | 38%          | 89%                | tende a subestimar; só serve como faixa |
-  | `Estimate` | 27%          | 71%                | converge para 5; **não usar**           |
+  | Campo      | Acerto exato | Dentro de ±1 nível | Observação                                         |
+  | ---------- | ------------ | ------------------ | -------------------------------------------------- |
+  | `Priority` | 48%          | 84%                | elevou 14 issues não-P1 a P0/P1                    |
+  | `Size`     | 48%          | 90%                | só serve como faixa                                |
+  | `Estimate` | 36%          | 78%                | converge para 5 (36 de 50 respostas); **não usar** |
 
-  A confiança ajuda pouco: em `Priority`, 67% de acerto com confiança ≥ 0,9
-  contra 32% abaixo de 0,7. Também rebaixou 5 de 12 issues P1 reais para P2
-  (ex.: tela branca no iOS, #461), o que é o erro caro. Por isso o Jev **não
-  define** `Priority`: vale como alerta ("isto parece P1?"), e a decisão fica
-  com o usuário. Refazer a calibragem se os critérios de `Priority` mudarem,
-  usando a lista de `docs/jev-calibragem.md`.
+  **A confiança não é um sinal confiável na triagem.** Em `Priority`, a faixa
+  ≥ 0,9 acertou 3 de 10 e a faixa 0,7–0,9 acertou 14 de 14; numa rodada
+  anterior, com outra amostra, foi o contrário (10 de 15 e 7 de 11). Dos 9 P1
+  da amostra, 2 foram rebaixados para P2 (5 de 12 na rodada anterior), que é o
+  erro caro. Por isso o Jev **não define** `Priority`: vale como alerta ("isto
+  parece P1?"), e a decisão fica com o usuário. Os valores do Project foram
+  tomados como verdade sem verificar quem os definiu, e os critérios das
+  perguntas não foram ajustados. Refazer a calibragem se os critérios de
+  `Priority` mudarem.
 
 ## Testes
 
