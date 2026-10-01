@@ -185,7 +185,7 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 - **Como chamar:** `POST https://api.typesafe.ai/v1/systemone` com
   `{ state, model: "jev-latest", questions }`. A chave fica na variável
   `TYPESAFE_API_KEY` do shell de cada pessoa — nunca no repositório. O script
-  de apoio é `~/.claude/scripts/jev.mjs` (local da máquina, fora do repo): lê o
+  de apoio é `~/.agents/scripts/jev.mjs` (local da máquina, fora do repo): lê o
   JSON da entrada padrão e imprime as respostas.
 - **Perguntas estreitas e independentes**, todas numa só chamada (rodam em
   paralelo). O `state` leva só o contexto necessário: o trecho da regra e as
