@@ -103,6 +103,7 @@
         [assets]="assets()"
         [assetsError]="assetsError()"
         [error]="formError()"
+        [submitting]="itemSubmission.pending()"
         (save)="saveItem($event)"
         (closed)="closeForm()"
       />
@@ -135,6 +136,7 @@
         [item]="unfreezeItemTarget()!"
         [wallets]="wallets()"
         [error]="unfreezeError()"
+        [submitting]="unfreezeSubmission.pending()"
         (confirmed)="confirmUnfreeze($event)"
         (closed)="cancelUnfreeze()"
       />

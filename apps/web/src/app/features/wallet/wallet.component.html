@@ -108,6 +108,7 @@
         [assets]="assets()"
         [assetsError]="assetsError()"
         [error]="formError()"
+        [submitting]="positionSubmission.pending()"
         (save)="savePosition($event)"
         (closed)="closeForm()"
       />
@@ -138,6 +139,7 @@
         [position]="moveToFridgePosition()!"
         [fridges]="fridges()"
         [error]="moveToFridgeError()"
+        [submitting]="moveSubmission.pending()"
         (confirmed)="confirmMoveToFridge($event)"
         (closed)="closeMoveToFridge()"
       />

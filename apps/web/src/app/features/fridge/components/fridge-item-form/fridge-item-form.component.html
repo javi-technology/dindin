@@ -89,7 +89,8 @@
     </button>
     <button
       type="submit"
-      class="px-4 py-2 text-sm font-medium text-on-action bg-action hover:bg-action-hover rounded-lg transition-colors"
+      class="px-4 py-2 text-sm font-medium text-on-action bg-action hover:bg-action-hover rounded-lg transition-colors disabled:opacity-50"
+      [disabled]="submitting()"
     >
       {{ item() ? 'Salvar' : 'Adicionar' }}
     </button>

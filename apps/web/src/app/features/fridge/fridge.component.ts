@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY, Subject, catchError, switchMap, tap } from 'rxjs';
+import { EMPTY, Subject, catchError, finalize, switchMap, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
@@ -18,6 +18,7 @@ import {
 } from './components/fridge-item-form/fridge-item-form.component';
 import { UnfreezeFormComponent } from './components/unfreeze-form/unfreeze-form.component';
 import { FridgeService } from '../../core/services/fridge.service';
+import { Submission } from '../../shared/utils/submission.util';
 import { AssetService } from '../../core/services/asset.service';
 import { WalletService } from '../../core/services/wallet.service';
 import { SetupService } from '../../core/services/setup.service';
@@ -46,6 +47,10 @@ export class FridgeComponent implements OnInit {
   private readonly walletService = inject(WalletService);
   private readonly setupService = inject(SetupService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Um envio por vez: o segundo toque não pode virar item duplicado (#497). */
+  readonly itemSubmission = new Submission();
+  readonly unfreezeSubmission = new Submission();
 
   /**
    * Geladeira a carregar. O switchMap sobre este Subject cancela a requisição
@@ -207,24 +212,32 @@ export class FridgeComponent implements OnInit {
       return;
     }
 
+    // O guard vem antes de montar a requisição: a chamada ao serviço é o envio.
+    if (!this.itemSubmission.start()) return;
+
     const editing = this.editingItem();
     const request$ = editing
       ? this.fridgeService.updateItem(fridge.id, editing.id, payload)
       : this.fridgeService.createItem(fridge.id, payload);
 
-    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.closeForm();
-        this.loadItems(fridge.id);
-      },
-      error: () => {
-        this.formError.set(
-          editing
-            ? 'Erro ao atualizar item. Verifique os dados e tente novamente.'
-            : 'Erro ao criar item. Verifique os dados e tente novamente.',
-        );
-      },
-    });
+    request$
+      .pipe(
+        finalize(() => this.itemSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.closeForm();
+          this.loadItems(fridge.id);
+        },
+        error: () => {
+          this.formError.set(
+            editing
+              ? 'Erro ao atualizar item. Verifique os dados e tente novamente.'
+              : 'Erro ao criar item. Verifique os dados e tente novamente.',
+          );
+        },
+      });
   }
 
   deleteItem(item: FridgeItem): void {
@@ -267,9 +280,14 @@ export class FridgeComponent implements OnInit {
     const fridge = this.selectedFridge();
     if (!item || !fridge) return;
 
+    if (!this.unfreezeSubmission.start()) return;
+
     this.fridgeService
       .unfreezeItem(fridge.id, item.id, walletId)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        finalize(() => this.unfreezeSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: () => {
           this.items.update((current) =>

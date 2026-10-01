@@ -30,6 +30,7 @@ import {
   MoveToFridgeValue,
 } from './components/move-to-fridge-form/move-to-fridge-form.component';
 import { WalletService } from '../../core/services/wallet.service';
+import { Submission } from '../../shared/utils/submission.util';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
@@ -66,6 +67,10 @@ export class WalletComponent implements OnInit {
   private readonly dividendService = inject(DividendService);
   private readonly setupService = inject(SetupService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Um envio por vez: o segundo toque não pode virar posição duplicada (#497). */
+  readonly positionSubmission = new Submission();
+  readonly moveSubmission = new Submission();
   /**
    * Carteira a carregar. O switchMap sobre este Subject cancela a requisição
    * em voo quando outra carteira é escolhida, para que a resposta atrasada da
@@ -250,24 +255,32 @@ export class WalletComponent implements OnInit {
       return;
     }
 
+    // O guard vem antes de montar a requisição: a chamada ao serviço é o envio.
+    if (!this.positionSubmission.start()) return;
+
     const editing = this.editingPosition();
     const request$ = editing
       ? this.positionService.update(wallet.id, editing.id, payload)
       : this.positionService.create(wallet.id, payload);
 
-    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.closeForm();
-        this.loadPositions(wallet.id);
-      },
-      error: () => {
-        this.formError.set(
-          editing
-            ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'
-            : 'Erro ao criar posição. Verifique os dados e tente novamente.',
-        );
-      },
-    });
+    request$
+      .pipe(
+        finalize(() => this.positionSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.closeForm();
+          this.loadPositions(wallet.id);
+        },
+        error: () => {
+          this.formError.set(
+            editing
+              ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'
+              : 'Erro ao criar posição. Verifique os dados e tente novamente.',
+          );
+        },
+      });
   }
 
   deletePosition(position: Position): void {
@@ -310,9 +323,14 @@ export class WalletComponent implements OnInit {
     const wallet = this.selectedWallet();
     if (!position || !wallet) return;
 
+    if (!this.moveSubmission.start()) return;
+
     this.positionService
       .moveToFridge(wallet.id, position.id, payload)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        finalize(() => this.moveSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: () => {
           this.closeMoveToFridge();

@@ -152,7 +152,7 @@
           <button
             type="submit"
             class="inline-flex items-center bg-action hover:bg-action-hover text-on-action font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-            [disabled]="form.invalid"
+            [disabled]="form.invalid || submission.pending()"
           >
             @if (editingTicker()) {
               <svg lucidePencil [size]="18" class="mr-2"></svg>
