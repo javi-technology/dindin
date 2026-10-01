@@ -41,6 +41,9 @@ class CacheLocal {
 
   String? _dono;
 
+  /// Contador dos vínculos pedidos; só o último termina o que começou.
+  int _geracao = 0;
+
   /// Usuário a quem o cache pertence agora, ou `null` sem sessão.
   String? get dono => _dono;
 
@@ -73,9 +76,16 @@ class CacheLocal {
   ///
   /// Trocar de usuário apaga o que era do anterior; vincular o mesmo usuário
   /// mantém o cache. Sem vínculo o cache não lê nem grava.
+  ///
+  /// A sessão pode mudar mais depressa do que o armazenamento responde (sair e
+  /// entrar logo em seguida), então só o **último** vínculo pedido vale: cada
+  /// chamada tem uma geração, e a leitura que volta depois de outro vínculo
+  /// não insere nem apaga nada (revisão do PR #518). Sem isso, a carteira do
+  /// usuário anterior entraria no cache de quem está na frente.
   Future<void> vincularA(String? uid) async {
     if (uid != null && uid == _dono) return;
 
+    final geracao = ++_geracao;
     _entradas.clear();
     _dono = uid;
     final meuPrefixo = uid == null ? null : '$_prefixo$uid:';
@@ -83,6 +93,7 @@ class CacheLocal {
     try {
       final guardado = await _armazenamento.lerTudo();
       for (final par in guardado.entries) {
+        if (geracao != _geracao) return;
         if (!par.key.startsWith(_prefixo)) continue;
 
         if (meuPrefixo != null && par.key.startsWith(meuPrefixo)) {
