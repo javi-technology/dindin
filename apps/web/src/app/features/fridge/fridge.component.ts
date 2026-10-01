@@ -9,6 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, Subject, catchError, finalize, switchMap, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
 import { FridgeItemsTableComponent } from './components/fridge-items-table/fridge-items-table.component';
@@ -71,6 +72,8 @@ export class FridgeComponent implements OnInit {
   editingItem = signal<FridgeItem | null>(null);
   formVisible = signal(false);
   formError = signal<string | null>(null);
+  /** Aviso que não é falha: o registro repetido já estava gravado (#497). */
+  notice = signal<string | null>(null);
   deleteConfirmItem = signal<FridgeItem | null>(null);
   unfreezeItemTarget = signal<FridgeItem | null>(null);
   unfreezeError = signal<string | null>(null);
@@ -195,6 +198,7 @@ export class FridgeComponent implements OnInit {
     this.editingItem.set(item);
     this.formVisible.set(true);
     this.formError.set(null);
+    this.notice.set(null);
   }
 
   closeForm(): void {
@@ -230,7 +234,19 @@ export class FridgeComponent implements OnInit {
           this.closeForm();
           this.loadItems(fridge.id);
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
+          // 409 é a API recusando o envio repetido: o item já foi gravado
+          // (típico de um retry depois de a resposta anterior se perder), e a
+          // tela não pode dizer que falhou (revisão do PR #517).
+          if (!editing && err.status === 409) {
+            this.closeForm();
+            this.notice.set(
+              err.error?.error ?? 'Este item já foi cadastrado há instantes.',
+            );
+            this.loadItems(fridge.id);
+            return;
+          }
+
           this.formError.set(
             editing
               ? 'Erro ao atualizar item. Verifique os dados e tente novamente.'

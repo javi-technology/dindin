@@ -18,6 +18,7 @@ import {
 } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
 import { PositionsTableComponent } from './components/positions-table/positions-table.component';
@@ -91,6 +92,8 @@ export class WalletComponent implements OnInit {
   editingPosition = signal<Position | null>(null);
   formVisible = signal(false);
   formError = signal<string | null>(null);
+  /** Aviso que não é falha: o registro repetido já estava gravado (#497). */
+  notice = signal<string | null>(null);
   deleteConfirmPosition = signal<Position | null>(null);
 
   fridges = signal<Fridge[]>([]);
@@ -238,6 +241,7 @@ export class WalletComponent implements OnInit {
     this.editingPosition.set(position);
     this.formVisible.set(true);
     this.formError.set(null);
+    this.notice.set(null);
   }
 
   closeForm(): void {
@@ -273,7 +277,20 @@ export class WalletComponent implements OnInit {
           this.closeForm();
           this.loadPositions(wallet.id);
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
+          // 409 é a API recusando o envio repetido: a posição já foi gravada
+          // (típico de um retry depois de a resposta anterior se perder), e a
+          // tela não pode dizer que falhou (revisão do PR #517).
+          if (!editing && err.status === 409) {
+            this.closeForm();
+            this.notice.set(
+              err.error?.error ??
+                'Esta posição já foi cadastrada há instantes.',
+            );
+            this.loadPositions(wallet.id);
+            return;
+          }
+
           this.formError.set(
             editing
               ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'

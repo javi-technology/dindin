@@ -19,8 +19,15 @@ const CONTROL_FIELDS = new Set(['createdAt', 'updatedAt']);
 
 type Data = DocumentData & { ticker: string; createdAt: string };
 
+/**
+ * Compara as chaves dos **dois** registros: o campo que só existe no anterior
+ * (uma posição com preço-alvo, seguida de outra igual sem ele) também
+ * diferencia. Campo ausente e `null` são o mesmo valor.
+ */
 function sameValues(existing: DocumentData, incoming: Data): boolean {
-  return Object.keys(incoming)
+  const fields = new Set([...Object.keys(existing), ...Object.keys(incoming)]);
+
+  return [...fields]
     .filter((field) => !CONTROL_FIELDS.has(field))
     .every((field) => (existing[field] ?? null) === (incoming[field] ?? null));
 }
