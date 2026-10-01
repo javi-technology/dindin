@@ -272,16 +272,17 @@ Duas mudanças anteriores deixaram resíduo no Firestore, e o script
    precisa do tratamento especial `LEGACY_AUTO_ID`.
 
 O script **simula por padrão** e é idempotente. Requer credenciais com
-permissão de escrita no Firestore do projeto, como os demais scripts:
+permissão de escrita no Firestore do projeto, como os demais scripts. Use a
+credencial de curta duração descrita em
+[`docs/credenciais-locais.md`](docs/credenciais-locais.md), nunca uma chave JSON
+de service account:
 
 ```bash
 # simula e conta
-GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
-  npm run migrate:legacy --workspace=apps/api
+npm run migrate:legacy --workspace=apps/api
 
 # aplica
-GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
-  npm run migrate:legacy --workspace=apps/api -- --apply
+npm run migrate:legacy --workspace=apps/api -- --apply
 ```
 
 Para ensaiar sem tocar em produção, aponte para o emulador:

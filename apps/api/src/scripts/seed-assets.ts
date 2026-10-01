@@ -8,20 +8,17 @@
  *    na Brapi (ver issue #86).
  *
  * Uso (a partir da raiz do repositório):
- *   GOOGLE_APPLICATION_CREDENTIALS=<caminho-da-service-account> \
- *     npm run seed:assets --workspace=apps/api
+ *   npm run seed:assets --workspace=apps/api
  *
  * Ou, a partir de apps/api (o script `npm run build` gera lib/, e o
  * `node` roda com cwd = apps/api, por isso o caminho é relativo a essa
  * pasta e não à raiz do repositório):
  *   cd apps/api
  *   npm run build
- *   GOOGLE_APPLICATION_CREDENTIALS=<caminho-da-service-account> \
- *     node lib/scripts/seed-assets.js
+ *   node lib/scripts/seed-assets.js
  *
- * Requer credenciais com permissão de escrita no Firestore do projeto
- * (ex: `firebase login` + Application Default Credentials, ou uma
- * service account key via GOOGLE_APPLICATION_CREDENTIALS).
+ * Requer credenciais com permissão de escrita no Firestore do projeto, pelas
+ * Application Default Credentials: ver docs/credenciais-locais.md.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';

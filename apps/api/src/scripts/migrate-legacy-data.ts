@@ -15,13 +15,11 @@
  * migrado.
  *
  * Uso (a partir da raiz do repositório), com credenciais de escrita no
- * Firestore do projeto — `gcloud auth application-default login` ou uma
- * service account key:
+ * Firestore do projeto — `gcloud auth application-default login`, sem chave
+ * de service account (ver docs/credenciais-locais.md):
  *
- *   GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
- *     npm run migrate:legacy --workspace=apps/api            # simula
- *   GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json \
- *     npm run migrate:legacy --workspace=apps/api -- --apply # aplica
+ *   npm run migrate:legacy --workspace=apps/api            # simula
+ *   npm run migrate:legacy --workspace=apps/api -- --apply # aplica
  *
  * Para ensaiar contra o emulador, sem tocar em produção:
  *
@@ -182,10 +180,9 @@ if (require.main === module) {
     if (isMissingCredentialsError(error)) {
       logError('migrateLegacyData.missingCredentials', {
         hint:
-          'defina GOOGLE_APPLICATION_CREDENTIALS com uma service account ' +
-          '(ex.: GOOGLE_APPLICATION_CREDENTIALS=$PWD/sa-key.json), rode ' +
-          '`gcloud auth application-default login`, ou aponte para o ' +
-          'emulador com FIRESTORE_EMULATOR_HOST=127.0.0.1:8080',
+          'rode `gcloud auth application-default login` (ver ' +
+          'docs/credenciais-locais.md) ou aponte para o emulador com ' +
+          'FIRESTORE_EMULATOR_HOST=127.0.0.1:8080',
       });
       process.exitCode = 1;
       return;
