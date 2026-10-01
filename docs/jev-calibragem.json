@@ -1,0 +1,1979 @@
+{
+  "geradoEm": "2026-10-01",
+  "modelo": "jev-1.13.0 (jev-latest)",
+  "projeto": "javi-technology/projects/4",
+  "universo": "139 issues Done com Priority, Size e Estimate preenchidos, de 157 itens do Project",
+  "amostra": "todos os P0 (1), 12 P1, 17 P2 e 15 P3, na ordem de um embaralhamento com semente 42",
+  "entradaPorIssue": "state = { titulo, labels, corpo (primeiros 3500 caracteres) }; as 3 perguntas em uma só chamada",
+  "perguntas": {
+    "priority": {
+      "type": "choice",
+      "instructions": "Qual a prioridade desta issue de um app financeiro pessoal? Use o risco ao usuário e aos dados, não o tamanho do trabalho.",
+      "criteria": {
+        "P0": "Incidente em produção ou bloqueante: o app ou o deploy está quebrado agora",
+        "P1": "Risco financeiro ou de dados: pode mostrar valor errado, duplicar registro, vazar dado, conceder ou negar acesso pago indevidamente, ou afeta segurança",
+        "P2": "Melhoria relevante de produto, confiabilidade ou qualidade, sem risco imediato a dinheiro ou dados",
+        "P3": "Desejável: polimento, refactor, documentação ou ajuste de conveniência que pode esperar"
+      }
+    },
+    "size": {
+      "type": "choice",
+      "instructions": "Qual o tamanho da mudança, medido por quantidade de arquivos e camadas afetadas (API, web, mobile, regras, CI, docs)?",
+      "criteria": {
+        "XS": "Um ou dois arquivos, numa só camada, mudança mínima",
+        "S": "Poucos arquivos numa só camada",
+        "M": "Várias partes de uma camada, ou uma mudança simples em duas camadas",
+        "L": "Várias camadas, ou módulo novo com testes",
+        "XL": "Mudança ampla e transversal, em várias camadas e com migração ou infraestrutura"
+      }
+    },
+    "estimate": {
+      "type": "choice",
+      "instructions": "Quantos story points de esforço relativo? Ajuste pontual = 1 a 2; feature ponta a ponta = 5.",
+      "criteria": {
+        "1": "Trivial, poucos minutos de trabalho",
+        "2": "Ajuste pontual simples",
+        "3": "Tarefa média, bem entendida",
+        "5": "Feature ponta a ponta ou trabalho com várias partes",
+        "8": "Grande e com incerteza, no limite de caber em uma issue"
+      }
+    }
+  },
+  "issues": [
+    {
+      "issue": 450,
+      "titulo": "[Bug] - carteira recomendada responde 500 por índice ausente no Firestore",
+      "real": {
+        "priority": "P0",
+        "size": "XS",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P0",
+          "confianca": 0.75,
+          "probabilidades": {
+            "P3": 0,
+            "P0": 0.81,
+            "P1": 0.03,
+            "P2": 0.16
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.35,
+          "probabilidades": {
+            "XL": 0,
+            "S": 0.23,
+            "M": 0.48,
+            "L": 0.17,
+            "XS": 0.12
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.4,
+          "probabilidades": {
+            "1": 0.03,
+            "2": 0.52,
+            "3": 0.39,
+            "5": 0.06,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 365,
+      "titulo": "[Bug] - Teste do ESLint lê arquivo de regras que foi removido",
+      "real": {
+        "priority": "P1",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.49,
+          "probabilidades": {
+            "P3": 0.17,
+            "P0": 0.21,
+            "P2": 0.62,
+            "P1": 0
+          }
+        },
+        "size": {
+          "escolha": "XS",
+          "confianca": 0.9,
+          "probabilidades": {
+            "M": 0.02,
+            "XL": 0,
+            "S": 0.06,
+            "L": 0,
+            "XS": 0.92
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.48,
+          "probabilidades": {
+            "1": 0.42,
+            "2": 0.58,
+            "3": 0,
+            "5": 0,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 290,
+      "titulo": "Projeção de proventos: voltar a usar o último provento real da Brapi",
+      "real": {
+        "priority": "P1",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.98,
+          "probabilidades": {
+            "P2": 0.01,
+            "P0": 0.01,
+            "P3": 0,
+            "P1": 0.98
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.81,
+          "probabilidades": {
+            "XL": 0,
+            "S": 0,
+            "XS": 0,
+            "M": 0.85,
+            "L": 0.15
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.31,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.17,
+            "3": 0.38,
+            "5": 0.45,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 296,
+      "titulo": "[Bug] - Cadastro de posição aceita carteira inexistente e gera posição órfã",
+      "real": {
+        "priority": "P1",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 1,
+          "probabilidades": {
+            "P3": 0,
+            "P1": 1,
+            "P0": 0,
+            "P2": 0
+          }
+        },
+        "size": {
+          "escolha": "XS",
+          "confianca": 0.58,
+          "probabilidades": {
+            "M": 0.02,
+            "XS": 0.67,
+            "L": 0.01,
+            "XL": 0,
+            "S": 0.3
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.76,
+          "probabilidades": {
+            "1": 0.02,
+            "2": 0.81,
+            "3": 0.16,
+            "5": 0.01,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 442,
+      "titulo": "[Feature] - App lê o status da assinatura em /api/me",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.99,
+          "probabilidades": {
+            "P2": 0.01,
+            "P1": 0.99,
+            "P3": 0,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.32,
+          "probabilidades": {
+            "S": 0.35,
+            "XS": 0.01,
+            "XL": 0,
+            "M": 0.47000000000000003,
+            "L": 0.17
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.85,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.01,
+            "3": 0.11,
+            "5": 0.88,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 297,
+      "titulo": "[Bug] - Limite diário de sugestões de IA pode ser excedido e vira às 21h",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.98,
+          "probabilidades": {
+            "P0": 0,
+            "P1": 0.99,
+            "P3": 0,
+            "P2": 0.01
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.24,
+          "probabilidades": {
+            "M": 0.4,
+            "L": 0.24,
+            "XS": 0.05,
+            "XL": 0,
+            "S": 0.31
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.7,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.01,
+            "3": 0.21,
+            "5": 0.76,
+            "8": 0.02
+          }
+        }
+      }
+    },
+    {
+      "issue": 173,
+      "titulo": "fix(assinatura): abrir checkout não pode liberar acesso após concessão manual expirada",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.99,
+          "probabilidades": {
+            "P3": 0,
+            "P0": 0.01,
+            "P1": 0.99,
+            "P2": 0
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.35,
+          "probabilidades": {
+            "XS": 0.39,
+            "M": 0.1,
+            "L": 0.03,
+            "XL": 0,
+            "S": 0.48
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.61,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.69,
+            "3": 0.28,
+            "5": 0.02,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 472,
+      "titulo": "[Feature] - Atualiza firebase-admin e firebase-tools (grupo firebase)",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.69,
+          "probabilidades": {
+            "P0": 0.1,
+            "P2": 0.76,
+            "P1": 0.03,
+            "P3": 0.11
+          }
+        },
+        "size": {
+          "escolha": "XS",
+          "confianca": 0.26,
+          "probabilidades": {
+            "S": 0.33,
+            "M": 0.23,
+            "L": 0.02,
+            "XS": 0.41,
+            "XL": 0.01
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.57,
+          "probabilidades": {
+            "1": 0.06,
+            "2": 0.66,
+            "3": 0.23,
+            "5": 0.05,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 220,
+      "titulo": "Adiciona ESLint ao monorepo e ao pipeline de CI",
+      "real": {
+        "priority": "P1",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.73,
+          "probabilidades": {
+            "P3": 0.19,
+            "P1": 0.01,
+            "P2": 0.8,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "XL",
+          "confianca": 0.92,
+          "probabilidades": {
+            "M": 0.01,
+            "XS": 0,
+            "XL": 0.93,
+            "S": 0,
+            "L": 0.06
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.88,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.08,
+            "5": 0.91,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 219,
+      "titulo": "Remove subcoleção de posições órfãs ao excluir carteira",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.94,
+          "probabilidades": {
+            "P2": 0.04,
+            "P0": 0,
+            "P3": 0,
+            "P1": 0.96
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.61,
+          "probabilidades": {
+            "M": 0.26,
+            "XS": 0.02,
+            "L": 0.03,
+            "S": 0.69,
+            "XL": 0
+          }
+        },
+        "estimate": {
+          "escolha": "3",
+          "confianca": 0.46,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.05,
+            "3": 0.57,
+            "5": 0.37,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 171,
+      "titulo": "fix(assinatura): preservar estado da Stripe durante concessão manual",
+      "real": {
+        "priority": "P1",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 1,
+          "probabilidades": {
+            "P2": 0,
+            "P0": 0,
+            "P3": 0,
+            "P1": 1
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.45,
+          "probabilidades": {
+            "XL": 0.38,
+            "XS": 0,
+            "S": 0,
+            "L": 0.56,
+            "M": 0.06
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.92,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "5": 0.94,
+            "8": 0.06
+          }
+        }
+      }
+    },
+    {
+      "issue": 387,
+      "titulo": "[Feature] - persiste o horário de apuração da cotação da Brapi",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.47,
+          "probabilidades": {
+            "P0": 0,
+            "P2": 0.61,
+            "P1": 0.38,
+            "P3": 0.01
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.34,
+          "probabilidades": {
+            "XL": 0,
+            "XS": 0.1,
+            "S": 0.47,
+            "M": 0.28,
+            "L": 0.15
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.67,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.04,
+            "3": 0.22,
+            "5": 0.74,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 461,
+      "titulo": "[Bug] - tela branca no iOS quando token APNs ainda não está disponível",
+      "real": {
+        "priority": "P1",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.34,
+          "probabilidades": {
+            "P1": 0.02,
+            "P3": 0.02,
+            "P2": 0.5,
+            "P0": 0.46
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.39,
+          "probabilidades": {
+            "L": 0.1,
+            "S": 0.26,
+            "M": 0.51,
+            "XL": 0,
+            "XS": 0.13
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.38,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.52,
+            "3": 0.42,
+            "5": 0.05,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 397,
+      "titulo": "[Feature] - simulação por ativo específico sob assinatura",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.95,
+          "probabilidades": {
+            "P2": 0.04,
+            "P0": 0,
+            "P3": 0,
+            "P1": 0.96
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.76,
+          "probabilidades": {
+            "XS": 0,
+            "L": 0.81,
+            "XL": 0,
+            "M": 0.19,
+            "S": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.98,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.01,
+            "5": 0.99,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 242,
+      "titulo": "Proventos: cabeçalho de KPIs (projeção, recebido, média, DY)",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.72,
+          "probabilidades": {
+            "P2": 0.79,
+            "P0": 0,
+            "P3": 0.06,
+            "P1": 0.15
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.25,
+          "probabilidades": {
+            "M": 0.39,
+            "XL": 0,
+            "XS": 0.02,
+            "S": 0.39,
+            "L": 0.2
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.93,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.05,
+            "5": 0.95,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 200,
+      "titulo": "Consolida PRs do dependabot em PRs empilhados",
+      "real": {
+        "priority": "P2",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.58,
+          "probabilidades": {
+            "P3": 0.28,
+            "P2": 0.68,
+            "P0": 0,
+            "P1": 0.04
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.45,
+          "probabilidades": {
+            "S": 0.03,
+            "XS": 0.01,
+            "M": 0.56,
+            "L": 0.37,
+            "XL": 0.03
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.59,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.03,
+            "3": 0.29,
+            "5": 0.67,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 215,
+      "titulo": "Permitir somar/subtrair quantidade da posição (+N/-N) com recálculo do preço médio",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.51,
+          "probabilidades": {
+            "P1": 0.64,
+            "P0": 0,
+            "P2": 0.33,
+            "P3": 0.03
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.5,
+          "probabilidades": {
+            "S": 0.6,
+            "L": 0,
+            "XL": 0,
+            "M": 0.09,
+            "XS": 0.31
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.9,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.08,
+            "5": 0.92,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 247,
+      "titulo": "Proventos: cards por ticker com sparkline de valor por cota",
+      "real": {
+        "priority": "P2",
+        "size": "L",
+        "estimate": "5"
+      },
+      "jev": {
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.98,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.01,
+            "5": 0.98,
+            "8": 0.01
+          }
+        },
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.84,
+          "probabilidades": {
+            "P0": 0,
+            "P3": 0.1,
+            "P1": 0.02,
+            "P2": 0.88
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.57,
+          "probabilidades": {
+            "S": 0.1,
+            "XS": 0,
+            "M": 0.66,
+            "XL": 0,
+            "L": 0.24
+          }
+        }
+      }
+    },
+    {
+      "issue": 22,
+      "titulo": "Robustez da atualização diária de cotações (retry + fallback Yahoo)",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.47,
+          "probabilidades": {
+            "P2": 0.61,
+            "P0": 0,
+            "P1": 0.39,
+            "P3": 0
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.41,
+          "probabilidades": {
+            "L": 0.23,
+            "S": 0.23,
+            "XL": 0,
+            "XS": 0,
+            "M": 0.54
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.85,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.12,
+            "5": 0.88,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 195,
+      "titulo": "Exibir data de pagamento dos proventos na tela de Proventos",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.91,
+          "probabilidades": {
+            "P2": 0.93,
+            "P1": 0.03,
+            "P0": 0,
+            "P3": 0.04
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.74,
+          "probabilidades": {
+            "S": 0,
+            "XS": 0,
+            "XL": 0.01,
+            "M": 0.2,
+            "L": 0.79
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.96,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "5": 0.97,
+            "8": 0.03
+          }
+        }
+      }
+    },
+    {
+      "issue": 144,
+      "titulo": "ci(seguranca): configurar dependabot.yml com version updates agrupados (npm + actions)",
+      "real": {
+        "priority": "P2",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.63,
+          "probabilidades": {
+            "P3": 0.02,
+            "P2": 0.25,
+            "P1": 0.73,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "XS",
+          "confianca": 0.87,
+          "probabilidades": {
+            "M": 0.03,
+            "XS": 0.89,
+            "S": 0.08,
+            "L": 0,
+            "XL": 0
+          }
+        },
+        "estimate": {
+          "escolha": "3",
+          "confianca": 0.38,
+          "probabilidades": {
+            "1": 0.02,
+            "2": 0.23,
+            "3": 0.51,
+            "5": 0.24,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 300,
+      "titulo": "[Feature] - Cria endpoints agregados de renda mensal e resumo do dashboard",
+      "real": {
+        "priority": "P2",
+        "size": "L",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.96,
+          "probabilidades": {
+            "P0": 0,
+            "P3": 0,
+            "P2": 0.03,
+            "P1": 0.97
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.63,
+          "probabilidades": {
+            "M": 0.29,
+            "S": 0,
+            "L": 0.71,
+            "XL": 0,
+            "XS": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.99,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.01,
+            "5": 0.98,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 258,
+      "titulo": "[Feature] - Reduz o bundle inicial com lazy loading das rotas de feature",
+      "real": {
+        "priority": "P2",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.76,
+          "probabilidades": {
+            "P2": 0.83,
+            "P0": 0,
+            "P1": 0,
+            "P3": 0.17
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.39,
+          "probabilidades": {
+            "L": 0,
+            "M": 0.06,
+            "S": 0.52,
+            "XL": 0,
+            "XS": 0.42
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.3,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.15,
+            "3": 0.39,
+            "5": 0.45,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 314,
+      "titulo": "[Feature] - Remove o SDK do Firestore do frontend e restringe a leitura nas regras",
+      "real": {
+        "priority": "P2",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.93,
+          "probabilidades": {
+            "P3": 0.01,
+            "P0": 0,
+            "P1": 0.95,
+            "P2": 0.04
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.52,
+          "probabilidades": {
+            "XL": 0.01,
+            "S": 0,
+            "M": 0.62,
+            "XS": 0,
+            "L": 0.37
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.9,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.07,
+            "5": 0.93,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 313,
+      "titulo": "[Feature] - Move os contratos de request/response da API para dindin-shared-types",
+      "real": {
+        "priority": "P2",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.29,
+          "probabilidades": {
+            "P0": 0,
+            "P3": 0.07,
+            "P2": 0.47,
+            "P1": 0.46
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.59,
+          "probabilidades": {
+            "M": 0.68,
+            "L": 0.29,
+            "XS": 0,
+            "S": 0,
+            "XL": 0.03
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.93,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.05,
+            "5": 0.94,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 262,
+      "titulo": "Limita projeção por ativo e agenda de pagamentos no plano gratuito, liberando tudo na assinatura básica",
+      "real": {
+        "priority": "P2",
+        "size": "L",
+        "estimate": "8"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.94,
+          "probabilidades": {
+            "P3": 0,
+            "P0": 0,
+            "P1": 0.96,
+            "P2": 0.04
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.63,
+          "probabilidades": {
+            "L": 0.29,
+            "XS": 0,
+            "M": 0.71,
+            "XL": 0,
+            "S": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.99,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "5": 0.99,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 483,
+      "titulo": "[Bug] - Android bloqueia HTTP sem TLS para os emuladores do Firebase",
+      "real": {
+        "priority": "P2",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.46,
+          "probabilidades": {
+            "P0": 0.05,
+            "P1": 0.24,
+            "P3": 0.12,
+            "P2": 0.59
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.52,
+          "probabilidades": {
+            "M": 0.61,
+            "S": 0.04,
+            "XS": 0.01,
+            "XL": 0,
+            "L": 0.34
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.24,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.24,
+            "3": 0.35,
+            "5": 0.39,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 399,
+      "titulo": "[Feature] - gera os contratos da API para TypeScript e Dart",
+      "real": {
+        "priority": "P2",
+        "size": "L",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.68,
+          "probabilidades": {
+            "P1": 0.23,
+            "P3": 0.01,
+            "P0": 0,
+            "P2": 0.76
+          }
+        },
+        "size": {
+          "escolha": "XL",
+          "confianca": 0.95,
+          "probabilidades": {
+            "L": 0.04,
+            "S": 0,
+            "XS": 0,
+            "XL": 0.96,
+            "M": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.9,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "5": 0.92,
+            "8": 0.08
+          }
+        }
+      }
+    },
+    {
+      "issue": 395,
+      "titulo": "[Feature] - cria o motor de simulação de proventos",
+      "real": {
+        "priority": "P2",
+        "size": "L",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.47,
+          "probabilidades": {
+            "P2": 0.39,
+            "P0": 0,
+            "P1": 0.6,
+            "P3": 0.01
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.75,
+          "probabilidades": {
+            "XS": 0,
+            "M": 0.18,
+            "S": 0.01,
+            "XL": 0,
+            "L": 0.81
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.65,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.01,
+            "3": 0.22,
+            "5": 0.71,
+            "8": 0.06
+          }
+        }
+      }
+    },
+    {
+      "issue": 25,
+      "titulo": "Configurar preço-alvo na geladeira",
+      "real": {
+        "priority": "P2",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.41,
+          "probabilidades": {
+            "P0": 0,
+            "P3": 0.01,
+            "P2": 0.56,
+            "P1": 0.43
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.48,
+          "probabilidades": {
+            "XS": 0.02,
+            "M": 0.59,
+            "S": 0.06,
+            "L": 0.33,
+            "XL": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.52,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.16,
+            "3": 0.21,
+            "5": 0.62,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 24,
+      "titulo": "Parser do PDF de carteira do BB",
+      "real": {
+        "priority": "P3",
+        "size": "XL",
+        "estimate": "8"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.97,
+          "probabilidades": {
+            "P3": 0,
+            "P1": 0.98,
+            "P2": 0.02,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.79,
+          "probabilidades": {
+            "L": 0.83,
+            "XS": 0,
+            "M": 0.14,
+            "S": 0.03,
+            "XL": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.91,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "5": 0.93,
+            "8": 0.07
+          }
+        }
+      }
+    },
+    {
+      "issue": 301,
+      "titulo": "[Feature] - Paraleliza a leitura de itens da geladeira nos serviços da API",
+      "real": {
+        "priority": "P3",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.71,
+          "probabilidades": {
+            "P0": 0,
+            "P1": 0.06,
+            "P2": 0.78,
+            "P3": 0.16
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.7,
+          "probabilidades": {
+            "M": 0.06,
+            "S": 0.76,
+            "XS": 0.18,
+            "XL": 0,
+            "L": 0
+          }
+        },
+        "estimate": {
+          "escolha": "3",
+          "confianca": 0.39,
+          "probabilidades": {
+            "1": 0.01,
+            "2": 0.3,
+            "3": 0.52,
+            "5": 0.17,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 372,
+      "titulo": "[Feature] - Exige o template de pull request",
+      "real": {
+        "priority": "P3",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P3",
+          "confianca": 0.99,
+          "probabilidades": {
+            "P0": 0,
+            "P1": 0,
+            "P2": 0,
+            "P3": 1
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.37,
+          "probabilidades": {
+            "XS": 0.43,
+            "S": 0.51,
+            "M": 0.06,
+            "L": 0,
+            "XL": 0
+          }
+        },
+        "estimate": {
+          "escolha": "2",
+          "confianca": 0.44,
+          "probabilidades": {
+            "1": 0.07,
+            "2": 0.55,
+            "3": 0.1,
+            "5": 0.27,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 309,
+      "titulo": "[Feature] - Divide o componente da Carteira em subcomponentes",
+      "real": {
+        "priority": "P3",
+        "size": "M",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P3",
+          "confianca": 0.86,
+          "probabilidades": {
+            "P2": 0.1,
+            "P0": 0,
+            "P3": 0.9,
+            "P1": 0
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.49,
+          "probabilidades": {
+            "M": 0.28,
+            "XL": 0,
+            "S": 0.6,
+            "L": 0.11,
+            "XS": 0.01
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.61,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.01,
+            "3": 0.3,
+            "5": 0.68,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 271,
+      "titulo": "Documenta as transições de Status do card no fluxo de trabalho",
+      "real": {
+        "priority": "P3",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P3",
+          "confianca": 0.96,
+          "probabilidades": {
+            "P1": 0,
+            "P0": 0,
+            "P3": 0.97,
+            "P2": 0.03
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.85,
+          "probabilidades": {
+            "S": 0.88,
+            "L": 0,
+            "XS": 0.03,
+            "XL": 0,
+            "M": 0.09
+          }
+        },
+        "estimate": {
+          "escolha": "3",
+          "confianca": 0.38,
+          "probabilidades": {
+            "1": 0.02,
+            "2": 0.29,
+            "3": 0.5,
+            "5": 0.19,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 27,
+      "titulo": "Enviar notificações por e-mail quando ativo atingir alvo",
+      "real": {
+        "priority": "P3",
+        "size": "L",
+        "estimate": "5"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.57,
+          "probabilidades": {
+            "P3": 0.16,
+            "P2": 0.68,
+            "P0": 0,
+            "P1": 0.16
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.28,
+          "probabilidades": {
+            "S": 0.15,
+            "XL": 0,
+            "L": 0.43,
+            "XS": 0.03,
+            "M": 0.39
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.84,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.02,
+            "3": 0.1,
+            "5": 0.88,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 235,
+      "titulo": "Remove husky e lint-staged e documenta stacked PRs",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P3",
+          "confianca": 0.85,
+          "probabilidades": {
+            "P0": 0,
+            "P2": 0.11,
+            "P3": 0.89,
+            "P1": 0
+          }
+        },
+        "size": {
+          "escolha": "L",
+          "confianca": 0.55,
+          "probabilidades": {
+            "M": 0.2,
+            "S": 0,
+            "XL": 0.16,
+            "L": 0.64,
+            "XS": 0
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.5,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.02,
+            "3": 0.38,
+            "5": 0.59,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 323,
+      "titulo": "[Feature] - Adiciona verificação de formatação e cobertura de testes ao CI",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "size": {
+          "escolha": "L",
+          "confianca": 0.36,
+          "probabilidades": {
+            "XS": 0,
+            "XL": 0.06,
+            "S": 0.01,
+            "L": 0.49,
+            "M": 0.44
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.79,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.01,
+            "3": 0.16,
+            "5": 0.83,
+            "8": 0
+          }
+        },
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.67,
+          "probabilidades": {
+            "P3": 0.24,
+            "P2": 0.76,
+            "P1": 0,
+            "P0": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 362,
+      "titulo": "[Feature] - Deriva o espelho da quantidade do formulário de posição",
+      "real": {
+        "priority": "P3",
+        "size": "XS",
+        "estimate": "1"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.6,
+          "probabilidades": {
+            "P2": 0.27,
+            "P1": 0.7,
+            "P0": 0,
+            "P3": 0.03
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.47,
+          "probabilidades": {
+            "XS": 0.36,
+            "S": 0.57,
+            "M": 0.05,
+            "XL": 0,
+            "L": 0.02
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.52,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.02,
+            "3": 0.35,
+            "5": 0.62,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 317,
+      "titulo": "[Feature] - Atualiza a API para o Express 5",
+      "real": {
+        "priority": "P3",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.27,
+          "probabilidades": {
+            "P2": 0.41,
+            "P1": 0.46,
+            "P3": 0.13,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.63,
+          "probabilidades": {
+            "XS": 0.01,
+            "XL": 0.01,
+            "L": 0.07,
+            "S": 0.21,
+            "M": 0.7
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.92,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.06,
+            "5": 0.94,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 311,
+      "titulo": "[Feature] - Divide o componente de Proventos em subcomponentes",
+      "real": {
+        "priority": "P3",
+        "size": "M",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P3",
+          "confianca": 0.87,
+          "probabilidades": {
+            "P2": 0.1,
+            "P3": 0.9,
+            "P1": 0,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.43,
+          "probabilidades": {
+            "L": 0.18,
+            "S": 0.54,
+            "XS": 0.01,
+            "XL": 0,
+            "M": 0.27
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.8,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.15,
+            "5": 0.84,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 325,
+      "titulo": "[Feature] - Define CLAUDE.md como fonte única das regras do projeto",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.45,
+          "probabilidades": {
+            "P3": 0.35,
+            "P2": 0.59,
+            "P1": 0,
+            "P0": 0.06
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.66,
+          "probabilidades": {
+            "XL": 0.02,
+            "S": 0.12,
+            "M": 0.72,
+            "XS": 0.01,
+            "L": 0.13
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.63,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.04,
+            "3": 0.25,
+            "5": 0.71,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 319,
+      "titulo": "[Feature] - Atualiza pdf-parse para a v2 no parser da carteira do BB",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.48,
+          "probabilidades": {
+            "P3": 0.06,
+            "P1": 0.62,
+            "P2": 0.32,
+            "P0": 0
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.47,
+          "probabilidades": {
+            "M": 0.03,
+            "XL": 0,
+            "L": 0.01,
+            "S": 0.57,
+            "XS": 0.39
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.42,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.03,
+            "3": 0.42,
+            "5": 0.54,
+            "8": 0.01
+          }
+        }
+      }
+    },
+    {
+      "issue": 326,
+      "titulo": "[Feature] - Migra dados legados de posições, itens e proventos automáticos",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "3"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P1",
+          "confianca": 0.82,
+          "probabilidades": {
+            "P2": 0.12,
+            "P0": 0,
+            "P3": 0.02,
+            "P1": 0.86
+          }
+        },
+        "size": {
+          "escolha": "M",
+          "confianca": 0.24,
+          "probabilidades": {
+            "L": 0.23,
+            "S": 0.24,
+            "M": 0.4,
+            "XS": 0,
+            "XL": 0.13
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.98,
+          "probabilidades": {
+            "1": 0,
+            "2": 0,
+            "3": 0.01,
+            "5": 0.99,
+            "8": 0
+          }
+        }
+      }
+    },
+    {
+      "issue": 244,
+      "titulo": "Proventos: gráfico de concentração da renda por ticker",
+      "real": {
+        "priority": "P3",
+        "size": "S",
+        "estimate": "2"
+      },
+      "jev": {
+        "priority": {
+          "escolha": "P2",
+          "confianca": 0.8,
+          "probabilidades": {
+            "P3": 0.09,
+            "P0": 0,
+            "P1": 0.06,
+            "P2": 0.85
+          }
+        },
+        "size": {
+          "escolha": "S",
+          "confianca": 0.58,
+          "probabilidades": {
+            "XL": 0,
+            "M": 0.12,
+            "XS": 0.21,
+            "S": 0.66,
+            "L": 0.01
+          }
+        },
+        "estimate": {
+          "escolha": "5",
+          "confianca": 0.43,
+          "probabilidades": {
+            "1": 0,
+            "2": 0.03,
+            "3": 0.43,
+            "5": 0.54,
+            "8": 0
+          }
+        }
+      }
+    }
+  ]
+}

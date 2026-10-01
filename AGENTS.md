@@ -193,23 +193,38 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   texto da pergunta carrega todo o significado (o id não é enviado ao modelo).
 - **Não enviar** dado de usuário do app, credenciais nem o conteúdo de
   `.env*`. Texto de regra, de issue e de código sem segredo é o limite.
-- **Regra de ação:**
-  - confiança alta, decisão reversível e dentro das regras deste arquivo →
-    seguir e **avisar** o usuário do que foi decidido;
-  - confiança abaixo de 0,7, ou probabilidade dividida → **perguntar** ao
-    usuário;
+- **Cada tipo de pergunta devolve um sinal diferente.** `choice` e `score`
+  trazem `confidence`; `noul` traz **só a probabilidade de "sim"**
+  (`noul`), sem `confidence`. A regra de ação usa o sinal de cada um:
+
+  | Tipo     | Pode seguir sozinho quando                                                  | Pergunta ao usuário quando            |
+  | -------- | --------------------------------------------------------------------------- | ------------------------------------- |
+  | `noul`   | probabilidade ≤ 0,10 ou ≥ 0,90                                              | entre 0,10 e 0,90 (0,50 é "não sei")  |
+  | `choice` | `confidence` ≥ 0,90 **e** a opção mais provável tem ≥ 0,70 de probabilidade | qualquer outro caso, inclusive empate |
+  | `score`  | `confidence` ≥ 0,90                                                         | abaixo disso                          |
+
+  Os limites são provisórios: valem como ponto de partida conservador, não
+  foram calibrados para conferência de regra (ver abaixo) e podem ser
+  ajustados com dados.
+
+- **Regra de ação**, depois de aplicar a tabela:
+  - o sinal permite seguir sozinho, a decisão é reversível e está dentro das
+    regras deste arquivo → seguir e **avisar** o usuário do que foi decidido;
+  - o sinal não permite → **perguntar** ao usuário;
   - decisão que toca dado financeiro, billing/assinatura, `firestore.rules`,
-    segurança ou prioridade P0/P1 → **perguntar sempre**, mesmo com confiança
-    alta.
+    segurança ou prioridade P0/P1 → **perguntar sempre**, mesmo com o sinal
+    alto.
 - **Conferir aderência a uma regra deste arquivo** é o uso mais seguro: a
   regra vai no `state` e a pergunta é um `noul` ("a proposta respeita a
-  regra?"). Foi testado em um caso (diálogo nativo de exclusão contra
-  `ConfirmarDialog`: 0,02 de aderência, `ajustar` com confiança 1). Amostra
-  pequena — não tratar como garantia.
+  regra?"), lido pela tabela acima. Foi testado em um caso (diálogo nativo de
+  exclusão contra `ConfirmarDialog`: probabilidade de aderência 0,02, que a
+  tabela leria como "não respeita"). Amostra pequena — não tratar como
+  garantia.
 - **Triagem de issue (`Priority`, `Size`, `Estimate`) é só segunda opinião, nunca
-  preenchimento automático.** Calibragem com 45 issues fechadas (sorteio com
-  semente fixa; critérios escritos a partir deste arquivo), comparando com o que
-  foi definido à mão:
+  preenchimento automático.** Calibragem com 45 issues fechadas, comparando
+  com o que foi definido à mão. A amostra, o procedimento e as respostas estão
+  em `docs/jev-calibragem.md` e `docs/jev-calibragem.json` (os critérios foram
+  escritos a partir deste arquivo):
 
   | Campo      | Acerto exato | Dentro de ±1 nível | Observação                              |
   | ---------- | ------------ | ------------------ | --------------------------------------- |
@@ -221,7 +236,8 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   contra 32% abaixo de 0,7. Também rebaixou 5 de 12 issues P1 reais para P2
   (ex.: tela branca no iOS, #461), o que é o erro caro. Por isso o Jev **não
   define** `Priority`: vale como alerta ("isto parece P1?"), e a decisão fica
-  com o usuário. Refazer a calibragem se os critérios de `Priority` mudarem.
+  com o usuário. Refazer a calibragem se os critérios de `Priority` mudarem,
+  usando a lista de `docs/jev-calibragem.md`.
 
 ## Testes
 
