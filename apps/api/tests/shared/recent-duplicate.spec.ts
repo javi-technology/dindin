@@ -39,8 +39,10 @@ describe('addUnlessRecentDuplicate', () => {
   });
 
   beforeAll(() => {
+    // Projeto próprio: o teste de regras limpa o `dindin-test` inteiro em
+    // `beforeEach`, e rodando em paralelo apagaria os dados daqui no meio.
     app = initializeApp(
-      { projectId: 'dindin-test' },
+      { projectId: 'dindin-recent-duplicate' },
       `recent-dup-${randomUUID()}`,
     );
   });

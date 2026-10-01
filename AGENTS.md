@@ -369,10 +369,16 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ### Operações de escrita do app (`apps/mobile`)
 
-- **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de
+- **Envio duplicado não pode gerar registro duplicado — no web, no app e na
+  API.** O web reserva o envio com `Submission` (`shared/utils/submission.util.ts`)
+  e deixa o botão indisponível até a resposta, inclusive em falha. A API também
+  recusa, com **409**, a criação de posição ou de item idêntica a uma gravada
+  há menos de 10 segundos (`addUnlessRecentDuplicate`, em transação): o
+  cliente não é a única proteção, porque um app antigo, um retry de rede e um
+  segundo dispositivo não passam por ela (issue #497). No celular, tocar de
   novo quando a resposta demora é o comportamento normal do usuário, e o
   resultado seria posição duplicada — erro de dado financeiro, não incômodo de
-  interface. A proteção está em dois lugares: o mixin `EnvioDeFormulario`
+  interface. No app, a proteção está em dois lugares: o mixin `EnvioDeFormulario`
   descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
 - **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
   o que foi digitado permanece. Refazer o preenchimento no teclado do celular

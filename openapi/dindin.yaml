@@ -1579,6 +1579,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Position' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: 'Posição idêntica enviada há instantes (envio repetido, janela de 10 segundos)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /api/wallets/{walletId}/positions/{id}:
     parameters:
@@ -1748,6 +1753,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FridgeItem' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: 'Item idêntico enviado há instantes (envio repetido, janela de 10 segundos)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /api/fridges/{fridgeId}/items/{id}:
     parameters:

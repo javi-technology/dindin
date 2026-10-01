@@ -23,6 +23,7 @@ import {
   walletsCollection,
 } from '../firestore/paths';
 import { routeParam } from '../shared/route-params';
+import { addUnlessRecentDuplicate } from '../shared/recent-duplicate';
 
 /**
  * Resolve o `currentPrice` de cada item a partir da collection `quotes`
@@ -243,8 +244,13 @@ export const createItem = asyncHandler(
       updatedAt: now,
     };
 
-    const docRef = await fridgeItemsCollection(userId, fridgeId).add(itemData);
-    res.status(201).json({ id: docRef.id, ...itemData });
+    // Recusa com 409 o envio idêntico ao que acabou de ser gravado: o toque
+    // repetido duplicaria o item da geladeira (issue #497).
+    const id = await addUnlessRecentDuplicate(
+      fridgeItemsCollection(userId, fridgeId),
+      itemData,
+    );
+    res.status(201).json({ id, ...itemData });
   },
 );
 
