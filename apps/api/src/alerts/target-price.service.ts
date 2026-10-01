@@ -215,4 +215,17 @@ export async function checkAllTargetPrices(now = new Date()): Promise<void> {
   }
 
   logInfo('checkAllTargetPrices.done', { created, notified, pushed, failed });
+
+  // Sinaliza a falha **depois** de percorrer todos os usuários e registrar o
+  // resultado (issue #501): os demais jobs agendados lançam ao falhar, e é o
+  // erro que aciona o `retryCount` e deixa rastro no Cloud Logging. Terminar
+  // com sucesso falhando para todos fazia o usuário deixar de ser avisado sem
+  // que ninguém percebesse. O retry é seguro: o estado de envio é gravado por
+  // canal (#408), então o que já saiu não sai de novo.
+  if (failed > 0) {
+    throw new Error(
+      `[checkAllTargetPrices] ${failed} falha(s) ao verificar ou avisar ` +
+        `(${userDocuments.length} usuário(s))`,
+    );
+  }
 }

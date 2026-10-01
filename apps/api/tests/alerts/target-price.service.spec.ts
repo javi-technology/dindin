@@ -697,8 +697,14 @@ describe('TargetPriceService – notificação dos alertas criados', () => {
         fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
         users: ['user-1', 'user-2'],
       });
-      (sendAlertPushes as jest.Mock).mockRejectedValue(new Error('fcm'));
-      (sendAlertEmails as jest.Mock).mockRejectedValue(new Error('mail'));
+      // `Once`: um `mockRejectedValue` permanente vazaria para os testes
+      // seguintes, que compartilham o mesmo mock do módulo.
+      (sendAlertPushes as jest.Mock)
+        .mockRejectedValueOnce(new Error('fcm'))
+        .mockRejectedValueOnce(new Error('fcm'));
+      (sendAlertEmails as jest.Mock)
+        .mockRejectedValueOnce(new Error('mail'))
+        .mockRejectedValueOnce(new Error('mail'));
 
       await expect(checkAllTargetPrices()).rejects.toThrow(/4 falha/);
     });
