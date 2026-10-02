@@ -25,6 +25,11 @@ info:
     API do DinDin — carteiras, posições, geladeira, proventos, patrimônio,
     carteira sugerida, simulação e cobrança.
 
+    Qualquer rota `/api/*` pode responder, além do que declara, 401 (sem ID
+    token válido), 413 (corpo acima do limite), 429 (limite de requisições) e
+    500 (falha inesperada), sempre com `ErrorResponse`. Eles vêm de
+    middlewares e não são repetidos em cada operação.
+
 servers:
   - url: https://dindin-4e720.web.app
     description: Produção
@@ -57,6 +62,24 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     BadRequest:
       description: Requisição inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Sem permissão (administrador) ou sem assinatura (`code`, como `SUBSCRIPTION_REQUIRED`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Conflito com o estado atual do recurso (`code`, como `ALREADY_SUBSCRIBED`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadGateway:
+      description: Falha de um provedor externo; a mensagem é escrita para a tela.
       content:
         application/json:
           schema:
@@ -796,6 +819,29 @@ components:
         upcomingTotal: { type: number }
         paidTotal: { type: number }
 
+    MonthlyDividendProjection:
+      type: object
+      description: Provento mensal projetado de um ativo, pelo último provento e pela quantidade atual.
+      required: [ticker, amountPerShare, quantity, monthlyAmount]
+      properties:
+        ticker: { type: string }
+        amountPerShare: { type: number }
+        quantity: { type: number }
+        monthlyAmount: { type: number }
+
+    DividendProjectionResponse:
+      type: object
+      description: |
+        Resposta de `GET /api/dividends/projection`. Não é a de
+        `/api/monthly-income` (`MonthlyIncomeResponse`), que web e app usam
+        para a renda projetada.
+      required: [projections, total]
+      properties:
+        projections:
+          type: array
+          items: { $ref: '#/components/schemas/MonthlyDividendProjection' }
+        total: { type: number }
+
     MonthlyIncomeResponse:
       type: object
       required: [byTicker, total, totalFromFridge]
@@ -1158,6 +1204,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SetupResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/me/notification-tokens:
@@ -1196,7 +1243,16 @@ paths:
       operationId: stripeWebhook
       security: []
       responses:
-        '200': { description: Evento recebido }
+        '200':
+          description: Evento recebido (`duplicate` quando já havia sido processado)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: boolean }
+                  duplicate: { type: boolean }
         '400': { $ref: '#/components/responses/BadRequest' }
 
   /api/billing/checkout-session:
@@ -1214,7 +1270,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CheckoutSessionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/billing/portal-session:
     post:
@@ -1227,6 +1285,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PortalSessionResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/billing/store/purchase:
     post:
@@ -1310,6 +1369,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Asset' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/admin/assets/{ticker}:
     parameters:
@@ -1331,6 +1392,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Asset' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /api/admin/users:
@@ -1346,6 +1408,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/AdminUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /api/admin/users/{uid}/subscription:
     parameters:
@@ -1368,6 +1431,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AdminUser' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
     delete:
       summary: Revoga a concessão manual (admin)
       operationId: adminRevokeSubscription
@@ -1377,7 +1443,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/quotes/dividend-history:
     get:
@@ -1419,6 +1487,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DividendHistoryResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /api/wallets:
@@ -1480,6 +1549,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Wallet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       summary: Exclui a carteira
@@ -1579,6 +1649,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Position' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: 'Posição idêntica enviada há instantes (envio repetido, janela de 10 segundos)'
           content:
@@ -1619,6 +1690,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Position' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       summary: Exclui a posição
@@ -1652,6 +1724,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FridgeItem' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/fridges:
     get:
@@ -1753,6 +1826,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FridgeItem' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: 'Item idêntico enviado há instantes (envio repetido, janela de 10 segundos)'
           content:
@@ -1793,6 +1867,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FridgeItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       summary: Exclui o item
@@ -1826,6 +1901,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Position' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/dividends:
     get:
@@ -1872,7 +1948,8 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MonthlyIncomeResponse' }
+              schema:
+                { $ref: '#/components/schemas/DividendProjectionResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/dividends/monthly-report:
@@ -1889,6 +1966,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MonthlyDividendReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/dividends/{id}:
@@ -1921,6 +1999,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DividendResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       summary: Exclui o provento
@@ -1948,6 +2027,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/PatrimonySnapshot' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /api/patrimony/snapshots:
@@ -1998,6 +2078,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/WalletSimulationResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/simulations/asset:
     post:
@@ -2021,6 +2102,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/recommended-wallets/bb-fii:
     get:
@@ -2068,21 +2151,31 @@ paths:
 
   /api/recommended-wallets/bb-fii/suggestions:
     get:
-      summary: Sugestões de IA já geradas
-      operationId: listSuggestions
+      summary: Sugestão de IA já gerada para a carteira, o mês e a aba
+      operationId: getSuggestion
       parameters:
         - name: walletId
           in: query
+          required: true
           schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+        - name: tab
+          in: query
+          description: 'Padrão `renda`.'
+          schema: { $ref: '#/components/schemas/AiSuggestionTab' }
       responses:
         '200':
           description: OK
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/AiSuggestion' }
+              schema: { $ref: '#/components/schemas/AiSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       summary: Gera uma sugestão de IA
       description: 'Recurso de assinante: exige o entitlement `ai`.'
@@ -2093,11 +2186,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AiSuggestion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '402':
           description: 'Sem assinatura (`code: SUBSCRIPTION_REQUIRED`).'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
 
   /api/recommended-wallets/bb-fii/suggestions/{id}/applied:
     parameters:
@@ -2122,6 +2218,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AiSuggestion' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /api/admin/recommended-wallets/bb-fii/import:
     post:

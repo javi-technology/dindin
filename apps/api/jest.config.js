@@ -2,7 +2,10 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/tests/setup-supertest.js'],
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup-supertest.js',
+    '<rootDir>/tests/setup-contrato-openapi.ts',
+  ],
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.spec.ts'],
   transform: {

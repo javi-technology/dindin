@@ -310,6 +310,18 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   só apareceria no celular do usuário, depois do deploy (issue #399).
 - Um teste compara as rotas registradas no Express com os paths do YAML:
   rota fora da descrição, ou descrição sem rota, reprova a suíte.
+- **Rota nova ou alterada tem a resposta validada contra o schema** (issue
+  #499). O `supertest` dos testes de API confere sozinho o corpo de toda
+  resposta contra o `openapi/dindin.yaml` (`tests/setup-contrato-openapi.ts`,
+  helper em `tests/support/openapi-contract.ts`), no job `build-and-test-api`:
+  corpo fora do schema, status não descrito ou corpo em resposta declarada sem
+  corpo reprovam o teste. 401, 413, 429 e 500 vêm de middleware, valem para
+  toda rota e são conferidos como `ErrorResponse` sem declaração por operação.
+  Ao mockar um serviço no teste de controller, a fixture respeita o contrato:
+  use as de `tests/support/fixtures-contrato.ts`, tipadas com os tipos
+  gerados, em vez de `{ id: 'x' }`. Corrigir a divergência é no código **ou**
+  no YAML, o que for o erro. A primeira execução achou dois casos em que o
+  YAML mentia: `GET /api/dividends/projection` e `GET .../suggestions`.
 - `npm run contracts:check` roda em **dois** jobs do CI: no `lint`, que não
   tem SDK do Dart e confere o TypeScript, e no `build-and-test-mobile`, que
   tem o Flutter e confere o modelo Dart.

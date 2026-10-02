@@ -91,11 +91,11 @@ describe('rate limiting global da API', () => {
       next();
     });
     semIp.use(apiRateLimiter);
-    semIp.get('/api/me', (_req: Request, res: Response) => {
+    semIp.get('/api/rota-de-teste', (_req: Request, res: Response) => {
       res.json({ ok: true });
     });
 
-    const response = await request(semIp).get('/api/me');
+    const response = await request(semIp).get('/api/rota-de-teste');
 
     expect(response.status).toBe(200);
   });
