@@ -1,5 +1,6 @@
 import type { MonthlyIncomeItem, ScheduleTotals } from 'dindin-shared-types';
 import { todayAsUtcDate } from '../shared/date';
+import { roundCurrency } from '../shared/numbers';
 
 /**
  * Recorte gratuito da projeção por ativo e da agenda de pagamentos (#262).
@@ -34,8 +35,6 @@ export interface LimitedMonthlyIncome {
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MS_PER_DAY = 86400000;
-
-const round = (value: number): number => Math.round(value * 100) / 100;
 
 /**
  * Converte `YYYY-MM-DD` em timestamp UTC de meia-noite — mesma semântica de
@@ -86,7 +85,10 @@ export function computeScheduleTotals(
     else paidTotal += item.monthlyIncome;
   }
 
-  return { upcomingTotal: round(upcomingTotal), paidTotal: round(paidTotal) };
+  return {
+    upcomingTotal: roundCurrency(upcomingTotal),
+    paidTotal: roundCurrency(paidTotal),
+  };
 }
 
 export function limitMonthlyIncome(

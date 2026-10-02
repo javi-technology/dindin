@@ -13,6 +13,7 @@ import {
   positionsCollection,
   walletsCollection,
 } from '../firestore/paths';
+import { roundCurrency } from '../shared/numbers';
 
 export interface AppliedItemInput {
   ticker?: unknown;
@@ -31,7 +32,7 @@ function weightedAveragePrice(
   const average =
     (currentQuantity * currentPrice + addedQuantity * purchasePrice) /
     (currentQuantity + addedQuantity);
-  return Math.round(average * 100) / 100;
+  return roundCurrency(average);
 }
 
 function isPositiveNumber(value: unknown): value is number {
