@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/api/atualizacao_obrigatoria.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/auth/auth_service.dart';
 import 'core/data/cache_local.dart';
@@ -9,6 +10,7 @@ import 'core/assinatura/assinatura_service.dart';
 import 'core/setup/setup_service.dart';
 import 'core/theme/dindin_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'features/atualizacao/atualizacao_gate.dart';
 import 'features/auth/login_screen.dart';
 import 'features/inicio/inicio_screen.dart';
 
@@ -24,6 +26,7 @@ class DinDinApp extends StatelessWidget {
     required this.setup,
     required this.assinatura,
     this.geladeiraInicial,
+    this.atualizacao,
   });
 
   final AuthService auth;
@@ -45,6 +48,10 @@ class DinDinApp extends StatelessWidget {
   /// notificação de preço-alvo (issue #408).
   final String? geladeiraInicial;
 
+  /// Estado "a API recusou esta versão do app" (issue #500). Quando acionado,
+  /// a tela de atualização toma o lugar do app inteiro.
+  final AtualizacaoObrigatoria? atualizacao;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -61,6 +68,13 @@ class DinDinApp extends StatelessWidget {
         // O padrão é a preferência do sistema, e o celular é usado no escuro
         // com muito mais frequência que o desktop.
         themeMode: tema.modo,
+        builder: (context, child) {
+          final app = child ?? const SizedBox.shrink();
+          final estado = atualizacao;
+          return estado == null
+              ? app
+              : AtualizacaoGate(atualizacao: estado, child: app);
+        },
         home: AuthGate(
           sessoes: auth.sessoes,
           aoAutenticar: (sessao) async {
