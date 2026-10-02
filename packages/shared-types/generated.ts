@@ -325,6 +325,26 @@ export interface ScheduleTotals {
   paidTotal: number;
 }
 
+/**
+ * Provento mensal projetado de um ativo, pelo último provento e pela quantidade atual.
+ */
+export interface MonthlyDividendProjection {
+  ticker: string;
+  amountPerShare: number;
+  quantity: number;
+  monthlyAmount: number;
+}
+
+/**
+ * Resposta de `GET /api/dividends/projection`. Não é a de
+ * `/api/monthly-income` (`MonthlyIncomeResponse`), que web e app usam
+ * para a renda projetada.
+ */
+export interface DividendProjectionResponse {
+  projections: MonthlyDividendProjection[];
+  total: number;
+}
+
 export interface MonthlyIncomeResponse {
   byTicker: MonthlyIncomeItem[];
   total: number;
