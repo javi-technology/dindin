@@ -58,7 +58,12 @@ describe('rate limiting global da API', () => {
     const blocked = await getMe(ip);
 
     expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: 'Muitas requisições' });
+    expect(blocked.body).toEqual({
+      error: 'Muitas requisições',
+      code: 'RATE_LIMITED',
+    });
+    // Os clientes avisam quanto esperar (issue #505): web e app leem o header.
+    expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
     expect(verifyIdTokenMock).toHaveBeenCalledTimes(callsBeforeBlock);
   });
 

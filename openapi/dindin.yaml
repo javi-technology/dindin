@@ -27,7 +27,8 @@ info:
 
     Qualquer rota `/api/*` pode responder, além do que declara, 401 (sem ID
     token válido), 413 (corpo acima do limite), 426 (app abaixo da versão
-    mínima), 429 (limite de requisições) e 500 (falha inesperada), sempre com
+    mínima), 429 (limite de requisições, `code: RATE_LIMITED`, com `Retry-After`
+    em segundos) e 500 (falha inesperada), sempre com
     `ErrorResponse`. Eles vêm de middlewares e não são repetidos em cada
     operação.
 
