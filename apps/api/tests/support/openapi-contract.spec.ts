@@ -54,7 +54,7 @@ describe('validarRespostaContraContrato', () => {
     expect(erros.join(' ')).toContain('418');
   });
 
-  it.each([401, 413, 429, 500])(
+  it.each([401, 413, 426, 429, 500])(
     'deve aceitar o %i dos middlewares como ErrorResponse, sem declaração por rota',
     (status) => {
       expect(
