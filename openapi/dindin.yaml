@@ -26,9 +26,22 @@ info:
     carteira sugerida, simulação e cobrança.
 
     Qualquer rota `/api/*` pode responder, além do que declara, 401 (sem ID
-    token válido), 413 (corpo acima do limite), 429 (limite de requisições) e
-    500 (falha inesperada), sempre com `ErrorResponse`. Eles vêm de
-    middlewares e não são repetidos em cada operação.
+    token válido), 413 (corpo acima do limite), 426 (app abaixo da versão
+    mínima), 429 (limite de requisições) e 500 (falha inesperada), sempre com
+    `ErrorResponse`. Eles vêm de middlewares e não são repetidos em cada
+    operação.
+
+    O app informa a versão instalada no cabeçalho `X-App-Version` (`X.Y.Z`).
+    Abaixo da mínima em vigor a API responde 426 com
+    `code: APP_UPDATE_REQUIRED`, e o app mostra a tela de atualização
+    obrigatória. Quem não envia o cabeçalho (web e apps anteriores à política)
+    não é bloqueado. Ver `docs/compatibilidade-app-api.md`.
+
+# Mudanças incompatíveis deliberadas (issue #500). O CI reprova mudança
+# incompatível em relação à branch-base, a menos que esta lista ganhe uma
+# entrada nova: issue, o que mudou e a versão mínima do app. É histórico.
+x-incompatible-changes:
+  - 'issue #499: GET /api/dividends/projection e GET /api/recommended-wallets/bb-fii/suggestions passam a ser descritos como a API sempre os devolveu; o comportamento da API não mudou, só a descrição que estava errada.'
 
 servers:
   - url: https://dindin-4e720.web.app
