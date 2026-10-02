@@ -687,6 +687,14 @@ Regras:
 - `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não. Só marque
   um 5xx como exposto quando o texto for escrito para a tela (ex.: o 502 do
   provedor de IA).
+- **Os controllers não respondem 4xx direto.** `res.status(4xx).json({ error })`
+  é reprovado pelo ESLint (`no-restricted-syntax`, issue #508): lance o
+  `HttpError` e deixe o `asyncHandler` responder. Código de contrato (como
+  `ALREADY_SUBSCRIBED`) vai em `{ code }` (`HttpError.conflict(msg, { code })`)
+  e o `asyncHandler` o devolve ao lado de `error`. Falha 4xx é logada como
+  **aviso**, sem stack; 5xx continua erro. Ficam de fora os middlewares e os
+  webhooks (`handleWebhook`, notificações das lojas), que não passam pelo
+  `asyncHandler` e desligam a regra na linha, com o motivo.
 - **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
   tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
   contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.
