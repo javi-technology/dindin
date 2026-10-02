@@ -170,6 +170,8 @@ function withPaidEvents(
   return {
     ...info,
     // Evita resíduos de ponto flutuante (ex.: 1.25 + 1.1 = 2.3499999...).
+    // Seis casas porque a taxa por cota não é valor monetário: `roundCurrency`
+    // a truncaria em centavos.
     annualDividend: Math.round(total * 1e6) / 1e6,
     paidEvents: paid,
     ...(upcoming.length > 0 ? { upcomingEvents: upcoming } : {}),

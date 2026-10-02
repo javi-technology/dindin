@@ -124,6 +124,8 @@ function amountByPaymentDate(
     if (paymentDate > today) continue;
     amounts.set(paymentDate, (amounts.get(paymentDate) ?? 0) + rate);
   }
+  // Seis casas porque a taxa por cota não é valor monetário: `roundCurrency`
+  // a truncaria em centavos.
   for (const [date, amount] of amounts) {
     amounts.set(date, Math.round(amount * 1e6) / 1e6);
   }
