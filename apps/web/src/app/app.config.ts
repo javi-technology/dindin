@@ -7,13 +7,18 @@ import { routes } from './app.routes';
 import { environment } from '../environments/environment';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { unauthorizedInterceptor } from './core/interceptors/unauthorized.interceptor';
+import { httpErrorInterceptor } from './core/interceptors/http-error.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(
-      withInterceptors([authInterceptor, unauthorizedInterceptor]),
+      withInterceptors([
+        authInterceptor,
+        unauthorizedInterceptor,
+        httpErrorInterceptor,
+      ]),
     ),
     provideFirebaseAuth(environment.firebase, environment.useEmulators),
   ],

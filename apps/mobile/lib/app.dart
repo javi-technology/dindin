@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/api/atualizacao_obrigatoria.dart';
+import 'core/api/aviso_de_limite.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/auth/auth_service.dart';
 import 'core/data/cache_local.dart';
@@ -12,6 +13,7 @@ import 'core/theme/dindin_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/atualizacao/atualizacao_gate.dart';
 import 'features/auth/login_screen.dart';
+import 'features/limite/aviso_de_limite_gate.dart';
 import 'features/inicio/inicio_screen.dart';
 
 /// Raiz do aplicativo.
@@ -27,6 +29,7 @@ class DinDinApp extends StatelessWidget {
     required this.assinatura,
     this.geladeiraInicial,
     this.atualizacao,
+    this.avisoDeLimite,
   });
 
   final AuthService auth;
@@ -52,6 +55,9 @@ class DinDinApp extends StatelessWidget {
   /// a tela de atualização toma o lugar do app inteiro.
   final AtualizacaoObrigatoria? atualizacao;
 
+  /// Aviso global do 429 de rate limit (issue #505), por cima de qualquer tela.
+  final AvisoDeLimite? avisoDeLimite;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -69,7 +75,11 @@ class DinDinApp extends StatelessWidget {
         // com muito mais frequência que o desktop.
         themeMode: tema.modo,
         builder: (context, child) {
-          final app = child ?? const SizedBox.shrink();
+          var app = child ?? const SizedBox.shrink();
+          final limite = avisoDeLimite;
+          if (limite != null) {
+            app = AvisoDeLimiteGate(aviso: limite, child: app);
+          }
           final estado = atualizacao;
           return estado == null
               ? app
