@@ -4,6 +4,7 @@ import {
   AiSuggestionTab,
   RecommendedWalletComparisonItem,
 } from 'dindin-models';
+import { roundCurrency } from '../shared/numbers';
 
 /**
  * Parser da saída do modelo (issue #306).
@@ -155,8 +156,7 @@ export function parseSuggestionOutput(
           )
           .map((item) => {
             const suggestedAmount = item.suggestedAmount as number;
-            const normalizedAmount =
-              Math.round(suggestedAmount * ratio * 100) / 100;
+            const normalizedAmount = roundCurrency(suggestedAmount * ratio);
             return {
               ticker: item.ticker,
               from: suggestedAmount,
@@ -173,14 +173,13 @@ export function parseSuggestionOutput(
           }
           return {
             ...item,
-            suggestedAmount:
-              Math.round(item.suggestedAmount * ratio * 100) / 100,
+            suggestedAmount: roundCurrency(item.suggestedAmount * ratio),
             ...(item.fallbackAllocations?.length
               ? {
                   fallbackAllocations: item.fallbackAllocations.map(
                     (allocation) => ({
                       ...allocation,
-                      amount: Math.round(allocation.amount * ratio * 100) / 100,
+                      amount: roundCurrency(allocation.amount * ratio),
                     }),
                   ),
                 }
