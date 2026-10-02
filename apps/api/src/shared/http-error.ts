@@ -20,10 +20,20 @@ export class HttpError extends Error {
    */
   readonly expose: boolean;
 
+  /**
+   * Código de contrato lido pelo cliente (ex.: `ALREADY_SUBSCRIBED`), além da
+   * mensagem. O `asyncHandler` o devolve no corpo ao lado de `error`.
+   */
+  readonly code?: string;
+
   constructor(
     message: string,
     statusCode: number,
-    { expose, cause }: { expose?: boolean; cause?: unknown } = {},
+    {
+      expose,
+      cause,
+      code,
+    }: { expose?: boolean; cause?: unknown; code?: string } = {},
   ) {
     // `cause` guarda o erro que originou este: converter um erro capturado
     // sem ele jogaria fora o stack de quem falhou de verdade, e o log do
@@ -32,12 +42,13 @@ export class HttpError extends Error {
     this.name = 'HttpError';
     this.statusCode = statusCode;
     this.expose = expose ?? statusCode < 500;
+    this.code = code;
   }
 
   /** 400 — dado inválido enviado pelo cliente. */
   static badRequest(
     message: string,
-    options: { cause?: unknown } = {},
+    options: { cause?: unknown; code?: string } = {},
   ): HttpError {
     return new HttpError(message, 400, options);
   }
@@ -45,7 +56,7 @@ export class HttpError extends Error {
   /** 404 — recurso inexistente ou fora do alcance do usuário. */
   static notFound(
     message: string,
-    options: { cause?: unknown } = {},
+    options: { cause?: unknown; code?: string } = {},
   ): HttpError {
     return new HttpError(message, 404, options);
   }
@@ -53,7 +64,7 @@ export class HttpError extends Error {
   /** 409 — a operação conflita com o estado atual do recurso. */
   static conflict(
     message: string,
-    options: { cause?: unknown } = {},
+    options: { cause?: unknown; code?: string } = {},
   ): HttpError {
     return new HttpError(message, 409, options);
   }
