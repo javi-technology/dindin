@@ -36,12 +36,12 @@ ajv.addSchema({ $id: 'dindin', ...especificacao });
 
 /**
  * Status que a rota não decide: 401 (autenticação), 413 (limite de corpo),
- * 429 (rate limit) e 500 (falha inesperada) vêm de middlewares e do
+ * 426 (app abaixo da versão mínima), 429 (rate limit) e 500 (falha inesperada) vêm de middlewares e do
  * `asyncHandler`, valem para toda rota `/api/*` e sempre têm corpo
  * `ErrorResponse`. Declará-los em cada operação seria ruído; a descrição os
  * registra uma vez, e aqui eles são conferidos contra o mesmo schema.
  */
-const STATUS_TRANSVERSAIS = [401, 413, 429, 500];
+const STATUS_TRANSVERSAIS = [401, 413, 426, 429, 500];
 const RESPOSTA_TRANSVERSAL = {
   content: {
     'application/json': {

@@ -134,6 +134,18 @@ jobs:
       - name: Verificar contratos
         run: npm run contracts:check
 
+      # O app instalado só é corrigido por uma nova versão nas lojas (#500):
+      # mudança incompatível do contrato precisa ser declarada em
+      # `x-incompatible-changes`. Compara com a branch-base do PR.
+      - name: Verificar mudança incompatível do contrato
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          git show FETCH_HEAD:openapi/dindin.yaml > "$RUNNER_TEMP/dindin-base.yaml"
+          node scripts/openapi-breaking.mjs "$RUNNER_TEMP/dindin-base.yaml" openapi/dindin.yaml
+
   build-and-test-api:
     name: Build and Test API
     needs: version
@@ -386,6 +398,7 @@ jobs:
           STRIPE_PRICE_BASIC_MONTHLY=${{ vars.STRIPE_PRICE_BASIC_MONTHLY }}
           STRIPE_PRICE_BASIC_YEARLY=${{ vars.STRIPE_PRICE_BASIC_YEARLY }}
           APP_BASE_URL=${{ vars.APP_BASE_URL }}
+          APP_MIN_VERSION=${{ vars.APP_MIN_VERSION }}
           EOF
 
       - name: Deploy Hosting e Functions

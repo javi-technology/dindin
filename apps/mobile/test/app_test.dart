@@ -7,6 +7,7 @@ import 'package:dindin_mobile/app.dart';
 import 'package:dindin_mobile/core/auth/auth_service.dart';
 import 'package:dindin_mobile/core/auth/sessao.dart';
 import 'package:dindin_mobile/core/api/api_client.dart';
+import 'package:dindin_mobile/core/api/atualizacao_obrigatoria.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
@@ -239,5 +240,39 @@ void main() {
       expect(cache.dono, 'u1');
       expect(cache.ler('carteiras')!.dados, [1]);
     });
+  });
+
+  testWidgets('a recusa da versão pela API troca o app pela atualização', (
+    tester,
+  ) async {
+    final atualizacao = AtualizacaoObrigatoria();
+    final cliente = ApiClient(
+      baseUrl: 'https://api.exemplo',
+      tokenProvider: AuthService(AuthBackendFalso()),
+    );
+    await tester.pumpWidget(
+      DinDinApp(
+        auth: AuthService(AuthBackendFalso()),
+        tema: await ThemeController.carregar(),
+        api: DinDinApi(cliente),
+        cache: await cacheDeTeste(),
+        notificacoes: await NotificacoesService.carregar(
+          backend: NotificacoesBackendFalso(),
+          registrarToken: (_, _) async {},
+          removerToken: (_) async {},
+        ),
+        setup: SetupService(DinDinApi(cliente)),
+        assinatura: AssinaturaService(DinDinApi(cliente)),
+        atualizacao: atualizacao,
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Entrar'), findsOneWidget);
+
+    atualizacao.exigir();
+    await tester.pump();
+
+    expect(find.text('Atualize o DinDin'), findsOneWidget);
+    expect(find.text('Entrar'), findsNothing);
   });
 }

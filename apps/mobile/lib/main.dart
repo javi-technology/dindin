@@ -4,10 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_config.dart';
+import 'core/api/atualizacao_obrigatoria.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/firebase_auth_backend.dart';
 import 'core/data/cache_local.dart';
@@ -44,7 +46,19 @@ Future<void> main() async {
   final cache = await CacheLocal.abrir();
 
   final auth = AuthService(FirebaseAuthBackend());
-  final api = DinDinApi(ApiClient(baseUrl: apiBaseUrl, tokenProvider: auth));
+
+  // A API recusa a versão abaixo da mínima (issue #500); o app informa a sua
+  // em toda requisição e mostra a tela de atualização quando é recusado.
+  final atualizacao = AtualizacaoObrigatoria();
+  final info = await PackageInfo.fromPlatform();
+  final api = DinDinApi(
+    ApiClient(
+      baseUrl: apiBaseUrl,
+      tokenProvider: auth,
+      versaoDoApp: info.version,
+      atualizacao: atualizacao,
+    ),
+  );
 
   final notificacoes = await NotificacoesService.carregar(
     backend: FirebaseNotificacoesBackend(),
@@ -80,6 +94,7 @@ Future<void> main() async {
       notificacoes: notificacoes,
       setup: SetupService(api),
       assinatura: assinatura,
+      atualizacao: atualizacao,
       geladeiraInicial: inicial?.data['fridgeId'] as String?,
     ),
   );

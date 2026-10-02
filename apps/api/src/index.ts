@@ -7,6 +7,7 @@ import {
   adminAuthMiddleware,
   AuthRequest,
 } from './middleware/auth.middleware';
+import { requireMinAppVersion } from './middleware/app-version.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
 import {
   adminRateLimiter,
@@ -192,7 +193,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 // a pagá-lo (issue #298). O `/api/health` fica acima, aberto.
 // No Express 5 o curinga precisa de nome (`*splat`): `'/api/*'` é recusado
 // pelo path-to-regexp v8 (issue #317).
-app.use('/api/*splat', apiRateLimiter, authMiddleware);
+app.use('/api/*splat', apiRateLimiter, requireMinAppVersion(), authMiddleware);
 
 // O limite pequeno vale para todas as rotas: o que trafega nelas é um punhado
 // de campos. Só o import do PDF da carteira do BB, em base64, precisa de mais.

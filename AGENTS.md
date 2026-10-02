@@ -322,6 +322,28 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   gerados, em vez de `{ id: 'x' }`. Corrigir a divergência é no código **ou**
   no YAML, o que for o erro. A primeira execução achou dois casos em que o
   YAML mentia: `GET /api/dividends/projection` e `GET .../suggestions`.
+- **Compatibilidade com o app instalado** (issue #500; detalhes em
+  `docs/compatibilidade-app-api.md`). O web atualiza com o Hosting; o app
+  continua rodando a versão antiga depois de um deploy, e só uma nova versão
+  nas lojas o corrige. Por isso:
+  - **Mudança incompatível** no contrato é remover ou renomear rota, campo ou
+    status 2xx; mudar o tipo de um campo; tornar obrigatório o que era
+    opcional na requisição, ou opcional o que era obrigatório na resposta;
+    acrescentar valor a enum de resposta. Campo opcional novo e rota nova são
+    compatíveis.
+  - O CI (`scripts/openapi-breaking.mjs`, no job `lint`, em PR) compara o YAML
+    com o da branch-base e **reprova a mudança incompatível**, a menos que
+    `x-incompatible-changes` ganhe uma entrada nova (issue, o que mudou e a
+    versão mínima do app). Prefira o caminho compatível: campo novo ao lado do
+    antigo, e o antigo sai depois que a versão mínima o dispensa.
+  - O app manda `X-App-Version` em toda requisição. Abaixo de `APP_MIN_VERSION`
+    a API responde **426** com `code: APP_UPDATE_REQUIRED` (antes da
+    autenticação, em `/api/*`) e o app troca a tela por "Atualize o DinDin".
+    Quem não manda o cabeçalho (web e apps anteriores à política) passa.
+  - Subir a versão mínima é deliberado: só depois de a versão corrigida estar
+    publicada nas duas lojas, ou o usuário fica sem app utilizável.
+  - O app ignora campo desconhecido na resposta (o modelo gerado lê só o que
+    conhece).
 - `npm run contracts:check` roda em **dois** jobs do CI: no `lint`, que não
   tem SDK do Dart e confere o TypeScript, e no `build-and-test-mobile`, que
   tem o Flutter e confere o modelo Dart.
