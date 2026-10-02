@@ -35,6 +35,7 @@ import {
 } from '../shared/validation';
 import { logError } from '../shared/logger';
 import { routeParam } from '../shared/route-params';
+import { HttpError } from '../shared/http-error';
 
 const dividendSchema = z.object({
   ticker: tickerField(),
@@ -63,8 +64,7 @@ export const createDividend = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBody(dividendSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
@@ -96,8 +96,7 @@ export const getDividend = asyncHandler(
     const doc = await dividendsCollection(uid(req)).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Provento não encontrado' });
-      return;
+      throw HttpError.notFound('Provento não encontrado');
     }
 
     res.json({ id: doc.id, ...doc.data() });
@@ -112,14 +111,12 @@ export const updateDividend = asyncHandler(
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Provento não encontrado' });
-      return;
+      throw HttpError.notFound('Provento não encontrado');
     }
 
     const parsed = parseBody(updateDividendSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
@@ -205,10 +202,7 @@ export const getMonthlyDividendReport = asyncHandler(
         parsedYear < MIN_REPORT_YEAR ||
         parsedYear > MAX_REPORT_YEAR
       ) {
-        res
-          .status(400)
-          .json({ error: 'Ano deve ser um inteiro entre 1900 e 2100' });
-        return;
+        throw HttpError.badRequest('Ano deve ser um inteiro entre 1900 e 2100');
       }
       year = parsedYear;
     }
@@ -350,8 +344,7 @@ export const deleteDividend = asyncHandler(
     const doc = await dividendRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Provento não encontrado' });
-      return;
+      throw HttpError.notFound('Provento não encontrado');
     }
 
     await dividendRef.delete();

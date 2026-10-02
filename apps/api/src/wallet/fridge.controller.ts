@@ -69,8 +69,7 @@ export const createFridge = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBody(fridgeSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const { name, description } = parsed.data;
@@ -95,8 +94,7 @@ export const getFridge = asyncHandler(
     const doc = await fridgesCollection(uid(req)).doc(fridgeId).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Geladeira não encontrada' });
-      return;
+      throw HttpError.notFound('Geladeira não encontrada');
     }
 
     res.json({ id: doc.id, ...doc.data() });
@@ -111,14 +109,12 @@ export const updateFridge = asyncHandler(
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Geladeira não encontrada' });
-      return;
+      throw HttpError.notFound('Geladeira não encontrada');
     }
 
     const parsed = parseBody(updateFridgeSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const { name, description } = parsed.data;
@@ -143,8 +139,7 @@ export const deleteFridge = asyncHandler(
     const doc = await fridgeRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Geladeira não encontrada' });
-      return;
+      throw HttpError.notFound('Geladeira não encontrada');
     }
 
     // Remove os itens da geladeira em cascata antes de deletar a geladeira.
@@ -160,18 +155,15 @@ export const deleteFridge = asyncHandler(
 
 /* ---------- FridgeItem CRUD ---------- */
 
-/** Verifica se a geladeira existe e pertence ao usuário. Retorna true se válida. */
-async function validateFridgeExists(
+/** Garante que a geladeira existe e pertence ao usuário; senão, responde 404. */
+async function assertFridgeExists(
   userId: string,
   fridgeId: string,
-  res: Response,
-): Promise<boolean> {
+): Promise<void> {
   const fridgeDoc = await fridgesCollection(userId).doc(fridgeId).get();
   if (!fridgeDoc.exists) {
-    res.status(404).json({ error: 'Geladeira não encontrada' });
-    return false;
+    throw HttpError.notFound('Geladeira não encontrada');
   }
-  return true;
 }
 
 const fridgeSchema = z.object({
@@ -199,7 +191,7 @@ export const listItems = asyncHandler(
     const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
 
-    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+    await assertFridgeExists(userId, fridgeId);
 
     const snapshot = await fridgeItemsCollection(userId, fridgeId).get();
     const items = snapshot.docs.map(
@@ -214,21 +206,19 @@ export const createItem = asyncHandler(
   async (req: Request, res: Response) => {
     const fridgeId = routeParam(req, 'fridgeId');
     const userId = uid(req);
-    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+    await assertFridgeExists(userId, fridgeId);
 
     const parsed = parseBody(itemSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
     const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
-      res.status(400).json({
-        error: 'Ticker não encontrado no catálogo de ativos suportados',
-      });
-      return;
+      throw HttpError.badRequest(
+        'Ticker não encontrado no catálogo de ativos suportados',
+      );
     }
 
     const now = new Date().toISOString();
@@ -261,13 +251,12 @@ export const getItem = asyncHandler(
     const id = routeParam(req, 'id');
     const userId = uid(req);
 
-    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+    await assertFridgeExists(userId, fridgeId);
 
     const doc = await fridgeItemsCollection(userId, fridgeId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item não encontrado' });
-      return;
+      throw HttpError.notFound('Item não encontrado');
     }
 
     const item = { id: doc.id, ...doc.data() } as FridgeItem;
@@ -283,30 +272,27 @@ export const updateItem = asyncHandler(
     const id = routeParam(req, 'id');
     const userId = uid(req);
 
-    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+    await assertFridgeExists(userId, fridgeId);
 
     const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item não encontrado' });
-      return;
+      throw HttpError.notFound('Item não encontrado');
     }
 
     const parsed = parseBody(updateItemSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
     const ticker = body.ticker;
     if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
-        res.status(400).json({
-          error: 'Ticker não encontrado no catálogo de ativos suportados',
-        });
-        return;
+        throw HttpError.badRequest(
+          'Ticker não encontrado no catálogo de ativos suportados',
+        );
       }
     }
 
@@ -337,14 +323,13 @@ export const deleteItem = asyncHandler(
     const id = routeParam(req, 'id');
     const userId = uid(req);
 
-    if (!(await validateFridgeExists(userId, fridgeId, res))) return;
+    await assertFridgeExists(userId, fridgeId);
 
     const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);
     const doc = await itemRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Item não encontrado' });
-      return;
+      throw HttpError.notFound('Item não encontrado');
     }
 
     await itemRef.delete();
@@ -361,8 +346,7 @@ export const unfreezeItem = asyncHandler(
     const { walletId } = req.body as { walletId?: unknown };
 
     if (!walletId || typeof walletId !== 'string') {
-      res.status(400).json({ error: 'walletId é obrigatório' });
-      return;
+      throw HttpError.badRequest('walletId é obrigatório');
     }
 
     const itemRef = fridgeItemsCollection(userId, fridgeId).doc(id);

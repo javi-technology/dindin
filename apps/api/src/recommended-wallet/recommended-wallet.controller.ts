@@ -47,8 +47,7 @@ export const getLatestRecommended = asyncHandler(
     const wallet = await getRecommendedWallet(monthQuery(req));
 
     if (!wallet) {
-      res.status(404).json({ error: 'Carteira recomendada não encontrada' });
-      return;
+      throw HttpError.notFound('Carteira recomendada não encontrada');
     }
 
     res.json(wallet);
@@ -84,8 +83,7 @@ export const importRecommended = asyncHandler(
       typeof contentBase64 !== 'string' ||
       !parseBbFileName(fileName)
     ) {
-      res.status(400).json({ error: 'fileName ou conteúdo inválido' });
-      return;
+      throw HttpError.badRequest('fileName ou conteúdo inválido');
     }
 
     const buffer = Buffer.from(contentBase64, 'base64');
@@ -123,8 +121,7 @@ export const getSuggestion = asyncHandler(
     const month = monthQuery(req);
 
     if (!walletId || !month) {
-      res.status(400).json({ error: 'walletId e month são obrigatórios' });
-      return;
+      throw HttpError.badRequest('walletId e month são obrigatórios');
     }
 
     const suggestion = await getSavedSuggestion(
@@ -135,8 +132,7 @@ export const getSuggestion = asyncHandler(
     );
 
     if (!suggestion) {
-      res.status(404).json({ error: 'Sugestão não encontrada' });
-      return;
+      throw HttpError.notFound('Sugestão não encontrada');
     }
 
     res.json(suggestion);
@@ -158,8 +154,7 @@ export const generateSuggestion = asyncHandler(
       typeof month !== 'string' ||
       (tab !== 'renda' && tab !== 'ganho')
     ) {
-      res.status(400).json({ error: 'walletId, month e tab são obrigatórios' });
-      return;
+      throw HttpError.badRequest('walletId, month e tab são obrigatórios');
     }
 
     if (
@@ -168,8 +163,7 @@ export const generateSuggestion = asyncHandler(
         !Number.isFinite(contribution) ||
         contribution < 0)
     ) {
-      res.status(400).json({ error: 'contribution inválido' });
-      return;
+      throw HttpError.badRequest('contribution inválido');
     }
 
     const suggestion = await generateSuggestionForUser(

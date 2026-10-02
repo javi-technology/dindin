@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from './auth.middleware';
-import { logError } from '../shared/logger';
+import { logError, logWarn } from '../shared/logger';
 
 /** Handler de rota que só cuida do caminho feliz e das respostas de negócio. */
 type RouteHandler = (req: Request, res: Response) => Promise<void> | void;
@@ -16,6 +16,16 @@ function statusCodeOf(error: unknown): number {
       : undefined;
 
   return typeof statusCode === 'number' ? statusCode : 500;
+}
+
+/** Código de contrato anexado ao erro (`HttpError.code`), quando houver. */
+function codeOf(error: unknown): string | undefined {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+  return typeof code === 'string' ? code : undefined;
 }
 
 /**
@@ -61,27 +71,45 @@ export function asyncHandler(name: string, handler: RouteHandler) {
       // parser do PDF convertida em 400). Sem o stack dele, o log aponta
       // para a linha da conversão, não para a falha real (issue #304).
       const cause = (error as { cause?: unknown }).cause;
+      const code = statusCodeOf(error);
 
-      logError(name, {
+      const fields = {
         method: req.method,
         path: req.path,
         uid: (req as AuthRequest).user?.uid,
         params: req.params,
         message: (error as Error).message,
-        stack: (error as Error).stack,
-        ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
-      });
+      };
+
+      // Falha de negócio (4xx) é resposta esperada, não incidente: vai como
+      // aviso e sem stack, para não afogar os erros de verdade (issue #508).
+      if (code < 500) {
+        logWarn(name, {
+          ...fields,
+          status: code,
+          ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
+        });
+      } else {
+        logError(name, {
+          ...fields,
+          stack: (error as Error).stack,
+          ...(cause instanceof Error ? { causeStack: cause.stack } : {}),
+        });
+      }
 
       // Um handler pode falhar depois de já ter respondido; um segundo status
       // quebraria a resposta que o cliente já está recebendo.
       if (res.headersSent) return;
 
       // Mensagem não exposta fica só no log, acima.
-      const code = statusCodeOf(error);
+      const contractCode = codeOf(error);
       res.status(code).json({
         error: exposeOf(error, code)
           ? (error as Error).message
           : 'Erro interno do servidor',
+        ...(contractCode && exposeOf(error, code)
+          ? { code: contractCode }
+          : {}),
       });
     }
   };

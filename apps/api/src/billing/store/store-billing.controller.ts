@@ -12,6 +12,7 @@ import {
   InvalidNotificationError,
   StorePlatform,
 } from './store-validators';
+import { HttpError } from '../../shared/http-error';
 
 const PLATFORMS: StorePlatform[] = ['apple', 'google'];
 
@@ -37,10 +38,9 @@ export const registerStorePurchaseHandler = asyncHandler(
       typeof credential !== 'string' ||
       credential === ''
     ) {
-      res
-        .status(400)
-        .json({ error: 'platform, productId e credential são obrigatórios' });
-      return;
+      throw HttpError.badRequest(
+        'platform, productId e credential são obrigatórios',
+      );
     }
 
     try {
@@ -77,6 +77,8 @@ export function handleStoreNotification(platform: StorePlatform) {
     } catch (error) {
       if (error instanceof InvalidNotificationError) {
         logWarn('billing.store.invalidNotification', { platform });
+        // Webhook da loja: fora do `asyncHandler`, a resposta é direta.
+        // eslint-disable-next-line no-restricted-syntax
         res.status(400).json({ error: 'Notificação inválida' });
         return;
       }
