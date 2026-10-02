@@ -3,6 +3,7 @@ import type { DividendHistoryEntry } from 'dindin-shared-types';
 import { asyncHandler } from '../middleware/async-handler';
 import { getMonthlyDividendHistory } from './quote-history.service';
 import { routeParam } from '../shared/route-params';
+import { HttpError } from '../shared/http-error';
 
 export const MIN_MONTHS = 1;
 export const MAX_MONTHS = 60;
@@ -58,11 +59,9 @@ export const getDividendHistoryBatch = asyncHandler(
     const { tickers } = req.query;
 
     if (typeof tickers !== 'string' || tickers.trim().length === 0) {
-      res.status(400).json({
-        error:
-          'Tickers é obrigatório e deve ser uma lista separada por vírgula',
-      });
-      return;
+      throw HttpError.badRequest(
+        'Tickers é obrigatório e deve ser uma lista separada por vírgula',
+      );
     }
 
     const requested = [
@@ -75,18 +74,16 @@ export const getDividendHistoryBatch = asyncHandler(
     ];
 
     if (requested.length === 0 || requested.length > MAX_TICKERS) {
-      res.status(400).json({
-        error: `Tickers deve conter entre 1 e ${MAX_TICKERS} itens`,
-      });
-      return;
+      throw HttpError.badRequest(
+        `Tickers deve conter entre 1 e ${MAX_TICKERS} itens`,
+      );
     }
 
     const months = parseMonths(req.query.months);
     if (months === null) {
-      res.status(400).json({
-        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
-      });
-      return;
+      throw HttpError.badRequest(
+        `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
+      );
     }
 
     const histories = await Promise.all(
@@ -115,18 +112,16 @@ export const getDividendHistory = asyncHandler(
   async (req: Request, res: Response) => {
     const ticker = (routeParam(req, 'ticker') ?? '').trim().toUpperCase();
     if (ticker.length === 0) {
-      res
-        .status(400)
-        .json({ error: 'Ticker é obrigatório e deve ser um texto não vazio' });
-      return;
+      throw HttpError.badRequest(
+        'Ticker é obrigatório e deve ser um texto não vazio',
+      );
     }
 
     const months = parseMonths(req.query.months);
     if (months === null) {
-      res.status(400).json({
-        error: `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
-      });
-      return;
+      throw HttpError.badRequest(
+        `Months deve ser um inteiro entre ${MIN_MONTHS} e ${MAX_MONTHS}`,
+      );
     }
 
     res.json({ ticker, history: await historyOf(ticker, months) });

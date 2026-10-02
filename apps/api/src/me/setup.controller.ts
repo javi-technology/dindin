@@ -3,6 +3,7 @@ import { DefaultResource, SetupRequest } from 'dindin-shared-types';
 import { asyncHandler } from '../middleware/async-handler';
 import { uid } from '../firestore/paths';
 import { provisionDefaults } from './default-setup.service';
+import { HttpError } from '../shared/http-error';
 
 const RESOURCES: DefaultResource[] = ['wallet', 'fridge'];
 
@@ -13,8 +14,7 @@ export const setupDefaults = asyncHandler(
     const { resource } = (req.body ?? {}) as SetupRequest;
 
     if (resource !== undefined && !RESOURCES.includes(resource)) {
-      res.status(400).json({ error: 'Recurso inválido' });
-      return;
+      throw HttpError.badRequest('Recurso inválido');
     }
 
     res.json(await provisionDefaults(uid(req), resource));

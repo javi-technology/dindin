@@ -14,10 +14,10 @@ import {
   reserveCheckoutSession,
 } from './checkout-session.service';
 import { logError, logWarn } from '../shared/logger';
+import { HttpError } from '../shared/http-error';
 
-function sendAlreadySubscribed(res: Response): void {
-  res.status(409).json({
-    error: 'Assinatura já ativa',
+function alreadySubscribed(): never {
+  throw HttpError.conflict('Assinatura já ativa', {
     code: 'ALREADY_SUBSCRIBED',
   });
 }
@@ -27,14 +27,12 @@ export const createCheckoutSession = asyncHandler(
   async (req: Request, res: Response) => {
     const { interval } = req.body ?? {};
     if (interval !== 'month' && interval !== 'year') {
-      res.status(400).json({ error: 'interval inválido' });
-      return;
+      throw HttpError.badRequest('interval inválido');
     }
 
     const uid = (req as AuthRequest).user!.uid;
     if (isInForce(await getSubscription(uid))) {
-      sendAlreadySubscribed(res);
-      return;
+      alreadySubscribed();
     }
 
     let email: string | undefined;
@@ -48,15 +46,12 @@ export const createCheckoutSession = asyncHandler(
     // Revalida o status na transação: o webhook pode ter ativado a assinatura
     const reservation = await reserveCheckoutSession(uid, interval, customer);
     if (reservation.kind === 'already_subscribed') {
-      sendAlreadySubscribed(res);
-      return;
+      alreadySubscribed();
     }
     if (reservation.kind === 'in_progress') {
-      res.status(409).json({
-        error: 'Checkout em andamento',
+      throw HttpError.conflict('Checkout em andamento', {
         code: 'CHECKOUT_IN_PROGRESS',
       });
-      return;
     }
 
     res.json({ url: reservation.url });
@@ -69,10 +64,9 @@ export const createPortalSession = asyncHandler(
     const uid = (req as AuthRequest).user!.uid;
     const subscription = await getSubscription(uid);
     if (!subscription.providerCustomerId) {
-      res
-        .status(404)
-        .json({ error: 'Cliente não encontrado', code: 'NO_CUSTOMER' });
-      return;
+      throw HttpError.notFound('Cliente não encontrado', {
+        code: 'NO_CUSTOMER',
+      });
     }
 
     const retryAfter = await consumePortalQuota(uid);
@@ -112,6 +106,9 @@ export async function handleWebhook(
     );
   } catch {
     logWarn('billing.webhook.invalidSignature');
+    // O webhook não passa pelo `asyncHandler` (responde 500 por conta própria
+    // para a Stripe retentar), então a resposta é direta.
+    // eslint-disable-next-line no-restricted-syntax
     res.status(400).json({ error: 'Assinatura inválida' });
     return;
   }
