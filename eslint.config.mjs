@@ -42,6 +42,26 @@ export default tseslint.config(
     },
   },
   {
+    // Falha de negócio é sinalizada com `HttpError`, traduzido pelo
+    // `asyncHandler` (issue #508): sem isso o `code`, o `expose` e o nível do
+    // log ficam a cargo de cada controller. Só middlewares respondem 4xx
+    // direto, porque não passam pelo `asyncHandler`. Webhooks que respondem
+    // por conta própria desligam a regra na linha, com o motivo.
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/middleware/**', 'apps/api/src/index.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='json'][callee.object.callee.property.name='status'][callee.object.arguments.0.value>=400][callee.object.arguments.0.value<500]",
+          message:
+            'Use HttpError (badRequest, notFound, conflict...) em vez de res.status(4xx).json: o asyncHandler traduz o erro em resposta (issue #508).',
+        },
+      ],
+    },
+  },
+  {
     // Os testes usam helpers de mock que às vezes precisam de asserção de tipo
     // para simular payloads inválidos vindos da rede.
     files: ['**/*.spec.ts', '**/tests/**/*.ts'],
