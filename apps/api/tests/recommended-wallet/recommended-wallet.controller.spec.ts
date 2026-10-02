@@ -65,6 +65,10 @@ jest.mock('../../src/recommended-wallet/storage.service', () => ({
 }));
 
 import { app } from '../../src/index';
+import {
+  carteiraSugeridaFixture,
+  sugestaoFixture,
+} from '../support/fixtures-contrato';
 
 describe('recommended-wallet.controller', () => {
   beforeEach(() => {
@@ -77,21 +81,19 @@ describe('recommended-wallet.controller', () => {
       month: '2026-09',
       revision: 2,
     });
-    persistRecommendedWalletMock.mockResolvedValue({
-      id: 'bb-fii_2026-09',
-    });
+    persistRecommendedWalletMock.mockResolvedValue(carteiraSugeridaFixture);
     getSavedSuggestionMock.mockResolvedValue(undefined);
   });
 
   it('deve listar carteiras recomendadas para usuário autenticado', async () => {
-    listRecommendedWalletsMock.mockResolvedValue([{ id: 'bb-fii_2026-09' }]);
+    listRecommendedWalletsMock.mockResolvedValue([carteiraSugeridaFixture]);
 
     const response = await request(app)
       .get('/api/recommended-wallets/bb-fii')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([{ id: 'bb-fii_2026-09' }]);
+    expect(response.body).toEqual([carteiraSugeridaFixture]);
   });
 
   it('deve retornar 404 quando a carteira mais recente não existe', async () => {
@@ -148,7 +150,7 @@ describe('recommended-wallet.controller', () => {
       });
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 'bb-fii_2026-09' });
+    expect(response.body).toEqual(carteiraSugeridaFixture);
     expect(buildRecommendedWalletMock).toHaveBeenCalledWith(
       Buffer.from('pdf'),
       'wallets/fii-bb/CartFII_Set26_2.pdf',
@@ -205,7 +207,7 @@ describe('recommended-wallet.controller', () => {
   });
 
   it('deve retornar uma sugestão salva', async () => {
-    getSavedSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
+    getSavedSuggestionMock.mockResolvedValue(sugestaoFixture);
 
     const response = await request(app)
       .get('/api/recommended-wallets/bb-fii/suggestions')
@@ -213,7 +215,7 @@ describe('recommended-wallet.controller', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ id: 'suggestion-1' });
+    expect(response.body).toEqual(sugestaoFixture);
   });
 
   it('deve rejeitar geração sem dados obrigatórios', async () => {
@@ -245,7 +247,7 @@ describe('recommended-wallet.controller', () => {
   );
 
   it('deve gerar sugestão com status 201', async () => {
-    generateSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
+    generateSuggestionMock.mockResolvedValue(sugestaoFixture);
 
     const response = await request(app)
       .post('/api/recommended-wallets/bb-fii/suggestions')
@@ -253,7 +255,7 @@ describe('recommended-wallet.controller', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ id: 'suggestion-1' });
+    expect(response.body).toEqual(sugestaoFixture);
     expect(generateSuggestionMock).toHaveBeenCalledWith(
       'user-1',
       'wallet-1',
@@ -266,7 +268,7 @@ describe('recommended-wallet.controller', () => {
 
   it('deve delegar a validação do cache ao serviço', async () => {
     generateSuggestionMock.mockResolvedValue({
-      id: 'suggestion-1',
+      ...sugestaoFixture,
       contribution: 500,
     });
 
@@ -294,6 +296,7 @@ describe('recommended-wallet.controller', () => {
 
   it('deve gerar novamente quando o aporte for diferente do cache', async () => {
     generateSuggestionMock.mockResolvedValue({
+      ...sugestaoFixture,
       id: 'suggestion-2',
       contribution: 600,
     });

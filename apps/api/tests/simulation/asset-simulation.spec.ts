@@ -29,8 +29,12 @@ jest.mock('../../src/billing/entitlement.service', () => ({
 }));
 
 import { app } from '../../src/index';
+import {
+  simulacaoDeAtivoFixture,
+  simulacaoDeCarteiraFixture,
+} from '../support/fixtures-contrato';
 
-const result = { ticker: 'MXRF11', totalIncome: 10, byTicker: [] };
+const result = simulacaoDeAtivoFixture;
 
 function post(body: unknown) {
   return request(app)
@@ -44,7 +48,7 @@ describe('simulação por ativo sob assinatura', () => {
     jest.clearAllMocks();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     simulateAssetMock.mockResolvedValue(result);
-    simulateRecommendedWalletMock.mockResolvedValue({ totalIncome: 1 });
+    simulateRecommendedWalletMock.mockResolvedValue(simulacaoDeCarteiraFixture);
     hasEntitlementMock.mockResolvedValue(true);
   });
 

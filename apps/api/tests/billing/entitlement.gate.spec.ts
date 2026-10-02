@@ -37,6 +37,7 @@ jest.mock('../../src/recommended-wallet/ai-suggestion.service', () => ({
 }));
 
 import { app } from '../../src/index';
+import { sugestaoFixture } from '../support/fixtures-contrato';
 
 const FUTURE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -111,8 +112,8 @@ describe('gate de assinatura nos endpoints de sugestão IA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
-    getSavedSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
-    generateSuggestionMock.mockResolvedValue({ id: 'suggestion-1' });
+    getSavedSuggestionMock.mockResolvedValue(sugestaoFixture);
+    generateSuggestionMock.mockResolvedValue(sugestaoFixture);
   });
 
   it('deve responder 403 SUBSCRIPTION_REQUIRED sem documento de assinatura', async () => {
