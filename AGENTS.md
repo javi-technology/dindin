@@ -695,6 +695,13 @@ Regras:
   **aviso**, sem stack; 5xx continua erro. Ficam de fora os middlewares e os
   webhooks (`handleWebhook`, notificações das lojas), que não passam pelo
   `asyncHandler` e desligam a regra na linha, com o motivo.
+- **Web e app tratam os mesmos erros HTTP, do mesmo jeito** (issue #505; matriz
+  em `docs/tratamento-erros-http.md`). O 429 de rate limit traz
+  `code: RATE_LIMITED` e `Retry-After`: o `httpErrorInterceptor` (web) e o
+  `ApiClient` (app) mostram um aviso global com a espera, em qualquer tela, e
+  trocam a mensagem do erro por um texto em pt-BR. O 429 de negócio (limite
+  diário da IA) não tem esse código e segue com o texto da API. Mudou uma
+  linha da matriz num lado: mude no outro e nos testes dos dois.
 - **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
   tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
   contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.
