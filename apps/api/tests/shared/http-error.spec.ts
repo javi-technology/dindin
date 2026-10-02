@@ -33,6 +33,27 @@ describe('shared/http-error', () => {
     expect(error.expose).toBe(true);
   });
 
+  // Alguns 4xx carregam um código de contrato lido pelo cliente (ex.:
+  // `ALREADY_SUBSCRIBED`), além da mensagem escrita para a tela (issue #508).
+  describe('código de contrato', () => {
+    it('deve guardar o code informado', () => {
+      expect(new HttpError('x', 409, { code: 'ALREADY_SUBSCRIBED' }).code).toBe(
+        'ALREADY_SUBSCRIBED',
+      );
+    });
+
+    it('deve deixar o code indefinido por padrão', () => {
+      expect(new HttpError('x', 409).code).toBeUndefined();
+    });
+
+    it.each(['badRequest', 'notFound', 'conflict'] as const)(
+      '%s deve aceitar o code',
+      (factory) => {
+        expect(HttpError[factory]('x', { code: 'CODIGO' }).code).toBe('CODIGO');
+      },
+    );
+  });
+
   describe('fábricas', () => {
     it.each([
       ['badRequest', 400, true],
