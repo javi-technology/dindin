@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
 import { BillingService } from './core/services/billing.service';
 import { APP_VERSION } from '../environments/version';
+import { RateLimitNoticeService } from './core/services/rate-limit-notice.service';
 
 @Component({
   selector: 'app-stub',
@@ -70,6 +71,22 @@ describe('AppComponent', () => {
       'Simulação',
       'Assinatura',
     ]);
+  });
+
+  it('deve mostrar o aviso de rate limit em qualquer tela do shell', () => {
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="rate-limit-notice"]'),
+    ).toBeNull();
+
+    TestBed.inject(RateLimitNoticeService).show(30);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="rate-limit-notice"]')
+        ?.textContent,
+    ).toContain('Aguarde 30 segundos');
+    TestBed.inject(RateLimitNoticeService).dismiss();
   });
 
   it('deve destacar a rota ativa sobrepondo a cor base do link', async () => {
