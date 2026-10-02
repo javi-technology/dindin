@@ -5,6 +5,7 @@ import {
 } from './patrimony-snapshot.service';
 import { asyncHandler } from '../middleware/async-handler';
 import { uid } from '../firestore/paths';
+import { HttpError } from '../shared/http-error';
 
 const INVALID_LIMIT_ERROR = 'Limit must be an integer between 1 and 730';
 
@@ -28,8 +29,7 @@ export const getPatrimonyHistory = asyncHandler(
     const rawLimit = req.query.limit;
     const limit = parseLimit(rawLimit);
     if (rawLimit !== undefined && limit === undefined) {
-      res.status(400).json({ error: INVALID_LIMIT_ERROR });
-      return;
+      throw HttpError.badRequest(INVALID_LIMIT_ERROR);
     }
 
     const snapshots = await listPatrimonySnapshots(uid(req), limit);

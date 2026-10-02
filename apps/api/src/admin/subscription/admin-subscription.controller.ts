@@ -18,6 +18,7 @@ import {
 } from '../../billing/entitlement.service';
 import { asyncHandler } from '../../middleware/async-handler';
 import { routeParam } from '../../shared/route-params';
+import { HttpError } from '../../shared/http-error';
 
 const VALID_PLANS: SubscriptionPlan[] = ['basic'];
 const LIST_USERS_PAGE_SIZE = 1000;
@@ -124,14 +125,12 @@ export const grantSubscription = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseGrantBody(req.body);
     if ('error' in parsed) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const user = await findAuthUser(routeParam(req, 'uid'));
     if (!user) {
-      res.status(404).json({ error: 'Usuário não encontrado' });
-      return;
+      throw HttpError.notFound('Usuário não encontrado');
     }
 
     // Leitura e gravação na mesma transação: o webhook pode gravar o estado
@@ -168,11 +167,9 @@ export const grantSubscription = asyncHandler(
     });
 
     if (!result) {
-      res.status(409).json({
-        error: 'Usuário já tem assinatura ativa na Stripe',
+      throw HttpError.conflict('Usuário já tem assinatura ativa na Stripe', {
         code: STRIPE_SUBSCRIPTION_CODE,
       });
-      return;
     }
 
     res.json(toAdminUser(user, result));
@@ -219,15 +216,13 @@ export const revokeSubscription = asyncHandler(
     });
 
     if (result.status === 409) {
-      res.status(409).json({
-        error: 'Só assinatura manual pode ser revogada pelo admin',
-        code: STRIPE_SUBSCRIPTION_CODE,
-      });
-      return;
+      throw HttpError.conflict(
+        'Só assinatura manual pode ser revogada pelo admin',
+        { code: STRIPE_SUBSCRIPTION_CODE },
+      );
     }
     if (result.status === 404) {
-      res.status(404).json({ error: result.error });
-      return;
+      throw HttpError.notFound(result.error);
     }
 
     const user = (await findAuthUser(uid)) ?? ({ uid } as UserRecord);
