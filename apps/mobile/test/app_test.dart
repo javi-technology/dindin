@@ -8,6 +8,7 @@ import 'package:dindin_mobile/core/auth/auth_service.dart';
 import 'package:dindin_mobile/core/auth/sessao.dart';
 import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/api/atualizacao_obrigatoria.dart';
+import 'package:dindin_mobile/core/api/aviso_de_limite.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
@@ -274,5 +275,41 @@ void main() {
 
     expect(find.text('Atualize o DinDin'), findsOneWidget);
     expect(find.text('Entrar'), findsNothing);
+  });
+
+  testWidgets('o 429 avisa a espera por cima da tela, sem tirá-la', (
+    tester,
+  ) async {
+    final aviso = AvisoDeLimite();
+    final cliente = ApiClient(
+      baseUrl: 'https://api.exemplo',
+      tokenProvider: AuthService(AuthBackendFalso()),
+    );
+    await tester.pumpWidget(
+      DinDinApp(
+        auth: AuthService(AuthBackendFalso()),
+        tema: await ThemeController.carregar(),
+        api: DinDinApi(cliente),
+        cache: await cacheDeTeste(),
+        notificacoes: await NotificacoesService.carregar(
+          backend: NotificacoesBackendFalso(),
+          registrarToken: (_, _) async {},
+          removerToken: (_) async {},
+        ),
+        setup: SetupService(DinDinApi(cliente)),
+        assinatura: AssinaturaService(DinDinApi(cliente)),
+        avisoDeLimite: aviso,
+      ),
+    );
+    await tester.pump();
+
+    aviso.avisar(30);
+    await tester.pump();
+
+    expect(find.textContaining('Aguarde 30 segundos'), findsOneWidget);
+    expect(find.text('Entrar'), findsOneWidget);
+
+    aviso.dispensar();
+    await tester.pump();
   });
 }
