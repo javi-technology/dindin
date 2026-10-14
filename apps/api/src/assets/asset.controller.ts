@@ -10,6 +10,7 @@ import {
 } from '../shared/validation';
 import { assetsCollection } from '../firestore/paths';
 import { routeParam } from '../shared/route-params';
+import { HttpError } from '../shared/http-error';
 
 /**
  * Lista os ativos disponíveis no catálogo para seleção em posições/itens
@@ -66,8 +67,7 @@ export const createAsset = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBodyAll(assetSchema, req.body ?? {});
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.errors.join('; ') });
-      return;
+      throw HttpError.badRequest(parsed.errors.join('; '));
     }
 
     const { ticker, name, assetType, active, qualifiedInvestor } = parsed.data;
@@ -77,8 +77,7 @@ export const createAsset = asyncHandler(
     const existing = await docRef.get();
 
     if (existing.exists) {
-      res.status(409).json({ error: 'Ativo já cadastrado' });
-      return;
+      throw HttpError.conflict('Ativo já cadastrado');
     }
 
     const now = new Date().toISOString();
@@ -106,14 +105,12 @@ export const updateAsset = asyncHandler(
     const existing = await docRef.get();
 
     if (!existing.exists) {
-      res.status(404).json({ error: 'Ativo não encontrado' });
-      return;
+      throw HttpError.notFound('Ativo não encontrado');
     }
 
     const parsed = parseBodyAll(updateAssetSchema, req.body ?? {});
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.errors.join('; ') });
-      return;
+      throw HttpError.badRequest(parsed.errors.join('; '));
     }
 
     const now = new Date().toISOString();

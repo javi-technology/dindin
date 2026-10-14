@@ -51,7 +51,10 @@ describe('rate limiting das rotas admin', () => {
     const blocked = await listAdminUsers();
 
     expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: 'Muitas requisições' });
+    expect(blocked.body).toEqual({
+      error: 'Muitas requisições',
+      code: 'RATE_LIMITED',
+    });
   });
 
   it('deve contar o limite por usuário, não por IP', async () => {

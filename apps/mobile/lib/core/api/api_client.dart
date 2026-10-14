@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 
 import '../auth/token_provider.dart';
 import 'api_exception.dart';
+import 'atualizacao_obrigatoria.dart';
+import 'aviso_de_limite.dart';
 
 /// Cliente HTTP da API do DinDin.
 ///
@@ -16,13 +18,25 @@ class ApiClient {
     required String baseUrl,
     required TokenProvider tokenProvider,
     http.Client? httpClient,
+    String? versaoDoApp,
+    this.atualizacao,
+    this.avisoDeLimite,
   }) : _baseUrl = Uri.parse(baseUrl),
        _tokens = tokenProvider,
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? http.Client(),
+       _versao = versaoDoApp;
 
   final Uri _baseUrl;
   final TokenProvider _tokens;
   final http.Client _http;
+
+  /// Versão instalada (`X.Y.Z`), enviada em toda requisição: é com ela que a
+  /// API decide se este app ainda é aceito (issue #500).
+  final String? _versao;
+  final AtualizacaoObrigatoria? atualizacao;
+
+  /// Aviso global do 429 de rate limit (issue #505).
+  final AvisoDeLimite? avisoDeLimite;
 
   Future<dynamic> get(String caminho, {Map<String, String>? query}) =>
       _enviar('GET', caminho, query: query);
@@ -80,6 +94,9 @@ class ApiClient {
     if (token != null) {
       requisicao.headers['Authorization'] = 'Bearer $token';
     }
+    if (_versao != null) {
+      requisicao.headers['X-App-Version'] = _versao;
+    }
     if (body != null) {
       requisicao.headers['Content-Type'] = 'application/json; charset=utf-8';
       requisicao.body = jsonEncode(body);
@@ -111,13 +128,45 @@ class ApiClient {
       );
     }
 
+    // Abaixo da versão mínima: nenhuma tela resolve isso, só instalar a nova.
+    if (resposta.statusCode == 426 && code == codigoAtualizacaoObrigatoria) {
+      atualizacao?.exigir();
+      throw AtualizacaoObrigatoriaException(
+        message: mensagem is String ? mensagem : null,
+      );
+    }
+
+    // O rate limit vale para toda rota: o aviso é global, e a mensagem diz
+    // quanto esperar. O 429 de negócio (limite diário da IA) tem texto próprio
+    // e segue o caminho comum.
+    if (resposta.statusCode == 429 && code == codigoLimiteDeRequisicoes) {
+      final segundos = _esperaPedida(resposta);
+      avisoDeLimite?.avisar(segundos);
+      throw ApiException(
+        statusCode: 429,
+        message: mensagemDeLimite(segundos),
+        code: codigoLimiteDeRequisicoes,
+      );
+    }
+
     throw ApiException(
       statusCode: resposta.statusCode,
       message: mensagem is String
           ? mensagem
+          : resposta.statusCode >= 502
+          ? 'O serviço está indisponível no momento. Tente de novo em '
+                'instantes.'
           : 'Não foi possível completar a operação.',
       code: code is String ? code : null,
     );
+  }
+
+  /// Segundos pedidos pelo `Retry-After`, ou o padrão se ausente ou inválido.
+  int _esperaPedida(http.Response resposta) {
+    final segundos = double.tryParse(resposta.headers['retry-after'] ?? '');
+    return segundos != null && segundos > 0
+        ? segundos.ceil()
+        : esperaPadraoEmSegundos;
   }
 
   dynamic _decodificar(http.Response resposta) {

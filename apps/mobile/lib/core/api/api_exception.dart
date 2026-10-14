@@ -20,6 +20,18 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode: $message)';
 }
 
+/// A API recusou a versão instalada do app (426, issue #500).
+class AtualizacaoObrigatoriaException extends ApiException {
+  const AtualizacaoObrigatoriaException({String? message})
+    : super(
+        statusCode: 426,
+        message:
+            message ??
+            'Esta versão do app não é mais aceita. Atualize o DinDin.',
+        code: 'APP_UPDATE_REQUIRED',
+      );
+}
+
 /// 401 que sobreviveu à renovação do token: a sessão acabou de verdade.
 class UnauthorizedException extends ApiException {
   const UnauthorizedException({String? message, super.code})

@@ -3,6 +3,7 @@ import {
   RecommendedWalletComparisonItem,
 } from 'dindin-models';
 import { buyWholeSharesWithRemainder } from '../shared/whole-share-allocation';
+import { roundCurrency } from '../shared/numbers';
 
 /**
  * Regras de alocação da sugestão da IA (issue #306).
@@ -48,7 +49,6 @@ export function redistributeUnspentAmounts(
   const normalizedQualifiedTickers = new Set(
     [...qualifiedTickers].map((ticker) => ticker.toUpperCase()),
   );
-  const roundAmount = (amount: number) => Math.round(amount * 100) / 100;
   const states = items
     .map((item, index) => {
       if (item.action !== 'buy') return null;
@@ -120,7 +120,7 @@ export function redistributeUnspentAmounts(
     (total, state) => total + state.quantity * state.price,
     0,
   );
-  const pool = roundAmount(totalAvailable - fixedSpent - eligibleSpent);
+  const pool = roundCurrency(totalAvailable - fixedSpent - eligibleSpent);
   if (pool <= 0) return items;
 
   // A compra de cota inteira com o troco é a mesma conta da simulação de
@@ -141,7 +141,7 @@ export function redistributeUnspentAmounts(
       const quantityIncreased = state.quantity > state.originalQuantity;
       updatedByIndex.set(state.index, {
         ...state.item,
-        suggestedAmount: roundAmount(state.quantity * state.price),
+        suggestedAmount: roundCurrency(state.quantity * state.price),
         suggestedQuantity: state.quantity,
         referencePrice: state.price,
         ...(quantityIncreased
@@ -194,8 +194,6 @@ export function applyFallbackAllocations(
       comparisonItem,
     ]),
   );
-  const roundAmount = (amount: number): number =>
-    Math.round(amount * 100) / 100;
   const withQuantities = (
     allocations: Array<{ ticker: string; amount: number }>,
   ) =>
@@ -224,14 +222,14 @@ export function applyFallbackAllocations(
     if (sum === 0) return allocations;
     const normalized = allocations.map((allocation) => ({
       ticker: allocation.ticker,
-      amount: roundAmount((allocation.amount / sum) * total),
+      amount: roundCurrency((allocation.amount / sum) * total),
     }));
-    const difference = roundAmount(
+    const difference = roundCurrency(
       total -
         normalized.reduce((value, allocation) => value + allocation.amount, 0),
     );
     if (difference !== 0) {
-      normalized[normalized.length - 1].amount = roundAmount(
+      normalized[normalized.length - 1].amount = roundCurrency(
         normalized[normalized.length - 1].amount + difference,
       );
     }
@@ -311,8 +309,8 @@ export function applyFallbackAllocations(
         ticker: candidate.ticker.toUpperCase(),
         amount:
           weightTotal > 0
-            ? roundAmount((suggestedAmount * weights[index]) / weightTotal)
-            : roundAmount(suggestedAmount / candidates.length),
+            ? roundCurrency((suggestedAmount * weights[index]) / weightTotal)
+            : roundCurrency(suggestedAmount / candidates.length),
       }));
       allocations = normalizeAmounts(allocations, suggestedAmount);
     } else if (

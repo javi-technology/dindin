@@ -72,6 +72,13 @@ const rotasDaEspecificacao = (): string[] => {
 };
 
 describe('contratos da API', () => {
+  describe('validação das respostas (issue #499)', () => {
+    it('deve conferir toda resposta do supertest com o OpenAPI', () => {
+      const jest = conteudo('apps/api/jest.config.js');
+      expect(jest).toContain('tests/setup-contrato-openapi.ts');
+    });
+  });
+
   describe('descrição única', () => {
     it('deve estar versionada no repositório', () => {
       expect(existsSync(join(repoRoot, ESPECIFICACAO))).toBe(true);

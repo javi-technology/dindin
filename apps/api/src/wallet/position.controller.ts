@@ -83,8 +83,7 @@ export const createPosition = asyncHandler(
     const walletId = routeParam(req, 'walletId');
     const parsed = parseBody(positionSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
@@ -96,16 +95,14 @@ export const createPosition = asyncHandler(
     // mesma verificação que `createItem` já faz com a geladeira.
     const walletDoc = await walletsCollection(userId).doc(walletId).get();
     if (!walletDoc.exists) {
-      res.status(404).json({ error: 'Carteira não encontrada' });
-      return;
+      throw HttpError.notFound('Carteira não encontrada');
     }
 
     const ticker = body.ticker;
     if (!(await assetExists(ticker))) {
-      res.status(400).json({
-        error: 'Ticker não encontrado no catálogo de ativos suportados',
-      });
-      return;
+      throw HttpError.badRequest(
+        'Ticker não encontrado no catálogo de ativos suportados',
+      );
     }
 
     const now = new Date().toISOString();
@@ -144,8 +141,7 @@ export const getPosition = asyncHandler(
     const doc = await positionsCollection(uid(req), walletId).doc(id).get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Posição não encontrada' });
-      return;
+      throw HttpError.notFound('Posição não encontrada');
     }
 
     const position = { id: doc.id, ...doc.data() } as Position;
@@ -163,24 +159,21 @@ export const updatePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Posição não encontrada' });
-      return;
+      throw HttpError.notFound('Posição não encontrada');
     }
 
     const parsed = parseBody(updatePositionSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const body = parsed.data;
     const ticker = body.ticker;
     if (ticker !== undefined) {
       if (!(await assetExists(ticker))) {
-        res.status(400).json({
-          error: 'Ticker não encontrado no catálogo de ativos suportados',
-        });
-        return;
+        throw HttpError.badRequest(
+          'Ticker não encontrado no catálogo de ativos suportados',
+        );
       }
     }
 
@@ -221,8 +214,7 @@ export const deletePosition = asyncHandler(
     const doc = await positionRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Posição não encontrada' });
-      return;
+      throw HttpError.notFound('Posição não encontrada');
     }
 
     await positionRef.delete();
@@ -243,8 +235,7 @@ export const moveToFridge = asyncHandler(
 
     // Validação dos campos obrigatórios
     if (!fridgeId || typeof fridgeId !== 'string') {
-      res.status(400).json({ error: 'fridgeId é obrigatório' });
-      return;
+      throw HttpError.badRequest('fridgeId é obrigatório');
     }
 
     if (
@@ -254,10 +245,9 @@ export const moveToFridge = asyncHandler(
       targetPrice < 0 ||
       !Number.isFinite(targetPrice)
     ) {
-      res.status(400).json({
-        error: 'targetPrice é obrigatório e deve ser um número não negativo',
-      });
-      return;
+      throw HttpError.badRequest(
+        'targetPrice é obrigatório e deve ser um número não negativo',
+      );
     }
 
     const positionRef = positionsCollection(userId, walletId).doc(positionId);

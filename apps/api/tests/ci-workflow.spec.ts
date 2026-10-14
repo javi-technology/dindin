@@ -45,6 +45,15 @@ describe('.github/workflows/ci-cd.yml', () => {
     expect(deploy).toMatch(/needs:[\s\S]*- audit/);
   });
 
+  // #500: o app instalado só é corrigido por uma nova versão nas lojas; o
+  // contrato não pode mudar de forma incompatível sem aviso explícito.
+  it('deve reprovar no job lint a mudança incompatível do OpenAPI em PR', () => {
+    const lint = jobBlock('lint');
+
+    expect(lint).toContain('scripts/openapi-breaking.mjs');
+    expect(lint).toMatch(/if: github\.event_name == 'pull_request'/);
+  });
+
   // #323: a formatação não era verificada em lugar nenhum e dependia de
   // disciplina manual — já houve arquivo desformatado entrando na develop.
   it('deve verificar a formatação no job lint', () => {

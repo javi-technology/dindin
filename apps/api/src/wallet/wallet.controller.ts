@@ -11,6 +11,7 @@ import { asyncHandler } from '../middleware/async-handler';
 import { deleteDocumentCascading } from '../firestore/cascade-delete';
 import { uid, walletsCollection } from '../firestore/paths';
 import { routeParam } from '../shared/route-params';
+import { HttpError } from '../shared/http-error';
 
 // O DinDin é BRL-only por decisão de produto (issue #266, herdada da #105):
 // projeção de proventos, patrimônio e totais consolidados somam valores sem
@@ -38,8 +39,7 @@ export const createWallet = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBody(createWalletSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const { name, description, currency } = parsed.data;
@@ -66,8 +66,7 @@ export const getWallet = asyncHandler(
       .get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Carteira não encontrada' });
-      return;
+      throw HttpError.notFound('Carteira não encontrada');
     }
 
     res.json({ id: doc.id, ...doc.data() });
@@ -82,14 +81,12 @@ export const updateWallet = asyncHandler(
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Carteira não encontrada' });
-      return;
+      throw HttpError.notFound('Carteira não encontrada');
     }
 
     const parsed = parseBody(updateWalletSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     const { name, description, currency } = parsed.data;
@@ -115,8 +112,7 @@ export const deleteWallet = asyncHandler(
     const doc = await walletRef.get();
 
     if (!doc.exists) {
-      res.status(404).json({ error: 'Carteira não encontrada' });
-      return;
+      throw HttpError.notFound('Carteira não encontrada');
     }
 
     // Remove as posições em cascata antes da carteira: o Firestore não apaga

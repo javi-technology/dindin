@@ -4,6 +4,7 @@ import type {
   TickerDividendYield,
 } from 'dindin-shared-types';
 import { logError } from '../shared/logger';
+import { roundCurrency } from '../shared/numbers';
 
 /**
  * Cálculo de proventos: projeção mensal e dividend yield (issue #225).
@@ -46,10 +47,6 @@ function isValidDividend(dividend: Dividend): boolean {
 /** Uniformiza o ticker para agrupar `hglg11`, ` HGLG11 ` e `HGLG11`. */
 export function normalizeTicker(ticker: unknown): string {
   return typeof ticker === 'string' ? ticker.trim().toUpperCase() : '';
-}
-
-function roundYield(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /** Quantidade válida da posição; qualquer coisa fora disso conta como zero. */
@@ -199,7 +196,7 @@ export function computeDividendYield(
       ticker: position.ticker,
       annualIncome,
       currentValue,
-      yield: roundYield(dividendYield),
+      yield: roundCurrency(dividendYield),
     });
 
     totalAnnualIncome += annualIncome;
@@ -215,7 +212,7 @@ export function computeDividendYield(
       currentValue: totalCurrentValue,
       yield:
         totalCurrentValue > 0
-          ? roundYield((totalAnnualIncome / totalCurrentValue) * 100)
+          ? roundCurrency((totalAnnualIncome / totalCurrentValue) * 100)
           : 0,
     },
   };
