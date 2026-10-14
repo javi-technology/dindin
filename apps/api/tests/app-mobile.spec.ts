@@ -53,6 +53,21 @@ describe('app Flutter em apps/mobile', () => {
         'flutter_lints',
       );
     });
+
+    // O `pub get` automático da IDE reescreve o lock a cada abertura, e a
+    // alteração acabava pendente ou entrando no commit de outra issue (#540).
+    // O CI resolve as dependências no `flutter pub get`, dentro das faixas do
+    // pubspec.yaml.
+    it('não deve versionar o pubspec.lock', () => {
+      const versionado = execFileSync(
+        'git',
+        ['ls-files', '--', 'apps/mobile/pubspec.lock'],
+        { cwd: repoRoot, encoding: 'utf-8' },
+      ).trim();
+
+      expect(versionado).toBe('');
+      expect(conteudo('.gitignore')).toMatch(/^apps\/mobile\/pubspec\.lock$/m);
+    });
   });
 
   // A versão do SDK fixada num arquivo próprio é o que permite ao CI usar
