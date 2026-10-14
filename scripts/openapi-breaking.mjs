@@ -10,9 +10,12 @@
  *
  *   - rota ou método removido, ou status de sucesso (2xx) removido;
  *   - na RESPOSTA: campo removido, com outro tipo, que deixou de ser
- *     obrigatório, ou valor novo em enum (o Dart gerado recusa o desconhecido);
- *   - na REQUISIÇÃO: campo obrigatório novo, valor de enum removido, ou campo
- *     que mudou de tipo ou foi removido.
+ *     obrigatório, valor novo em enum ou enum removido (o Dart gerado recusa
+ *     o valor desconhecido);
+ *   - na REQUISIÇÃO: campo obrigatório novo, campo removido, tipo que deixou
+ *     de ser aceito, valor de enum removido ou enum novo em campo livre;
+ *   - nos PARÂMETROS (da operação ou do path): parâmetro obrigatório novo, que
+ *     passou a ser obrigatório, ou com tipo ou enum que recusa o valor antigo.
  *
  * Campo opcional novo na resposta e rota nova são compatíveis. Uma mudança
  * incompatível é aceita quando declarada em `x-incompatible-changes` na raiz
@@ -86,6 +89,8 @@ const achatar = (
   atual.obrigatorio = atual.obrigatorio && obrigatorio;
   saida.set(caminho, atual);
 
+  // `obrigatorio` é relativo ao pai: `.metadata.source` obrigatório dentro de
+  // `metadata` opcional só é exigido de quem manda `metadata`.
   for (const [nome, filho] of Object.entries(props)) {
     achatar(
       doc,
@@ -107,6 +112,95 @@ const achatar = (
 
 const corpoJson = (doc, no) =>
   resolver(doc, no)?.content?.['application/json']?.schema;
+
+/** `.a.b` → `.a`; `.a[]` → `.a`; `.a` → `` (o corpo). */
+const paiDe = (campo) => campo.replace(/(\.[^.[\]]+|\[\])$/, '');
+
+const atomos = (tipos) => new Set([...tipos].flatMap((t) => t.split('|')));
+
+/** O tipo que o cliente antigo manda ainda é aceito? (`integer` cabe em `number`). */
+const tiposRecusados = (antes, depois) => {
+  const aceitos = atomos(depois);
+  return [...atomos(antes)].filter(
+    (t) => !aceitos.has(t) && !(t === 'integer' && aceitos.has('number')),
+  );
+};
+
+/**
+ * O que o cliente antigo manda (corpo ou parâmetro) continua aceito? `remocao`
+ * desliga o aviso de campo removido para parâmetros: o servidor ignora o
+ * parâmetro de query que não conhece, e o de path removido já é rota removida.
+ */
+const compararEntrada = (rotulo, antes, depois, problemas, remocao = true) => {
+  for (const [campo, d] of depois) {
+    const a = antes.get(campo);
+    // Campo novo dentro de objeto novo só é exigido de quem manda o objeto,
+    // e o cliente antigo não o manda: o próprio objeto é que seria avisado.
+    if (!a && d.obrigatorio && campo !== '' && antes.has(paiDe(campo))) {
+      problemas.push(`${rotulo}: campo obrigatório "${campo}" novo`);
+    } else if (a && !a.obrigatorio && d.obrigatorio) {
+      problemas.push(`${rotulo}: campo "${campo}" passou a ser obrigatório`);
+    }
+  }
+  for (const [campo, a] of antes) {
+    const d = depois.get(campo);
+    if (!d) {
+      if (remocao) problemas.push(`${rotulo}: campo "${campo}" removido`);
+      continue;
+    }
+    const recusados = tiposRecusados(a.tipos, d.tipos);
+    if (recusados.length) {
+      problemas.push(
+        `${rotulo}: campo "${campo || '(corpo)'}" mudou de tipo (${[...a.tipos].join(',')} → ${[...d.tipos].join(',')})`,
+      );
+    }
+    if (d.enum.size && !a.enum.size) {
+      problemas.push(
+        `${rotulo}: campo "${campo || '(corpo)'}" passou a ter enum (${[...d.enum].join(', ')})`,
+      );
+    }
+    for (const valor of a.enum) {
+      if (d.enum.size && !d.enum.has(valor)) {
+        problemas.push(
+          `${rotulo}: valor "${valor}" removido do enum de "${campo || '(corpo)'}"`,
+        );
+      }
+    }
+  }
+};
+
+/** Parâmetros da operação somados aos do path; o da operação prevalece. */
+const parametros = (doc, item, operacao) => {
+  const saida = new Map();
+  for (const no of [
+    ...(item.parameters ?? []),
+    ...(operacao.parameters ?? []),
+  ]) {
+    const p = resolver(doc, no);
+    if (!p?.name || !p?.in) continue;
+    const esquema = achatar(doc, p.schema);
+    const raiz = esquema.get('') ?? { tipos: new Set(), enum: new Set() };
+    esquema.set('', { ...raiz, obrigatorio: p.in === 'path' || !!p.required });
+    saida.set(`${p.in}:${p.name}`, esquema);
+  }
+  return saida;
+};
+
+/**
+ * `in:nome` → caminhos `.in:nome...`, sob uma raiz `''` que representa a
+ * operação: assim o parâmetro novo tem pai e entra como campo novo.
+ */
+const achatarParametros = (mapa) => {
+  const saida = new Map([
+    ['', { tipos: new Set(['object']), obrigatorio: true, enum: new Set() }],
+  ]);
+  for (const [chave, esquema] of mapa) {
+    for (const [caminho, info] of esquema) {
+      saida.set(`.${chave}${caminho}`, info);
+    }
+  }
+  return saida;
+};
 
 const comparar = (base, atual) => {
   const problemas = [];
@@ -157,6 +251,11 @@ const comparar = (base, atual) => {
               `${rotulo}: campo "${campo}" deixou de ser obrigatório na resposta`,
             );
           }
+          if (a.enum.size && !d.enum.size) {
+            problemas.push(
+              `${rotulo}: enum de "${campo || '(corpo)'}" removido (o app recusa valor fora de ${[...a.enum].join(', ')})`,
+            );
+          }
           for (const valor of d.enum) {
             if (a.enum.size && !a.enum.has(valor)) {
               problemas.push(
@@ -167,34 +266,19 @@ const comparar = (base, atual) => {
         }
       }
 
-      const antesReq = achatar(base, corpoJson(base, antiga.requestBody));
-      const depoisReq = achatar(atual, corpoJson(atual, nova.requestBody));
-      for (const [campo, d] of depoisReq) {
-        const a = antesReq.get(campo);
-        if (!a && d.obrigatorio && campo !== '') {
-          problemas.push(
-            `${rota}: campo obrigatório "${campo}" novo na requisição`,
-          );
-        } else if (a && !a.obrigatorio && d.obrigatorio) {
-          problemas.push(
-            `${rota}: campo "${campo}" passou a ser obrigatório na requisição`,
-          );
-        }
-      }
-      for (const [campo, a] of antesReq) {
-        const d = depoisReq.get(campo);
-        if (!d) {
-          problemas.push(`${rota}: campo "${campo}" removido da requisição`);
-          continue;
-        }
-        for (const valor of a.enum) {
-          if (d.enum.size && !d.enum.has(valor)) {
-            problemas.push(
-              `${rota}: valor "${valor}" removido do enum de "${campo}" na requisição`,
-            );
-          }
-        }
-      }
+      compararEntrada(
+        `${rota} requisição`,
+        achatar(base, corpoJson(base, antiga.requestBody)),
+        achatar(atual, corpoJson(atual, nova.requestBody)),
+        problemas,
+      );
+      compararEntrada(
+        `${rota} parâmetro`,
+        achatarParametros(parametros(base, operacoes, antiga)),
+        achatarParametros(parametros(atual, atual.paths[caminho], nova)),
+        problemas,
+        false,
+      );
     }
   }
 
