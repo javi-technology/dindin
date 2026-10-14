@@ -15,14 +15,25 @@ Do ponto de vista de quem **consome** a API:
 | Rota nova                                                            | sim         |
 | Campo opcional novo na resposta                                      | sim         |
 | Campo opcional novo na requisição                                    | sim         |
+| Objeto opcional novo na requisição, mesmo com campo obrigatório      | sim         |
+| Parâmetro opcional novo                                              | sim         |
+| Campo da requisição que passou a aceitar mais um tipo                | sim         |
 | Rota, método ou status 2xx removido                                  | **não**     |
 | Campo removido ou renomeado na resposta                              | **não**     |
 | Campo da resposta com outro tipo                                     | **não**     |
 | Campo da resposta que deixou de ser obrigatório                      | **não**     |
 | Valor novo em enum de resposta (o Dart gerado recusa o desconhecido) | **não**     |
-| Campo obrigatório novo na requisição                                 | **não**     |
+| Enum removido de campo da resposta (vira string livre)               | **não**     |
+| Campo obrigatório novo na requisição (ou em objeto que já existia)   | **não**     |
 | Campo da requisição que passou a ser obrigatório                     | **não**     |
-| Valor removido de enum da requisição                                 | **não**     |
+| Campo da requisição que deixou de aceitar o tipo antigo              | **não**     |
+| Valor removido de enum da requisição, ou enum novo em campo livre    | **não**     |
+| Parâmetro obrigatório novo, ou que passou a ser obrigatório          | **não**     |
+| Parâmetro que deixou de aceitar o tipo ou o valor antigo             | **não**     |
+
+Parâmetro é o da operação somado ao do path (`parameters` nos dois níveis).
+Campo obrigatório dentro de objeto opcional **novo** é compatível: o app
+antigo não manda o objeto, então nada lhe é exigido.
 
 Para renomear, entregue o campo novo **ao lado** do antigo, mantenha os dois
 até a versão mínima do app dispensar o antigo e só então o remova.

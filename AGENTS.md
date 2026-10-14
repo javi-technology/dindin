@@ -328,9 +328,11 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   nas lojas o corrige. Por isso:
   - **Mudança incompatível** no contrato é remover ou renomear rota, campo ou
     status 2xx; mudar o tipo de um campo; tornar obrigatório o que era
-    opcional na requisição, ou opcional o que era obrigatório na resposta;
-    acrescentar valor a enum de resposta. Campo opcional novo e rota nova são
-    compatíveis.
+    opcional na requisição ou nos parâmetros (da operação e do path), ou
+    opcional o que era obrigatório na resposta; acrescentar valor a enum de
+    resposta ou remover o enum dela; restringir os valores aceitos na
+    requisição. Campo opcional novo, parâmetro opcional novo, objeto opcional
+    novo (mesmo com campo obrigatório dentro) e rota nova são compatíveis.
   - O CI (`scripts/openapi-breaking.mjs`, no job `lint`, em PR) compara o YAML
     com o da branch-base e **reprova a mudança incompatível**, a menos que
     `x-incompatible-changes` ganhe uma entrada nova (issue, o que mudou e a
