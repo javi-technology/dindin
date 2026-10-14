@@ -11,6 +11,7 @@ jest.mock('firebase-functions/logger', () => ({
 import * as functionsLogger from 'firebase-functions/logger';
 
 import { asyncHandler } from '../../src/middleware/async-handler';
+import { HttpError } from '../../src/shared/http-error';
 
 // ---------------------------------------------------------------------------
 // Testes do asyncHandler (issue #222)
@@ -57,14 +58,19 @@ function createRequest(overrides: Partial<Request> = {}): Request {
 
 describe('asyncHandler', () => {
   let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    warnSpy = jest
+      .spyOn(functionsLogger, 'warn')
+      .mockImplementation(() => undefined);
     errorSpy = jest
       .spyOn(functionsLogger, 'error')
       .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    warnSpy.mockRestore();
     errorSpy.mockRestore();
   });
 
@@ -144,7 +150,7 @@ describe('asyncHandler', () => {
       createResponse() as unknown as Response,
     );
 
-    expect(errorSpy).toHaveBeenCalledWith(
+    expect(warnSpy).toHaveBeenCalledWith(
       'importRecommended',
       expect.objectContaining({ causeStack: origem.stack }),
     );
@@ -191,6 +197,83 @@ describe('asyncHandler', () => {
 
     expect(res.status).not.toHaveBeenCalledWith(500);
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  // Falha de negócio (4xx) é resposta esperada — "não encontrada", "dado
+  // inválido" — e não incidente: logá-la como erro, com stack, afogaria os
+  // erros de verdade no Cloud Logging (issue #508).
+  describe('severidade do log', () => {
+    it('deve logar 4xx como aviso, sem stack', async () => {
+      const handler = jest
+        .fn()
+        .mockRejectedValue(HttpError.notFound('Geladeira não encontrada'));
+
+      await asyncHandler('getFridge', handler)(
+        createRequest(),
+        createResponse() as unknown as Response,
+      );
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith('getFridge', {
+        method: 'GET',
+        path: '/api/wallets/wallet-1',
+        uid: 'user-123',
+        params: { id: 'wallet-1' },
+        message: 'Geladeira não encontrada',
+        status: 404,
+      });
+    });
+
+    it('deve manter 5xx como erro, com stack', async () => {
+      const handler = jest.fn().mockRejectedValue(new Error('Firestore caiu'));
+
+      await asyncHandler('getFridge', handler)(
+        createRequest(),
+        createResponse() as unknown as Response,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(
+        'getFridge',
+        expect.objectContaining({ stack: expect.any(String) }),
+      );
+    });
+  });
+
+  describe('código de contrato', () => {
+    it('deve incluir o code na resposta quando o erro o traz', async () => {
+      const res = createResponse();
+      const handler = jest.fn().mockRejectedValue(
+        HttpError.conflict('Assinatura já ativa', {
+          code: 'ALREADY_SUBSCRIBED',
+        }),
+      );
+
+      await asyncHandler('checkout', handler)(
+        createRequest(),
+        res as unknown as Response,
+      );
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Assinatura já ativa',
+        code: 'ALREADY_SUBSCRIBED',
+      });
+    });
+
+    it('deve manter só `error` quando não há code', async () => {
+      const res = createResponse();
+      const handler = jest
+        .fn()
+        .mockRejectedValue(HttpError.notFound('Item não encontrado'));
+
+      await asyncHandler('getItem', handler)(
+        createRequest(),
+        res as unknown as Response,
+      );
+
+      expect(res.json).toHaveBeenCalledWith({ error: 'Item não encontrado' });
+    });
   });
 
   // O recommended-wallet.controller anexava `statusCode` ao erro e repetia, em

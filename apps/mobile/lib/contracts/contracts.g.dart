@@ -1941,6 +1941,65 @@ class ScheduleTotals {
   };
 }
 
+/// Provento mensal projetado de um ativo, pelo último provento e pela quantidade atual.
+class MonthlyDividendProjection {
+  const MonthlyDividendProjection({
+    required this.ticker,
+    required this.amountPerShare,
+    required this.quantity,
+    required this.monthlyAmount,
+  });
+
+  factory MonthlyDividendProjection.fromJson(Map<String, dynamic> json) =>
+      MonthlyDividendProjection(
+        ticker: json['ticker'] as String,
+        amountPerShare: (json['amountPerShare'] as num).toDouble(),
+        quantity: (json['quantity'] as num).toDouble(),
+        monthlyAmount: (json['monthlyAmount'] as num).toDouble(),
+      );
+
+  final String ticker;
+  final double amountPerShare;
+  final double quantity;
+  final double monthlyAmount;
+
+  Map<String, dynamic> toJson() => {
+    'ticker': ticker,
+    'amountPerShare': amountPerShare,
+    'quantity': quantity,
+    'monthlyAmount': monthlyAmount,
+  };
+}
+
+/// Resposta de `GET /api/dividends/projection`. Não é a de
+/// `/api/monthly-income` (`MonthlyIncomeResponse`), que web e app usam
+/// para a renda projetada.
+class DividendProjectionResponse {
+  const DividendProjectionResponse({
+    required this.projections,
+    required this.total,
+  });
+
+  factory DividendProjectionResponse.fromJson(Map<String, dynamic> json) =>
+      DividendProjectionResponse(
+        projections: (json['projections'] as List<dynamic>)
+            .map(
+              (e) =>
+                  MonthlyDividendProjection.fromJson(e as Map<String, dynamic>),
+            )
+            .toList(),
+        total: (json['total'] as num).toDouble(),
+      );
+
+  final List<MonthlyDividendProjection> projections;
+  final double total;
+
+  Map<String, dynamic> toJson() => {
+    'projections': projections.map((e) => e.toJson()).toList(),
+    'total': total,
+  };
+}
+
 class MonthlyIncomeResponse {
   const MonthlyIncomeResponse({
     required this.byTicker,

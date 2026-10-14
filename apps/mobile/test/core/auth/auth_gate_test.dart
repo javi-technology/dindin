@@ -17,12 +17,16 @@ void main() {
   setUp(() => sessoes = StreamController<Sessao?>.broadcast());
   tearDown(() => sessoes.close());
 
-  Widget arvore({Future<void> Function(Sessao)? aoAutenticar}) => MaterialApp(
+  Widget arvore({
+    Future<void> Function(Sessao)? aoAutenticar,
+    Future<void> Function()? aoEncerrar,
+  }) => MaterialApp(
     home: AuthGate(
       sessoes: sessoes.stream,
       login: const Text('tela de login'),
       autenticado: const Text('tela do app'),
       aoAutenticar: aoAutenticar,
+      aoEncerrar: aoEncerrar,
     ),
   );
 
@@ -123,6 +127,86 @@ void main() {
       await tester.pump();
 
       expect(find.text('tela do app'), findsOneWidget);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Sessão que termina (issue #498)
+  //
+  // No celular a sessão acaba por caminhos que não são o botão de sair: token
+  // revogado, conta removida, 401 que sobrevive à renovação. O que pertencia
+  // ao usuário (o cache) precisa sair junto, senão o próximo a entrar no mesmo
+  // aparelho vê a carteira de quem saiu.
+  // -------------------------------------------------------------------------
+  group('sessão encerrada', () {
+    testWidgets('avisa quando a sessão termina', (tester) async {
+      var encerradas = 0;
+      await tester.pumpWidget(arvore(aoEncerrar: () async => encerradas++));
+      sessoes.add(const Sessao(uid: 'u1', email: 'a@b.c'));
+      await tester.pump();
+      expect(encerradas, 0);
+
+      sessoes.add(null);
+      await tester.pump();
+
+      expect(encerradas, 1);
+    });
+
+    // Abrir o app sem sessão é o caso em que o token foi revogado com o app
+    // fechado: o cache que ficou no aparelho também precisa ser apagado.
+    testWidgets('avisa também quando o app abre sem sessão', (tester) async {
+      var encerradas = 0;
+      await tester.pumpWidget(arvore(aoEncerrar: () async => encerradas++));
+
+      sessoes.add(null);
+      await tester.pump();
+
+      expect(encerradas, 1);
+    });
+
+    testWidgets('não avisa de novo enquanto a sessão segue encerrada', (
+      tester,
+    ) async {
+      var encerradas = 0;
+      await tester.pumpWidget(arvore(aoEncerrar: () async => encerradas++));
+
+      sessoes.add(null);
+      await tester.pump();
+      sessoes.add(null);
+      await tester.pump();
+
+      expect(encerradas, 1);
+    });
+
+    testWidgets('prepara de novo quando o mesmo usuário volta a entrar', (
+      tester,
+    ) async {
+      final preparadas = <String>[];
+      await tester.pumpWidget(
+        arvore(aoAutenticar: (sessao) async => preparadas.add(sessao.uid)),
+      );
+      sessoes.add(const Sessao(uid: 'u1', email: 'a@b.c'));
+      await tester.pump();
+
+      sessoes.add(null);
+      await tester.pump();
+      sessoes.add(const Sessao(uid: 'u1', email: 'a@b.c'));
+      await tester.pump();
+
+      // O cache foi apagado ao sair: sem preparar de novo, o app mostraria a
+      // tela autenticada com o cache sem dono.
+      expect(preparadas, ['u1', 'u1']);
+    });
+
+    testWidgets('uma falha ao avisar não prende o login', (tester) async {
+      await tester.pumpWidget(
+        arvore(aoEncerrar: () => Future<void>.error(Exception('disco'))),
+      );
+
+      sessoes.add(null);
+      await tester.pump();
+
+      expect(find.text('tela de login'), findsOneWidget);
     });
   });
 }

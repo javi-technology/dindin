@@ -112,7 +112,7 @@ describe('AlertMailService', () => {
   it('deve enviar o e-mail pela API do Resend', async () => {
     seedFirestore();
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.resend.com/emails');
@@ -278,7 +278,7 @@ describe('AlertMailService', () => {
   it('não deve reenviar alerta que já tem notifiedEmailAt', async () => {
     const { alertUpdate } = seedFirestore();
 
-    const sent = await sendAlertEmails('user-1', [
+    const { sent } = await sendAlertEmails('user-1', [
       alert({ notifiedEmailAt: '2026-09-18T22:16:00Z' }),
     ]);
 
@@ -293,7 +293,7 @@ describe('AlertMailService', () => {
   it('não deve reenviar alerta legado, marcado só com notifiedAt', async () => {
     const { alertUpdate } = seedFirestore();
 
-    const sent = await sendAlertEmails('user-1', [
+    const { sent } = await sendAlertEmails('user-1', [
       alert({ notifiedAt: '2026-09-18T22:16:00Z' }),
     ]);
 
@@ -306,7 +306,7 @@ describe('AlertMailService', () => {
     const { alertUpdate } = seedFirestore();
     fetchMock.mockResolvedValue(errorResponse());
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(alertUpdate).not.toHaveBeenCalled();
     expect(sent).toBe(0);
@@ -333,7 +333,7 @@ describe('AlertMailService', () => {
     seedFirestore();
     delete process.env.RESEND_API_KEY;
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sent).toBe(0);
@@ -344,7 +344,7 @@ describe('AlertMailService', () => {
     seedFirestore();
     getUserMock.mockResolvedValue({ email: undefined });
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sent).toBe(0);
@@ -355,7 +355,7 @@ describe('AlertMailService', () => {
     seedFirestore();
     getUserMock.mockRejectedValue(new Error('user not found'));
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(sent).toBe(0);
@@ -364,7 +364,7 @@ describe('AlertMailService', () => {
   it('não deve consultar o Auth quando não há alerta a notificar', async () => {
     seedFirestore();
 
-    const sent = await sendAlertEmails('user-1', []);
+    const { sent } = await sendAlertEmails('user-1', []);
 
     expect(getUserMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -377,7 +377,7 @@ describe('AlertMailService', () => {
       .mockResolvedValueOnce(errorResponse(500, 'oops'))
       .mockResolvedValue(okResponse());
 
-    const sent = await sendAlertEmails('user-1', [
+    const { sent } = await sendAlertEmails('user-1', [
       alert(),
       alert({ id: 'fridge-1_MXRF11', ticker: 'MXRF11' }),
     ]);
@@ -395,7 +395,7 @@ describe('AlertMailService', () => {
       );
     });
 
-    const sent = await sendAlertEmails('user-1', [alert()]);
+    const { sent } = await sendAlertEmails('user-1', [alert()]);
 
     expect(sent).toBe(0);
     expect(functionsLogger.error).toHaveBeenCalled();
@@ -410,6 +410,82 @@ function contraste(a: string, b: string): number {
       return valor <= 0.03928
         ? valor / 12.92
         : Math.pow((valor + 0.055) / 1.055, 2.4);
+
+      // -------------------------------------------------------------------------
+      // Falha de envio visível para o job (revisão do PR #519)
+      //
+      // Os envios absorvem a falha de cada alerta para os demais seguirem. Se a
+      // contagem de falhas não sobe até o job, o Resend respondendo 500 deixa o
+      // job terminar com sucesso, sem retry, e o usuário sem aviso.
+      // -------------------------------------------------------------------------
+      describe('falhas devolvidas ao job', () => {
+        it('deve contar como falha o envio recusado pelo Resend', async () => {
+          seedFirestore();
+          fetchMock.mockResolvedValue(errorResponse(500, 'oops'));
+
+          const resultado = await sendAlertEmails('user-1', [alert()]);
+
+          expect(resultado).toEqual({ sent: 0, failed: 1 });
+        });
+
+        it('deve contar a falha e o sucesso quando só um alerta falha', async () => {
+          seedFirestore();
+          fetchMock
+            .mockResolvedValueOnce(errorResponse(500, 'oops'))
+            .mockResolvedValue(okResponse());
+
+          const resultado = await sendAlertEmails('user-1', [
+            alert(),
+            alert({ id: 'fridge-1_MXRF11', ticker: 'MXRF11' }),
+          ]);
+
+          expect(resultado).toEqual({ sent: 1, failed: 1 });
+        });
+
+        it('deve contar como falha a requisição que passa do timeout', async () => {
+          seedFirestore();
+          fetchMock.mockRejectedValue(
+            Object.assign(new Error('aborted'), { name: 'AbortError' }),
+          );
+
+          const resultado = await sendAlertEmails('user-1', [alert()]);
+
+          expect(resultado).toEqual({ sent: 0, failed: 1 });
+        });
+
+        // Sem a chave nenhum alerta sai: é falha de configuração, e o job precisa
+        // dizer isso em vez de terminar como se nada tivesse a enviar.
+        it('deve contar cada alerta como falha quando a RESEND_API_KEY falta', async () => {
+          seedFirestore();
+          delete process.env.RESEND_API_KEY;
+
+          const resultado = await sendAlertEmails('user-1', [
+            alert(),
+            alert({ id: 'fridge-1_MXRF11', ticker: 'MXRF11' }),
+          ]);
+
+          expect(resultado).toEqual({ sent: 0, failed: 2 });
+        });
+
+        // Usuário sem e-mail não é falha: não há o que tentar de novo.
+        it('não deve contar como falha o usuário sem e-mail', async () => {
+          seedFirestore();
+          getUserMock.mockResolvedValue({ email: undefined });
+
+          const resultado = await sendAlertEmails('user-1', [alert()]);
+
+          expect(resultado).toEqual({ sent: 0, failed: 0 });
+        });
+
+        it('não deve contar falha quando não há alerta a notificar', async () => {
+          seedFirestore();
+
+          expect(await sendAlertEmails('user-1', [])).toEqual({
+            sent: 0,
+            failed: 0,
+          });
+        });
+      });
     });
     return 0.2126 * canais[0] + 0.7152 * canais[1] + 0.0722 * canais[2];
   };

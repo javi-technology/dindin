@@ -10,6 +10,7 @@ import {
   simulateAsset as simulateAssetForUser,
   simulateRecommendedWallet,
 } from './simulation.service';
+import { HttpError } from '../shared/http-error';
 
 /**
  * Rotas da simulação (issue #396).
@@ -32,8 +33,7 @@ export const simulateWallet = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBody(walletSimulationSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     res.json(await simulateRecommendedWallet(parsed.data));
@@ -45,8 +45,7 @@ export const simulateAsset = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = parseBody(assetSimulationSchema, req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error });
-      return;
+      throw HttpError.badRequest(parsed.error);
     }
 
     res.json(await simulateAssetForUser(parsed.data));

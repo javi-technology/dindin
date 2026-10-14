@@ -74,9 +74,13 @@ class Recurso<T> extends ChangeNotifier {
       ),
     );
 
+    // A resposta pode chegar depois de outro usuário entrar no mesmo aparelho
+    // (issue #498): gravá-la mostraria a carteira do primeiro ao segundo.
+    final dono = cache.dono;
+
     try {
       final dados = await buscar();
-      await cache.gravar(chave, serializar(dados));
+      if (cache.dono == dono) await cache.gravar(chave, serializar(dados));
 
       _publicar(EstadoDoRecurso(dados: dados, atualizadoEm: DateTime.now()));
     } catch (erro) {

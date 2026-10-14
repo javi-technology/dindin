@@ -1,3 +1,4 @@
+import { SendResult } from './send-result';
 import { getAuth } from 'firebase-admin/auth';
 import { Alert } from 'dindin-models';
 import { alertsCollection } from '../firestore/paths';
@@ -158,26 +159,28 @@ async function postEmail(
 }
 
 /**
- * Envia um e-mail por alerta ainda não notificado e marca `notifiedAt`.
- * Retorna quantos e-mails foram enviados.
+ * Envia um e-mail por alerta ainda não notificado e marca `notifiedEmailAt`.
+ * Devolve quantos foram enviados e quantos falharam (ver `SendResult`).
  */
 export async function sendAlertEmails(
   userId: string,
   alerts: Alert[],
   now = new Date(),
-): Promise<number> {
+): Promise<SendResult> {
   // O estado é por canal desde a #408. `notifiedAt` segue sendo lido para os
   // alertas gravados antes disso: sem ele, o primeiro job depois do deploy
   // reenviaria e-mail de tudo o que já tinha sido avisado.
   const pending = alerts.filter(
     (alert) => !alert.notifiedEmailAt && !alert.notifiedAt,
   );
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { sent: 0, failed: 0 };
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     logError('sendAlertEmails.missingApiKey', { pending: pending.length });
-    return 0;
+    // Sem a chave nenhum alerta sai: é falha de configuração, e o job precisa
+    // dizer isso em vez de terminar como se não houvesse o que enviar.
+    return { sent: 0, failed: pending.length };
   }
 
   const email = await userEmail(userId);
@@ -186,12 +189,14 @@ export async function sendAlertEmails(
       uid: userId,
       pending: pending.length,
     });
-    return 0;
+    // Não é falha: sem e-mail no cadastro não há o que tentar de novo.
+    return { sent: 0, failed: 0 };
   }
 
   const userAlerts = alertsCollection(userId);
   const notifiedEmailAt = now.toISOString();
   let sent = 0;
+  let failed = 0;
 
   for (const alert of pending) {
     try {
@@ -202,7 +207,9 @@ export async function sendAlertEmails(
       await userAlerts.doc(alert.id).update({ notifiedEmailAt });
       sent += 1;
     } catch (error) {
-      // Uma falha de envio não pode impedir o aviso dos demais ativos.
+      // Uma falha de envio não pode impedir o aviso dos demais ativos, mas
+      // é contada: é ela que faz o job falhar e acionar o retry.
+      failed += 1;
       logError('sendAlertEmails.sendFailed', {
         uid: userId,
         ticker: alert.ticker,
@@ -211,5 +218,5 @@ export async function sendAlertEmails(
     }
   }
 
-  return sent;
+  return { sent, failed };
 }

@@ -1,6 +1,13 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { AuthRequest } from './auth.middleware';
 
+/**
+ * Código de contrato do 429 de rate limit (issue #505). A IA também responde
+ * 429, com mensagem de negócio; web e app só mostram o aviso global de espera
+ * quando vem este código.
+ */
+export const RATE_LIMITED = 'RATE_LIMITED';
+
 /** Chave do contador quando o IP do cliente não pôde ser resolvido. */
 const UNKNOWN_IP_KEY = 'unknown-ip';
 
@@ -31,7 +38,7 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   keyGenerator: (req) => (req.ip ? ipKeyGenerator(req.ip) : UNKNOWN_IP_KEY),
-  message: { error: 'Muitas requisições' },
+  message: { error: 'Muitas requisições', code: RATE_LIMITED },
   validate: { trustProxy: false },
 });
 
@@ -52,5 +59,5 @@ export const adminRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req: AuthRequest) =>
     req.user?.uid ?? ipKeyGenerator(req.ip ?? ''),
-  message: { error: 'Muitas requisições' },
+  message: { error: 'Muitas requisições', code: RATE_LIMITED },
 });

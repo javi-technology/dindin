@@ -46,7 +46,12 @@ export class UnfreezeFormComponent implements OnInit {
     this.form.reset({ walletId: this.wallets()[0]?.id ?? '' });
   }
 
+  /** Envio em andamento no pai: bloqueia o segundo envio e o botão (#497). */
+  readonly submitting = input(false);
+
   submit(): void {
+    if (this.submitting()) return;
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;

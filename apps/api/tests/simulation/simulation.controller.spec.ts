@@ -27,17 +27,19 @@ jest.mock('../../src/billing/entitlement.service', () => ({
 }));
 
 import { app } from '../../src/index';
+import {
+  opcaoDeCarteiraFixture,
+  simulacaoDeCarteiraFixture,
+} from '../support/fixtures-contrato';
 
-const result = { totalIncome: 10, byTicker: [], unallocatedAmount: 0 };
+const result = simulacaoDeCarteiraFixture;
 
 describe('simulation.controller — carteira sugerida', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     simulateRecommendedWalletMock.mockResolvedValue(result);
-    listSimulationProvidersMock.mockResolvedValue([
-      { slug: 'bb-fii', label: 'Banco do Brasil — FIIs', months: ['2026-09'] },
-    ]);
+    listSimulationProvidersMock.mockResolvedValue([opcaoDeCarteiraFixture]);
     // A simulação geral é gratuita: nenhuma rota dela consulta assinatura.
     hasEntitlementMock.mockResolvedValue(false);
   });

@@ -131,4 +131,20 @@ describe('UnfreezeFormComponent', () => {
 
     expect(fechados).toBe(1);
   });
+
+  describe('envio em andamento (issue #497)', () => {
+    it('não deve emitir nem habilitar o botão enquanto o envio não responde', () => {
+      setup();
+      component.form.patchValue({ walletId: 'wallet-2' });
+      fixture.componentRef.setInput('submitting', true);
+      fixture.detectChanges();
+
+      component.submit();
+
+      expect(confirmadas).toEqual([]);
+      expect(
+        (element('button[type="submit"]') as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+  });
 });

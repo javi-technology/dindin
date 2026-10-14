@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dindin_mobile/core/api/api_client.dart';
 import 'package:dindin_mobile/core/assinatura/assinatura_service.dart';
 import 'package:dindin_mobile/core/auth/auth_service.dart';
-import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/notificacoes/notificacoes_service.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
@@ -19,6 +18,7 @@ import 'package:dindin_mobile/features/inicio/inicio_screen.dart';
 
 import '../../core/auth/auth_backend_falso.dart';
 import '../../core/notificacoes/notificacoes_backend_falso.dart';
+import '../../support/cache_de_teste.dart';
 
 // ---------------------------------------------------------------------------
 // Catálogo que chega depois de o formulário abrir (review da #468).
@@ -100,7 +100,7 @@ void main() {
         home: InicioScreen(
           auth: AuthService(AuthBackendFalso()),
           api: api,
-          cache: await CacheLocal.abrir(),
+          cache: await cacheDeTeste(),
           tema: await ThemeController.carregar(),
           notificacoes: await NotificacoesService.carregar(
             backend: NotificacoesBackendFalso(),

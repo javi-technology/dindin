@@ -310,6 +310,42 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   só apareceria no celular do usuário, depois do deploy (issue #399).
 - Um teste compara as rotas registradas no Express com os paths do YAML:
   rota fora da descrição, ou descrição sem rota, reprova a suíte.
+- **Rota nova ou alterada tem a resposta validada contra o schema** (issue
+  #499). O `supertest` dos testes de API confere sozinho o corpo de toda
+  resposta contra o `openapi/dindin.yaml` (`tests/setup-contrato-openapi.ts`,
+  helper em `tests/support/openapi-contract.ts`), no job `build-and-test-api`:
+  corpo fora do schema, status não descrito ou corpo em resposta declarada sem
+  corpo reprovam o teste. 401, 413, 429 e 500 vêm de middleware, valem para
+  toda rota e são conferidos como `ErrorResponse` sem declaração por operação.
+  Ao mockar um serviço no teste de controller, a fixture respeita o contrato:
+  use as de `tests/support/fixtures-contrato.ts`, tipadas com os tipos
+  gerados, em vez de `{ id: 'x' }`. Corrigir a divergência é no código **ou**
+  no YAML, o que for o erro. A primeira execução achou dois casos em que o
+  YAML mentia: `GET /api/dividends/projection` e `GET .../suggestions`.
+- **Compatibilidade com o app instalado** (issue #500; detalhes em
+  `docs/compatibilidade-app-api.md`). O web atualiza com o Hosting; o app
+  continua rodando a versão antiga depois de um deploy, e só uma nova versão
+  nas lojas o corrige. Por isso:
+  - **Mudança incompatível** no contrato é remover ou renomear rota, campo ou
+    status 2xx; mudar o tipo de um campo; tornar obrigatório o que era
+    opcional na requisição ou nos parâmetros (da operação e do path), ou
+    opcional o que era obrigatório na resposta; acrescentar valor a enum de
+    resposta ou remover o enum dela; restringir os valores aceitos na
+    requisição. Campo opcional novo, parâmetro opcional novo, objeto opcional
+    novo (mesmo com campo obrigatório dentro) e rota nova são compatíveis.
+  - O CI (`scripts/openapi-breaking.mjs`, no job `lint`, em PR) compara o YAML
+    com o da branch-base e **reprova a mudança incompatível**, a menos que
+    `x-incompatible-changes` ganhe uma entrada nova (issue, o que mudou e a
+    versão mínima do app). Prefira o caminho compatível: campo novo ao lado do
+    antigo, e o antigo sai depois que a versão mínima o dispensa.
+  - O app manda `X-App-Version` em toda requisição. Abaixo de `APP_MIN_VERSION`
+    a API responde **426** com `code: APP_UPDATE_REQUIRED` (antes da
+    autenticação, em `/api/*`) e o app troca a tela por "Atualize o DinDin".
+    Quem não manda o cabeçalho (web e apps anteriores à política) passa.
+  - Subir a versão mínima é deliberado: só depois de a versão corrigida estar
+    publicada nas duas lojas, ou o usuário fica sem app utilizável.
+  - O app ignora campo desconhecido na resposta (o modelo gerado lê só o que
+    conhece).
 - `npm run contracts:check` roda em **dois** jobs do CI: no `lint`, que não
   tem SDK do Dart e confere o TypeScript, e no `build-and-test-mobile`, que
   tem o Flutter e confere o modelo Dart.
@@ -369,10 +405,16 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ### Operações de escrita do app (`apps/mobile`)
 
-- **Envio duplicado não pode gerar registro duplicado.** No celular, tocar de
+- **Envio duplicado não pode gerar registro duplicado — no web, no app e na
+  API.** O web reserva o envio com `Submission` (`shared/utils/submission.util.ts`)
+  e deixa o botão indisponível até a resposta, inclusive em falha. A API também
+  recusa, com **409**, a criação de posição ou de item idêntica a uma gravada
+  há menos de 10 segundos (`addUnlessRecentDuplicate`, em transação): o
+  cliente não é a única proteção, porque um app antigo, um retry de rede e um
+  segundo dispositivo não passam por ela (issue #497). No celular, tocar de
   novo quando a resposta demora é o comportamento normal do usuário, e o
   resultado seria posição duplicada — erro de dado financeiro, não incômodo de
-  interface. A proteção está em dois lugares: o mixin `EnvioDeFormulario`
+  interface. No app, a proteção está em dois lugares: o mixin `EnvioDeFormulario`
   descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
 - **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
   o que foi digitado permanece. Refazer o preenchimento no teclado do celular
@@ -451,10 +493,22 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   não sabe.
 - Valorização e desvalorização usam `positive` e `danger`, nunca o token da
   marca.
-- O logout limpa o cache (`CacheLocal.limpar`): o dado é do usuário
-  autenticado, e deixá-lo para trás mostraria a carteira de quem saiu para
-  quem entrar depois no mesmo aparelho. A escolha de tema não é dado de
-  usuário e permanece.
+- **O cache é do usuário que o gravou** (issue #498). O `CacheLocal` só lê e
+  grava para o usuário vinculado (`vincularA(uid)`), e o uid vai na chave de
+  cada entrada. O vínculo acompanha a **sessão**, e não o botão de sair: o
+  `AuthGate` vincula ao autenticar (`aoAutenticar`) e desvincula, apagando
+  tudo, quando a sessão termina por qualquer caminho (`aoEncerrar`), inclusive
+  ao abrir o app sem sessão. Token revogado, conta removida e 401 que
+  sobrevive à renovação não passam pelo botão, e quem entrar depois no mesmo
+  aparelho veria a carteira de quem saiu. A resposta que chega depois de trocar
+  de usuário não é gravada (`Recurso`). A escolha de tema não é dado de usuário
+  e permanece.
+- **O cache fica no armazenamento seguro do sistema** (Keychain no iOS,
+  Keystore no Android, via `flutter_secure_storage`), nunca nas preferências em
+  texto puro: patrimônio, carteiras e proventos são dado financeiro. O item
+  não migra para outro aparelho nem entra em backup. Ao abrir, o cache apaga o
+  que as versões anteriores deixaram nas preferências. Os testes usam
+  `ArmazenamentoEmMemoria`, em `test/support/`.
 - O conteúdo passado a `VisaoRecurso` **precisa ser rolável**: é o que habilita
   o puxar-para-atualizar, o gesto que o usuário tenta antes de procurar botão.
 
@@ -635,6 +689,21 @@ Regras:
 - `expose` segue o padrão da classe: 4xx expõe a mensagem, 5xx não. Só marque
   um 5xx como exposto quando o texto for escrito para a tela (ex.: o 502 do
   provedor de IA).
+- **Os controllers não respondem 4xx direto.** `res.status(4xx).json({ error })`
+  é reprovado pelo ESLint (`no-restricted-syntax`, issue #508): lance o
+  `HttpError` e deixe o `asyncHandler` responder. Código de contrato (como
+  `ALREADY_SUBSCRIBED`) vai em `{ code }` (`HttpError.conflict(msg, { code })`)
+  e o `asyncHandler` o devolve ao lado de `error`. Falha 4xx é logada como
+  **aviso**, sem stack; 5xx continua erro. Ficam de fora os middlewares e os
+  webhooks (`handleWebhook`, notificações das lojas), que não passam pelo
+  `asyncHandler` e desligam a regra na linha, com o motivo.
+- **Web e app tratam os mesmos erros HTTP, do mesmo jeito** (issue #505; matriz
+  em `docs/tratamento-erros-http.md`). O 429 de rate limit traz
+  `code: RATE_LIMITED` e `Retry-After`: o `httpErrorInterceptor` (web) e o
+  `ApiClient` (app) mostram um aviso global com a espera, em qualquer tela, e
+  trocam a mensagem do erro por um texto em pt-BR. O 429 de negócio (limite
+  diário da IA) não tem esse código e segue com o texto da API. Mudou uma
+  linha da matriz num lado: mude no outro e nos testes dos dois.
 - **Mensagens de erro sempre em português (pt-BR)**, porque algumas chegam à
   tela do usuário. Ficam em inglês apenas o `statusText` do HTTP e códigos de
   contrato consumidos pelo frontend, como `code: 'SUBSCRIPTION_REQUIRED'`.

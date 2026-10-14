@@ -10,7 +10,11 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 jest.mock('../../src/alerts/alert-mail.service', () => ({
-  sendAlertEmails: jest.fn().mockResolvedValue(0),
+  sendAlertEmails: jest.fn().mockResolvedValue({ sent: 0, failed: 0 }),
+}));
+
+jest.mock('../../src/alerts/alert-push.service', () => ({
+  sendAlertPushes: jest.fn().mockResolvedValue({ sent: 0, failed: 0 }),
 }));
 
 jest.mock('firebase-functions/logger', () => ({
@@ -25,6 +29,7 @@ jest.mock('firebase-functions/logger', () => ({
 import * as functionsLogger from 'firebase-functions/logger';
 
 import { sendAlertEmails } from '../../src/alerts/alert-mail.service';
+import { sendAlertPushes } from '../../src/alerts/alert-push.service';
 import {
   checkAllTargetPrices,
   checkUserTargetPrices,
@@ -618,18 +623,163 @@ describe('TargetPriceService – notificação dos alertas criados', () => {
     expect(sendAlertEmails).not.toHaveBeenCalled();
   });
 
-  it('deve concluir o job mesmo se a notificação de um usuário falhar', async () => {
-    seedFirestore({
-      quotes: { HGLG11: 125 },
-      fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
-      users: ['user-1', 'user-2'],
-    });
-    (sendAlertEmails as jest.Mock).mockRejectedValueOnce(
-      new Error('mail indisponível'),
-    );
+  // -------------------------------------------------------------------------
+  // Falha do job (issue #501)
+  //
+  // Os demais jobs agendados lançam ao falhar, e é o erro que aciona o
+  // `retryCount` e deixa rastro no Cloud Logging. O de preço-alvo só contava
+  // `failed` e terminava com sucesso: falhando para todos os usuários, ninguém
+  // era avisado, e nem o retry rodava. O retry é seguro porque o estado de
+  // envio é gravado por canal (#408): o que já saiu não sai de novo.
+  // -------------------------------------------------------------------------
+  describe('falha do job', () => {
+    it('deve sinalizar a falha ao final quando o e-mail de um usuário falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+        users: ['user-1', 'user-2'],
+      });
+      (sendAlertEmails as jest.Mock).mockRejectedValueOnce(
+        new Error('mail indisponível'),
+      );
 
-    await expect(checkAllTargetPrices()).resolves.toBeUndefined();
-    expect(functionsLogger.error).toHaveBeenCalled();
+      await expect(checkAllTargetPrices()).rejects.toThrow(
+        /checkAllTargetPrices.*1 falha/,
+      );
+      expect(functionsLogger.error).toHaveBeenCalled();
+    });
+
+    // Lançar não pode interromper o job: os demais usuários seguem sendo
+    // avisados, e o erro vem só no fim.
+    it('deve avisar os demais usuários antes de sinalizar a falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+        users: ['user-1', 'user-2'],
+      });
+      (sendAlertEmails as jest.Mock).mockRejectedValueOnce(
+        new Error('mail indisponível'),
+      );
+
+      await expect(checkAllTargetPrices()).rejects.toThrow();
+
+      expect(sendAlertEmails).toHaveBeenCalledTimes(2);
+    });
+
+    it('deve sinalizar a falha quando o push de um usuário falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertPushes as jest.Mock).mockRejectedValueOnce(
+        new Error('fcm indisponível'),
+      );
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/1 falha/);
+    });
+
+    it('deve sinalizar a falha quando a verificação de um usuário falha', async () => {
+      const { alertsCollection } = seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+        users: ['user-1', 'user-2'],
+      });
+      alertsCollection.where.mockImplementationOnce(() => ({
+        get: jest.fn().mockRejectedValue(new Error('firestore caiu')),
+      }));
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/1 falha/);
+    });
+
+    it('deve contar cada falha, de qualquer etapa', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+        users: ['user-1', 'user-2'],
+      });
+      // `Once`: um `mockRejectedValue` permanente vazaria para os testes
+      // seguintes, que compartilham o mesmo mock do módulo.
+      (sendAlertPushes as jest.Mock)
+        .mockRejectedValueOnce(new Error('fcm'))
+        .mockRejectedValueOnce(new Error('fcm'));
+      (sendAlertEmails as jest.Mock)
+        .mockRejectedValueOnce(new Error('mail'))
+        .mockRejectedValueOnce(new Error('mail'));
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/4 falha/);
+    });
+
+    // Os envios absorvem a falha de cada alerta e devolvem a contagem: é ela
+    // que faz o job falhar quando o Resend responde 500 ou o FCM não entrega
+    // (revisão do PR #519).
+    it('deve sinalizar a falha que o envio de e-mail devolve sem lançar', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertEmails as jest.Mock).mockResolvedValueOnce({
+        sent: 0,
+        failed: 1,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/1 falha/);
+    });
+
+    it('deve sinalizar a falha que o envio de push devolve sem lançar', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertPushes as jest.Mock).mockResolvedValueOnce({
+        sent: 0,
+        failed: 2,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow(/2 falha/);
+    });
+
+    it('deve contar o que foi enviado mesmo quando há falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertEmails as jest.Mock).mockResolvedValueOnce({
+        sent: 3,
+        failed: 1,
+      });
+
+      await expect(checkAllTargetPrices()).rejects.toThrow();
+
+      expect(functionsLogger.info).toHaveBeenCalledWith(
+        'checkAllTargetPrices.done',
+        expect.objectContaining({ notified: 3, failed: 1 }),
+      );
+    });
+
+    it('deve terminar sem erro quando tudo dá certo', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+        users: ['user-1', 'user-2'],
+      });
+
+      await expect(checkAllTargetPrices()).resolves.toBeUndefined();
+    });
+
+    it('deve registrar o resultado do job antes de sinalizar a falha', async () => {
+      seedFirestore({
+        quotes: { HGLG11: 125 },
+        fridges: [{ id: 'fridge-1', name: 'Geladeira FIIs', items: [item()] }],
+      });
+      (sendAlertEmails as jest.Mock).mockRejectedValueOnce(new Error('mail'));
+
+      await expect(checkAllTargetPrices()).rejects.toThrow();
+
+      expect(functionsLogger.info).toHaveBeenCalledWith(
+        'checkAllTargetPrices.done',
+        expect.objectContaining({ failed: 1 }),
+      );
+    });
   });
 });
 
@@ -689,7 +839,7 @@ describe('TargetPriceService – envio dos avisos pelo job', () => {
       maxConcurrent = Math.max(maxConcurrent, running);
       await new Promise((resolve) => setImmediate(resolve));
       running -= 1;
-      return 1;
+      return { sent: 1, failed: 0 };
     });
 
     await checkAllTargetPrices();

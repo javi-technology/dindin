@@ -125,4 +125,23 @@ describe('MoveToFridgeFormComponent', () => {
 
     expect(fechados).toBe(1);
   });
+
+  describe('envio em andamento (issue #497)', () => {
+    it('não deve emitir nem habilitar o botão enquanto o envio não responde', () => {
+      setup();
+      component.form.patchValue({
+        fridgeId: 'fridge-2',
+        targetPrice: '120,50',
+      });
+      fixture.componentRef.setInput('submitting', true);
+      fixture.detectChanges();
+
+      component.submit();
+
+      expect(confirmados).toEqual([]);
+      expect(
+        (element('button[type="submit"]') as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+  });
 });

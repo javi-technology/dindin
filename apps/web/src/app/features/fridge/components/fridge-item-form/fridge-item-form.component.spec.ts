@@ -179,4 +179,25 @@ describe('FridgeItemFormComponent', () => {
 
     expect(fechados).toBe(1);
   });
+
+  describe('envio em andamento (issue #497)', () => {
+    it('não deve emitir nem habilitar o botão enquanto o envio não responde', () => {
+      setup();
+      component.form.patchValue({
+        ticker: 'hglg11',
+        quantity: 15,
+        transferredPrice: '110,50',
+        targetPrice: '120',
+      });
+      fixture.componentRef.setInput('submitting', true);
+      fixture.detectChanges();
+
+      component.submit();
+
+      expect(salvos).toEqual([]);
+      expect(
+        (element('button[type="submit"]') as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+  });
 });

@@ -10,8 +10,7 @@
  * o mesmo conteúdo.
  *
  * Uso (a partir da raiz do repositório):
- *   GOOGLE_APPLICATION_CREDENTIALS=<caminho-da-service-account> \
- *     npm run backfill:dividend-history --workspace=apps/api
+ *   npm run backfill:dividend-history --workspace=apps/api
  *
  * Para validar em um ativo antes de rodar em todos, defina BACKFILL_TICKER:
  *   BACKFILL_TICKER=HGLG11 npm run backfill:dividend-history --workspace=apps/api
@@ -19,7 +18,8 @@
  * Em CI, use o workflow manual `.github/workflows/backfill-dividend-history.yml`,
  * que já autentica com a service account do projeto.
  *
- * Requer credenciais com permissão de escrita no Firestore do projeto.
+ * Requer credenciais com permissão de escrita no Firestore do projeto, pelas
+ * Application Default Credentials: ver docs/credenciais-locais.md.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { quotesCollection } from '../firestore/paths';

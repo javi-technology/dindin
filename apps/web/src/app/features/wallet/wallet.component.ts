@@ -18,6 +18,7 @@ import {
 } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
 import { PositionsTableComponent } from './components/positions-table/positions-table.component';
@@ -30,6 +31,7 @@ import {
   MoveToFridgeValue,
 } from './components/move-to-fridge-form/move-to-fridge-form.component';
 import { WalletService } from '../../core/services/wallet.service';
+import { Submission } from '../../shared/utils/submission.util';
 import { PositionService } from '../../core/services/position.service';
 import { FridgeService } from '../../core/services/fridge.service';
 import { AssetService } from '../../core/services/asset.service';
@@ -66,6 +68,10 @@ export class WalletComponent implements OnInit {
   private readonly dividendService = inject(DividendService);
   private readonly setupService = inject(SetupService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Um envio por vez: o segundo toque não pode virar posição duplicada (#497). */
+  readonly positionSubmission = new Submission();
+  readonly moveSubmission = new Submission();
   /**
    * Carteira a carregar. O switchMap sobre este Subject cancela a requisição
    * em voo quando outra carteira é escolhida, para que a resposta atrasada da
@@ -86,6 +92,8 @@ export class WalletComponent implements OnInit {
   editingPosition = signal<Position | null>(null);
   formVisible = signal(false);
   formError = signal<string | null>(null);
+  /** Aviso que não é falha: o registro repetido já estava gravado (#497). */
+  notice = signal<string | null>(null);
   deleteConfirmPosition = signal<Position | null>(null);
 
   fridges = signal<Fridge[]>([]);
@@ -233,6 +241,7 @@ export class WalletComponent implements OnInit {
     this.editingPosition.set(position);
     this.formVisible.set(true);
     this.formError.set(null);
+    this.notice.set(null);
   }
 
   closeForm(): void {
@@ -250,24 +259,45 @@ export class WalletComponent implements OnInit {
       return;
     }
 
+    // O guard vem antes de montar a requisição: a chamada ao serviço é o envio.
+    if (!this.positionSubmission.start()) return;
+
     const editing = this.editingPosition();
     const request$ = editing
       ? this.positionService.update(wallet.id, editing.id, payload)
       : this.positionService.create(wallet.id, payload);
 
-    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.closeForm();
-        this.loadPositions(wallet.id);
-      },
-      error: () => {
-        this.formError.set(
-          editing
-            ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'
-            : 'Erro ao criar posição. Verifique os dados e tente novamente.',
-        );
-      },
-    });
+    request$
+      .pipe(
+        finalize(() => this.positionSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.closeForm();
+          this.loadPositions(wallet.id);
+        },
+        error: (err: HttpErrorResponse) => {
+          // 409 é a API recusando o envio repetido: a posição já foi gravada
+          // (típico de um retry depois de a resposta anterior se perder), e a
+          // tela não pode dizer que falhou (revisão do PR #517).
+          if (!editing && err.status === 409) {
+            this.closeForm();
+            this.notice.set(
+              err.error?.error ??
+                'Esta posição já foi cadastrada há instantes.',
+            );
+            this.loadPositions(wallet.id);
+            return;
+          }
+
+          this.formError.set(
+            editing
+              ? 'Erro ao atualizar posição. Verifique os dados e tente novamente.'
+              : 'Erro ao criar posição. Verifique os dados e tente novamente.',
+          );
+        },
+      });
   }
 
   deletePosition(position: Position): void {
@@ -310,9 +340,14 @@ export class WalletComponent implements OnInit {
     const wallet = this.selectedWallet();
     if (!position || !wallet) return;
 
+    if (!this.moveSubmission.start()) return;
+
     this.positionService
       .moveToFridge(wallet.id, position.id, payload)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        finalize(() => this.moveSubmission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: () => {
           this.closeMoveToFridge();

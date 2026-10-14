@@ -19,7 +19,18 @@ jest.mock('firebase-admin/firestore', () => ({
   getFirestore: jest.fn(() => firestoreMock),
 }));
 
+// A proteção contra envio idêntico em sequência (issue #497) é testada contra o
+// emulador em `tests/shared/recent-duplicate.spec.ts`. Aqui ela é um dublê que
+// grava como antes, para os testes da rota seguirem exercitando o `add`.
+const addUnlessRecentDuplicateMock = jest.fn();
+
+jest.mock('../../src/shared/recent-duplicate', () => ({
+  addUnlessRecentDuplicate: (...args: unknown[]) =>
+    addUnlessRecentDuplicateMock(...args),
+}));
+
 import { app } from '../../src/index';
+import { HttpError } from '../../src/shared/http-error';
 import { Fridge, FridgeItem, Wallet } from 'dindin-models';
 
 /* ---------- Helpers de mock ---------- */
@@ -433,6 +444,13 @@ describe('Fridge CRUD', () => {
   beforeEach(() => {
     verifyIdTokenMock.mockReset();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
+    addUnlessRecentDuplicateMock.mockReset();
+    addUnlessRecentDuplicateMock.mockImplementation(
+      async (
+        collection: { add: (data: unknown) => Promise<{ id: string }> },
+        data: unknown,
+      ) => (await collection.add(data)).id,
+    );
   });
 
   describe('GET /api/fridges', () => {
@@ -718,6 +736,13 @@ describe('FridgeItem CRUD', () => {
   beforeEach(() => {
     verifyIdTokenMock.mockReset();
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
+    addUnlessRecentDuplicateMock.mockReset();
+    addUnlessRecentDuplicateMock.mockImplementation(
+      async (
+        collection: { add: (data: unknown) => Promise<{ id: string }> },
+        data: unknown,
+      ) => (await collection.add(data)).id,
+    );
   });
 
   describe('GET /api/fridges/:fridgeId/items', () => {
@@ -812,6 +837,52 @@ describe('FridgeItem CRUD', () => {
 
       expect(response.status).toBe(200);
       expect(response.body[0]).not.toHaveProperty('currentPriceQuotedAt');
+    });
+  });
+
+  describe('POST /api/fridges/:fridgeId/items: envio repetido (issue #497)', () => {
+    const corpo = {
+      ticker: 'HGLG11',
+      quantity: 5,
+      transferredPrice: 95.0,
+      targetPrice: 110.0,
+    };
+
+    it('deve gravar pela proteção contra envio idêntico em sequência', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], []);
+
+      await request(app)
+        .post('/api/fridges/fridge-1/items')
+        .set('Authorization', authHeader)
+        .send(corpo);
+
+      expect(addUnlessRecentDuplicateMock).toHaveBeenCalledTimes(1);
+      expect(addUnlessRecentDuplicateMock.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          fridgeId: 'fridge-1',
+          ticker: 'HGLG11',
+          quantity: 5,
+          transferredPrice: 95.0,
+          targetPrice: 110.0,
+        }),
+      );
+    });
+
+    it('deve retornar 409 quando o mesmo item acaba de ser enviado', async () => {
+      firestoreMock = createFirestoreMock([baseFridge], []);
+      addUnlessRecentDuplicateMock.mockRejectedValue(
+        HttpError.conflict('Um registro idêntico foi enviado há instantes.'),
+      );
+
+      const response = await request(app)
+        .post('/api/fridges/fridge-1/items')
+        .set('Authorization', authHeader)
+        .send(corpo);
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe(
+        'Um registro idêntico foi enviado há instantes.',
+      );
     });
   });
 

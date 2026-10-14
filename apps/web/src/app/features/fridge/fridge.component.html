@@ -30,6 +30,15 @@
         }
       </div>
 
+      @if (notice()) {
+        <div
+          class="bg-info-soft text-info-ink rounded-lg p-4 mb-4"
+          data-testid="notice-message"
+        >
+          {{ notice() }}
+        </div>
+      }
+
       @if (error()) {
         <div
           class="bg-danger-soft text-danger-ink rounded-lg p-4 mb-4"
@@ -103,6 +112,7 @@
         [assets]="assets()"
         [assetsError]="assetsError()"
         [error]="formError()"
+        [submitting]="itemSubmission.pending()"
         (save)="saveItem($event)"
         (closed)="closeForm()"
       />
@@ -135,6 +145,7 @@
         [item]="unfreezeItemTarget()!"
         [wallets]="wallets()"
         [error]="unfreezeError()"
+        [submitting]="unfreezeSubmission.pending()"
         (confirmed)="confirmUnfreeze($event)"
         (closed)="cancelUnfreeze()"
       />

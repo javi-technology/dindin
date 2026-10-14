@@ -4,6 +4,7 @@ import type {
   MonthlyDividendReportMonth,
   TickerTotal,
 } from 'dindin-shared-types';
+import { roundCurrency } from '../shared/numbers';
 
 export type { MonthlyDividendReport, MonthlyDividendReportMonth, TickerTotal };
 
@@ -11,10 +12,6 @@ export const MIN_REPORT_YEAR = 1900;
 export const MAX_REPORT_YEAR = 2100;
 
 const PAYMENT_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-function roundTotal(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 export function isValidPaymentDate(value: unknown): value is string {
   if (typeof value !== 'string' || !PAYMENT_DATE_REGEX.test(value)) {
@@ -121,14 +118,14 @@ export function buildMonthlyDividendReport(
       .sort(([tickerA], [tickerB]) => tickerA.localeCompare(tickerB))
       .map(([ticker, tickerTotal]) => ({
         ticker,
-        total: roundTotal(tickerTotal),
+        total: roundCurrency(tickerTotal),
       }));
 
   const months = [...monthTotals.entries()]
     .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
     .map(([month, monthData]) => ({
       month,
-      total: roundTotal(monthData.total),
+      total: roundCurrency(monthData.total),
       byTicker: toTickerTotals(monthData.byTicker),
     }));
 
@@ -136,7 +133,7 @@ export function buildMonthlyDividendReport(
     year,
     months,
     byTicker: toTickerTotals(yearTotals),
-    total: roundTotal(total),
+    total: roundCurrency(total),
     availableYears: [...availableYears].sort((yearA, yearB) => yearB - yearA),
   };
 }

@@ -15,7 +15,9 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 import { AssetService } from '../../core/services/asset.service';
+import { Submission } from '../../shared/utils/submission.util';
 import { ASSET_TYPES, Asset, AssetType } from 'dindin-models';
 import { LucidePlus, LucideArrowLeft, LucidePencil } from '@lucide/angular';
 
@@ -37,6 +39,9 @@ export class AdminAssetsComponent implements OnInit {
   private readonly assetService = inject(AssetService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Um envio por vez: o segundo toque não pode virar cadastro repetido (#497). */
+  readonly submission = new Submission();
 
   assets = signal<Asset[]>([]);
   loading = signal(false);
@@ -103,6 +108,9 @@ export class AdminAssetsComponent implements OnInit {
       return;
     }
 
+    // O guard vem antes de montar a requisição: a chamada ao serviço é o envio.
+    if (!this.submission.start()) return;
+
     const formValue = this.form.getRawValue();
     const ticker = (formValue.ticker as string).trim().toUpperCase();
     const payload = {
@@ -116,25 +124,30 @@ export class AdminAssetsComponent implements OnInit {
       ? this.assetService.update(editingTicker, payload)
       : this.assetService.create({ ticker, ...payload });
 
-    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (asset) => {
-        this.successMessage.set(
-          editingTicker
-            ? `Ativo ${asset.ticker} atualizado com sucesso.`
-            : `Ativo ${asset.ticker} cadastrado com sucesso.`,
-        );
-        this.resetForm();
-        this.loadAssets();
-      },
-      error: (err) => {
-        const message =
-          err.error?.error ||
-          (editingTicker
-            ? 'Erro ao atualizar ativo. Tente novamente.'
-            : 'Erro ao cadastrar ativo. Tente novamente.');
-        this.formError.set(message);
-      },
-    });
+    request
+      .pipe(
+        finalize(() => this.submission.finish()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (asset) => {
+          this.successMessage.set(
+            editingTicker
+              ? `Ativo ${asset.ticker} atualizado com sucesso.`
+              : `Ativo ${asset.ticker} cadastrado com sucesso.`,
+          );
+          this.resetForm();
+          this.loadAssets();
+        },
+        error: (err) => {
+          const message =
+            err.error?.error ||
+            (editingTicker
+              ? 'Erro ao atualizar ativo. Tente novamente.'
+              : 'Erro ao cadastrar ativo. Tente novamente.');
+          this.formError.set(message);
+        },
+      });
   }
 
   startEditing(asset: Asset): void {

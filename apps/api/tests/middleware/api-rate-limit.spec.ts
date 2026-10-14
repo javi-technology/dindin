@@ -58,7 +58,12 @@ describe('rate limiting global da API', () => {
     const blocked = await getMe(ip);
 
     expect(blocked.status).toBe(429);
-    expect(blocked.body).toEqual({ error: 'Muitas requisições' });
+    expect(blocked.body).toEqual({
+      error: 'Muitas requisições',
+      code: 'RATE_LIMITED',
+    });
+    // Os clientes avisam quanto esperar (issue #505): web e app leem o header.
+    expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
     expect(verifyIdTokenMock).toHaveBeenCalledTimes(callsBeforeBlock);
   });
 
@@ -91,11 +96,11 @@ describe('rate limiting global da API', () => {
       next();
     });
     semIp.use(apiRateLimiter);
-    semIp.get('/api/me', (_req: Request, res: Response) => {
+    semIp.get('/api/rota-de-teste', (_req: Request, res: Response) => {
       res.json({ ok: true });
     });
 
-    const response = await request(semIp).get('/api/me');
+    const response = await request(semIp).get('/api/rota-de-teste');
 
     expect(response.status).toBe(200);
   });
