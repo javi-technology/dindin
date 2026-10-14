@@ -65,6 +65,19 @@ describe('devcontainer', () => {
       );
     });
 
+    // O lock fixa cada feature por digest. Feature nova sem entrada nele é
+    // resolvida na hora do build, e o container deixa de ser reproduzível.
+    it('deve fixar no lock todas as features declaradas', () => {
+      const lock = lerJsonc('.devcontainer/devcontainer-lock.json');
+
+      expect(Object.keys(lock.features).sort()).toEqual(
+        Object.keys(devcontainer().features).sort(),
+      );
+      for (const feature of Object.values<any>(lock.features)) {
+        expect(feature.integrity).toMatch(/^sha256:[0-9a-f]{64}$/);
+      }
+    });
+
     it('deve receber as versões como argumento no Dockerfile', () => {
       const dockerfile = conteudo('.devcontainer/Dockerfile');
 
