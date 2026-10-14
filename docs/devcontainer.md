@@ -9,10 +9,16 @@ alcança — outros repositórios, `~/.ssh`, credenciais do gcloud e do Firebase
 
 - **Só a pasta do repositório é montada.** Nada da home do host entra, e a
   suíte da API (`tests/devcontainer.spec.ts`) reprova a montagem que a traga.
-- **A chave SSH não entra no container.** O push usa o ssh-agent do host,
-  repassado pelo socket `/run/host-services/ssh-auth.sock` (Docker Desktop e
-  OrbStack). O agente consegue usar a chave enquanto o container roda, mas
-  não lê o arquivo nem o copia para fora.
+- **O arquivo da chave SSH não entra no container.** O push usa o ssh-agent
+  do host, repassado pelo socket `/run/host-services/ssh-auth.sock` (Docker
+  Desktop e OrbStack): o agente de IA não lê a chave nem a copia para fora.
+  **Mas a capacidade de autenticar entra inteira:** enquanto o container
+  roda, ele autentica com **toda** chave carregada no ssh-agent do host, em
+  **qualquer** destino que ela alcance — outros repositórios, outras
+  organizações, servidores. O token fine-grained limita o `gh`, não o git por
+  SSH. Para restringir o container ao DinDin, use uma chave dedicada, como
+  uma **deploy key** com escrita só neste repositório, e carregue no agente
+  só ela enquanto o container estiver aberto (veja "Primeiro uso").
 - `node_modules` e `apps/mobile/.dart_tool` ficam em volumes do container: os
   binários nativos instalados no macOS não rodam no Linux, e o `.dart_tool`
   guarda caminhos absolutos da máquina que o gerou.
@@ -21,18 +27,26 @@ alcança — outros repositórios, `~/.ssh`, credenciais do gcloud e do Firebase
 - **O agente não vem na imagem.** O container traz a toolchain do projeto;
   o agente de IA que trabalha nele é instalado e autenticado por quem o
   abre, e a configuração dele fica dentro do container, não na home do host.
-- **As credenciais git do host não chegam ao git do container.** O VS Code
-  copia o `~/.gitconfig` do host e registra um credential helper que devolve
-  ao container as credenciais HTTPS do host — acesso além do token restrito
-  ao repositório. As opções que desligam isso são do usuário, não do
-  repositório, então o container se protege sozinho:
-  - `GIT_CONFIG_GLOBAL` aponta para o volume `dindin-git-config`, e a cópia
-    do `~/.gitconfig` não é lida;
-  - `credential.helper` vazio, por variável de ambiente (que vence todos os
-    arquivos de configuração), zera a lista de helpers, inclusive o que o VS
-    Code grava em `/etc/gitconfig` ou no global;
+- **Credenciais git do host: o container impede o uso, as opções do VS Code
+  impedem a entrada.** O VS Code copia o `~/.gitconfig` do host, registra um
+  credential helper que devolve as credenciais HTTPS do host e pode repassar
+  as credenciais do Docker e o login do `gh`. As opções que desligam isso são
+  configurações de **usuário** do VS Code, que o repositório não controla —
+  por isso são **pré-requisito** (veja "Primeiro uso"). O que o container faz
+  por conta própria:
+  - a imagem traz um `~/.gitconfig` vazio e somente leitura, e a extensão não
+    sobrescreve um arquivo existente, então a cópia não acontece;
+  - `GIT_CONFIG_GLOBAL` aponta para o volume `dindin-git-config`, e o
+    `credential.helper` vazio, por variável de ambiente (que vence todos os
+    arquivos de configuração), zera a lista de helpers: o git não usa um
+    helper que tenha sido registrado;
   - `git.terminalAuthentication` e `github.gitAuthentication` desligados
-    impedem o askpass do VS Code de usar a conta do GitHub logada no host.
+    impedem o askpass do VS Code de usar a conta do GitHub logada no host;
+  - o `verifica-credenciais.sh` roda a cada conexão e avisa quando encontra
+    sinal de que alguma opção está ligada.
+
+  Nada disso impede o agente de **ler** um arquivo ou de chamar um helper
+  que tenha entrado: com as opções ligadas, a garantia não vale.
 
 O isolamento é de **arquivos**, não de rede: o container acessa a internet
 livremente. Um firewall de saída por lista de domínios fica para issue
@@ -53,25 +67,34 @@ macOS e o segundo, KVM.
 
 1. Instale um runtime de containers (Docker Desktop ou OrbStack) e a extensão
    Dev Containers do VS Code (ou o `@devcontainers/cli`).
-2. No VS Code do host, desligue o repasse de credenciais (configurações de
-   usuário). O container já neutraliza o git, mas assim nada é copiado:
+2. **Pré-requisito:** no VS Code do host, desligue o repasse de credenciais
+   nas configurações de usuário (`settings.json`), antes de abrir o
+   container. Sem isso, credenciais do host entram no container e o agente
+   pode lê-las:
 
    ```json
    "dev.containers.copyGitConfig": false,
    "dev.containers.gitCredentialHelperConfigLocation": "none",
-   "dev.containers.dockerCredentialHelper": false
+   "dev.containers.dockerCredentialHelper": false,
+   "dev.containers.githubCLILoginWithToken": false
    ```
 
-   Deixe `dev.containers.githubCLILoginWithToken` em `false` (o padrão), ou o
-   `gh` do container herda o login do host.
+   Se o container já existia com elas ligadas, reconstrua-o
+   (**Rebuild Container**) depois de desligar.
 
 3. No host, carregue a chave no ssh-agent. Sem isso o agente repassado está
-   vazio e o push falha com `Permission denied (publickey)`:
+   vazio e o push falha com `Permission denied (publickey)`. O container
+   autentica com **toda** chave que estiver carregada, então, para limitá-lo
+   ao DinDin, carregue só uma **deploy key** do repositório (com escrita) e
+   tire as demais enquanto o container estiver aberto:
 
    ```bash
-   ssh-add --apple-use-keychain ~/.ssh/id_ed25519
-   ssh-add -l   # deve listar a chave
+   ssh-add -D                                   # tira as chaves carregadas
+   ssh-add --apple-use-keychain ~/.ssh/dindin_deploy_ed25519
+   ssh-add -l                                   # deve listar só ela
    ```
+
+   Com a chave pessoal carregada, o container alcança tudo o que ela alcança.
 
 4. Abra o repositório e escolha **Reopen in Container**. O
    `post-create.sh` instala as dependências (`npm ci` e `flutter pub get`) e

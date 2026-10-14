@@ -755,17 +755,24 @@ Regras:
   credenciais do gcloud e do Firebase.
 - **Só o repositório é montado.** Nada da home do host entra no container,
   e a suíte reprova a montagem que a traga.
-- **A chave SSH não é montada**: o push usa o ssh-agent do host, repassado
-  pelo socket. O agente usa a chave enquanto o container roda, mas não lê o
-  arquivo nem o copia para fora.
+- **O arquivo da chave SSH não é montado**: o push usa o ssh-agent do host,
+  repassado pelo socket, e o agente não lê a chave. Mas o container autentica
+  com **toda** chave carregada no agente do host, em qualquer destino que
+  ela alcance: o token restrito do `gh` não limita o git por SSH. Para
+  restringir ao DinDin, carregue no agente só uma deploy key do repositório.
 - `gh` autentica com token fine-grained restrito ao repositório, não com o
   login completo da conta.
-- **As credenciais git do host não chegam ao container**: o VS Code copia o
-  `~/.gitconfig` e registra um credential helper do host, e as opções que
-  desligam isso são do usuário. O container lê o global de um volume próprio
-  (`GIT_CONFIG_GLOBAL`) e zera os helpers por variável de ambiente, que
-  vence todos os arquivos. A identidade do autor é configurada dentro do
-  container e fica no volume.
+- **Credenciais git do host: o container impede o uso; impedir a entrada é
+  pré-requisito do usuário.** O VS Code copia o `~/.gitconfig`, registra um
+  credential helper do host e pode repassar o login do Docker e do `gh`; as
+  opções que desligam isso (`dev.containers.*`, em `docs/devcontainer.md`)
+  são configurações de usuário e precisam estar desligadas antes de abrir o
+  container. A imagem traz um `~/.gitconfig` vazio e somente leitura, para a
+  cópia não acontecer; o git lê o global de um volume próprio
+  (`GIT_CONFIG_GLOBAL`) e zera os helpers por variável de ambiente; e um
+  script avisa a cada conexão se alguma opção estiver ligada. Com elas
+  ligadas, o agente pode ler o que entrou. A identidade do autor é
+  configurada dentro do container e fica no volume.
 - Node, Java e Flutter do container são os do CI, e a suíte reprova quando
   divergem. Ao subir uma versão no CI ou no `.flutter-version`, suba também
   no `devcontainer.json`.

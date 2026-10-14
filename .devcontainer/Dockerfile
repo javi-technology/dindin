@@ -21,6 +21,16 @@ RUN apt-get update \
   && echo 'node ALL=(root) NOPASSWD:ALL' >/etc/sudoers.d/node \
   && chmod 0440 /etc/sudoers.d/node
 
+# O VS Code copia o ~/.gitconfig do host para o container, a menos que já
+# exista um: este, vazio e somente leitura, faz a cópia não acontecer. A
+# configuração global do git fica no volume apontado por GIT_CONFIG_GLOBAL.
+RUN printf '%s\n' \
+    '# Vazio de propósito (issue #538): impede a cópia do .gitconfig do host.' \
+    '# A configuração global do git fica no volume dindin-git-config.' \
+    >/home/node/.gitconfig \
+  && chown root:root /home/node/.gitconfig \
+  && chmod 0444 /home/node/.gitconfig
+
 RUN git clone --depth 1 --branch "${FLUTTER_VERSION}" \
     https://github.com/flutter/flutter.git /opt/flutter \
   && chown -R node:node /opt/flutter
@@ -29,8 +39,7 @@ ENV PATH="/opt/flutter/bin:${PATH}"
 
 USER node
 
-RUN git config --global --add safe.directory /opt/flutter \
-  && flutter config --no-analytics \
+RUN flutter config --no-analytics \
   && dart --disable-analytics \
   && flutter precache --no-android --no-ios --no-web \
   && flutter --version

@@ -35,6 +35,15 @@ describe('fonte única das regras', () => {
 
     // O rtk deixou de ser usado (issue #538): a regra que mandava prefixar
     // todo comando com ele não pode voltar sem a ferramenta.
+    // A garantia do devcontainer não pode ser mais forte que a proteção: o
+    // container impede o git de usar as credenciais do host, mas a entrada
+    // delas depende das opções do VS Code do usuário.
+    it('não deve prometer que as credenciais do host não entram no container', () => {
+      expect(conteudo('AGENTS.md')).not.toContain('não chegam ao container');
+      expect(conteudo('AGENTS.md')).toMatch(/pré-requisito/i);
+      expect(conteudo('AGENTS.md')).toContain('deploy key');
+    });
+
     it('não deve exigir o rtk', () => {
       expect(conteudo('AGENTS.md')).not.toMatch(/\brtk\b/i);
     });

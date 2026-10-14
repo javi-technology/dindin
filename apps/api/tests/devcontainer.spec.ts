@@ -166,6 +166,39 @@ describe('devcontainer', () => {
     // são do usuário, não do repositório; por isso o container as neutraliza
     // por conta própria. A configuração por variável de ambiente vence todos
     // os arquivos, e `credential.helper` vazio zera a lista de helpers.
+    // A extensão não sobrescreve um `~/.gitconfig` existente: com o arquivo
+    // já na imagem, a cópia do host não entra no container. Ignorar a cópia
+    // (GIT_CONFIG_GLOBAL) não basta, porque o agente leria o arquivo direto.
+    it('deve trazer um ~/.gitconfig vazio e somente leitura na imagem', () => {
+      const dockerfile = conteudo('.devcontainer/Dockerfile');
+
+      expect(dockerfile).toContain('chown root:root /home/node/.gitconfig');
+      expect(dockerfile).toContain('chmod 0444 /home/node/.gitconfig');
+      expect(dockerfile).not.toContain('git config --global');
+    });
+
+    // As opções que impedem a entrada das credenciais são do usuário; o
+    // container não as controla, então avisa ao conectar quando estão ligadas.
+    describe('verificação ao conectar', () => {
+      const script = (): string =>
+        conteudo('.devcontainer/verifica-credenciais.sh');
+
+      it('deve rodar a cada conexão', () => {
+        expect(devcontainer().postAttachCommand).toBe(
+          'bash .devcontainer/verifica-credenciais.sh',
+        );
+      });
+
+      it.each([
+        'dev.containers.copyGitConfig',
+        'dev.containers.gitCredentialHelperConfigLocation',
+        'dev.containers.dockerCredentialHelper',
+        'dev.containers.githubCLILoginWithToken',
+      ])('deve apontar %s quando detectar o repasse', (opcao) => {
+        expect(script()).toContain(opcao);
+      });
+    });
+
     describe('credenciais git do host', () => {
       const env = (): Record<string, string> => devcontainer().containerEnv;
 
@@ -251,8 +284,19 @@ describe('devcontainer', () => {
       'dev.containers.copyGitConfig',
       'dev.containers.gitCredentialHelperConfigLocation',
       'dev.containers.dockerCredentialHelper',
-    ])('deve recomendar desligar %s', (opcao) => {
+      'dev.containers.githubCLILoginWithToken',
+    ])('deve exigir %s desligada', (opcao) => {
       expect(conteudo(guia)).toContain(opcao);
+    });
+
+    it('deve tratar as opções do VS Code como pré-requisito', () => {
+      expect(conteudo(guia)).toMatch(/pré-requisito/i);
+    });
+
+    // O ssh-agent repassa a capacidade de autenticar com toda chave carregada
+    // no host, em qualquer destino: o token restrito do gh não a limita.
+    it('deve explicitar o alcance do ssh-agent e a chave dedicada', () => {
+      expect(conteudo(guia)).toContain('deploy key');
     });
 
     it('deve ser citado no AGENTS.md', () => {
