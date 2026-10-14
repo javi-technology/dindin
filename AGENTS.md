@@ -24,7 +24,7 @@ ou contradizer uma decisão anterior custa mais que a consulta.
   Em tarefa grande, comece por `memory_briefing` com `settled_first: true`,
   que traz primeiro as regras e decisões já assentadas.
 
-- **Escopo:** workspace `default`, projeto `dindin`. O cliente que não
+- **Escopo:** workspace `default`, projeto `javi-technology-dindin`. O cliente que não
   encaminha o id da sessão ao MCP **passa `workspace` e `project` em toda
   chamada**: sem isso a consulta pode cair em outro projeto e devolver o
   contexto errado, que parece certo.
