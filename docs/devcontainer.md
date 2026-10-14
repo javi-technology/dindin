@@ -45,11 +45,6 @@ Node, Java e Flutter são os do CI. As versões estão no `devcontainer.json`
 quando divergem de `.github/workflows/ci-cd.yml` ou de
 `apps/mobile/.flutter-version`. Ao subir uma versão, suba nos dois lugares.
 
-O `rtk`, exigido pelo `AGENTS.md` em todo comando de shell, vem fixado em
-`RTK_VERSION`, com o checksum de cada arquitetura no `Dockerfile`. Ao subir a
-versão, atualize os checksums com o `checksums.txt` da release, ou o build
-falha.
-
 O Flutter roda `flutter test` e `flutter analyze`. Rodar o app no simulador
 iOS ou no emulador Android continua sendo feito no host: o primeiro exige
 macOS e o segundo, KVM.

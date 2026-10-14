@@ -766,31 +766,8 @@ Regras:
   (`GIT_CONFIG_GLOBAL`) e zera os helpers por variável de ambiente, que
   vence todos os arquivos. A identidade do autor é configurada dentro do
   container e fica no volume.
-- O `rtk` vem na imagem, com versão e checksum fixados.
 - Node, Java e Flutter do container são os do CI, e a suíte reprova quando
   divergem. Ao subir uma versão no CI ou no `.flutter-version`, suba também
   no `devcontainer.json`.
 - O isolamento é de arquivos, não de rede: o container acessa a internet
   livremente.
-
-## RTK — Token-Optimized CLI
-
-**rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
-
-Sempre prefixar comandos de shell com `rtk`:
-
-```bash
-# Em vez de:              Use:
-git status                 rtk git status
-git log -10                rtk git log -10
-npm run test               rtk npm run test
-```
-
-Comandos meta (usar diretamente):
-
-```bash
-rtk gain              # dashboard de economia de tokens
-rtk gain --history    # histórico de economia por comando
-rtk discover          # encontrar oportunidades perdidas de uso do rtk
-rtk proxy <cmd>       # rodar sem filtragem, mas registrar uso
-```

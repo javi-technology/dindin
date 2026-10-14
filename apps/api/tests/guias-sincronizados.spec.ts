@@ -33,8 +33,10 @@ describe('fonte única das regras', () => {
       expect(conteudo('AGENTS.md')).not.toContain('.devin');
     });
 
-    it('deve manter a seção RTK', () => {
-      expect(conteudo('AGENTS.md')).toContain('## RTK');
+    // O rtk deixou de ser usado (issue #538): a regra que mandava prefixar
+    // todo comando com ele não pode voltar sem a ferramenta.
+    it('não deve exigir o rtk', () => {
+      expect(conteudo('AGENTS.md')).not.toMatch(/\brtk\b/i);
     });
   });
 

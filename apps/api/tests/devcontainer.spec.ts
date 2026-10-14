@@ -88,8 +88,7 @@ describe('devcontainer', () => {
 
     // A imagem `devcontainers/javascript-node:1-22` parou no 22.16, abaixo do
     // que o Angular exige; a oficial acompanha a linha 22.x, como o
-    // `setup-node` do CI. É a trixie porque o binário arm64 do rtk exige a
-    // glibc 2.39, e a bookworm traz a 2.36.
+    // `setup-node` do CI, sobre o Debian estável atual (trixie).
     it('deve partir da imagem oficial do Node, que acompanha a linha do CI', () => {
       expect(conteudo('.devcontainer/Dockerfile')).toMatch(
         /^FROM node:\$\{NODE_VERSION\}-trixie$/m,
@@ -212,78 +211,15 @@ describe('devcontainer', () => {
     });
   });
 
-  // O AGENTS.md exige o rtk em todo comando de shell; sem ele no container,
-  // o agente quebraria a regra no primeiro comando.
-  // O ai-memory fica num servidor externo, alcançado pelo túnel SSH que o
-  // host abre em 127.0.0.1. O servidor recusa com 403 ("forbidden host")
-  // o pedido cujo Host não seja 127.0.0.1 ou localhost, então o container
-  // não pode chamá-lo por host.docker.internal: um repassador local dá ao
-  // agente o mesmo endereço do host.
-  describe('ai-memory', () => {
-    const postStart = (): string => conteudo('.devcontainer/post-start.sh');
+  // O rtk deixou de ser usado: nem a imagem nem o guia o trazem.
+  it('não deve trazer o rtk', () => {
+    const tudo = [
+      conteudo('.devcontainer/devcontainer.json'),
+      conteudo('.devcontainer/Dockerfile'),
+      conteudo('docs/devcontainer.md'),
+    ].join('\n');
 
-    it('deve repassar 127.0.0.1 do container ao túnel do host', () => {
-      expect(devcontainer().postStartCommand).toBe(
-        'bash .devcontainer/post-start.sh',
-      );
-      expect(postStart()).toMatch(
-        /socat TCP-LISTEN:"\$\{AI_MEMORY_PORT\}",bind=127\.0\.0\.1,fork,reuseaddr/,
-      );
-      expect(postStart()).toContain(
-        'TCP:host.docker.internal:"${AI_MEMORY_PORT}"',
-      );
-      expect(conteudo('.devcontainer/Dockerfile')).toMatch(/\bsocat\b/);
-    });
-
-    it('deve ler a porta do host, com a do túnel como padrão', () => {
-      expect(devcontainer().containerEnv.AI_MEMORY_PORT).toBe(
-        '${localEnv:AI_MEMORY_PORT:49374}',
-      );
-    });
-
-    // O `containerEnv` fica gravado na configuração do container e aparece
-    // num `docker inspect`; o `remoteEnv` só nos processos da ferramenta.
-    it('deve receber o token do host só no remoteEnv', () => {
-      expect(devcontainer().remoteEnv.AI_MEMORY_TOKEN).toBe(
-        '${localEnv:AI_MEMORY_TOKEN}',
-      );
-      expect(devcontainer().containerEnv).not.toHaveProperty('AI_MEMORY_TOKEN');
-    });
-  });
-
-  describe('rtk', () => {
-    const dockerfile = (): string => conteudo('.devcontainer/Dockerfile');
-
-    it('deve fixar a versão no devcontainer.json', () => {
-      expect(devcontainer().build.args.RTK_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(dockerfile()).toMatch(/^ARG RTK_VERSION$/m);
-    });
-
-    it('deve conferir o checksum do binário de cada arquitetura', () => {
-      expect(dockerfile()).toMatch(
-        /alvo=aarch64-unknown-linux-gnu;\s*\\?\s*sha=[0-9a-f]{64}/,
-      );
-      expect(dockerfile()).toMatch(
-        /alvo=x86_64-unknown-linux-musl;\s*\\?\s*sha=[0-9a-f]{64}/,
-      );
-      expect(dockerfile()).toContain('sha256sum -c');
-    });
-
-    it('deve verificar o binário no build', () => {
-      expect(dockerfile()).toContain('rtk --version');
-    });
-  });
-
-  it('deve encaminhar as portas dos emuladores e do ng serve', () => {
-    const emuladores = JSON.parse(conteudo('firebase.json')).emulators;
-    const portasDosEmuladores = Object.values(emuladores)
-      .map((emulador: any) => emulador?.port)
-      .filter((porta): porta is number => typeof porta === 'number');
-
-    expect(portasDosEmuladores.length).toBeGreaterThan(0);
-    expect(devcontainer().forwardPorts).toEqual(
-      expect.arrayContaining([...portasDosEmuladores, 4000, 4200]),
-    );
+    expect(tudo).not.toMatch(/\brtk\b/i);
   });
 
   describe('guia', () => {
