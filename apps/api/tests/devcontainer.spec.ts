@@ -72,6 +72,15 @@ describe('devcontainer', () => {
       expect(dockerfile).toMatch(/^ARG FLUTTER_VERSION$/m);
       expect(dockerfile).toContain('--branch "${FLUTTER_VERSION}"');
     });
+
+    // A imagem `devcontainers/javascript-node:1-22` parou no 22.16, abaixo do
+    // que o Angular exige; a oficial acompanha a linha 22.x, como o
+    // `setup-node` do CI.
+    it('deve partir da imagem oficial do Node, que acompanha a linha do CI', () => {
+      expect(conteudo('.devcontainer/Dockerfile')).toMatch(
+        /^FROM node:\$\{NODE_VERSION\}-bookworm$/m,
+      );
+    });
   });
 
   describe('isolamento do host', () => {

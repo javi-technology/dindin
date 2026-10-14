@@ -4,15 +4,21 @@
 # `apps/mobile/.flutter-version`: fixá-las aqui as faria divergir do pipeline
 # na primeira atualização.
 ARG NODE_VERSION
-FROM mcr.microsoft.com/devcontainers/javascript-node:1-${NODE_VERSION}-bookworm
+# A imagem oficial acompanha a linha 22.x, como o `setup-node` do CI; a
+# `devcontainers/javascript-node` parou numa versão abaixo da que o Angular
+# exige.
+FROM node:${NODE_VERSION}-bookworm
 
 ARG FLUTTER_VERSION
 
 # O Flutter roda só `flutter test` e `flutter analyze` aqui: simulador iOS
-# exige macOS e o emulador Android, KVM. Por isso só o pré-cache de Linux.
+# exige macOS e o emulador Android, KVM. O `sudo` é do post-create.sh, que
+# acerta o dono dos volumes.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends unzip xz-utils zip \
-  && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends sudo unzip xz-utils zip \
+  && rm -rf /var/lib/apt/lists/* \
+  && echo 'node ALL=(root) NOPASSWD:ALL' >/etc/sudoers.d/node \
+  && chmod 0440 /etc/sudoers.d/node
 
 RUN git clone --depth 1 --branch "${FLUTTER_VERSION}" \
     https://github.com/flutter/flutter.git /opt/flutter \
