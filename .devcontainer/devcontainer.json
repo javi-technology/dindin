@@ -1,0 +1,58 @@
+// Ambiente isolado para os agentes de IA (issue #538). O guia está em
+// docs/devcontainer.md, e a suíte da API (tests/devcontainer.spec.ts) reprova
+// montagem da home do host e versão divergente do CI.
+{
+  "name": "DinDin",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "NODE_VERSION": "22",
+      "FLUTTER_VERSION": "3.47.5"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "jdkDistro": "tem"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "remoteUser": "node",
+  // Alcança serviços do host, como o ai-memory. O Docker Desktop já resolve
+  // o nome; a entrada vale para o Docker no Linux.
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  "mounts": [
+    // O ssh-agent do host assina o push sem que a chave entre no container.
+    "source=/run/host-services/ssh-auth.sock,target=/run/host-services/ssh-auth.sock,type=bind",
+    // Login do Claude Code e do gh, que sobrevive ao rebuild.
+    "source=dindin-claude-config,target=/home/node/.claude,type=volume",
+    "source=dindin-gh-config,target=/home/node/.config/gh,type=volume",
+    // Binários nativos do macOS não rodam no Linux, e o .dart_tool guarda
+    // caminhos absolutos: cada lado tem a sua cópia.
+    "source=dindin-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=dindin-api-node-modules,target=${containerWorkspaceFolder}/apps/api/node_modules,type=volume",
+    "source=dindin-web-node-modules,target=${containerWorkspaceFolder}/apps/web/node_modules,type=volume",
+    "source=dindin-mobile-dart-tool,target=${containerWorkspaceFolder}/apps/mobile/.dart_tool,type=volume"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude"
+  },
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "/run/host-services/ssh-auth.sock"
+  },
+  // Hosting, Functions, Firestore, Auth, interface dos emuladores e ng serve.
+  "forwardPorts": [5002, 5001, 8080, 9099, 4000, 4200],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "angular.ng-template",
+        "dart-code.flutter"
+      ]
+    }
+  }
+}

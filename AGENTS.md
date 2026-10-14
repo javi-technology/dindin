@@ -747,6 +747,25 @@ Regras:
 
 - Nunca commitar credenciais: `sa-key.json`, `service-account*.json` e `.env*` estão no `.gitignore` e devem permanecer fora do versionamento.
 
+### Ambiente isolado dos agentes (devcontainer)
+
+- **Os agentes de IA trabalham no devcontainer** (`.devcontainer/`, issue
+  #538; passo a passo em `docs/devcontainer.md`). Na máquina, o agente
+  alcança tudo o que o usuário alcança: outros repositórios, `~/.ssh` e as
+  credenciais do gcloud e do Firebase.
+- **Só o repositório é montado.** Nada da home do host entra no container,
+  e a suíte reprova a montagem que a traga.
+- **A chave SSH não é montada**: o push usa o ssh-agent do host, repassado
+  pelo socket. O agente usa a chave enquanto o container roda, mas não lê o
+  arquivo nem o copia para fora.
+- `gh` autentica com token fine-grained restrito ao repositório, não com o
+  login completo da conta.
+- Node, Java e Flutter do container são os do CI, e a suíte reprova quando
+  divergem. Ao subir uma versão no CI ou no `.flutter-version`, suba também
+  no `devcontainer.json`.
+- O isolamento é de arquivos, não de rede: o container acessa a internet
+  livremente.
+
 ## RTK — Token-Optimized CLI
 
 **rtk** é um proxy de CLI que filtra e comprime saídas de comandos, economizando 60-90% de tokens.
