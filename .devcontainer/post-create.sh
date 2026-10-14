@@ -5,7 +5,7 @@ set -euo pipefail
 # Volumes nomeados nascem do root: sem isto o `npm ci` não grava neles.
 sudo chown node:node \
   node_modules apps/api/node_modules apps/web/node_modules \
-  apps/mobile/.dart_tool /home/node/.claude /home/node/.config/gh
+  apps/mobile/.dart_tool /home/node/.config/gh /home/node/.config/git
 
 # O socket do ssh-agent repassado pelo host chega do root.
 if [ -S /run/host-services/ssh-auth.sock ]; then
@@ -21,3 +21,17 @@ curl -fsSL https://api.github.com/meta |
 
 npm ci
 (cd apps/mobile && flutter pub get)
+
+# O `.gitconfig` do host não entra no container, então a identidade é
+# configurada aqui uma vez; ela fica no volume e sobrevive ao rebuild.
+if ! git config --get user.name >/dev/null || ! git config --get user.email >/dev/null; then
+  cat <<'AVISO'
+
+Identidade git não configurada: o commit vai falhar com "Author identity
+unknown". Configure uma vez, dentro do container:
+
+  git config --global user.name "Seu Nome"
+  git config --global user.email "seu-email@exemplo.com"
+
+AVISO
+fi

@@ -760,6 +760,13 @@ Regras:
   arquivo nem o copia para fora.
 - `gh` autentica com token fine-grained restrito ao repositório, não com o
   login completo da conta.
+- **As credenciais git do host não chegam ao container**: o VS Code copia o
+  `~/.gitconfig` e registra um credential helper do host, e as opções que
+  desligam isso são do usuário. O container lê o global de um volume próprio
+  (`GIT_CONFIG_GLOBAL`) e zera os helpers por variável de ambiente, que
+  vence todos os arquivos. A identidade do autor é configurada dentro do
+  container e fica no volume.
+- O `rtk` vem na imagem, com versão e checksum fixados.
 - Node, Java e Flutter do container são os do CI, e a suíte reprova quando
   divergem. Ao subir uma versão no CI ou no `.flutter-version`, suba também
   no `devcontainer.json`.

@@ -16,8 +16,23 @@ alcança — outros repositórios, `~/.ssh`, credenciais do gcloud e do Firebase
 - `node_modules` e `apps/mobile/.dart_tool` ficam em volumes do container: os
   binários nativos instalados no macOS não rodam no Linux, e o `.dart_tool`
   guarda caminhos absolutos da máquina que o gerou.
-- O login do Claude Code e do `gh` fica em volumes próprios
-  (`dindin-claude-config` e `dindin-gh-config`), que sobrevivem ao rebuild.
+- O login do `gh` fica num volume próprio (`dindin-gh-config`), que
+  sobrevive ao rebuild.
+- **O agente não vem na imagem.** O container traz a toolchain do projeto;
+  o agente de IA que trabalha nele é instalado e autenticado por quem o
+  abre, e a configuração dele fica dentro do container, não na home do host.
+- **As credenciais git do host não chegam ao git do container.** O VS Code
+  copia o `~/.gitconfig` do host e registra um credential helper que devolve
+  ao container as credenciais HTTPS do host — acesso além do token restrito
+  ao repositório. As opções que desligam isso são do usuário, não do
+  repositório, então o container se protege sozinho:
+  - `GIT_CONFIG_GLOBAL` aponta para o volume `dindin-git-config`, e a cópia
+    do `~/.gitconfig` não é lida;
+  - `credential.helper` vazio, por variável de ambiente (que vence todos os
+    arquivos de configuração), zera a lista de helpers, inclusive o que o VS
+    Code grava em `/etc/gitconfig` ou no global;
+  - `git.terminalAuthentication` e `github.gitAuthentication` desligados
+    impedem o askpass do VS Code de usar a conta do GitHub logada no host.
 
 O isolamento é de **arquivos**, não de rede: o container acessa a internet
 livremente. Um firewall de saída por lista de domínios fica para issue
@@ -30,6 +45,11 @@ Node, Java e Flutter são os do CI. As versões estão no `devcontainer.json`
 quando divergem de `.github/workflows/ci-cd.yml` ou de
 `apps/mobile/.flutter-version`. Ao subir uma versão, suba nos dois lugares.
 
+O `rtk`, exigido pelo `AGENTS.md` em todo comando de shell, vem fixado em
+`RTK_VERSION`, com o checksum de cada arquitetura no `Dockerfile`. Ao subir a
+versão, atualize os checksums com o `checksums.txt` da release, ou o build
+falha.
+
 O Flutter roda `flutter test` e `flutter analyze`. Rodar o app no simulador
 iOS ou no emulador Android continua sendo feito no host: o primeiro exige
 macOS e o segundo, KVM.
@@ -38,7 +58,19 @@ macOS e o segundo, KVM.
 
 1. Instale um runtime de containers (Docker Desktop ou OrbStack) e a extensão
    Dev Containers do VS Code (ou o `@devcontainers/cli`).
-2. No host, carregue a chave no ssh-agent. Sem isso o agente repassado está
+2. No VS Code do host, desligue o repasse de credenciais (configurações de
+   usuário). O container já neutraliza o git, mas assim nada é copiado:
+
+   ```json
+   "dev.containers.copyGitConfig": false,
+   "dev.containers.gitCredentialHelperConfigLocation": "none",
+   "dev.containers.dockerCredentialHelper": false
+   ```
+
+   Deixe `dev.containers.githubCLILoginWithToken` em `false` (o padrão), ou o
+   `gh` do container herda o login do host.
+
+3. No host, carregue a chave no ssh-agent. Sem isso o agente repassado está
    vazio e o push falha com `Permission denied (publickey)`:
 
    ```bash
@@ -46,10 +78,22 @@ macOS e o segundo, KVM.
    ssh-add -l   # deve listar a chave
    ```
 
-3. Abra o repositório e escolha **Reopen in Container**. O
+4. Abra o repositório e escolha **Reopen in Container**. O
    `post-create.sh` instala as dependências (`npm ci` e `flutter pub get`) e
    grava as chaves do GitHub no `known_hosts`, obtidas da API por HTTPS.
-4. Dentro do container, confira o acesso ao GitHub:
+5. Dentro do container, configure a identidade do autor. O `.gitconfig` do
+   host não entra, e sem ela o commit falha com `Author identity unknown`. A
+   configuração fica no volume `dindin-git-config` e sobrevive ao rebuild:
+
+   ```bash
+   git config --global user.name "Seu Nome"
+   git config --global user.email "seu-email@exemplo.com"
+   ```
+
+   Use o e-mail cadastrado na sua conta do GitHub (ou o `noreply` dela), para
+   o commit ficar associado a você.
+
+6. Confira o acesso ao GitHub:
 
    ```bash
    ssh -T git@github.com
@@ -65,26 +109,42 @@ Projects da organização), em vez do login completo da sua conta:
 gh auth login --with-token   # cole o token e tecle Ctrl+D
 ```
 
-### Claude Code
-
-Rode `claude` e faça o login. A configuração fica em `/home/node/.claude`
-(`CLAUDE_CONFIG_DIR`), no volume do container, separada da do host.
-
 ### ai-memory
 
-O ai-memory roda no host. De dentro do container, o endereço é
-`host.docker.internal` no lugar de `127.0.0.1`. O token é digitado na hora,
-sem eco, e nunca é versionado:
+O ai-memory fica num servidor externo, alcançado pelo túnel SSH que o host
+abre em `127.0.0.1:49374`. O túnel precisa estar aberto no host: se ele cair,
+o container perde o acesso junto com o host.
 
-```bash
-read -rs AI_MEMORY_TOKEN
-claude mcp add --scope user --transport http ai-memory \
-  http://host.docker.internal:<porta>/mcp \
-  --header "Authorization: Bearer $AI_MEMORY_TOKEN"
+O servidor recusa com `403 forbidden host` o pedido endereçado a
+`host.docker.internal`; ele só aceita `127.0.0.1` e `localhost`. Por isso o
+`post-start.sh` sobe um repassador (`socat`) em `127.0.0.1:${AI_MEMORY_PORT}`
+dentro do container, que encaminha ao túnel do host. Para o agente, o
+endereço é o mesmo do host:
+
+```text
+http://127.0.0.1:${AI_MEMORY_PORT}/mcp
+Authorization: Bearer ${AI_MEMORY_TOKEN}
 ```
 
-A porta e o token são os da configuração do host (`claude mcp get ai-memory`
-no host). O cadastro fica no volume do Claude Code e sobrevive ao rebuild.
+- `AI_MEMORY_PORT` é a porta do túnel. O padrão é `49374`; se o seu túnel
+  usar outra, exporte `AI_MEMORY_PORT` no host antes de abrir o container.
+- `AI_MEMORY_TOKEN` vem do ambiente do host, pelo `remoteEnv`: chega aos
+  processos do container sem ficar gravado na configuração dele (um
+  `docker inspect` não o mostra), no repositório ou na imagem. Cadastre o
+  servidor no cliente MCP do agente referenciando a variável, nunca o valor.
+
+No host, guarde o token no Keychain e exporte-o a partir dele, em vez de
+deixá-lo em texto puro no `~/.zshrc`:
+
+```bash
+# uma vez: grava o token no Keychain (pede o valor sem eco)
+security add-generic-password -a "$USER" -s ai-memory-token -w
+# no ~/.zshrc
+export AI_MEMORY_TOKEN="$(security find-generic-password -a "$USER" -s ai-memory-token -w)"
+```
+
+O VS Code só herda a variável quando é aberto por um terminal que a tem
+(`code .`); aberto pelo Dock, ele não lê o `~/.zshrc`.
 
 ## Emuladores
 

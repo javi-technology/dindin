@@ -7,7 +7,8 @@
     "dockerfile": "Dockerfile",
     "args": {
       "NODE_VERSION": "22",
-      "FLUTTER_VERSION": "3.47.5"
+      "FLUTTER_VERSION": "3.47.5",
+      "RTK_VERSION": "0.50.0"
     }
   },
   "features": {
@@ -15,8 +16,7 @@
       "version": "21",
       "jdkDistro": "tem"
     },
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "remoteUser": "node",
   // Alcança serviços do host, como o ai-memory. O Docker Desktop já resolve
@@ -25,9 +25,10 @@
   "mounts": [
     // O ssh-agent do host assina o push sem que a chave entre no container.
     "source=/run/host-services/ssh-auth.sock,target=/run/host-services/ssh-auth.sock,type=bind",
-    // Login do Claude Code e do gh, que sobrevive ao rebuild.
-    "source=dindin-claude-config,target=/home/node/.claude,type=volume",
+    // Login do gh, que sobrevive ao rebuild.
     "source=dindin-gh-config,target=/home/node/.config/gh,type=volume",
+    // Configuração global do git, com a identidade do autor.
+    "source=dindin-git-config,target=/home/node/.config/git,type=volume",
     // Binários nativos do macOS não rodam no Linux, e o .dart_tool guarda
     // caminhos absolutos: cada lado tem a sua cópia.
     "source=dindin-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
@@ -36,18 +37,36 @@
     "source=dindin-mobile-dart-tool,target=${containerWorkspaceFolder}/apps/mobile/.dart_tool,type=volume"
   ],
   "containerEnv": {
-    "CLAUDE_CONFIG_DIR": "/home/node/.claude"
+    // Porta do túnel SSH do host até o ai-memory (docs/devcontainer.md).
+    "AI_MEMORY_PORT": "${localEnv:AI_MEMORY_PORT:49374}",
+    // O VS Code copia o ~/.gitconfig do host e registra um credential helper
+    // que devolve as credenciais HTTPS do host. O global aponta para o volume,
+    // então a cópia não é lida; e a configuração por variável vence todos os
+    // arquivos, com o helper vazio zerando a lista. O push usa o ssh-agent.
+    "GIT_CONFIG_GLOBAL": "/home/node/.config/git/config",
+    "GIT_CONFIG_COUNT": "1",
+    "GIT_CONFIG_KEY_0": "credential.helper",
+    "GIT_CONFIG_VALUE_0": ""
   },
   "remoteEnv": {
-    "SSH_AUTH_SOCK": "/run/host-services/ssh-auth.sock"
+    "SSH_AUTH_SOCK": "/run/host-services/ssh-auth.sock",
+    // O token vem do ambiente do host. No remoteEnv ele chega só aos
+    // processos da ferramenta; no containerEnv ficaria gravado na
+    // configuração do container, visível num `docker inspect`.
+    "AI_MEMORY_TOKEN": "${localEnv:AI_MEMORY_TOKEN}"
   },
   // Hosting, Functions, Firestore, Auth, interface dos emuladores e ng serve.
   "forwardPorts": [5002, 5001, 8080, 9099, 4000, 4200],
   "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
   "customizations": {
     "vscode": {
+      // O askpass do git do VS Code usaria a conta do GitHub logada no host.
+      "settings": {
+        "git.terminalAuthentication": false,
+        "github.gitAuthentication": false
+      },
       "extensions": [
-        "anthropic.claude-code",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "angular.ng-template",
