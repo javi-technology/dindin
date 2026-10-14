@@ -151,6 +151,130 @@ describe('openapi-breaking', () => {
     expect(r.saida).toContain('extra');
   });
 
+  it('deve reprovar campo da requisição com outro tipo', () => {
+    const r = executar(
+      base.replace(
+        'required: [nome]\n      properties:\n        nome: { type: string }',
+        'required: [nome]\n      properties:\n        nome: { type: number }',
+      ),
+    );
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain('".nome" mudou de tipo');
+  });
+
+  it('deve reprovar item de array da requisição com outro tipo', () => {
+    const comTags = (tipo: string) =>
+      base.replace(
+        'required: [nome]\n      properties:\n        nome: { type: string }',
+        `required: [nome]\n      properties:\n        nome: { type: string }\n        tags: { type: array, items: { type: ${tipo} } }`,
+      );
+    const r = executar(comTags('number'), comTags('string'));
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain('".tags[]" mudou de tipo');
+  });
+
+  it('deve aceitar campo da requisição que passou a aceitar mais um tipo', () => {
+    const r = executar(
+      base.replace(
+        'required: [nome]\n      properties:\n        nome: { type: string }',
+        'required: [nome]\n      properties:\n        nome: { type: [string, number] }',
+      ),
+    );
+    expect(r.codigo).toBe(0);
+  });
+
+  it('deve reprovar enum novo em campo livre da requisição', () => {
+    const r = executar(
+      base.replace(
+        'required: [nome]\n      properties:\n        nome: { type: string }',
+        'required: [nome]\n      properties:\n        nome: { type: string, enum: [X] }',
+      ),
+    );
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain('nome');
+  });
+
+  it('deve reprovar enum removido da resposta', () => {
+    const r = executar(base.replace('      enum: [A, B]\n', ''));
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain('".tipo"');
+  });
+
+  describe('parâmetros', () => {
+    const comParametro = (yaml: string, parametro: string, nivel = 'get') =>
+      nivel === 'get'
+        ? yaml.replace(
+            '  /api/itens:\n    get:\n',
+            `  /api/itens:\n    get:\n      parameters:\n        - ${parametro}\n`,
+          )
+        : yaml.replace(
+            '  /api/itens:\n',
+            `  /api/itens:\n    parameters:\n      - ${parametro}\n`,
+          );
+    const moeda = (required: boolean, tipo = 'string') =>
+      `{ name: moeda, in: query, required: ${required}, schema: { type: ${tipo} } }`;
+
+    it('deve reprovar parâmetro obrigatório novo na operação', () => {
+      const r = executar(comParametro(base, moeda(true)));
+      expect(r.codigo).toBe(1);
+      expect(r.saida).toContain('moeda');
+    });
+
+    it('deve reprovar parâmetro obrigatório novo no path', () => {
+      const r = executar(comParametro(base, moeda(true), 'path'));
+      expect(r.codigo).toBe(1);
+      expect(r.saida).toContain('POST /api/itens');
+    });
+
+    it('deve aceitar parâmetro opcional novo', () => {
+      expect(executar(comParametro(base, moeda(false))).codigo).toBe(0);
+    });
+
+    it('deve reprovar parâmetro que passou a ser obrigatório', () => {
+      const r = executar(
+        comParametro(base, moeda(true)),
+        comParametro(base, moeda(false)),
+      );
+      expect(r.codigo).toBe(1);
+      expect(r.saida).toContain('moeda');
+    });
+
+    it('deve reprovar parâmetro com outro tipo', () => {
+      const r = executar(
+        comParametro(base, moeda(false, 'number')),
+        comParametro(base, moeda(false)),
+      );
+      expect(r.codigo).toBe(1);
+      expect(r.saida).toContain('moeda');
+    });
+  });
+
+  describe('objeto opcional na requisição', () => {
+    const comMetadata = (requeridos: string, props: string) =>
+      base.replace(
+        'required: [nome]\n      properties:\n        nome: { type: string }',
+        `required: [nome]\n      properties:\n        nome: { type: string }\n        metadata:\n          type: object\n          required: [${requeridos}]\n          properties: { ${props} }`,
+      );
+
+    it('deve aceitar objeto opcional novo com campo obrigatório interno', () => {
+      expect(
+        executar(comMetadata('source', 'source: { type: string }')).codigo,
+      ).toBe(0);
+    });
+
+    it('deve reprovar campo obrigatório novo em objeto opcional existente', () => {
+      const r = executar(
+        comMetadata(
+          'source, canal',
+          'source: { type: string }, canal: { type: string }',
+        ),
+        comMetadata('source', 'source: { type: string }'),
+      );
+      expect(r.codigo).toBe(1);
+      expect(r.saida).toContain('.metadata.canal');
+    });
+  });
+
   it('deve reprovar status de sucesso removido', () => {
     const r = executar(
       base.replace(
