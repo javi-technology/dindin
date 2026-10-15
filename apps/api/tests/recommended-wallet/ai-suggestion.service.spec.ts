@@ -2208,41 +2208,98 @@ describe('ai-suggestion.service', () => {
     expect(doc.set).toHaveBeenCalled();
   });
 
-  it('deve reutilizar cache quando o aporte for igual', async () => {
-    const saved = {
-      id: 'wallet-1_2026-09_renda',
-      walletId: 'wallet-1',
-      month: '2026-09',
-      tab: 'renda',
-      contribution: 500,
-      historyMonths: [],
-      // A mesma sugestão: as compras lançadas continuam marcadas (#544).
-      appliedItems: [
-        {
-          ticker: 'HGLG11',
-          quantity: 2,
-          price: 160,
-          appliedAt: '2026-09-10T00:00:00Z',
-        },
-      ],
+  // "Gerar sugestão do mês" é o único botão de geração: com o mesmo aporte,
+  // ele também gera uma sugestão nova, sem itens aplicados (#551).
+  it('deve gerar uma nova sugestão mesmo com o mesmo aporte e histórico', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Aporte maior.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+          historyMonths: [],
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+      set: jest.fn(),
     };
-    const doc = {
-      get: jest
-        .fn()
-        .mockResolvedValue({ exists: true, id: saved.id, data: () => saved }),
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
     };
     firestoreMock = {
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({
-          collection: jest.fn(() => ({ doc: jest.fn(() => doc) })),
-        })),
-      })),
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
+        }
+        return {
+          doc: jest.fn(() => ({
+            collection: jest.fn(() => ({
+              ...query,
+              doc: jest.fn(() => savedDoc),
+            })),
+          })),
+        };
+      }),
     };
 
-    await expect(
-      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', false, 500),
-    ).resolves.toEqual(saved);
-    expect(global.fetch).not.toHaveBeenCalled();
+    const result = await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      false,
+      500,
+    );
+
+    expect(result).toMatchObject({
+      summary: 'Novo resumo',
+      contribution: 500,
+      projectedDividends: 2.5,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    expect(savedDoc.set).toHaveBeenCalled();
+    // Sugestão nova começa sem itens aplicados: o usuário pode aplicar um
+    // segundo aporte no mesmo mês (#544). O que já foi lançado na carteira
+    // não é tocado.
+    expect(result.appliedItems).toBeUndefined();
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
   });
 
   it('deve ignorar cache quando o histórico salvo estiver desatualizado', async () => {

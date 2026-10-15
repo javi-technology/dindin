@@ -275,19 +275,10 @@ export async function generateSuggestion(
   const availableHistoryMonths = sortedHistoryWallets.map(
     (wallet) => `${wallet.month}:${wallet.revision}`,
   );
-  // Uma sugestão gerada de novo (outro aporte, histórico novo ou `force`)
-  // começa sem itens aplicados: o usuário pode aplicar um segundo aporte no
-  // mesmo mês (#544). Só a sugestão devolvida do cache mantém as marcas.
-  const saved = await getSavedSuggestion(uid, walletId, month, tab);
-  if (
-    !force &&
-    saved &&
-    saved.contribution === contribution &&
-    JSON.stringify(saved.historyMonths ?? []) ===
-      JSON.stringify(availableHistoryMonths)
-  ) {
-    return saved;
-  }
+  // Toda chamada gera uma sugestão nova, sem itens aplicados: "Gerar
+  // sugestão do mês" é o único botão de geração, e um segundo aporte no mês,
+  // mesmo de igual valor, precisa poder ser aplicado (#544, #551). Ler a
+  // sugestão gravada é papel do GET.
   // A cota é reservada antes de qualquer chamada ao provedor e devolvida se
   // a geração não chegar ao fim (issue #297).
   const reservedDay = await reserveDailySuggestion(uid);
