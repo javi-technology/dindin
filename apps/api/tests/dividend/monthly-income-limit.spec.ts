@@ -167,4 +167,19 @@ describe('monthly-income-limit – computeScheduleTotals', () => {
       upcomingTotal: 30,
     });
   });
+
+  // Cotas compradas depois da data-com não recebem o pagamento da agenda
+  // (#562): os totais somam o valor do pagamento, não a renda projetada.
+  it('deve somar o valor do pagamento quando ele difere da renda projetada', () => {
+    const items = [
+      { ...item('AAAA11', 10, '2026-09-11'), scheduledIncome: 4 },
+      { ...item('BBBB11', 20, '2026-09-20'), scheduledIncome: 0 },
+      item('CCCC11', 5, '2026-09-25'),
+    ];
+
+    expect(computeScheduleTotals(items, TODAY)).toEqual({
+      paidTotal: 4,
+      upcomingTotal: 5,
+    });
+  });
 });
