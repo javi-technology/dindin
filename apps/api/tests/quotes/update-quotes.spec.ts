@@ -124,6 +124,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -133,6 +134,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -166,6 +168,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         '2026-07-14',
         10.8,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -352,6 +355,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -427,6 +431,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -458,6 +463,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -489,6 +495,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
 
       consoleErrorSpy.mockRestore();
@@ -532,6 +539,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           undefined,
           undefined,
           '2026-07-15T18:00:00Z',
+          undefined,
         );
       }
     });
@@ -598,6 +606,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-09-23T21:31:00Z',
+        undefined,
       );
     });
 
