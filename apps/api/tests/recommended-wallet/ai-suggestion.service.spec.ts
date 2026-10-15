@@ -2042,6 +2042,32 @@ describe('ai-suggestion.service', () => {
     expect(doc.get).toHaveBeenCalled();
   });
 
+  // Sugestões gravadas antes da identificação da geração (#544) usam o
+  // createdAt, único por geração do mesmo documento.
+  it('deve identificar a sugestão gravada antes da geração pelo createdAt', async () => {
+    const saved = {
+      id: 'wallet-1_2026-09_renda',
+      summary: 'Salva',
+      createdAt: '2026-09-18T00:00:00Z',
+    };
+    const doc = {
+      get: jest
+        .fn()
+        .mockResolvedValue({ exists: true, id: saved.id, data: () => saved }),
+    };
+    firestoreMock = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => ({
+          collection: jest.fn(() => ({ doc: jest.fn(() => doc) })),
+        })),
+      })),
+    };
+
+    await expect(
+      getSavedSuggestion('user-1', 'wallet-1', '2026-09', 'renda'),
+    ).resolves.toEqual({ ...saved, generationId: '2026-09-18T00:00:00Z' });
+  });
+
   it('deve gerar uma nova sugestão quando force estiver ativo', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue({
@@ -2463,6 +2489,11 @@ describe('ai-suggestion.service', () => {
     // não é tocado.
     expect(result.appliedItems).toBeUndefined();
     expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
+    // Cada geração ganha sua identificação, que o pedido de aplicar traz.
+    expect(result.generationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(savedDoc.set.mock.calls[0][0].generationId).toBe(
+      result.generationId,
+    );
   });
 
   it('deve reiniciar os itens aplicados ao gerar de novo com force', async () => {
@@ -2554,6 +2585,11 @@ describe('ai-suggestion.service', () => {
     // não é tocado.
     expect(result.appliedItems).toBeUndefined();
     expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
+    // Cada geração ganha sua identificação, que o pedido de aplicar traz.
+    expect(result.generationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(savedDoc.set.mock.calls[0][0].generationId).toBe(
+      result.generationId,
+    );
   });
 
   it('deve gerar ids determinísticos', () => {

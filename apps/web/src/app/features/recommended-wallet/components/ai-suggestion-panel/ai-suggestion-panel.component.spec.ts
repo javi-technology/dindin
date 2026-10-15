@@ -31,6 +31,7 @@ describe('AiSuggestionPanelComponent', () => {
     summary: 'Concentre o aporte em HGLG11.',
     disclaimer: 'Não é recomendação de investimento.',
     createdAt: '2026-09-01T12:00:00Z',
+    generationId: 'geracao-1',
     contribution: 500,
     projectedDividends: 120,
     items: [

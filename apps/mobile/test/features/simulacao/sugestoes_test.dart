@@ -48,6 +48,7 @@ AiSuggestion sugestao({List<AiSuggestionItem>? itens}) => AiSuggestion(
   items: itens ?? [item('HGLG11', 'buy', valor: 1500)],
   disclaimer: 'Não é recomendação de investimento.',
   createdAt: '2026-09-20T10:00:00Z',
+  generationId: 'geracao-1',
 );
 
 void main() {

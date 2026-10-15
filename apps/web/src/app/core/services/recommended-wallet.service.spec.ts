@@ -171,6 +171,7 @@ describe('RecommendedWalletService', () => {
   it('deve registrar um item aplicado da sugestão (#276)', () => {
     service
       .applySuggestionItem('wallet-1_2026-09_renda', {
+        generationId: 'geracao-1',
         ticker: 'HGCR11',
         fallbackFor: 'HGLG11',
         quantity: 1,
@@ -183,6 +184,7 @@ describe('RecommendedWalletService', () => {
     );
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
+      generationId: 'geracao-1',
       ticker: 'HGCR11',
       fallbackFor: 'HGLG11',
       quantity: 1,

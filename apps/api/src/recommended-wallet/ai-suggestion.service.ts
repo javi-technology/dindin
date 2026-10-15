@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
 import {
@@ -240,7 +241,17 @@ export async function getSavedSuggestion(
   const { input: _input, ...data } = doc.data() as AiSuggestion & {
     input?: AiSuggestionInput;
   };
-  return { ...data, id: doc.id };
+  return { ...data, id: doc.id, generationId: generationOf(data) };
+}
+
+/**
+ * Geração da sugestão gravada. As gravadas antes do `generationId` (#544)
+ * são identificadas pelo `createdAt`, que também muda a cada geração.
+ */
+export function generationOf(
+  suggestion: Pick<AiSuggestion, 'createdAt'> & { generationId?: string },
+): string {
+  return suggestion.generationId ?? suggestion.createdAt;
 }
 
 export async function generateSuggestion(
@@ -414,6 +425,7 @@ async function buildAndSaveSuggestion({
       priceByTicker,
     ),
     createdAt,
+    generationId: randomUUID(),
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,
     historyMonths: availableHistoryMonths,

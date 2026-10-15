@@ -762,6 +762,7 @@ class AiSuggestion {
     required this.items,
     required this.disclaimer,
     required this.createdAt,
+    required this.generationId,
     this.contribution,
     this.projectedDividends,
     this.historyMonths,
@@ -780,6 +781,7 @@ class AiSuggestion {
         .toList(),
     disclaimer: json['disclaimer'] as String,
     createdAt: json['createdAt'] as String,
+    generationId: json['generationId'] as String,
     contribution: json['contribution'] == null
         ? null
         : (json['contribution'] as num).toDouble(),
@@ -810,6 +812,9 @@ class AiSuggestion {
   final List<AiSuggestionItem> items;
   final String disclaimer;
   final String createdAt;
+
+  /// Identifica a geração; o pedido de aplicar a traz (#544).
+  final String generationId;
   final double? contribution;
   final double? projectedDividends;
   final List<String>? historyMonths;
@@ -825,6 +830,7 @@ class AiSuggestion {
     'items': items.map((e) => e.toJson()).toList(),
     'disclaimer': disclaimer,
     'createdAt': createdAt,
+    'generationId': generationId,
     if (contribution != null) 'contribution': contribution,
     if (projectedDividends != null) 'projectedDividends': projectedDividends,
     if (historyMonths != null) 'historyMonths': historyMonths,
@@ -1766,6 +1772,7 @@ class UnfreezeItemRequest {
 
 class ApplySuggestionItemRequest {
   const ApplySuggestionItemRequest({
+    required this.generationId,
     required this.ticker,
     this.fallbackFor,
     required this.quantity,
@@ -1774,6 +1781,7 @@ class ApplySuggestionItemRequest {
 
   factory ApplySuggestionItemRequest.fromJson(Map<String, dynamic> json) =>
       ApplySuggestionItemRequest(
+        generationId: json['generationId'] as String,
         ticker: json['ticker'] as String,
         fallbackFor: json['fallbackFor'] == null
             ? null
@@ -1782,12 +1790,15 @@ class ApplySuggestionItemRequest {
         price: (json['price'] as num).toDouble(),
       );
 
+  /// Geração da sugestão exibida; outra geração responde 409 `SUGGESTION_OUTDATED`.
+  final String generationId;
   final String ticker;
   final String? fallbackFor;
   final double quantity;
   final double price;
 
   Map<String, dynamic> toJson() => {
+    'generationId': generationId,
     'ticker': ticker,
     if (fallbackFor != null) 'fallbackFor': fallbackFor,
     'quantity': quantity,
