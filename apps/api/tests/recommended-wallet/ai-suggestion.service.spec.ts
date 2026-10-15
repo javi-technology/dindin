@@ -1650,7 +1650,7 @@ describe('ai-suggestion.service', () => {
     );
   });
 
-  it('deve usar openai/gpt-5.6-luna quando OPENROUTER_MODEL não está definido', async () => {
+  it('deve usar openai/gpt-6-luna quando OPENROUTER_MODEL não está definido', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -1664,7 +1664,7 @@ describe('ai-suggestion.service', () => {
 
     expect(
       JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).model,
-    ).toBe('openai/gpt-5.6-luna');
+    ).toBe('openai/gpt-6-luna');
   });
 
   it('deve consultar o OpenRouter com modelo, segredo e JSON estruturado', async () => {

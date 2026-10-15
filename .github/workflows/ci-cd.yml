@@ -275,7 +275,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.5
+          flutter-version: 3.47.7
           channel: stable
           cache: true
 
@@ -283,13 +283,13 @@ jobs:
         run: |
           set -euo pipefail
           FIXADA="${{ steps.sdk.outputs.version }}"
-          if [ "$FIXADA" != "3.47.5" ]; then
-            echo "::error::.flutter-version diz $FIXADA, mas o job instala 3.47.5"
+          if [ "$FIXADA" != "3.47.7" ]; then
+            echo "::error::.flutter-version diz $FIXADA, mas o job instala 3.47.7"
             exit 1
           fi
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       # O gerador de contratos é Node e roda da raiz; o job precisa dele para
       # conferir o modelo Dart gerado (issue #399).

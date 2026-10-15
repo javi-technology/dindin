@@ -24,6 +24,18 @@ export async function getAllUserPositions(
     );
   }
 
+  const groups = await getUserPositionsByWallet(userId);
+  return groups.flatMap(({ positions }) => positions);
+}
+
+/**
+ * Posições de todas as carteiras do usuário, agrupadas por carteira. A agenda
+ * de proventos compara cada carteira com a sua quantidade na data-com (#562),
+ * e o `walletId` gravado na posição não é garantido em dado antigo.
+ */
+export async function getUserPositionsByWallet(
+  userId: string,
+): Promise<{ walletId: string; positions: Position[] }[]> {
   const walletsSnapshot = await walletsCollection(userId).get();
 
   const positionsByWallet = await Promise.all(
@@ -32,7 +44,10 @@ export async function getAllUserPositions(
     ),
   );
 
-  return positionsByWallet.flatMap((snapshot) =>
-    snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Position),
-  );
+  return walletsSnapshot.docs.map((walletDoc, index) => ({
+    walletId: walletDoc.id,
+    positions: positionsByWallet[index].docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Position,
+    ),
+  }));
 }

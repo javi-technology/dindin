@@ -127,6 +127,118 @@ describe('PaymentScheduleComponent', () => {
     expect(dia).toContain('× 10');
   });
 
+  // Cotas compradas depois da data-com (#562): o item mostra só as que
+  // recebem e avisa das outras, para a compra não parecer perdida.
+  describe('cotas compradas após a data-com', () => {
+    const comCompraRecente = (
+      quantityAfterComDate: number,
+    ): PaymentSchedule => ({
+      ...vazia,
+      upcoming: [
+        {
+          date: '2026-09-15',
+          total: 1,
+          daysUntil: 3,
+          relativeLabel: 'em 3 dias',
+          items: [
+            {
+              ticker: 'MXRF11',
+              quantity: 10 + quantityAfterComDate,
+              monthlyDividend: 0.1,
+              monthlyIncome: (10 + quantityAfterComDate) / 10,
+              paymentDate: '2026-09-15',
+              quantityAfterComDate,
+              scheduledQuantity: 10,
+              scheduledIncome: 1,
+            },
+          ],
+        },
+      ],
+      upcomingTotal: 1,
+    });
+
+    it('deve detalhar só as cotas que recebem o pagamento', () => {
+      setup(comCompraRecente(9));
+
+      const dia = element('[data-testid="schedule-day"]')?.textContent ?? '';
+
+      expect(dia).toContain('× 10');
+      expect(dia).not.toContain('× 19');
+      expect(dia).not.toMatch(/R\$\s?1,90/);
+    });
+
+    it('deve avisar quantas cotas entram no próximo pagamento', () => {
+      setup(comCompraRecente(9));
+
+      expect(
+        element('[data-testid="schedule-after-com-date"]')?.textContent,
+      ).toContain(
+        '9 cotas compradas após a data-com entram no próximo pagamento',
+      );
+    });
+
+    it('deve usar o singular para uma cota', () => {
+      setup(comCompraRecente(1));
+
+      expect(
+        element('[data-testid="schedule-after-com-date"]')?.textContent,
+      ).toContain('1 cota comprada após a data-com entra no próximo pagamento');
+    });
+
+    // Quem vendeu depois da data-com recebe pela quantidade da foto (#562):
+    // o "× 30" com 19 cotas na carteira precisa de explicação.
+    describe('venda após a data-com', () => {
+      const comVenda: PaymentSchedule = {
+        ...vazia,
+        upcoming: [
+          {
+            date: '2026-09-15',
+            total: 3,
+            daysUntil: 3,
+            relativeLabel: 'em 3 dias',
+            items: [
+              {
+                ticker: 'MXRF11',
+                quantity: 19,
+                monthlyDividend: 0.1,
+                monthlyIncome: 1.9,
+                paymentDate: '2026-09-15',
+                scheduledQuantity: 30,
+                scheduledIncome: 3,
+              },
+            ],
+          },
+        ],
+        upcomingTotal: 3,
+      };
+
+      it('deve detalhar a quantidade da data-com', () => {
+        setup(comVenda);
+
+        const dia = element('[data-testid="schedule-day"]')?.textContent ?? '';
+
+        expect(dia).toContain('× 30');
+        expect(dia).toMatch(/R\$\s?3,00/);
+      });
+
+      it('deve avisar que as cotas vendidas ainda recebem', () => {
+        setup(comVenda);
+
+        expect(
+          element('[data-testid="schedule-sold-after-com-date"]')?.textContent,
+        ).toContain(
+          '11 cotas vendidas após a data-com ainda recebem este pagamento',
+        );
+      });
+    });
+
+    it('não deve avisar quando todas as cotas recebem', () => {
+      setup();
+
+      expect(element('[data-testid="schedule-after-com-date"]')).toBeNull();
+    });
+  });
+
   it('deve listar os ativos sem data anunciada', () => {
     setup();
 

@@ -144,6 +144,11 @@ export interface Quote {
   price: number;
   monthlyDividend: number; // último provento/rendimento por cota/ação
   dividendPaymentDate?: string; // YYYY-MM-DD — data de pagamento do provento
+  /**
+   * YYYY-MM-DD — data-com do provento (issue #562): quem comprou depois dela
+   * só recebe no pagamento seguinte, e a agenda não pode contá-lo neste.
+   */
+  dividendComDate?: string;
   annualDividend?: number; // soma dos proventos pagos nos últimos 12 meses
   updatedAt: string; // ISO-8601 — quando *nós* gravamos a cotação
   /**
