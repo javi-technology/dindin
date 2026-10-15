@@ -2,9 +2,11 @@ import { Position, Quote } from 'dindin-models';
 import type { MonthlyIncomeItem } from 'dindin-shared-types';
 import { positionsCollection } from '../firestore/paths';
 import { getQuotesByTicker } from '../quotes/quote-prices';
+import { today } from '../shared/date';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
 import { getAllUserPositions } from '../wallet/position-reader';
+import { applyComDateEligibility } from './com-date-eligibility.service';
 
 export type { MonthlyIncomeItem };
 
@@ -13,6 +15,8 @@ export interface MonthlyIncome {
   total: number;
   totalFromFridge: number;
   monthlyDividendByTicker: Map<string, number>;
+  /** Data-com do provento de cada ticker, quando conhecida (#562). */
+  comDateByTicker: Map<string, string>;
 }
 
 export const fetchFridgeItems = getAllUserFridgeItems;
@@ -41,7 +45,11 @@ export async function buildMonthlyIncome(
 
   const monthlyDividendByTicker = new Map<string, number>();
   const paymentDateByTicker = new Map<string, string>();
+  const comDateByTicker = new Map<string, string>();
   for (const [ticker, data] of quotes) {
+    if (typeof data.dividendComDate === 'string') {
+      comDateByTicker.set(ticker, data.dividendComDate);
+    }
     if (typeof data.dividendPaymentDate === 'string') {
       paymentDateByTicker.set(ticker, data.dividendPaymentDate);
     }
@@ -92,7 +100,13 @@ export async function buildMonthlyIncome(
     a.ticker.localeCompare(b.ticker),
   );
 
-  return { byTicker, total, totalFromFridge, monthlyDividendByTicker };
+  return {
+    byTicker,
+    total,
+    totalFromFridge,
+    monthlyDividendByTicker,
+    comDateByTicker,
+  };
 }
 
 /** Projeção de renda de uma carteira. */
@@ -128,4 +142,41 @@ export async function computeConsolidatedMonthlyIncome(
   ]);
 
   return buildMonthlyIncome(positions, fridgeItems);
+}
+
+/**
+ * Quantidade atual do usuário por ticker, somando carteiras e geladeira — o
+ * mesmo escopo da foto da data-com (#278).
+ */
+async function heldQuantityByTicker(
+  userId: string,
+): Promise<Map<string, number>> {
+  const [positions, fridgeItems] = await Promise.all([
+    getAllUserPositions(userId),
+    fetchFridgeItems(userId),
+  ]);
+  const held = new Map<string, number>();
+  for (const { ticker, quantity } of [...positions, ...fridgeItems]) {
+    const key = ticker.toUpperCase();
+    held.set(key, (held.get(key) ?? 0) + validQuantity(quantity));
+  }
+  return held;
+}
+
+/**
+ * Projeção com a agenda sem as cotas compradas depois da data-com (#562).
+ * As quantidades do usuário só são lidas quando alguma data-com já passou.
+ */
+export async function withComDateEligibility(
+  income: MonthlyIncome,
+  userId: string,
+): Promise<MonthlyIncome> {
+  const byTicker = await applyComDateEligibility(
+    income.byTicker,
+    userId,
+    income.comDateByTicker,
+    () => heldQuantityByTicker(userId),
+    today(),
+  );
+  return { ...income, byTicker };
 }
