@@ -127,6 +127,70 @@ describe('PaymentScheduleComponent', () => {
     expect(dia).toContain('× 10');
   });
 
+  // Cotas compradas depois da data-com (#562): o item mostra só as que
+  // recebem e avisa das outras, para a compra não parecer perdida.
+  describe('cotas compradas após a data-com', () => {
+    const comCompraRecente = (
+      quantityAfterComDate: number,
+    ): PaymentSchedule => ({
+      ...vazia,
+      upcoming: [
+        {
+          date: '2026-09-15',
+          total: 1,
+          daysUntil: 3,
+          relativeLabel: 'em 3 dias',
+          items: [
+            {
+              ticker: 'MXRF11',
+              quantity: 10 + quantityAfterComDate,
+              monthlyDividend: 0.1,
+              monthlyIncome: (10 + quantityAfterComDate) / 10,
+              paymentDate: '2026-09-15',
+              quantityAfterComDate,
+              scheduledIncome: 1,
+            },
+          ],
+        },
+      ],
+      upcomingTotal: 1,
+    });
+
+    it('deve detalhar só as cotas que recebem o pagamento', () => {
+      setup(comCompraRecente(9));
+
+      const dia = element('[data-testid="schedule-day"]')?.textContent ?? '';
+
+      expect(dia).toContain('× 10');
+      expect(dia).not.toContain('× 19');
+      expect(dia).not.toMatch(/R\$\s?1,90/);
+    });
+
+    it('deve avisar quantas cotas entram no próximo pagamento', () => {
+      setup(comCompraRecente(9));
+
+      expect(
+        element('[data-testid="schedule-after-com-date"]')?.textContent,
+      ).toContain(
+        '9 cotas compradas após a data-com entram no próximo pagamento',
+      );
+    });
+
+    it('deve usar o singular para uma cota', () => {
+      setup(comCompraRecente(1));
+
+      expect(
+        element('[data-testid="schedule-after-com-date"]')?.textContent,
+      ).toContain('1 cota comprada após a data-com entra no próximo pagamento');
+    });
+
+    it('não deve avisar quando todas as cotas recebem', () => {
+      setup();
+
+      expect(element('[data-testid="schedule-after-com-date"]')).toBeNull();
+    });
+  });
+
   it('deve listar os ativos sem data anunciada', () => {
     setup();
 
