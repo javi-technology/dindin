@@ -348,6 +348,55 @@ describe('DividendComponent', () => {
     });
   });
 
+  // Componente sem `display` é inline, e o `space-y-6` não separava as
+  // seções; o relatório mensal ficava fora do contêiner (issue #545).
+  describe('espaçamento entre seções', () => {
+    const secoes = (): HTMLElement[] =>
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          '[data-testid="dividend-sections"]',
+        )?.children ?? [],
+      ) as HTMLElement[];
+
+    it('deve agrupar todas as seções no contêiner espaçado', async () => {
+      await setup();
+
+      const container = (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="dividend-sections"]',
+      );
+      expect(container?.classList).toContain('space-y-6');
+      expect(secoes().map((secao) => secao.tagName.toLowerCase())).toEqual([
+        'app-dividend-kpis',
+        'app-payment-schedule',
+        'app-ticker-projection',
+        'app-monthly-report',
+      ]);
+    });
+
+    it('deve renderizar cada seção como bloco', async () => {
+      await setup();
+
+      expect(secoes().length).toBe(4);
+      for (const secao of secoes()) {
+        expect(secao.classList).toContain('block');
+      }
+    });
+
+    it('deve manter o relatório espaçado quando não há proventos', async () => {
+      dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
+        of({ byTicker: [], total: 0, totalFromFridge: 0 }),
+      );
+
+      await setup();
+
+      expect(secoes().map((secao) => secao.tagName.toLowerCase())).toEqual([
+        'app-dividend-kpis',
+        'p',
+        'app-monthly-report',
+      ]);
+    });
+  });
+
   // A tela passou a pedir a renda consolidada num endpoint só (issue #300).
   it('deve carregar a renda consolidada ao inicializar', async () => {
     await setup();

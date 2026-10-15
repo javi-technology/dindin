@@ -22,6 +22,7 @@ import {
  */
 @Component({
   selector: 'app-monthly-report',
+  host: { class: 'block' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BarChartComponent],

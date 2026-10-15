@@ -17,8 +17,8 @@
       </div>
     }
 
-    @if (!loading() && !error()) {
-      <div class="space-y-6">
+    <div class="space-y-6" data-testid="dividend-sections">
+      @if (!loading() && !error()) {
         <app-dividend-kpis
           [total]="total()"
           [totalFromFridge]="totalFromFridge()"
@@ -46,19 +46,19 @@
             [hiddenCount]="hiddenCount()"
           />
         }
-      </div>
-    }
+      }
 
-    <app-monthly-report
-      [report]="report()"
-      [loading]="reportLoading()"
-      [error]="reportError()"
-      [selectedYear]="selectedYear()"
-      [years]="reportYears()"
-      [series]="monthlySeries()"
-      [concentration]="tickerConcentration()"
-      [monthlyAverage]="monthlyAverage()"
-      (yearChange)="onYearChange($event)"
-    />
+      <app-monthly-report
+        [report]="report()"
+        [loading]="reportLoading()"
+        [error]="reportError()"
+        [selectedYear]="selectedYear()"
+        [years]="reportYears()"
+        [series]="monthlySeries()"
+        [concentration]="tickerConcentration()"
+        [monthlyAverage]="monthlyAverage()"
+        (yearChange)="onYearChange($event)"
+      />
+    </div>
   </div>
 </main>

@@ -14,6 +14,7 @@ import { LastMonthSummary } from '../../../../shared/utils/dividend-kpi.util';
  */
 @Component({
   selector: 'app-dividend-kpis',
+  host: { class: 'block' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dividend-kpis.component.html',
