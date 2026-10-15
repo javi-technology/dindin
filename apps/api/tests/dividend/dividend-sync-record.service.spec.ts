@@ -422,7 +422,11 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
         recorded: {},
         positions: [
           { path: 'users/u1/wallets/w1/positions/p1', quantity: 100 },
+          { path: 'users/u1/wallets/w2/positions/p2', quantity: 20 },
           { path: 'users/u2/wallets/w1/positions/p1', quantity: 30 },
+        ],
+        fridgeItems: [
+          { path: 'users/u1/fridges/f1/fridgeItems/i1', quantity: 10 },
         ],
       });
 
@@ -435,8 +439,15 @@ describe('DividendSyncRecordService — recordPaidDividends', () => {
       expect(result).toEqual([]);
       expect(batchSet).not.toHaveBeenCalled();
       expect(snapshotSet).toHaveBeenCalledTimes(1);
+      // A agenda compara cada carteira com a sua quantidade na data-com
+      // (#562): com só o total, uma compra na geladeira ou em outra carteira
+      // descontava das posições que não mudaram.
       expect(snapshotSet).toHaveBeenCalledWith('2026-09-30', {
-        quantities: { u1: 100, u2: 30 },
+        quantities: { u1: 130, u2: 30 },
+        holdings: {
+          u1: { wallets: { w1: 100, w2: 20 }, fridge: 10 },
+          u2: { wallets: { w1: 30 }, fridge: 0 },
+        },
         takenAt: expect.any(String),
       });
       expect(stateSet).toHaveBeenCalledWith({

@@ -13,18 +13,31 @@ import { applyComDateEligibility } from '../../src/dividend/com-date-eligibility
 import { MonthlyIncomeItem } from '../../src/dividend/monthly-income.service';
 
 // ---------------------------------------------------------------------------
-// Cotas compradas depois da data-com na agenda de proventos (issue #562)
+// Agenda de proventos pela quantidade da data-com (issue #562)
 //
 // Quem tem direito ao provento é quem tinha o ativo no fim da data-com
-// (#278). A agenda partia da quantidade atual: aplicar uma compra da Sugestão
-// do mês inflava o "A receber" de um pagamento que essas cotas não recebem.
+// (#278). A agenda partia da quantidade atual: uma compra feita depois da
+// data-com inflava o "A receber", e uma venda o reduzia.
+//
+// A foto guarda a quantidade de cada carteira e da geladeira. Cada carteira é
+// comparada com a sua: uma compra na geladeira ou em outra carteira não mexe
+// no pagamento das posições que não mudaram, e a soma das carteiras fecha com
+// o consolidado.
 // ---------------------------------------------------------------------------
 
 const UID = 'user-1';
 const TODAY = '2026-10-15';
+const COM_DATE = '2026-10-09';
 
-/** Fotos da data-com por `ticker/comDate`, com a quantidade de cada uid. */
-function mockSnapshots(snapshots: Record<string, Record<string, number>>) {
+interface Holdings {
+  wallets?: Record<string, number>;
+  fridge?: number;
+}
+
+/** Fotos da data-com por `ticker/comDate`. `undefined` = foto antiga. */
+function mockSnapshots(
+  snapshots: Record<string, Record<string, Holdings> | undefined>,
+) {
   const reads: string[] = [];
   firestoreMock = {
     collection: jest.fn((name: string) => {
@@ -36,14 +49,17 @@ function mockSnapshots(snapshots: Record<string, Record<string, number>>) {
             return {
               doc: (comDate: string) => ({
                 get: async () => {
-                  reads.push(`${ticker}/${comDate}`);
-                  const quantities = snapshots[`${ticker}/${comDate}`];
+                  const key = `${ticker}/${comDate}`;
+                  reads.push(key);
+                  if (!(key in snapshots)) return { exists: false };
+                  const holdings = snapshots[key];
                   return {
-                    exists: quantities !== undefined,
-                    data: () =>
-                      quantities === undefined
-                        ? undefined
-                        : { quantities, takenAt: '2026-10-09T21:30:00Z' },
+                    exists: true,
+                    data: () => ({
+                      quantities: {},
+                      takenAt: '2026-10-09T21:30:00Z',
+                      ...(holdings ? { holdings } : {}),
+                    }),
                   };
                 },
               }),
@@ -71,57 +87,187 @@ function item(
   };
 }
 
-const held = (entries: [string, number][]) => async () => new Map(entries);
+/** Quantidade atual por ticker e carteira. */
+const current = (entries: Record<string, Record<string, number>>) => async () =>
+  new Map(
+    Object.entries(entries).map(([ticker, byWallet]) => [
+      ticker,
+      new Map(Object.entries(byWallet)),
+    ]),
+  );
+
+const comDates = new Map([['MXRF11', COM_DATE]]);
 
 describe('applyComDateEligibility', () => {
   it('deve tirar do pagamento as cotas compradas depois da data-com', async () => {
-    mockSnapshots({ 'MXRF11/2026-10-09': { [UID]: 10 } });
+    mockSnapshots({
+      [`MXRF11/${COM_DATE}`]: { [UID]: { wallets: { a: 10 } } },
+    });
 
     const [result] = await applyComDateEligibility(
       [item('MXRF11', 19, 0.1)],
       UID,
-      new Map([['MXRF11', '2026-10-09']]),
-      held([['MXRF11', 19]]),
+      comDates,
+      current({ MXRF11: { a: 19 } }),
       TODAY,
     );
 
     expect(result).toEqual({
       ...item('MXRF11', 19, 0.1),
       quantityAfterComDate: 9,
+      scheduledQuantity: 10,
       scheduledIncome: 1,
     });
   });
 
-  // A renda mensal projetada olha os meses seguintes, em que as cotas novas
-  // recebem: ela não muda.
-  it('deve manter a renda mensal projetada', async () => {
-    mockSnapshots({ 'MXRF11/2026-10-09': { [UID]: 10 } });
+  // Revisão do #564: a quantidade global incluía a geladeira, e a compra
+  // feita só nela descontava das cotas da carteira.
+  it('não deve mexer na carteira quando a compra foi só na geladeira', async () => {
+    mockSnapshots({
+      [`MXRF11/${COM_DATE}`]: { [UID]: { wallets: { a: 10 }, fridge: 0 } },
+    });
+
+    const result = await applyComDateEligibility(
+      [item('MXRF11', 10, 0.1)],
+      UID,
+      comDates,
+      current({ MXRF11: { a: 10 } }),
+      TODAY,
+    );
+
+    expect(result).toEqual([item('MXRF11', 10, 0.1)]);
+  });
+
+  // Revisão do #564: a compra em B descontava de A, e as visões por carteira
+  // deixavam de fechar com o consolidado.
+  describe('compra numa carteira e não em outra', () => {
+    const snapshot = {
+      [`MXRF11/${COM_DATE}`]: { [UID]: { wallets: { a: 10 } } },
+    };
+    const agora = current({ MXRF11: { a: 10, b: 9 } });
+
+    it('não deve mexer na carteira que não comprou', async () => {
+      mockSnapshots(snapshot);
+
+      const result = await applyComDateEligibility(
+        [item('MXRF11', 10, 0.1)],
+        UID,
+        comDates,
+        current({ MXRF11: { a: 10 } }),
+        TODAY,
+      );
+
+      expect(result).toEqual([item('MXRF11', 10, 0.1)]);
+    });
+
+    it('deve tirar tudo da carteira que comprou depois', async () => {
+      mockSnapshots(snapshot);
+
+      const [result] = await applyComDateEligibility(
+        [item('MXRF11', 9, 0.1)],
+        UID,
+        comDates,
+        current({ MXRF11: { b: 9 } }),
+        TODAY,
+      );
+
+      expect(result).toMatchObject({
+        quantityAfterComDate: 9,
+        scheduledQuantity: 0,
+        scheduledIncome: 0,
+      });
+    });
+
+    it('deve fechar o consolidado com a soma das carteiras', async () => {
+      mockSnapshots(snapshot);
+
+      const [result] = await applyComDateEligibility(
+        [item('MXRF11', 19, 0.1)],
+        UID,
+        comDates,
+        agora,
+        TODAY,
+      );
+
+      expect(result).toMatchObject({
+        quantityAfterComDate: 9,
+        scheduledQuantity: 10,
+        scheduledIncome: 1,
+      });
+    });
+  });
+
+  // Revisão do #564: quem vendeu depois da data-com ainda recebe pela foto.
+  it('deve pagar pela quantidade da foto quando houve venda depois da data-com', async () => {
+    mockSnapshots({
+      [`MXRF11/${COM_DATE}`]: { [UID]: { wallets: { a: 30 } } },
+    });
 
     const [result] = await applyComDateEligibility(
       [item('MXRF11', 19, 0.1)],
       UID,
-      new Map([['MXRF11', '2026-10-09']]),
-      held([['MXRF11', 19]]),
+      comDates,
+      current({ MXRF11: { a: 19 } }),
       TODAY,
     );
 
-    expect(result.quantity).toBe(19);
+    expect(result).toEqual({
+      ...item('MXRF11', 19, 0.1),
+      scheduledQuantity: 30,
+      scheduledIncome: 3,
+    });
+    // A renda mensal projetada segue a posição atual.
     expect(result.monthlyIncome).toBe(1.9);
   });
 
   it('deve tirar todas as cotas quando o usuário não tinha o ativo na data-com', async () => {
-    mockSnapshots({ 'GARE11/2026-10-09': { 'outro-usuario': 50 } });
+    mockSnapshots({
+      [`GARE11/${COM_DATE}`]: { outro: { wallets: { x: 50 } } },
+    });
 
     const [result] = await applyComDateEligibility(
       [item('GARE11', 13, 0.07)],
       UID,
-      new Map([['GARE11', '2026-10-09']]),
-      held([['GARE11', 13]]),
+      new Map([['GARE11', COM_DATE]]),
+      current({ GARE11: { a: 13 } }),
       TODAY,
     );
 
-    expect(result.quantityAfterComDate).toBe(13);
-    expect(result.scheduledIncome).toBe(0);
+    expect(result).toMatchObject({
+      quantityAfterComDate: 13,
+      scheduledQuantity: 0,
+      scheduledIncome: 0,
+    });
+  });
+
+  // A foto anterior a esta versão só tem o total do usuário: sem saber em
+  // qual carteira estavam as cotas, vale a quantidade atual.
+  it('deve ignorar a foto sem a quantidade por carteira', async () => {
+    mockSnapshots({ [`MXRF11/${COM_DATE}`]: undefined });
+
+    const result = await applyComDateEligibility(
+      [item('MXRF11', 19, 0.1)],
+      UID,
+      comDates,
+      current({ MXRF11: { a: 19 } }),
+      TODAY,
+    );
+
+    expect(result).toEqual([item('MXRF11', 19, 0.1)]);
+  });
+
+  it('não deve mexer no item quando a foto da data-com não existe', async () => {
+    mockSnapshots({});
+
+    const result = await applyComDateEligibility(
+      [item('MXRF11', 19, 0.1)],
+      UID,
+      comDates,
+      current({ MXRF11: { a: 19 } }),
+      TODAY,
+    );
+
+    expect(result).toEqual([item('MXRF11', 19, 0.1)]);
   });
 
   // A foto é tirada às 18h30 do próprio dia: até lá, comprar ainda dá direito.
@@ -130,17 +276,19 @@ describe('applyComDateEligibility', () => {
     ['ainda não chegou', '2026-10-31'],
   ])('não deve mexer no item quando a data-com %s', async (_caso, comDate) => {
     const reads = mockSnapshots({});
+    const loadCurrent = jest.fn(current({ MXRF11: { a: 19 } }));
 
     const result = await applyComDateEligibility(
       [item('MXRF11', 19, 0.1)],
       UID,
       new Map([['MXRF11', comDate]]),
-      held([['MXRF11', 19]]),
+      loadCurrent,
       TODAY,
     );
 
     expect(result).toEqual([item('MXRF11', 19, 0.1)]);
     expect(reads).toEqual([]);
+    expect(loadCurrent).not.toHaveBeenCalled();
   });
 
   it('não deve mexer no item sem data-com conhecida', async () => {
@@ -150,72 +298,11 @@ describe('applyComDateEligibility', () => {
       [item('MXRF11', 19, 0.1)],
       UID,
       new Map(),
-      held([['MXRF11', 19]]),
+      current({ MXRF11: { a: 19 } }),
       TODAY,
     );
 
     expect(result).toEqual([item('MXRF11', 19, 0.1)]);
     expect(reads).toEqual([]);
-  });
-
-  // Mesma regra do registro do provento: sem foto, vale a quantidade atual.
-  it('não deve mexer no item quando a foto da data-com não existe', async () => {
-    mockSnapshots({});
-
-    const result = await applyComDateEligibility(
-      [item('MXRF11', 19, 0.1)],
-      UID,
-      new Map([['MXRF11', '2026-10-09']]),
-      held([['MXRF11', 19]]),
-      TODAY,
-    );
-
-    expect(result).toEqual([item('MXRF11', 19, 0.1)]);
-  });
-
-  it('não deve mexer no item quando o usuário vendeu depois da data-com', async () => {
-    mockSnapshots({ 'MXRF11/2026-10-09': { [UID]: 30 } });
-
-    const result = await applyComDateEligibility(
-      [item('MXRF11', 19, 0.1)],
-      UID,
-      new Map([['MXRF11', '2026-10-09']]),
-      held([['MXRF11', 19]]),
-      TODAY,
-    );
-
-    expect(result).toEqual([item('MXRF11', 19, 0.1)]);
-  });
-
-  // A foto é do usuário, não da carteira: a compra é atribuída à carteira
-  // até o limite do que ela tem, para nunca inflar o pagamento.
-  it('deve limitar as cotas tiradas à quantidade da carteira', async () => {
-    mockSnapshots({ 'MXRF11/2026-10-09': { [UID]: 20 } });
-
-    const [result] = await applyComDateEligibility(
-      [item('MXRF11', 5, 0.1)],
-      UID,
-      new Map([['MXRF11', '2026-10-09']]),
-      held([['MXRF11', 30]]),
-      TODAY,
-    );
-
-    expect(result.quantityAfterComDate).toBe(5);
-    expect(result.scheduledIncome).toBe(0);
-  });
-
-  it('não deve ler as quantidades do usuário quando nenhuma data-com passou', async () => {
-    mockSnapshots({});
-    const loadHeld = jest.fn(held([]));
-
-    await applyComDateEligibility(
-      [item('MXRF11', 19, 0.1)],
-      UID,
-      new Map([['MXRF11', '2026-10-31']]),
-      loadHeld,
-      TODAY,
-    );
-
-    expect(loadHeld).not.toHaveBeenCalled();
   });
 });
