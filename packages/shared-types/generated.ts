@@ -281,6 +281,10 @@ export interface UnfreezeItemRequest {
 }
 
 export interface ApplySuggestionItemRequest {
+  /**
+   * Geração da sugestão exibida; outra geração responde 409 `SUGGESTION_OUTDATED`.
+   */
+  generationId: string;
   ticker: string;
   fallbackFor?: string;
   quantity: number;

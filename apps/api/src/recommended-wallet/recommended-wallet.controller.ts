@@ -171,7 +171,6 @@ export const generateSuggestion = asyncHandler(
       walletId,
       month,
       tab,
-      req.query.force === 'true',
       contribution,
     );
 

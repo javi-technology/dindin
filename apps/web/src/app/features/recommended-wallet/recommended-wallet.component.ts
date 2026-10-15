@@ -322,6 +322,7 @@ export class RecommendedWalletComponent implements OnInit {
     this.applyError.set(null);
     this.recommendedWalletService
       .applySuggestionItem(suggestion.id, {
+        generationId: suggestion.generationId,
         ticker: target.ticker,
         ...(target.fallbackFor ? { fallbackFor: target.fallbackFor } : {}),
         quantity: value.quantity,
@@ -335,8 +336,20 @@ export class RecommendedWalletComponent implements OnInit {
           this.closeApply();
           this.refreshComparison();
         },
-        error: (error: { error?: { error?: string } }) => {
+        error: (error: { error?: { error?: string; code?: string } }) => {
           this.applySaving.set(false);
+          // Gerada de novo em outra aba ou aparelho (#544): o modal fecha,
+          // para que confirmar de novo não lance a compra antiga sobre a
+          // sugestão nova, e a tela passa a mostrar a atual.
+          if (error?.error?.code === 'SUGGESTION_OUTDATED') {
+            this.closeApply();
+            this.suggestionError.set(
+              error.error.error ??
+                'A sugestão foi gerada de novo. Confira a sugestão atual.',
+            );
+            this.loadSavedSuggestion();
+            return;
+          }
           this.applyError.set(
             error?.error?.error ??
               'Não foi possível aplicar a compra. Tente novamente.',
@@ -345,7 +358,7 @@ export class RecommendedWalletComponent implements OnInit {
       });
   }
 
-  generateSuggestion({ contribution, force }: GenerateRequest): void {
+  generateSuggestion({ contribution }: GenerateRequest): void {
     const walletId = this.selectedWalletId();
     const month = this.selectedMonth();
     const tab = this.selectedTab();
@@ -355,17 +368,11 @@ export class RecommendedWalletComponent implements OnInit {
     this.suggestionLoading.set(true);
     const request =
       contribution === undefined
-        ? this.recommendedWalletService.generateSuggestion(
-            walletId,
-            month,
-            tab,
-            force,
-          )
+        ? this.recommendedWalletService.generateSuggestion(walletId, month, tab)
         : this.recommendedWalletService.generateSuggestion(
             walletId,
             month,
             tab,
-            force,
             contribution,
           );
     request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({

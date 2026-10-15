@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { listQualifiedInvestorTickers } from '../assets/asset.service';
 import { computeMonthlyIncome } from '../dividend/monthly-income.service';
 import {
@@ -240,7 +241,17 @@ export async function getSavedSuggestion(
   const { input: _input, ...data } = doc.data() as AiSuggestion & {
     input?: AiSuggestionInput;
   };
-  return { ...data, id: doc.id };
+  return { ...data, id: doc.id, generationId: generationOf(data) };
+}
+
+/**
+ * Geração da sugestão gravada. As gravadas antes do `generationId` (#544)
+ * são identificadas pelo `createdAt`, que também muda a cada geração.
+ */
+export function generationOf(
+  suggestion: Pick<AiSuggestion, 'createdAt'> & { generationId?: string },
+): string {
+  return suggestion.generationId ?? suggestion.createdAt;
 }
 
 export async function generateSuggestion(
@@ -248,7 +259,6 @@ export async function generateSuggestion(
   walletId: string,
   month: string,
   tab: AiSuggestionTab,
-  force: boolean,
   contribution?: number,
 ): Promise<AiSuggestion> {
   if (!isTab(tab)) throw HttpError.badRequest('Aba inválida');
@@ -264,18 +274,10 @@ export async function generateSuggestion(
   const availableHistoryMonths = sortedHistoryWallets.map(
     (wallet) => `${wallet.month}:${wallet.revision}`,
   );
-  // Lida também com `force`: as compras já lançadas na carteira (#276)
-  // continuam marcadas na sugestão gerada de novo.
-  const saved = await getSavedSuggestion(uid, walletId, month, tab);
-  if (
-    !force &&
-    saved &&
-    saved.contribution === contribution &&
-    JSON.stringify(saved.historyMonths ?? []) ===
-      JSON.stringify(availableHistoryMonths)
-  ) {
-    return saved;
-  }
+  // Toda chamada gera uma sugestão nova, sem itens aplicados: "Gerar
+  // sugestão do mês" é o único botão de geração, e um segundo aporte no mês,
+  // mesmo de igual valor, precisa poder ser aplicado (#544, #551). Ler a
+  // sugestão gravada é papel do GET.
   // A cota é reservada antes de qualquer chamada ao provedor e devolvida se
   // a geração não chegar ao fim (issue #297).
   const reservedDay = await reserveDailySuggestion(uid);
@@ -289,7 +291,6 @@ export async function generateSuggestion(
       availableHistoryMonths,
       history,
       contribution,
-      saved,
     });
   } catch (error) {
     // A devolução é uma segunda transação no mesmo documento disputado. Se
@@ -315,7 +316,6 @@ interface BuildSuggestionArgs {
   availableHistoryMonths: string[];
   history: AiSuggestionHistoryMonth[];
   contribution?: number;
-  saved: AiSuggestion | null;
 }
 
 /** Monta, consulta a IA e persiste a sugestão, com a cota já reservada. */
@@ -328,7 +328,6 @@ async function buildAndSaveSuggestion({
   availableHistoryMonths,
   history,
   contribution,
-  saved,
 }: BuildSuggestionArgs): Promise<AiSuggestion> {
   // Só os tickers em jogo: os da comparação (posições do usuário) e os da
   // carteira recomendada do mês (issue #299). A mesma leitura serve para
@@ -416,12 +415,10 @@ async function buildAndSaveSuggestion({
       priceByTicker,
     ),
     createdAt,
+    generationId: randomUUID(),
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,
     historyMonths: availableHistoryMonths,
-    ...(saved?.appliedItems?.length
-      ? { appliedItems: saved.appliedItems }
-      : {}),
   };
   await aiSuggestionsCollection(uid)
     .doc(id)

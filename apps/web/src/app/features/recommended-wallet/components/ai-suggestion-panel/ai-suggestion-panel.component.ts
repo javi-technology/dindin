@@ -22,7 +22,6 @@ import { LucideSparkles, LucideWallet } from '@lucide/angular';
 export interface GenerateRequest {
   /** `undefined` quando o usuário não informou aporte. */
   contribution: number | undefined;
-  force: boolean;
 }
 
 export interface ApplyRequest {
@@ -70,7 +69,7 @@ export class AiSuggestionPanelComponent {
     this.contributionInput.set((event.target as HTMLInputElement).value);
   }
 
-  requestGeneration(force = false): void {
+  requestGeneration(): void {
     const raw = this.contributionInput().trim();
     const contribution = raw === '' ? undefined : parseBrlNumber(raw);
 
@@ -82,7 +81,7 @@ export class AiSuggestionPanelComponent {
       return;
     }
 
-    this.generate.emit({ contribution, force });
+    this.generate.emit({ contribution });
   }
 
   requestApply(

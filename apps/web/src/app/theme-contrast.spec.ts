@@ -157,3 +157,100 @@ describe('contraste das telas nos dois temas', () => {
     expect([...new Set(reprovados)]).toEqual([]);
   });
 });
+
+/*
+  Os botões "Aplicar" da Sugestão do mês ficam sobre o painel `bg-brand-soft`,
+  um fundo que não está na mesma lista de classes e que o teste acima não vê.
+  A borda era da cor do painel e sumia nos dois temas (issue #543).
+*/
+describe('botões Aplicar da Sugestão do mês', () => {
+  const PAINEL = 'brand-soft';
+  const markup = readFileSync(
+    join(
+      APP,
+      'features/recommended-wallet/components/ai-suggestion-panel/ai-suggestion-panel.component.html',
+    ),
+    'utf8',
+  );
+  const botoes = [
+    ...markup.matchAll(
+      /<button\s+type="button"\s+class="([^"]+)"\s+\[attr\.data-testid\]="\s*'apply-/g,
+    ),
+  ].map((match) => match[1].split(/\s+/));
+
+  /** Token da utilitária `prefixo-` na variante pedida (`''` é a base). */
+  function token(
+    classes: string[],
+    prefixo: string,
+    variante: string,
+  ): string | undefined {
+    for (const raw of classes) {
+      const { variant, name } = splitVariant(raw);
+      if (variant === variante && name.startsWith(prefixo)) {
+        const nome = name.slice(prefixo.length);
+        if (TOKENS.includes(nome) || nome === 'transparent') return nome;
+      }
+    }
+    return undefined;
+  }
+
+  /** Estado habilitado e desabilitado, com o fundo efetivo de cada um. */
+  function estados(classes: string[]) {
+    const base = {
+      fundo: token(classes, 'bg-', '') ?? PAINEL,
+      borda: token(classes, 'border-', ''),
+      texto: token(classes, 'text-', ''),
+    };
+    const fundoDesabilitado = token(classes, 'bg-', 'disabled') ?? base.fundo;
+    const desabilitado = {
+      fundo: fundoDesabilitado === 'transparent' ? PAINEL : fundoDesabilitado,
+      borda: token(classes, 'border-', 'disabled') ?? base.borda,
+      texto: token(classes, 'text-', 'disabled') ?? base.texto,
+    };
+    return { habilitado: base, desabilitado };
+  }
+
+  it('encontra o botão do item e o da alternativa', () => {
+    expect(botoes.length).toBe(2);
+  });
+
+  it.each([
+    ['claro', light],
+    ['escuro', dark],
+  ])('mantém borda e texto legíveis no tema %s', (_name, theme) => {
+    const reprovados: string[] = [];
+    for (const classes of botoes) {
+      for (const [estado, cores] of Object.entries(estados(classes))) {
+        expect(cores.borda, `${estado} sem borda`).toBeDefined();
+        expect(cores.texto, `${estado} sem texto`).toBeDefined();
+        const borda = contrast(
+          resolveToken(cores.borda!, theme),
+          resolveToken(PAINEL, theme),
+        );
+        const texto = contrast(
+          resolveToken(cores.texto!, theme),
+          resolveToken(cores.fundo, theme),
+        );
+        if (borda < 3) {
+          reprovados.push(
+            `${estado}: border-${cores.borda} sobre bg-${PAINEL} = ${borda.toFixed(2)}:1`,
+          );
+        }
+        if (texto < 4.5) {
+          reprovados.push(
+            `${estado}: text-${cores.texto} sobre bg-${cores.fundo} = ${texto.toFixed(2)}:1`,
+          );
+        }
+      }
+    }
+
+    expect([...new Set(reprovados)]).toEqual([]);
+  });
+
+  it('distingue o "Aplicado" do habilitado pelo preenchimento, não só pela cor', () => {
+    for (const classes of botoes) {
+      const { habilitado, desabilitado } = estados(classes);
+      expect(desabilitado.fundo).not.toBe(habilitado.fundo);
+    }
+  });
+});

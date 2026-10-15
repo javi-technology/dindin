@@ -1879,7 +1879,7 @@ describe('ai-suggestion.service', () => {
       firestoreMock = store.firestore;
 
       await expect(
-        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda'),
       ).rejects.toMatchObject({
         statusCode: 502,
         message: 'Falha ao consultar o provedor de IA',
@@ -1894,7 +1894,7 @@ describe('ai-suggestion.service', () => {
       firestoreMock = store.firestore;
 
       await expect(
-        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+        generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda'),
       ).rejects.toMatchObject({ statusCode: 502 });
 
       expect(store.counts.get(today())?.count ?? 0).toBe(0);
@@ -1933,11 +1933,11 @@ describe('ai-suggestion.service', () => {
     firestoreMock = store.firestore;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+      await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda');
     }
 
     await expect(
-      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true),
+      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda'),
     ).rejects.toMatchObject({
       statusCode: 429,
       message: 'Limite diário de sugestões atingido',
@@ -2012,7 +2012,7 @@ describe('ai-suggestion.service', () => {
     });
     firestoreMock = store.firestore;
 
-    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda');
 
     const [saved] = store.suggestionDoc.set.mock.calls[0];
     const item = saved.input.items.find(
@@ -2042,7 +2042,33 @@ describe('ai-suggestion.service', () => {
     expect(doc.get).toHaveBeenCalled();
   });
 
-  it('deve gerar uma nova sugestão quando force estiver ativo', async () => {
+  // Sugestões gravadas antes da identificação da geração (#544) usam o
+  // createdAt, único por geração do mesmo documento.
+  it('deve identificar a sugestão gravada antes da geração pelo createdAt', async () => {
+    const saved = {
+      id: 'wallet-1_2026-09_renda',
+      summary: 'Salva',
+      createdAt: '2026-09-18T00:00:00Z',
+    };
+    const doc = {
+      get: jest
+        .fn()
+        .mockResolvedValue({ exists: true, id: saved.id, data: () => saved }),
+    };
+    firestoreMock = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => ({
+          collection: jest.fn(() => ({ doc: jest.fn(() => doc) })),
+        })),
+      })),
+    };
+
+    await expect(
+      getSavedSuggestion('user-1', 'wallet-1', '2026-09', 'renda'),
+    ).resolves.toEqual({ ...saved, generationId: '2026-09-18T00:00:00Z' });
+  });
+
+  it('deve gerar uma nova sugestão com aporte informado', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue({
       ...comparison,
@@ -2135,7 +2161,6 @@ describe('ai-suggestion.service', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      true,
       100,
     );
 
@@ -2182,35 +2207,100 @@ describe('ai-suggestion.service', () => {
     expect(doc.set).toHaveBeenCalled();
   });
 
-  it('deve reutilizar cache quando o aporte for igual', async () => {
-    const saved = {
-      id: 'wallet-1_2026-09_renda',
-      walletId: 'wallet-1',
-      month: '2026-09',
-      tab: 'renda',
-      contribution: 500,
-      historyMonths: [],
+  // "Gerar sugestão do mês" é o único botão de geração: com o mesmo aporte,
+  // ele também gera uma sugestão nova, sem itens aplicados (#551).
+  it('deve gerar uma nova sugestão mesmo com o mesmo aporte e histórico', async () => {
+    process.env.OPENROUTER_API_KEY = 'secret';
+    compareWithWalletMock.mockResolvedValue(comparison);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        model: 'modelo',
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: 'Novo resumo',
+                items: [
+                  {
+                    ticker: 'HGLG11',
+                    action: 'buy',
+                    priority: 1,
+                    rationale: 'Aporte maior.',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    const savedDoc = {
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        id: 'wallet-1_2026-09_renda',
+        data: () => ({
+          id: 'wallet-1_2026-09_renda',
+          walletId: 'wallet-1',
+          month: '2026-09',
+          tab: 'renda',
+          contribution: 500,
+          historyMonths: [],
+          appliedItems: [
+            {
+              ticker: 'HGLG11',
+              quantity: 2,
+              price: 160,
+              appliedAt: '2026-09-10T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+      set: jest.fn(),
     };
-    const doc = {
-      get: jest
-        .fn()
-        .mockResolvedValue({ exists: true, id: saved.id, data: () => saved }),
+    const query = {
+      where: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ size: 0 }),
     };
     firestoreMock = {
-      collection: jest.fn(() => ({
-        doc: jest.fn(() => ({
-          collection: jest.fn(() => ({ doc: jest.fn(() => doc) })),
-        })),
-      })),
+      collection: jest.fn((name: string) => {
+        if (name === 'quotes') {
+          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
+        }
+        return {
+          doc: jest.fn(() => ({
+            collection: jest.fn(() => ({
+              ...query,
+              doc: jest.fn(() => savedDoc),
+            })),
+          })),
+        };
+      }),
     };
 
-    await expect(
-      generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', false, 500),
-    ).resolves.toEqual(saved);
-    expect(global.fetch).not.toHaveBeenCalled();
+    const result = await generateSuggestion(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      500,
+    );
+
+    expect(result).toMatchObject({
+      summary: 'Novo resumo',
+      contribution: 500,
+      projectedDividends: 2.5,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+    expect(savedDoc.set).toHaveBeenCalled();
+    // Sugestão nova começa sem itens aplicados: o usuário pode aplicar um
+    // segundo aporte no mesmo mês (#544). O que já foi lançado na carteira
+    // não é tocado.
+    expect(result.appliedItems).toBeUndefined();
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
   });
 
-  it('deve ignorar cache quando o histórico salvo estiver desatualizado', async () => {
+  it('deve usar o histórico atual da carteira recomendada', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue(comparison);
     getRecommendedWalletMock.mockResolvedValue({
@@ -2294,14 +2384,7 @@ describe('ai-suggestion.service', () => {
       }),
     };
 
-    await generateSuggestion(
-      'user-1',
-      'wallet-1',
-      '2026-09',
-      'renda',
-      false,
-      500,
-    );
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', 500);
 
     expect(global.fetch).toHaveBeenCalled();
     expect(getRecommendedWalletMock).toHaveBeenCalledWith('2026-08');
@@ -2353,7 +2436,7 @@ describe('ai-suggestion.service', () => {
     const { suggestionDoc } = store;
     firestoreMock = store.firestore;
 
-    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda', true);
+    await generateSuggestion('user-1', 'wallet-1', '2026-09', 'renda');
 
     expect(suggestionDoc.set).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2365,7 +2448,7 @@ describe('ai-suggestion.service', () => {
     );
   });
 
-  it('deve ignorar cache quando o aporte for diferente', async () => {
+  it('deve reiniciar os itens aplicados ao gerar com outro aporte', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue(comparison);
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -2438,7 +2521,6 @@ describe('ai-suggestion.service', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       600,
     );
 
@@ -2449,104 +2531,16 @@ describe('ai-suggestion.service', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(savedDoc.set).toHaveBeenCalled();
-    // Compras já lançadas na carteira continuam marcadas (#276).
-    const applied = [
-      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
-    ];
-    expect(result.appliedItems).toEqual(applied);
-    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
-  });
-
-  it('deve manter os itens aplicados ao gerar de novo com force', async () => {
-    process.env.OPENROUTER_API_KEY = 'secret';
-    compareWithWalletMock.mockResolvedValue(comparison);
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        model: 'modelo',
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: 'Novo resumo',
-                items: [
-                  {
-                    ticker: 'HGLG11',
-                    action: 'buy',
-                    priority: 1,
-                    rationale: 'Aporte maior.',
-                  },
-                ],
-              }),
-            },
-          },
-        ],
-      }),
-    });
-    const savedDoc = {
-      get: jest.fn().mockResolvedValue({
-        exists: true,
-        id: 'wallet-1_2026-09_renda',
-        data: () => ({
-          id: 'wallet-1_2026-09_renda',
-          walletId: 'wallet-1',
-          month: '2026-09',
-          tab: 'renda',
-          contribution: 500,
-          appliedItems: [
-            {
-              ticker: 'HGLG11',
-              quantity: 2,
-              price: 160,
-              appliedAt: '2026-09-10T00:00:00Z',
-            },
-          ],
-        }),
-      }),
-      set: jest.fn(),
-    };
-    const query = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ size: 0 }),
-    };
-    firestoreMock = {
-      collection: jest.fn((name: string) => {
-        if (name === 'quotes') {
-          return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
-        }
-        return {
-          doc: jest.fn(() => ({
-            collection: jest.fn(() => ({
-              ...query,
-              doc: jest.fn(() => savedDoc),
-            })),
-          })),
-        };
-      }),
-    };
-
-    const result = await generateSuggestion(
-      'user-1',
-      'wallet-1',
-      '2026-09',
-      'renda',
-      true,
-      600,
+    // Sugestão nova começa sem itens aplicados: o usuário pode aplicar um
+    // segundo aporte no mesmo mês (#544). O que já foi lançado na carteira
+    // não é tocado.
+    expect(result.appliedItems).toBeUndefined();
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
+    // Cada geração ganha sua identificação, que o pedido de aplicar traz.
+    expect(result.generationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(savedDoc.set.mock.calls[0][0].generationId).toBe(
+      result.generationId,
     );
-
-    expect(result).toMatchObject({
-      summary: 'Novo resumo',
-      contribution: 600,
-      projectedDividends: 2.5,
-    });
-    expect(global.fetch).toHaveBeenCalled();
-    expect(savedDoc.set).toHaveBeenCalled();
-    // Compras já lançadas na carteira continuam marcadas (#276).
-    const applied = [
-      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
-    ];
-    expect(result.appliedItems).toEqual(applied);
-    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
   });
 
   it('deve gerar ids determinísticos', () => {

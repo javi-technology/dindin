@@ -43,6 +43,7 @@ info:
 # entrada nova: issue, o que mudou e a versão mínima do app. É histórico.
 x-incompatible-changes:
   - 'issue #499: GET /api/dividends/projection e GET /api/recommended-wallets/bb-fii/suggestions passam a ser descritos como a API sempre os devolveu; o comportamento da API não mudou, só a descrição que estava errada.'
+  - 'issue #544: POST /api/recommended-wallets/bb-fii/suggestions/{id}/applied passa a exigir generationId, para não lançar a compra de uma geração anterior na atual; o corpo passa a ser descrito como o objeto que a API sempre recebeu, não um array. Só o web usa a rota (o app não aplica sugestões), então não há versão mínima do app a subir.'
 
 servers:
   - url: https://dindin-4e720.web.app
@@ -401,7 +402,18 @@ components:
     AiSuggestion:
       type: object
       required:
-        [id, walletId, month, tab, model, summary, items, disclaimer, createdAt]
+        [
+          id,
+          walletId,
+          month,
+          tab,
+          model,
+          summary,
+          items,
+          disclaimer,
+          createdAt,
+          generationId,
+        ]
       properties:
         id: { type: string }
         walletId: { type: string }
@@ -414,6 +426,9 @@ components:
           items: { $ref: '#/components/schemas/AiSuggestionItem' }
         disclaimer: { type: string }
         createdAt: { type: string, format: date-time }
+        generationId:
+          type: string
+          description: 'Identifica a geração; o pedido de aplicar a traz (#544).'
         contribution: { type: number }
         projectedDividends: { type: number }
         historyMonths:
@@ -766,8 +781,11 @@ components:
 
     ApplySuggestionItemRequest:
       type: object
-      required: [ticker, quantity, price]
+      required: [generationId, ticker, quantity, price]
       properties:
+        generationId:
+          type: string
+          description: 'Geração da sugestão exibida; outra geração responde 409 `SUGGESTION_OUTDATED`.'
         ticker: { type: string }
         fallbackFor: { type: string }
         quantity: { type: number }
@@ -2222,9 +2240,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: array
-              items: { $ref: '#/components/schemas/ApplySuggestionItemRequest' }
+            schema: { $ref: '#/components/schemas/ApplySuggestionItemRequest' }
       responses:
         '200':
           description: OK

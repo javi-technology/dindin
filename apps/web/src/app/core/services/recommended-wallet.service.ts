@@ -67,23 +67,15 @@ export class RecommendedWalletService {
     walletId: string,
     month: string,
     tab: AiSuggestionTab,
-    force = false,
     contribution?: number,
   ): Observable<AiSuggestion> {
-    let params = new HttpParams();
-    if (force) {
-      params = params.set('force', 'true');
-    }
-    return this.http.post<AiSuggestion>(
-      `${this.apiUrl}/suggestions`,
-      {
-        walletId,
-        month,
-        tab,
-        ...(contribution === undefined ? {} : { contribution }),
-      },
-      { params },
-    );
+    // Toda chamada gera uma sugestão nova (#551).
+    return this.http.post<AiSuggestion>(`${this.apiUrl}/suggestions`, {
+      walletId,
+      month,
+      tab,
+      ...(contribution === undefined ? {} : { contribution }),
+    });
   }
 
   /** Marca uma compra da sugestão como lançada na carteira (#276). */

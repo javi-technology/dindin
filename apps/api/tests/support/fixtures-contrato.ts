@@ -80,4 +80,5 @@ export const sugestaoFixture: AiSuggestion = {
   items: [],
   disclaimer: 'Não é recomendação de investimento.',
   createdAt: '2026-09-02T10:00:00.000Z',
+  generationId: 'geracao-1',
 };

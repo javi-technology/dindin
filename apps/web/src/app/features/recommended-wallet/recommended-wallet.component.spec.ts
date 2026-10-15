@@ -182,6 +182,7 @@ describe('RecommendedWalletComponent', () => {
         ],
         disclaimer: 'Aviso',
         createdAt: '2026-09-04T12:00:00Z',
+        generationId: 'geracao-1',
         contribution: 500,
         projectedDividends: 25,
       } satisfies AiSuggestion),
@@ -409,7 +410,6 @@ describe('RecommendedWalletComponent', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       1500.5,
     );
   });
@@ -551,6 +551,7 @@ describe('RecommendedWalletComponent', () => {
       ],
       disclaimer: 'Aviso',
       createdAt: '2026-09-04T12:00:00Z',
+      generationId: 'geracao-1',
     };
     const positions: Position[] = [
       {
@@ -657,7 +658,13 @@ describe('RecommendedWalletComponent', () => {
       expect(serviceMock.applySuggestionItem).toHaveBeenCalledTimes(1);
       expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
         'wallet-1_2026-09_renda',
-        { ticker: 'HGLG11', quantity: 2, price: 89.2 },
+        // A geração exibida vai junto: a API recusa a de outra (#544).
+        {
+          generationId: 'geracao-1',
+          ticker: 'HGLG11',
+          quantity: 2,
+          price: 89.2,
+        },
       );
       expect(modal()).toBeNull();
     });
@@ -672,7 +679,13 @@ describe('RecommendedWalletComponent', () => {
       expect(positionServiceMock.create).not.toHaveBeenCalled();
       expect(serviceMock.applySuggestionItem).toHaveBeenCalledWith(
         'wallet-1_2026-09_renda',
-        { ticker: 'HGCR11', fallbackFor: 'HGLG11', quantity: 1, price: 96.44 },
+        {
+          generationId: 'geracao-1',
+          ticker: 'HGCR11',
+          fallbackFor: 'HGLG11',
+          quantity: 1,
+          price: 96.44,
+        },
       );
     });
 
@@ -745,6 +758,33 @@ describe('RecommendedWalletComponent', () => {
       expect(
         fixture.componentInstance.suggestion()?.appliedItems,
       ).toBeUndefined();
+    });
+
+    // A sugestão foi gerada de novo em outra aba ou aparelho (#544): o modal
+    // fecha, para que confirmar de novo não lance a compra antiga sobre a
+    // sugestão nova, e a tela passa a mostrar a sugestão atual.
+    it('deve trocar pela sugestão atual quando a geração exibida ficou para trás', () => {
+      const atual: AiSuggestion = { ...suggestion, generationId: 'geracao-2' };
+      const mensagem =
+        'A sugestão foi gerada de novo. Confira a sugestão atual antes de aplicar.';
+      serviceMock.applySuggestionItem.and.returnValue(
+        throwError(() => ({
+          status: 409,
+          error: { error: mensagem, code: 'SUGGESTION_OUTDATED' },
+        })),
+      );
+      serviceMock.getSuggestion.and.returnValue(of(atual));
+      open('apply-item-HGLG11');
+
+      confirmButton().click();
+      fixture.detectChanges();
+
+      expect(modal()).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="suggestion-error"]')
+          ?.textContent,
+      ).toContain(mensagem);
+      expect(fixture.componentInstance.suggestion()).toEqual(atual);
     });
 
     it('deve mostrar erro genérico quando a API não explica a falha', () => {

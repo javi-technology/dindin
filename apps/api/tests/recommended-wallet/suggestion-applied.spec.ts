@@ -116,6 +116,7 @@ import { app } from '../../src/index';
 
 const UID = 'user-1';
 const SUGGESTION_ID = 'wallet-1_2026-09_renda';
+const GERACAO = 'geracao-1';
 const path = (uid = UID) => `users/${uid}/aiSuggestions/${SUGGESTION_ID}`;
 
 function suggestion(): AiSuggestion & { input: unknown } {
@@ -128,6 +129,7 @@ function suggestion(): AiSuggestion & { input: unknown } {
     summary: 'Resumo',
     disclaimer: 'Aviso',
     createdAt: '2026-09-18T00:00:00Z',
+    generationId: GERACAO,
     items: [
       {
         ticker: 'HGLG11',
@@ -188,11 +190,13 @@ const positions = () =>
     key.startsWith(`users/${UID}/wallets/wallet-1/positions/`),
   );
 
+// O pedido identifica a geração que o usuário vê (#544); os testes que não
+// tratam disso aplicam sobre a geração gravada.
 const apply = (body: object, id = SUGGESTION_ID) =>
   request(app)
     .post(`/api/recommended-wallets/bb-fii/suggestions/${id}/applied`)
     .set('Authorization', 'Bearer token')
-    .send(body);
+    .send({ generationId: GERACAO, ...body });
 
 describe('POST /api/recommended-wallets/bb-fii/suggestions/:id/applied (#276)', () => {
   beforeEach(() => {
@@ -324,6 +328,88 @@ describe('POST /api/recommended-wallets/bb-fii/suggestions/:id/applied (#276)', 
     expect(asFallback.status).toBe(200);
     expect(asItem.status).toBe(200);
     expect(docs.get(path())?.['appliedItems']).toHaveLength(2);
+  });
+
+  // Cada geração sobrescreve o mesmo documento e começa sem itens aplicados
+  // (#544). Sem identificar a geração, um pedido feito sobre a anterior
+  // (outra aba, outro aparelho, reenvio atrasado) lançaria a compra de novo e
+  // marcaria a geração nova.
+  describe('geração da sugestão', () => {
+    it('deve recusar com 400 o pedido sem a geração', async () => {
+      const response = await apply({
+        generationId: undefined,
+        ticker: 'HGLG11',
+        quantity: 1,
+        price: 95,
+      });
+
+      expect(response.status).toBe(400);
+      expect(docs.get(POSITION_PATH)?.['quantity']).toBe(2);
+    });
+
+    it('deve recusar com 409 o pedido feito sobre outra geração', async () => {
+      const response = await apply({
+        generationId: 'geracao-anterior',
+        ticker: 'HGLG11',
+        quantity: 1,
+        price: 95,
+      });
+
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe('SUGGESTION_OUTDATED');
+      expect(docs.get(POSITION_PATH)?.['quantity']).toBe(2);
+      expect(docs.get(path())?.['appliedItems']).toBeUndefined();
+    });
+
+    it('não deve repetir a compra da geração anterior na geração nova', async () => {
+      const pedido = { ticker: 'HGLG11', quantity: 1, price: 95 };
+      expect((await apply(pedido)).status).toBe(200);
+
+      // Gerar de novo grava o documento inteiro, com outra geração.
+      docs.set(path(), { ...suggestion(), generationId: 'geracao-2' });
+      const repetido = await apply(pedido);
+
+      expect(repetido.status).toBe(409);
+      expect(repetido.body.code).toBe('SUGGESTION_OUTDATED');
+      expect(docs.get(POSITION_PATH)?.['quantity']).toBe(3);
+      expect(docs.get(path())?.['appliedItems']).toBeUndefined();
+    });
+
+    it('deve aplicar na geração nova quando o pedido é dela', async () => {
+      docs.set(path(), { ...suggestion(), generationId: 'geracao-2' });
+
+      const response = await apply({
+        generationId: 'geracao-2',
+        ticker: 'HGLG11',
+        quantity: 1,
+        price: 95,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.generationId).toBe('geracao-2');
+    });
+
+    it('deve identificar a sugestão gravada antes da geração pelo createdAt', async () => {
+      const { generationId: _geracao, ...antiga } = suggestion();
+      docs.set(path(), antiga);
+
+      const outra = await apply({
+        generationId: GERACAO,
+        ticker: 'HGLG11',
+        quantity: 1,
+        price: 95,
+      });
+      const daSugestao = await apply({
+        generationId: antiga.createdAt,
+        ticker: 'HGLG11',
+        quantity: 1,
+        price: 95,
+      });
+
+      expect(outra.status).toBe(409);
+      expect(daSugestao.status).toBe(200);
+      expect(daSugestao.body.generationId).toBe(antiga.createdAt);
+    });
   });
 
   describe('lançamento na carteira', () => {

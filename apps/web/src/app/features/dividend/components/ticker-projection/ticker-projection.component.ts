@@ -23,6 +23,7 @@ export interface TickerCard {
  */
 @Component({
   selector: 'app-ticker-projection',
+  host: { class: 'block' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, SparklineComponent],
