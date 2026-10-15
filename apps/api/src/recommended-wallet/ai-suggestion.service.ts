@@ -264,8 +264,9 @@ export async function generateSuggestion(
   const availableHistoryMonths = sortedHistoryWallets.map(
     (wallet) => `${wallet.month}:${wallet.revision}`,
   );
-  // Lida também com `force`: as compras já lançadas na carteira (#276)
-  // continuam marcadas na sugestão gerada de novo.
+  // Uma sugestão gerada de novo (outro aporte, histórico novo ou `force`)
+  // começa sem itens aplicados: o usuário pode aplicar um segundo aporte no
+  // mesmo mês (#544). Só a sugestão devolvida do cache mantém as marcas.
   const saved = await getSavedSuggestion(uid, walletId, month, tab);
   if (
     !force &&
@@ -289,7 +290,6 @@ export async function generateSuggestion(
       availableHistoryMonths,
       history,
       contribution,
-      saved,
     });
   } catch (error) {
     // A devolução é uma segunda transação no mesmo documento disputado. Se
@@ -315,7 +315,6 @@ interface BuildSuggestionArgs {
   availableHistoryMonths: string[];
   history: AiSuggestionHistoryMonth[];
   contribution?: number;
-  saved: AiSuggestion | null;
 }
 
 /** Monta, consulta a IA e persiste a sugestão, com a cota já reservada. */
@@ -328,7 +327,6 @@ async function buildAndSaveSuggestion({
   availableHistoryMonths,
   history,
   contribution,
-  saved,
 }: BuildSuggestionArgs): Promise<AiSuggestion> {
   // Só os tickers em jogo: os da comparação (posições do usuário) e os da
   // carteira recomendada do mês (issue #299). A mesma leitura serve para
@@ -419,9 +417,6 @@ async function buildAndSaveSuggestion({
     ...(contribution === undefined ? {} : { contribution }),
     projectedDividends: input.projectedDividends,
     historyMonths: availableHistoryMonths,
-    ...(saved?.appliedItems?.length
-      ? { appliedItems: saved.appliedItems }
-      : {}),
   };
   await aiSuggestionsCollection(uid)
     .doc(id)

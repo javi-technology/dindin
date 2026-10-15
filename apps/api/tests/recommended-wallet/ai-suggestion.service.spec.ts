@@ -2190,6 +2190,15 @@ describe('ai-suggestion.service', () => {
       tab: 'renda',
       contribution: 500,
       historyMonths: [],
+      // A mesma sugestão: as compras lançadas continuam marcadas (#544).
+      appliedItems: [
+        {
+          ticker: 'HGLG11',
+          quantity: 2,
+          price: 160,
+          appliedAt: '2026-09-10T00:00:00Z',
+        },
+      ],
     };
     const doc = {
       get: jest
@@ -2449,15 +2458,14 @@ describe('ai-suggestion.service', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(savedDoc.set).toHaveBeenCalled();
-    // Compras já lançadas na carteira continuam marcadas (#276).
-    const applied = [
-      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
-    ];
-    expect(result.appliedItems).toEqual(applied);
-    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
+    // Sugestão nova começa sem itens aplicados: o usuário pode aplicar um
+    // segundo aporte no mesmo mês (#544). O que já foi lançado na carteira
+    // não é tocado.
+    expect(result.appliedItems).toBeUndefined();
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
   });
 
-  it('deve manter os itens aplicados ao gerar de novo com force', async () => {
+  it('deve reiniciar os itens aplicados ao gerar de novo com force', async () => {
     process.env.OPENROUTER_API_KEY = 'secret';
     compareWithWalletMock.mockResolvedValue(comparison);
     (global.fetch as jest.Mock).mockResolvedValue({
@@ -2541,12 +2549,11 @@ describe('ai-suggestion.service', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
     expect(savedDoc.set).toHaveBeenCalled();
-    // Compras já lançadas na carteira continuam marcadas (#276).
-    const applied = [
-      expect.objectContaining({ ticker: 'HGLG11', quantity: 2, price: 160 }),
-    ];
-    expect(result.appliedItems).toEqual(applied);
-    expect(savedDoc.set.mock.calls[0][0].appliedItems).toEqual(applied);
+    // Sugestão nova começa sem itens aplicados: o usuário pode aplicar um
+    // segundo aporte no mesmo mês (#544). O que já foi lançado na carteira
+    // não é tocado.
+    expect(result.appliedItems).toBeUndefined();
+    expect(savedDoc.set.mock.calls[0][0].appliedItems).toBeUndefined();
   });
 
   it('deve gerar ids determinísticos', () => {
