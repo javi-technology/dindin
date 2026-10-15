@@ -95,7 +95,8 @@ export function buildPaymentSchedule(
     });
 
   const upcoming = days.filter((day) => day.daysUntil >= 0);
-  const paid = days.filter((day) => day.daysUntil < 0);
+  // O último provento recebido é o que interessa primeiro (issue #546).
+  const paid = days.filter((day) => day.daysUntil < 0).reverse();
   const sumTotals = (list: PaymentScheduleDay[]): number =>
     round(list.reduce((sum, day) => sum + day.total, 0));
 

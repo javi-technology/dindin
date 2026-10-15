@@ -51,6 +51,26 @@ describe('buildPaymentSchedule', () => {
     ]);
   });
 
+  // Quem abre a tela procura o último provento recebido (issue #546).
+  it('deve ordenar os já pagos do mais recente para o mais antigo', () => {
+    const agenda = buildPaymentSchedule(
+      [
+        item('A', 10, '2026-08-25'),
+        item('B', 10, '2026-09-13'),
+        item('C', 10, '2026-09-07'),
+        item('D', 10, '2026-09-20'),
+      ],
+      hoje,
+    );
+
+    expect(agenda.paid.map((dia) => dia.date)).toEqual([
+      '2026-09-13',
+      '2026-09-07',
+      '2026-08-25',
+    ]);
+    expect(agenda.upcoming.map((dia) => dia.date)).toEqual(['2026-09-20']);
+  });
+
   it('deve rotular hoje, amanhã e datas seguintes', () => {
     const agenda = buildPaymentSchedule(
       [
