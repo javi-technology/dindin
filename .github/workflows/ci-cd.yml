@@ -275,7 +275,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.5
+          flutter-version: 3.47.7
           channel: stable
           cache: true
 
@@ -283,8 +283,8 @@ jobs:
         run: |
           set -euo pipefail
           FIXADA="${{ steps.sdk.outputs.version }}"
-          if [ "$FIXADA" != "3.47.5" ]; then
-            echo "::error::.flutter-version diz $FIXADA, mas o job instala 3.47.5"
+          if [ "$FIXADA" != "3.47.7" ]; then
+            echo "::error::.flutter-version diz $FIXADA, mas o job instala 3.47.7"
             exit 1
           fi
 
