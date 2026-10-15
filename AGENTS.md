@@ -416,6 +416,12 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   resultado seria posição duplicada — erro de dado financeiro, não incômodo de
   interface. No app, a proteção está em dois lugares: o mixin `EnvioDeFormulario`
   descarta a segunda chamada e o `RodapeFormulario` deixa o botão indisponível.
+- **Aplicar um item da Sugestão do mês leva o `generationId`** da sugestão
+  exibida (issue #544). Cada geração sobrescreve o mesmo documento e começa
+  sem itens aplicados, e a API recusa com **409 `SUGGESTION_OUTDATED`** o
+  pedido feito sobre outra geração: sem isso, uma aba antiga, outro aparelho
+  ou um reenvio atrasado lançaria a compra de novo na carteira. O web, ao
+  receber esse código, fecha o modal e recarrega a sugestão atual.
 - **Falha de rede preserva o formulário**: o envio volta a ficar disponível e
   o que foi digitado permanece. Refazer o preenchimento no teclado do celular
   é onde o usuário desiste.

@@ -292,6 +292,13 @@ export interface AiSuggestion {
   items: AiSuggestionItem[];
   disclaimer: string;
   createdAt: string;
+  /**
+   * Identifica a geração: cada geração sobrescreve o mesmo documento, e o
+   * pedido de aplicar traz este valor para não lançar a compra de uma
+   * geração anterior na atual (#544). Sugestões gravadas antes dele usam o
+   * `createdAt`.
+   */
+  generationId: string;
   contribution?: number;
   projectedDividends?: number;
   historyMonths?: string[];

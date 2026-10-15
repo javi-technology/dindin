@@ -14,8 +14,10 @@ import {
   walletsCollection,
 } from '../firestore/paths';
 import { roundCurrency } from '../shared/numbers';
+import { generationOf } from './ai-suggestion.service';
 
 export interface AppliedItemInput {
+  generationId?: unknown;
   ticker?: unknown;
   fallbackFor?: unknown;
   quantity?: unknown;
@@ -89,13 +91,20 @@ export async function recordAppliedItem(
     input.fallbackFor === undefined
       ? undefined
       : normalizeTicker(input.fallbackFor);
+  const generationId =
+    typeof input.generationId === 'string' && input.generationId !== ''
+      ? input.generationId
+      : undefined;
   if (
+    !generationId ||
     !ticker ||
     (input.fallbackFor !== undefined && !fallbackFor) ||
     !isPositiveNumber(input.quantity) ||
     !isPositiveNumber(input.price)
   ) {
-    throw HttpError.badRequest('Ticker, quantidade e preço são obrigatórios');
+    throw HttpError.badRequest(
+      'Geração, ticker, quantidade e preço são obrigatórios',
+    );
   }
   const { quantity, price } = input;
 
@@ -108,7 +117,21 @@ export async function recordAppliedItem(
     const { input: _input, ...data } = snapshot.data() as AiSuggestion & {
       input?: unknown;
     };
-    const suggestion: AiSuggestion = { ...data, id: snapshot.id };
+    const suggestion: AiSuggestion = {
+      ...data,
+      id: snapshot.id,
+      generationId: generationOf(data),
+    };
+
+    // Cada geração sobrescreve o documento e começa sem itens aplicados
+    // (#544): um pedido feito sobre outra geração (outra aba, outro
+    // aparelho, reenvio atrasado) lançaria a compra de novo.
+    if (suggestion.generationId !== generationId) {
+      throw HttpError.conflict(
+        'A sugestão foi gerada de novo. Confira a sugestão atual antes de aplicar.',
+        { code: 'SUGGESTION_OUTDATED' },
+      );
+    }
 
     if (!isApplicable(suggestion, ticker, fallbackFor)) {
       throw HttpError.badRequest(

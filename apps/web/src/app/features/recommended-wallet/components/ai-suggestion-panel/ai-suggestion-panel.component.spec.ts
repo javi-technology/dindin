@@ -31,6 +31,7 @@ describe('AiSuggestionPanelComponent', () => {
     summary: 'Concentre o aporte em HGLG11.',
     disclaimer: 'Não é recomendação de investimento.',
     createdAt: '2026-09-01T12:00:00Z',
+    generationId: 'geracao-1',
     contribution: 500,
     projectedDividends: 120,
     items: [
@@ -119,7 +120,7 @@ describe('AiSuggestionPanelComponent', () => {
 
       element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: undefined, force: false }]);
+      expect(geracoes).toEqual([{ contribution: undefined }]);
     });
 
     it('deve enviar o aporte em formato brasileiro', () => {
@@ -128,7 +129,7 @@ describe('AiSuggestionPanelComponent', () => {
 
       element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: 1500.5, force: false }]);
+      expect(geracoes).toEqual([{ contribution: 1500.5 }]);
     });
 
     it('deve recusar aporte inválido e avisar o pai', () => {
@@ -155,12 +156,18 @@ describe('AiSuggestionPanelComponent', () => {
       ).toBe(true);
     });
 
-    it('deve pedir regeração forçada', () => {
+    // "Gerar sugestão do mês" gera e regera; o "Regerar" do rodapé saiu
+    // (#551).
+    it('deve regerar pelo botão principal, sem o Regerar do rodapé', () => {
       setup({ suggestion });
+      type('contribution-input', '500');
 
-      element('[data-testid="regenerate-suggestion-button"]')?.click();
+      element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: undefined, force: true }]);
+      expect(
+        element('[data-testid="regenerate-suggestion-button"]'),
+      ).toBeNull();
+      expect(geracoes).toEqual([{ contribution: 500 }]);
     });
 
     it('deve exibir o erro recebido do pai', () => {
@@ -233,6 +240,31 @@ describe('AiSuggestionPanelComponent', () => {
 
       expect(button.disabled).toBe(true);
       expect(button.textContent).toContain('Aplicado');
+    });
+
+    // Um segundo aporte no mês gera uma sugestão nova, que a API devolve sem
+    // itens aplicados (#544): o botão volta a aceitar o lançamento.
+    it('deve liberar o item de novo quando chega uma sugestão nova', () => {
+      setup({
+        suggestion: {
+          ...suggestion,
+          appliedItems: [{ ticker: 'HGLG11', quantity: 4, price: 100 }],
+        },
+      });
+
+      fixture.componentRef.setInput('suggestion', {
+        ...suggestion,
+        contribution: 800,
+      });
+      fixture.detectChanges();
+      const button = element(
+        '[data-testid="apply-item-HGLG11"]',
+      ) as HTMLButtonElement;
+      button.click();
+
+      expect(button.disabled).toBe(false);
+      expect(button.textContent).toContain('Aplicar na carteira');
+      expect(aplicacoes).toEqual([{ item: suggestion.items[0] }]);
     });
   });
 

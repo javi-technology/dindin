@@ -15,6 +15,7 @@ import {
  */
 @Component({
   selector: 'app-payment-schedule',
+  host: { class: 'block' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
