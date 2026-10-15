@@ -4,7 +4,7 @@ import { join } from 'path';
 // ---------------------------------------------------------------------------
 // Testes da configuração do Dependabot (issue #144)
 // Garante version updates semanais e agrupados para npm e GitHub Actions,
-// abertos contra a develop (fluxo do projeto), sem majors do Angular — que
+// abertos contra a main (fluxo do projeto, #568), sem majors do Angular — que
 // exigem `ng update` com migrações e são tratados em issue própria.
 // ---------------------------------------------------------------------------
 

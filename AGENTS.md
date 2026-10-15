@@ -210,10 +210,10 @@ Regras:
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
-2. Preparar branch: `develop` → atualizar com `main` → criar `issue-<N>` (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
+2. Preparar branch: atualizar a `main` → criar `issue-<N>` a partir dela (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
-4. Abrir PR de `issue-<N>` para `develop` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
-5. Merge após revisão
+4. Abrir PR de `issue-<N>` para `main` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
+5. Merge após revisão — o merge na `main` é publicado em produção
 
 ### Jev (TypeSafe) como apoio a decisões
 
@@ -603,26 +603,28 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ```bash
 git checkout main && git pull origin main
-git checkout develop 2>/dev/null || git checkout -b develop
-git pull origin develop 2>/dev/null || true
-git merge main
 git checkout -b issue-<numero_issue>
 ```
 
 ### Regras de Branch
 
 - Branch da issue: **exatamente** `issue-<numero_issue>` (ex: `issue-3`).
-- Toda implementação parte da `develop` e retorna para `develop` via PR.
+- Toda implementação parte da `main` atualizada e retorna para a `main` via PR
+  (issue #568). Não há branch de integração intermediária: ela custava um PR
+  extra a cada entrega, e o `Closes #N` não fecha a issue num merge fora da
+  branch padrão.
+- **Cada PR mergeado na `main` é publicado**: o deploy roda a cada push nela,
+  depois de `audit`, `lint` e das suítes. Só faça o merge do que pode ir para
+  produção.
 - **Exceção — stacked PR:** quando for solicitado stacked PR, é permitido criar a
   branch `issue-<N>` a partir da branch de outra issue da pilha
   (`git checkout -b issue-<N> issue-<anterior>`), e o PR aponta para essa branch.
-  Só o primeiro PR da pilha aponta para `develop`.
+  Só o primeiro PR da pilha aponta para `main`.
   - Os PRs são revisados e mergeados **na ordem da pilha**.
   - Correção numa branch da base exige atualizar as de cima em ordem
     (`git rebase --onto <base-nova> <ponta-antiga> issue-<N>`) e reenviar com
     `git push --force-with-lease`, nunca `--force` puro.
-- A `develop` deve estar sincronizada com a `main` antes de criar nova branch.
-- Nunca commitar diretamente na `main` ou `develop`.
+- Nunca commitar diretamente na `main`.
 
 ### Padrão de Commits
 

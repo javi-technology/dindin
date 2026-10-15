@@ -64,9 +64,9 @@ Siga os passos abaixo para configurar o ambiente de desenvolvimento local:
 
 ## Integração Contínua
 
-A pipeline de CI roda a cada push ou pull request para as branches `main` e `develop`, executando instalação, build e testes da API e do frontend.
+A pipeline de CI roda a cada push ou pull request para a branch `main`, executando instalação, build e testes da API, do frontend e do app. Cada push na `main` — ou seja, cada PR mergeado — é publicado depois que as verificações passam.
 
-Veja os detalhes em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) e acompanhe as execuções em [Actions](https://github.com/javi-technology/dindin/actions/workflows/ci.yml).
+Veja os detalhes em [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) e acompanhe as execuções em [Actions](https://github.com/javi-technology/dindin/actions/workflows/ci-cd.yml).
 
 ## Deploy contínuo
 
