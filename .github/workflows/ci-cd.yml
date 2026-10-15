@@ -289,7 +289,7 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       # O gerador de contratos é Node e roda da raiz; o job precisa dele para
       # conferir o modelo Dart gerado (issue #399).

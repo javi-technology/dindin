@@ -555,6 +555,18 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 - O job roda formatação (`dart format --set-exit-if-changed`), análise
   (`flutter analyze --fatal-infos`) e a suíte, e **bloqueia o deploy**, como já
   fazem `lint` e as duas suítes de Node.
+- O **`apps/mobile/pubspec.lock` é versionado** (issue #555, revertendo a
+  #540): o app é aplicação, não biblioteca, e sem o lock o CI e o build das
+  lojas resolveriam as dependências na hora — o binário enviado poderia levar
+  um plugin numa versão que ninguém testou, e no app a correção só chega com
+  outra versão nas lojas. O CI e o `mobile-release` instalam com
+  `flutter pub get --enforce-lockfile`, que reprova o lock fora do
+  `pubspec.yaml`, como o `npm ci` faz no lado Node.
+- O `pub get` só altera o lock quando o `pubspec.yaml` muda. Lock alterado sem
+  mudança no `pubspec.yaml` vem de `pub upgrade` (inclusive o disparado pela
+  IDE): descarte-o com `git checkout -- apps/mobile/pubspec.lock`. Atualizar
+  dependência é mudança deliberada, com issue própria, gerada com o SDK de
+  `.flutter-version`.
 - Os workspaces npm **não** usam o glob `apps/*`: listam `apps/api` e
   `apps/web` um a um. Uma pasta sem `package.json` dentro de `apps/` quebraria
   o `npm ci`, e o glob a abarcaria em silêncio.

@@ -23,9 +23,6 @@ apps/mobile/android/.gradle/
 apps/mobile/android/local.properties
 .flutter-plugins
 .flutter-plugins-dependencies
-# O `pub get` automático da IDE o reescreve a cada abertura; o CI resolve as
-# dependências no `flutter pub get` (#540).
-apps/mobile/pubspec.lock
 
 # Configuração do Firebase no app: traz identificadores do projeto e chaves
 # de API, então segue a regra de nunca versionar credencial (#400).
