@@ -148,6 +148,7 @@ describe('PaymentScheduleComponent', () => {
               monthlyIncome: (10 + quantityAfterComDate) / 10,
               paymentDate: '2026-09-15',
               quantityAfterComDate,
+              scheduledQuantity: 10,
               scheduledIncome: 1,
             },
           ],
@@ -182,6 +183,53 @@ describe('PaymentScheduleComponent', () => {
       expect(
         element('[data-testid="schedule-after-com-date"]')?.textContent,
       ).toContain('1 cota comprada após a data-com entra no próximo pagamento');
+    });
+
+    // Quem vendeu depois da data-com recebe pela quantidade da foto (#562):
+    // o "× 30" com 19 cotas na carteira precisa de explicação.
+    describe('venda após a data-com', () => {
+      const comVenda: PaymentSchedule = {
+        ...vazia,
+        upcoming: [
+          {
+            date: '2026-09-15',
+            total: 3,
+            daysUntil: 3,
+            relativeLabel: 'em 3 dias',
+            items: [
+              {
+                ticker: 'MXRF11',
+                quantity: 19,
+                monthlyDividend: 0.1,
+                monthlyIncome: 1.9,
+                paymentDate: '2026-09-15',
+                scheduledQuantity: 30,
+                scheduledIncome: 3,
+              },
+            ],
+          },
+        ],
+        upcomingTotal: 3,
+      };
+
+      it('deve detalhar a quantidade da data-com', () => {
+        setup(comVenda);
+
+        const dia = element('[data-testid="schedule-day"]')?.textContent ?? '';
+
+        expect(dia).toContain('× 30');
+        expect(dia).toMatch(/R\$\s?3,00/);
+      });
+
+      it('deve avisar que as cotas vendidas ainda recebem', () => {
+        setup(comVenda);
+
+        expect(
+          element('[data-testid="schedule-sold-after-com-date"]')?.textContent,
+        ).toContain(
+          '11 cotas vendidas após a data-com ainda recebem este pagamento',
+        );
+      });
     });
 
     it('não deve avisar quando todas as cotas recebem', () => {
