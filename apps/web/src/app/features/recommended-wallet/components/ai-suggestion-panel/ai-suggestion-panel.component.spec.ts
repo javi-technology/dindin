@@ -120,7 +120,7 @@ describe('AiSuggestionPanelComponent', () => {
 
       element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: undefined, force: false }]);
+      expect(geracoes).toEqual([{ contribution: undefined }]);
     });
 
     it('deve enviar o aporte em formato brasileiro', () => {
@@ -129,7 +129,7 @@ describe('AiSuggestionPanelComponent', () => {
 
       element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: 1500.5, force: false }]);
+      expect(geracoes).toEqual([{ contribution: 1500.5 }]);
     });
 
     it('deve recusar aporte inválido e avisar o pai', () => {
@@ -156,12 +156,18 @@ describe('AiSuggestionPanelComponent', () => {
       ).toBe(true);
     });
 
-    it('deve pedir regeração forçada', () => {
+    // "Gerar sugestão do mês" gera e regera; o "Regerar" do rodapé saiu
+    // (#551).
+    it('deve regerar pelo botão principal, sem o Regerar do rodapé', () => {
       setup({ suggestion });
+      type('contribution-input', '500');
 
-      element('[data-testid="regenerate-suggestion-button"]')?.click();
+      element('[data-testid="generate-suggestion-button"]')?.click();
 
-      expect(geracoes).toEqual([{ contribution: undefined, force: true }]);
+      expect(
+        element('[data-testid="regenerate-suggestion-button"]'),
+      ).toBeNull();
+      expect(geracoes).toEqual([{ contribution: 500 }]);
     });
 
     it('deve exibir o erro recebido do pai', () => {

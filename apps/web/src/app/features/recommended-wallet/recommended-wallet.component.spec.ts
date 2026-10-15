@@ -410,7 +410,6 @@ describe('RecommendedWalletComponent', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       1500.5,
     );
   });

@@ -101,15 +101,16 @@ describe('RecommendedWalletService', () => {
     request.flush(suggestion);
   });
 
-  it('deve gerar sugestão e enviar force apenas quando solicitado', () => {
+  // Toda geração é nova na API, sem `force` (#551).
+  it('deve gerar sugestão sem enviar force', () => {
     const suggestion = { id: 'wallet-1_2026-09_renda' } as AiSuggestion;
 
     service
-      .generateSuggestion('wallet-1', '2026-09', 'renda', true)
+      .generateSuggestion('wallet-1', '2026-09', 'renda')
       .subscribe((result) => expect(result).toEqual(suggestion));
 
     const request = httpMock.expectOne(
-      '/api/recommended-wallets/bb-fii/suggestions?force=true',
+      '/api/recommended-wallets/bb-fii/suggestions',
     );
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
@@ -124,7 +125,7 @@ describe('RecommendedWalletService', () => {
     const suggestion = { id: 'wallet-1_2026-09_renda' } as AiSuggestion;
 
     service
-      .generateSuggestion('wallet-1', '2026-09', 'renda', false, 500)
+      .generateSuggestion('wallet-1', '2026-09', 'renda', 500)
       .subscribe((result) => expect(result).toEqual(suggestion));
 
     const request = httpMock.expectOne(
