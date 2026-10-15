@@ -108,6 +108,17 @@ export function quoteDividendHistoryCollection(ticker: string) {
   return quotesCollection().doc(ticker).collection('dividendHistory');
 }
 
+/**
+ * Foto da quantidade de cada usuário no fim da data-com de um provento
+ * (#278), indexada por `YYYY-MM-DD`.
+ */
+export function dividendSnapshotsCollection(ticker: string) {
+  return getFirestore()
+    .collection('dividendSync')
+    .doc(ticker)
+    .collection('snapshots');
+}
+
 /** Carteiras recomendadas do BB. */
 export function recommendedWalletsCollection() {
   return getFirestore().collection('recommendedWallets');

@@ -842,6 +842,17 @@ components:
         monthlyDividend: { type: number }
         monthlyIncome: { type: number }
         paymentDate: { type: string, format: date }
+        quantityAfterComDate:
+          type: number
+          description: |
+            Cotas compradas depois da data-com do pagamento de `paymentDate`
+            (#562): entram só no pagamento seguinte. Ausente quando não há.
+        scheduledIncome:
+          type: number
+          description: |
+            Valor do pagamento de `paymentDate` sem as cotas compradas depois
+            da data-com — o que a agenda soma. Ausente quando igual a
+            `monthlyIncome`, que segue sendo a renda mensal projetada.
 
     ScheduleTotals:
       type: object

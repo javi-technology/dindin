@@ -1906,6 +1906,8 @@ class MonthlyIncomeItem {
     required this.monthlyDividend,
     required this.monthlyIncome,
     this.paymentDate,
+    this.quantityAfterComDate,
+    this.scheduledIncome,
   });
 
   factory MonthlyIncomeItem.fromJson(Map<String, dynamic> json) =>
@@ -1917,6 +1919,12 @@ class MonthlyIncomeItem {
         paymentDate: json['paymentDate'] == null
             ? null
             : json['paymentDate'] as String,
+        quantityAfterComDate: json['quantityAfterComDate'] == null
+            ? null
+            : (json['quantityAfterComDate'] as num).toDouble(),
+        scheduledIncome: json['scheduledIncome'] == null
+            ? null
+            : (json['scheduledIncome'] as num).toDouble(),
       );
 
   final String ticker;
@@ -1925,12 +1933,24 @@ class MonthlyIncomeItem {
   final double monthlyIncome;
   final String? paymentDate;
 
+  /// Cotas compradas depois da data-com do pagamento de `paymentDate`
+  /// (#562): entram só no pagamento seguinte. Ausente quando não há.
+  final double? quantityAfterComDate;
+
+  /// Valor do pagamento de `paymentDate` sem as cotas compradas depois
+  /// da data-com — o que a agenda soma. Ausente quando igual a
+  /// `monthlyIncome`, que segue sendo a renda mensal projetada.
+  final double? scheduledIncome;
+
   Map<String, dynamic> toJson() => {
     'ticker': ticker,
     'quantity': quantity,
     'monthlyDividend': monthlyDividend,
     'monthlyIncome': monthlyIncome,
     if (paymentDate != null) 'paymentDate': paymentDate,
+    if (quantityAfterComDate != null)
+      'quantityAfterComDate': quantityAfterComDate,
+    if (scheduledIncome != null) 'scheduledIncome': scheduledIncome,
   };
 }
 

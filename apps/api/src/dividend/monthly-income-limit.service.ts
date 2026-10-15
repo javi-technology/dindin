@@ -81,8 +81,10 @@ export function computeScheduleTotals(
   for (const item of items) {
     const days = item.paymentDate ? daysUntil(item.paymentDate, today) : null;
     if (days === null) continue;
-    if (days >= 0) upcomingTotal += item.monthlyIncome;
-    else paidTotal += item.monthlyIncome;
+    // O valor do pagamento, sem as cotas compradas depois da data-com (#562).
+    const amount = item.scheduledIncome ?? item.monthlyIncome;
+    if (days >= 0) upcomingTotal += amount;
+    else paidTotal += amount;
   }
 
   return {
