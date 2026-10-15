@@ -41,9 +41,10 @@ describe('.github/dependabot.yml', () => {
       expect(block).toMatch(/directory: ['"]?\/['"]?$/m);
     });
 
-    it('deve rodar semanalmente contra a develop', () => {
+    // Sem a develop, o desenvolvimento parte da main (#568).
+    it('deve rodar semanalmente contra a main', () => {
       expect(block).toMatch(/interval: ['"]?weekly['"]?$/m);
-      expect(block).toMatch(/target-branch: ['"]?develop['"]?$/m);
+      expect(block).toMatch(/target-branch: ['"]?main['"]?$/m);
     });
 
     it('deve rotular com dependencies e usar prefixo chore(deps)', () => {
