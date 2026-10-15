@@ -259,7 +259,6 @@ export async function generateSuggestion(
   walletId: string,
   month: string,
   tab: AiSuggestionTab,
-  force: boolean,
   contribution?: number,
 ): Promise<AiSuggestion> {
   if (!isTab(tab)) throw HttpError.badRequest('Aba inválida');

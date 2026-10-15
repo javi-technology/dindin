@@ -261,7 +261,6 @@ describe('recommended-wallet.controller', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       undefined,
     );
   });
@@ -289,7 +288,6 @@ describe('recommended-wallet.controller', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       500,
     );
   });
@@ -318,8 +316,33 @@ describe('recommended-wallet.controller', () => {
       'wallet-1',
       '2026-09',
       'renda',
-      false,
       600,
+    );
+  });
+
+  // Toda geração é nova (#551); o `force` dos clientes antigos é aceito e
+  // não muda nada.
+  it('deve ignorar o force e gerar do mesmo jeito', async () => {
+    generateSuggestionMock.mockResolvedValue(sugestaoFixture);
+
+    const response = await request(app)
+      .post('/api/recommended-wallets/bb-fii/suggestions')
+      .query({ force: 'true' })
+      .send({
+        walletId: 'wallet-1',
+        month: '2026-09',
+        tab: 'renda',
+        contribution: 500,
+      })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    expect(generateSuggestionMock).toHaveBeenCalledWith(
+      'user-1',
+      'wallet-1',
+      '2026-09',
+      'renda',
+      500,
     );
   });
 
