@@ -382,6 +382,21 @@ describe('DividendComponent', () => {
       }
     });
 
+    // O espaçamento externo é do contêiner: uma margem própria na raiz da
+    // seção colapsa com a do `space-y-6` e vence a dela (32px do relatório
+    // contra os 24px das demais).
+    it('deve deixar a margem externa das seções com o contêiner', async () => {
+      await setup();
+
+      for (const secao of secoes()) {
+        const raiz = secao.firstElementChild as HTMLElement;
+        const margens = Array.from(raiz.classList).filter((classe) =>
+          /^-?m[tyb]?-/.test(classe),
+        );
+        expect(margens, secao.tagName.toLowerCase()).toEqual([]);
+      }
+    });
+
     it('deve manter o relatório espaçado quando não há proventos', async () => {
       dividendServiceMock.getConsolidatedMonthlyIncome.and.returnValue(
         of({ byTicker: [], total: 0, totalFromFridge: 0 }),
