@@ -1,7 +1,11 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { Dividend } from 'dindin-models';
-import { dividendsCollection } from '../firestore/paths';
+import {
+  dividendSnapshotsCollection,
+  dividendSyncDocument,
+  dividendsCollection,
+} from '../firestore/paths';
 import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
 
 /**
@@ -29,8 +33,6 @@ import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
  * versão), segue com a quantidade do dia do pagamento.
  */
 
-const SYNC_COLLECTION = 'dividendSync';
-const SNAPSHOTS_COLLECTION = 'snapshots';
 // Limite de operações de um batch do Firestore.
 const BATCH_LIMIT = 500;
 // Id do registro mensal do job que existia antes deste sync (`YYYY-MM_TICKER`).
@@ -165,8 +167,8 @@ export async function recordPaidDividends(
   today: string,
 ): Promise<Dividend[]> {
   const firestore = getFirestore();
-  const syncRef = firestore.collection(SYNC_COLLECTION).doc(ticker);
-  const snapshotsRef = syncRef.collection(SNAPSHOTS_COLLECTION);
+  const syncRef = dividendSyncDocument(ticker);
+  const snapshotsRef = dividendSnapshotsCollection(ticker);
   const syncSnapshot = await syncRef.get();
   const state = syncSnapshot.data() as DividendSyncState | undefined;
 

@@ -108,15 +108,17 @@ export function quoteDividendHistoryCollection(ticker: string) {
   return quotesCollection().doc(ticker).collection('dividendHistory');
 }
 
+/** Estado do registro automático de proventos de um ticker (#112). */
+export function dividendSyncDocument(ticker: string) {
+  return getFirestore().collection('dividendSync').doc(ticker);
+}
+
 /**
  * Foto da quantidade de cada usuário no fim da data-com de um provento
  * (#278), indexada por `YYYY-MM-DD`.
  */
 export function dividendSnapshotsCollection(ticker: string) {
-  return getFirestore()
-    .collection('dividendSync')
-    .doc(ticker)
-    .collection('snapshots');
+  return dividendSyncDocument(ticker).collection('snapshots');
 }
 
 /** Carteiras recomendadas do BB. */
