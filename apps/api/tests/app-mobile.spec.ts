@@ -54,19 +54,35 @@ describe('app Flutter em apps/mobile', () => {
       );
     });
 
-    // O `pub get` automático da IDE reescreve o lock a cada abertura, e a
-    // alteração acabava pendente ou entrando no commit de outra issue (#540).
-    // O CI resolve as dependências no `flutter pub get`, dentro das faixas do
-    // pubspec.yaml.
-    it('não deve versionar o pubspec.lock', () => {
+    // O app é aplicação, não biblioteca: sem o lock, o CI e o build das lojas
+    // resolvem as dependências na hora, e o binário enviado pode levar um
+    // plugin numa versão que ninguém testou (#555, revertendo a #540).
+    it('deve versionar o pubspec.lock', () => {
       const versionado = execFileSync(
         'git',
         ['ls-files', '--', 'apps/mobile/pubspec.lock'],
         { cwd: repoRoot, encoding: 'utf-8' },
       ).trim();
 
-      expect(versionado).toBe('');
-      expect(conteudo('.gitignore')).toMatch(/^apps\/mobile\/pubspec\.lock$/m);
+      expect(versionado).toBe('apps/mobile/pubspec.lock');
+      expect(conteudo('.gitignore')).not.toMatch(/pubspec\.lock/);
+    });
+  });
+
+  // Sem `--enforce-lockfile`, o `pub get` reescreve em silêncio o lock que não
+  // bate com o pubspec.yaml e o CI segue com outra árvore — o mesmo que o
+  // `npm ci` recusa no lado Node.
+  describe('instalação das dependências no CI', () => {
+    it.each([
+      '.github/workflows/ci-cd.yml',
+      '.github/workflows/mobile-release.yml',
+    ])('deve respeitar o pubspec.lock em %s', (workflow) => {
+      const instalacoes = conteudo(workflow).match(/flutter pub get[^\n]*/g);
+
+      expect(instalacoes).not.toBeNull();
+      instalacoes!.forEach((comando) =>
+        expect(comando).toContain('--enforce-lockfile'),
+      );
     });
   });
 
@@ -170,6 +186,13 @@ describe('app Flutter em apps/mobile', () => {
 
     it('deve descrever a pasta do app', () => {
       expect(guia()).toContain('apps/mobile');
+    });
+
+    // Sem a regra escrita, o próximo lock reescrito pela IDE leva de novo a
+    // tirá-lo do versionamento, que foi o desfecho da #540.
+    it('deve registrar a regra do pubspec.lock', () => {
+      expect(guia()).toContain('pubspec.lock');
+      expect(guia()).toContain('--enforce-lockfile');
     });
 
     it.each([
