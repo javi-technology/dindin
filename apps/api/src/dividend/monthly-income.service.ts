@@ -5,7 +5,7 @@ import { getQuotesByTicker } from '../quotes/quote-prices';
 import { today } from '../shared/date';
 import { roundCurrency, validQuantity } from '../shared/numbers';
 import { getAllUserFridgeItems } from '../wallet/fridge-reader';
-import { getAllUserPositions } from '../wallet/position-reader';
+import { getUserPositionsByWallet } from '../wallet/position-reader';
 import { applyComDateEligibility } from './com-date-eligibility.service';
 
 export type { MonthlyIncomeItem };
@@ -17,6 +17,11 @@ export interface MonthlyIncome {
   monthlyDividendByTicker: Map<string, number>;
   /** Data-com do provento de cada ticker, quando conhecida (#562). */
   comDateByTicker: Map<string, string>;
+  /**
+   * Quantidade atual por ticker e carteira, das carteiras desta projeção: a
+   * agenda compara cada carteira com a sua quantidade na data-com (#562).
+   */
+  currentByWallet?: Map<string, Map<string, number>>;
 }
 
 export const fetchFridgeItems = getAllUserFridgeItems;
@@ -109,6 +114,24 @@ export async function buildMonthlyIncome(
   };
 }
 
+/** Quantidade atual por ticker e carteira (#562). */
+function quantityByTickerAndWallet(
+  groups: { walletId: string; positions: Position[] }[],
+): Map<string, Map<string, number>> {
+  const byTicker = new Map<string, Map<string, number>>();
+  for (const { walletId, positions } of groups) {
+    for (const position of positions) {
+      const quantity = validQuantity(position.quantity);
+      if (quantity === 0) continue;
+      const ticker = position.ticker.toUpperCase();
+      const byWallet = byTicker.get(ticker) ?? new Map<string, number>();
+      byWallet.set(walletId, (byWallet.get(walletId) ?? 0) + quantity);
+      byTicker.set(ticker, byWallet);
+    }
+  }
+  return byTicker;
+}
+
 /** Projeção de renda de uma carteira. */
 export async function computeMonthlyIncome(
   userId: string,
@@ -123,7 +146,11 @@ export async function computeMonthlyIncome(
     (doc) => ({ id: doc.id, ...doc.data() }) as Position,
   );
 
-  return buildMonthlyIncome(positions, fridgeItems);
+  const income = await buildMonthlyIncome(positions, fridgeItems);
+  return {
+    ...income,
+    currentByWallet: quantityByTickerAndWallet([{ walletId, positions }]),
+  };
 }
 
 /**
@@ -136,36 +163,21 @@ export async function computeMonthlyIncome(
 export async function computeConsolidatedMonthlyIncome(
   userId: string,
 ): Promise<MonthlyIncome> {
-  const [positions, fridgeItems] = await Promise.all([
-    getAllUserPositions(userId),
+  const [groups, fridgeItems] = await Promise.all([
+    getUserPositionsByWallet(userId),
     fetchFridgeItems(userId),
   ]);
 
-  return buildMonthlyIncome(positions, fridgeItems);
+  const income = await buildMonthlyIncome(
+    groups.flatMap(({ positions }) => positions),
+    fridgeItems,
+  );
+  return { ...income, currentByWallet: quantityByTickerAndWallet(groups) };
 }
 
 /**
- * Quantidade atual do usuário por ticker, somando carteiras e geladeira — o
- * mesmo escopo da foto da data-com (#278).
- */
-async function heldQuantityByTicker(
-  userId: string,
-): Promise<Map<string, number>> {
-  const [positions, fridgeItems] = await Promise.all([
-    getAllUserPositions(userId),
-    fetchFridgeItems(userId),
-  ]);
-  const held = new Map<string, number>();
-  for (const { ticker, quantity } of [...positions, ...fridgeItems]) {
-    const key = ticker.toUpperCase();
-    held.set(key, (held.get(key) ?? 0) + validQuantity(quantity));
-  }
-  return held;
-}
-
-/**
- * Projeção com a agenda sem as cotas compradas depois da data-com (#562).
- * As quantidades do usuário só são lidas quando alguma data-com já passou.
+ * Projeção com a agenda pela quantidade da data-com de cada carteira (#562).
+ * A foto só é lida quando alguma data-com já passou.
  */
 export async function withComDateEligibility(
   income: MonthlyIncome,
@@ -175,7 +187,7 @@ export async function withComDateEligibility(
     income.byTicker,
     userId,
     income.comDateByTicker,
-    () => heldQuantityByTicker(userId),
+    async () => income.currentByWallet ?? new Map(),
     today(),
   );
   return { ...income, byTicker };

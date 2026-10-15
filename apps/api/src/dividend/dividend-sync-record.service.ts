@@ -48,8 +48,18 @@ interface DividendSyncState {
   updatedAt: string;
 }
 
+/** Quantidade de um usuário na data-com, por carteira e na geladeira. */
+export interface SnapshotHoldings {
+  wallets: Record<string, number>; // walletId → quantidade
+  fridge: number;
+}
+
 interface QuantitySnapshot {
   quantities: Record<string, number>; // uid → quantidade na data-com
+  // uid → onde estavam as cotas (#562). A agenda compara cada carteira com a
+  // sua: com só o total, uma compra na geladeira ou em outra carteira
+  // descontava das posições que não mudaram. Ausente nas fotos anteriores.
+  holdings?: Record<string, SnapshotHoldings>;
   takenAt: string;
 }
 
@@ -62,7 +72,12 @@ function userIdFromPath(path: string): string {
   return path.split('/')[1];
 }
 
-async function quantityByUser(ticker: string): Promise<Map<string, number>> {
+interface UserQuantities {
+  quantities: Map<string, number>;
+  holdings: Map<string, SnapshotHoldings>;
+}
+
+async function quantityByUser(ticker: string): Promise<UserQuantities> {
   const firestore = getFirestore();
   const [positions, fridgeItems] = await Promise.all([
     firestore.collectionGroup('positions').where('ticker', '==', ticker).get(),
@@ -73,13 +88,29 @@ async function quantityByUser(ticker: string): Promise<Map<string, number>> {
   ]);
 
   const quantities = new Map<string, number>();
-  for (const doc of [...positions.docs, ...fridgeItems.docs]) {
+  const holdings = new Map<string, SnapshotHoldings>();
+  const holdingsOf = (userId: string) => {
+    let entry = holdings.get(userId);
+    if (!entry) holdings.set(userId, (entry = { wallets: {}, fridge: 0 }));
+    return entry;
+  };
+  for (const doc of positions.docs) {
+    const quantity = validQuantity(doc.data().quantity);
+    if (quantity === 0) continue;
+    // `users/{uid}/wallets/{walletId}/positions/{id}`
+    const [, userId, , walletId] = doc.ref.path.split('/');
+    quantities.set(userId, (quantities.get(userId) ?? 0) + quantity);
+    const { wallets } = holdingsOf(userId);
+    wallets[walletId] = (wallets[walletId] ?? 0) + quantity;
+  }
+  for (const doc of fridgeItems.docs) {
     const quantity = validQuantity(doc.data().quantity);
     if (quantity === 0) continue;
     const userId = userIdFromPath(doc.ref.path);
     quantities.set(userId, (quantities.get(userId) ?? 0) + quantity);
+    holdingsOf(userId).fridge += quantity;
   }
-  return quantities;
+  return { quantities, holdings };
 }
 
 /**
@@ -182,7 +213,7 @@ export async function recordPaidDividends(
     .filter((date) => recorded[date] !== amounts.get(date))
     .sort();
 
-  let current: Map<string, number> | undefined;
+  let current: UserQuantities | undefined;
   const currentQuantities = async () =>
     (current ??= await quantityByUser(ticker));
 
@@ -208,8 +239,10 @@ export async function recordPaidDividends(
     );
     const missing = toSnapshot.filter((_, index) => !existing[index].exists);
     if (missing.length > 0) {
+      const { quantities, holdings } = await currentQuantities();
       const snapshot: QuantitySnapshot = {
-        quantities: Object.fromEntries(await currentQuantities()),
+        quantities: Object.fromEntries(quantities),
+        holdings: Object.fromEntries(holdings),
         takenAt: new Date().toISOString(),
       };
       await Promise.all(
@@ -241,7 +274,7 @@ export async function recordPaidDividends(
       ),
     ];
 
-    const [quantities, blocked, snapshots] = await Promise.all([
+    const [{ quantities }, blocked, snapshots] = await Promise.all([
       currentQuantities(),
       blockedMonthsByUser(ticker, dates[0], dates[dates.length - 1]),
       loadSnapshots(snapshotsRef, comDates),

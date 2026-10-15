@@ -1907,6 +1907,7 @@ class MonthlyIncomeItem {
     required this.monthlyIncome,
     this.paymentDate,
     this.quantityAfterComDate,
+    this.scheduledQuantity,
     this.scheduledIncome,
   });
 
@@ -1922,6 +1923,9 @@ class MonthlyIncomeItem {
         quantityAfterComDate: json['quantityAfterComDate'] == null
             ? null
             : (json['quantityAfterComDate'] as num).toDouble(),
+        scheduledQuantity: json['scheduledQuantity'] == null
+            ? null
+            : (json['scheduledQuantity'] as num).toDouble(),
         scheduledIncome: json['scheduledIncome'] == null
             ? null
             : (json['scheduledIncome'] as num).toDouble(),
@@ -1937,9 +1941,14 @@ class MonthlyIncomeItem {
   /// (#562): entram só no pagamento seguinte. Ausente quando não há.
   final double? quantityAfterComDate;
 
-  /// Valor do pagamento de `paymentDate` sem as cotas compradas depois
-  /// da data-com — o que a agenda soma. Ausente quando igual a
-  /// `monthlyIncome`, que segue sendo a renda mensal projetada.
+  /// Cotas com direito ao pagamento de `paymentDate`: a quantidade de
+  /// cada carteira na data-com (#562). Pode ser maior que `quantity`,
+  /// quando houve venda depois dela. Ausente quando igual a `quantity`.
+  final double? scheduledQuantity;
+
+  /// Valor do pagamento de `paymentDate` pela quantidade da data-com —
+  /// o que a agenda soma. Ausente quando igual a `monthlyIncome`, que
+  /// segue sendo a renda mensal projetada pela quantidade atual.
   final double? scheduledIncome;
 
   Map<String, dynamic> toJson() => {
@@ -1950,6 +1959,7 @@ class MonthlyIncomeItem {
     if (paymentDate != null) 'paymentDate': paymentDate,
     if (quantityAfterComDate != null)
       'quantityAfterComDate': quantityAfterComDate,
+    if (scheduledQuantity != null) 'scheduledQuantity': scheduledQuantity,
     if (scheduledIncome != null) 'scheduledIncome': scheduledIncome,
   };
 }

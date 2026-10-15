@@ -1,34 +1,38 @@
 import type { MonthlyIncomeItem } from 'dindin-shared-types';
 import { dividendSnapshotsCollection } from '../firestore/paths';
 import { roundCurrency } from '../shared/numbers';
+import type { SnapshotHoldings } from './dividend-sync-record.service';
 
 /**
- * Cotas compradas depois da data-com na agenda de proventos (#562).
+ * Agenda de proventos pela quantidade da data-com (#562).
  *
  * Quem tem direito ao provento é quem tinha o ativo no fim da data-com, e o
  * registro do pagamento já usa a foto dessa data (#278). A projeção parte da
- * quantidade atual, então uma compra feita depois da data-com inflava o "A
- * receber" — e o "Já pagos" — de um pagamento que essas cotas não recebem.
+ * quantidade atual: uma compra feita depois da data-com inflava o "A receber"
+ * — e o "Já pagos" — de um pagamento que essas cotas não recebem, e uma venda
+ * o reduzia.
  *
- * Com a data-com passada, a diferença entre o que o usuário tem hoje e o que
- * a foto guardou sai do pagamento (`scheduledIncome`) e é informada à parte
- * (`quantityAfterComDate`). A renda mensal projetada (`monthlyIncome`) não
- * muda: ela olha os meses seguintes, em que as cotas novas recebem.
+ * Com a data-com passada, cada carteira é comparada com a sua quantidade na
+ * foto: o pagamento sai dela (`scheduledQuantity` e `scheduledIncome`) e o que
+ * foi comprado depois é informado à parte (`quantityAfterComDate`). A
+ * comparação é por carteira, e não pelo total do usuário, para que uma compra
+ * na geladeira ou em outra carteira não mexa nas posições que não mudaram e
+ * para que a soma das carteiras feche com o consolidado. A renda mensal
+ * projetada (`monthlyIncome`) não muda: ela olha os meses seguintes.
  *
  * - A data-com de hoje ainda não conta: a foto é tirada às 18h30, depois do
  *   fechamento, e comprar no próprio dia dá direito.
- * - Sem data-com ou sem foto, vale a quantidade atual, como no registro.
- * - Quem vendeu depois da data-com continua com a quantidade atual: a agenda
- *   pode subestimar, nunca inflar.
- * - A foto é do usuário, não da carteira. A compra é atribuída à carteira até
- *   o que ela tem, de novo para nunca inflar o pagamento.
+ * - Sem data-com, sem foto ou com foto anterior a esta versão (só o total do
+ *   usuário), vale a quantidade atual.
+ * - Só entram as carteiras que têm o ativo hoje: a que vendeu tudo depois da
+ *   data-com não tem linha na agenda, nem na sua visão nem no consolidado.
  */
 export async function applyComDateEligibility(
   items: MonthlyIncomeItem[],
   userId: string,
   comDateByTicker: Map<string, string>,
-  /** Quantidade atual do usuário por ticker: carteiras e geladeira. */
-  loadHeldQuantities: () => Promise<Map<string, number>>,
+  /** Quantidade atual por ticker e carteira, das carteiras que os itens cobrem. */
+  loadCurrentByWallet: () => Promise<Map<string, Map<string, number>>>,
   today: string,
 ): Promise<MonthlyIncomeItem[]> {
   const candidates = items.filter((item) => {
@@ -37,39 +41,44 @@ export async function applyComDateEligibility(
   });
   if (candidates.length === 0) return items;
 
-  const [held, snapshots] = await Promise.all([
-    loadHeldQuantities(),
+  const [currentByWallet, snapshots] = await Promise.all([
+    loadCurrentByWallet(),
     Promise.all(
       candidates.map(async (item) => {
         const doc = await dividendSnapshotsCollection(item.ticker)
           .doc(comDateByTicker.get(item.ticker)!)
           .get();
-        const quantities = doc.exists
-          ? (doc.data()?.quantities as Record<string, number> | undefined)
+        const holdings = doc.exists
+          ? (doc.data()?.holdings as
+              Record<string, SnapshotHoldings> | undefined)
           : undefined;
-        return [item.ticker, quantities] as const;
+        return [item.ticker, holdings] as const;
       }),
     ),
   ]);
-  const snapshotByTicker = new Map(snapshots);
+  const holdingsByTicker = new Map(snapshots);
 
   return items.map((item) => {
-    const quantities = snapshotByTicker.get(item.ticker);
-    if (!quantities) return item;
+    const holdings = holdingsByTicker.get(item.ticker);
+    if (!holdings) return item;
 
-    const boughtAfter = Math.max(
-      0,
-      (held.get(item.ticker) ?? 0) - (quantities[userId] ?? 0),
-    );
-    const quantityAfterComDate = Math.min(item.quantity, boughtAfter);
-    if (quantityAfterComDate <= 0) return item;
+    const atComDate = holdings[userId]?.wallets ?? {};
+    let scheduledQuantity = 0;
+    let quantityAfterComDate = 0;
+    for (const [walletId, quantity] of currentByWallet.get(item.ticker) ?? []) {
+      const entitled = atComDate[walletId] ?? 0;
+      scheduledQuantity += entitled;
+      quantityAfterComDate += Math.max(0, quantity - entitled);
+    }
+    if (scheduledQuantity === item.quantity && quantityAfterComDate === 0) {
+      return item;
+    }
 
     return {
       ...item,
-      quantityAfterComDate,
-      scheduledIncome: roundCurrency(
-        (item.quantity - quantityAfterComDate) * item.monthlyDividend,
-      ),
+      ...(quantityAfterComDate > 0 && { quantityAfterComDate }),
+      scheduledQuantity,
+      scheduledIncome: roundCurrency(scheduledQuantity * item.monthlyDividend),
     };
   });
 }
