@@ -49,7 +49,7 @@ exigida. Só vale a entrada **nova** em relação à base; a lista é histórico
 não libera mudanças futuras.
 
 ```bash
-git show origin/develop:openapi/dindin.yaml > /tmp/base.yaml
+git show origin/main:openapi/dindin.yaml > /tmp/base.yaml
 node scripts/openapi-breaking.mjs /tmp/base.yaml openapi/dindin.yaml
 ```
 

@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - develop
   pull_request:
     branches:
       - main
-      - develop
 
 # Permissão mínima do GITHUB_TOKEN; jobs que precisam de mais declaram a sua.
 permissions:
@@ -21,7 +19,7 @@ jobs:
   #   - "feat"                                  → minor
   #   - demais commits                          → patch
   # Na main a versão é final (ex.: 1.2.0) e vira tag após o deploy. Nas demais
-  # branches e PRs é uma pré-release (ex.: 1.2.0-develop.42+a1b2c3d).
+  # branches e PRs é uma pré-release (ex.: 1.2.0-issue-568.42+a1b2c3d).
   version:
     name: Calcular versão
     runs-on: ubuntu-latest

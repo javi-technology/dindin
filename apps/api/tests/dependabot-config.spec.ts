@@ -4,7 +4,7 @@ import { join } from 'path';
 // ---------------------------------------------------------------------------
 // Testes da configuração do Dependabot (issue #144)
 // Garante version updates semanais e agrupados para npm e GitHub Actions,
-// abertos contra a develop (fluxo do projeto), sem majors do Angular — que
+// abertos contra a main (fluxo do projeto, #568), sem majors do Angular — que
 // exigem `ng update` com migrações e são tratados em issue própria.
 // ---------------------------------------------------------------------------
 
@@ -41,9 +41,10 @@ describe('.github/dependabot.yml', () => {
       expect(block).toMatch(/directory: ['"]?\/['"]?$/m);
     });
 
-    it('deve rodar semanalmente contra a develop', () => {
+    // Sem a develop, o desenvolvimento parte da main (#568).
+    it('deve rodar semanalmente contra a main', () => {
       expect(block).toMatch(/interval: ['"]?weekly['"]?$/m);
-      expect(block).toMatch(/target-branch: ['"]?develop['"]?$/m);
+      expect(block).toMatch(/target-branch: ['"]?main['"]?$/m);
     });
 
     it('deve rotular com dependencies e usar prefixo chore(deps)', () => {

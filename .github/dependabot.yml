@@ -1,12 +1,13 @@
-# Version updates semanais e agrupados. Os PRs são abertos contra a develop,
-# onde o CI (evento pull_request) valida cada bump antes do merge.
+# Version updates semanais e agrupados. Os PRs são abertos contra a main, de
+# onde parte o desenvolvimento (#568); o CI (evento pull_request) valida cada
+# bump antes do merge, e o merge é publicado.
 version: 2
 
 updates:
   - package-ecosystem: npm
     # O lock do root resolve os workspaces apps/* e packages/*.
     directory: /
-    target-branch: develop
+    target-branch: main
     schedule:
       interval: weekly
       day: monday
@@ -82,7 +83,7 @@ updates:
   - package-ecosystem: github-actions
     # Cobre os workflows em .github/workflows.
     directory: /
-    target-branch: develop
+    target-branch: main
     schedule:
       interval: weekly
       day: monday
