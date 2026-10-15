@@ -102,6 +102,15 @@ describe('app Flutter em apps/mobile', () => {
         `flutter-version: ${versaoFixada()}`,
       );
     });
+
+    // A restrição do pubspec.yaml é o que impede compilar o app com um SDK
+    // mais antigo que o validado; esquecida numa atualização, ela continuaria
+    // aceitando a versão anterior em silêncio (#557).
+    it('deve ser a mínima exigida pelo pubspec.yaml', () => {
+      expect(conteudo('apps/mobile/pubspec.yaml')).toMatch(
+        new RegExp(`^\\s*flutter:\\s*">=${versaoFixada()}"$`, 'm'),
+      );
+    });
   });
 
   // O glob `apps/*` alcançaria `apps/mobile`, que não tem `package.json`.
