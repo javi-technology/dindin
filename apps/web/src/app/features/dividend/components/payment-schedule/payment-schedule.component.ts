@@ -5,6 +5,7 @@ import {
   afterComDateNote,
   scheduleAmount,
   scheduleQuantity,
+  soldAfterComDateNote,
 } from '../../../../shared/utils/payment-schedule.util';
 import {
   formatCurrency,
@@ -36,4 +37,5 @@ export class PaymentScheduleComponent {
   scheduleAmount = scheduleAmount;
   scheduleQuantity = scheduleQuantity;
   afterComDateNote = afterComDateNote;
+  soldAfterComDateNote = soldAfterComDateNote;
 }

@@ -33,9 +33,12 @@ export function scheduleAmount(item: MonthlyIncomeItem): number {
   return item.scheduledIncome ?? item.monthlyIncome;
 }
 
-/** Cotas do item que recebem o pagamento da agenda (#562). */
+/**
+ * Cotas do item que recebem o pagamento da agenda: a quantidade da data-com
+ * (#562), que pode ser maior que a atual quando houve venda depois dela.
+ */
 export function scheduleQuantity(item: MonthlyIncomeItem): number {
-  return item.quantity - (item.quantityAfterComDate ?? 0);
+  return item.scheduledQuantity ?? item.quantity;
 }
 
 /**
@@ -43,6 +46,19 @@ export function scheduleQuantity(item: MonthlyIncomeItem): number {
  * acabou de aplicar uma compra veria o valor de antes e concluiria que ela
  * não foi registrada.
  */
+/**
+ * Aviso das cotas vendidas depois da data-com, que ainda recebem (#562): sem
+ * ele, "× 30" com 19 cotas na carteira pareceria erro de conta.
+ */
+export function soldAfterComDateNote(item: MonthlyIncomeItem): string | null {
+  const sold =
+    scheduleQuantity(item) - (item.quantity - (item.quantityAfterComDate ?? 0));
+  if (sold <= 0) return null;
+  return sold === 1
+    ? '1 cota vendida após a data-com ainda recebe este pagamento'
+    : `${sold} cotas vendidas após a data-com ainda recebem este pagamento`;
+}
+
 export function afterComDateNote(item: MonthlyIncomeItem): string | null {
   const quantity = item.quantityAfterComDate ?? 0;
   if (quantity <= 0) return null;
