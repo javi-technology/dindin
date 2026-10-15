@@ -44,9 +44,17 @@
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
                     </strong>
-                    por cota × {{ item.quantity }} =
-                    {{ formatCurrency(item.monthlyIncome) }}
+                    por cota × {{ scheduleQuantity(item) }} =
+                    {{ formatCurrency(scheduleAmount(item)) }}
                   </span>
+                  @if (afterComDateNote(item); as note) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-after-com-date"
+                    >
+                      {{ note }}
+                    </span>
+                  }
                 </li>
               }
             </ul>
@@ -93,9 +101,17 @@
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
                     </strong>
-                    por cota × {{ item.quantity }} =
-                    {{ formatCurrency(item.monthlyIncome) }}
+                    por cota × {{ scheduleQuantity(item) }} =
+                    {{ formatCurrency(scheduleAmount(item)) }}
                   </span>
+                  @if (afterComDateNote(item); as note) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-after-com-date"
+                    >
+                      {{ note }}
+                    </span>
+                  }
                 </li>
               }
             </ul>
