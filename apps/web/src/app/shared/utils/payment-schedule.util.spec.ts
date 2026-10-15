@@ -137,6 +137,24 @@ describe('buildPaymentSchedule', () => {
     expect(agenda.upcomingTotal).toBe(75);
   });
 
+  // Cotas compradas depois da data-com não recebem o pagamento (#562): a
+  // agenda soma o valor do pagamento, não a renda mensal projetada.
+  it('deve somar o valor do pagamento quando a API o informa', () => {
+    const agenda = buildPaymentSchedule(
+      [
+        { ...item('A', 30, '2026-09-10'), scheduledIncome: 12 },
+        { ...item('B', 70, '2026-09-20'), scheduledIncome: 0 },
+        item('C', 5, '2026-09-20'),
+      ],
+      hoje,
+    );
+
+    expect(agenda.paid[0].total).toBe(12);
+    expect(agenda.upcoming[0].total).toBe(5);
+    expect(agenda.paidTotal).toBe(12);
+    expect(agenda.upcomingTotal).toBe(5);
+  });
+
   it('deve retornar agenda vazia sem itens', () => {
     const agenda = buildPaymentSchedule([], hoje);
 

@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { PaymentSchedule } from '../../../../shared/utils/payment-schedule.util';
+import {
+  PaymentSchedule,
+  afterComDateNote,
+  scheduleAmount,
+  scheduleQuantity,
+  soldAfterComDateNote,
+} from '../../../../shared/utils/payment-schedule.util';
 import {
   formatCurrency,
   formatDate,
@@ -28,4 +34,8 @@ export class PaymentScheduleComponent {
 
   formatCurrency = formatCurrency;
   formatDate = formatDate;
+  scheduleAmount = scheduleAmount;
+  scheduleQuantity = scheduleQuantity;
+  afterComDateNote = afterComDateNote;
+  soldAfterComDateNote = soldAfterComDateNote;
 }

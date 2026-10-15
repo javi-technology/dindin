@@ -321,6 +321,23 @@ export interface MonthlyIncomeItem {
   monthlyDividend: number;
   monthlyIncome: number;
   paymentDate?: string;
+  /**
+   * Cotas compradas depois da data-com do pagamento de `paymentDate`
+   * (#562): entram só no pagamento seguinte. Ausente quando não há.
+   */
+  quantityAfterComDate?: number;
+  /**
+   * Cotas com direito ao pagamento de `paymentDate`: a quantidade de
+   * cada carteira na data-com (#562). Pode ser maior que `quantity`,
+   * quando houve venda depois dela. Ausente quando igual a `quantity`.
+   */
+  scheduledQuantity?: number;
+  /**
+   * Valor do pagamento de `paymentDate` pela quantidade da data-com —
+   * o que a agenda soma. Ausente quando igual a `monthlyIncome`, que
+   * segue sendo a renda mensal projetada pela quantidade atual.
+   */
+  scheduledIncome?: number;
 }
 
 /** Totais da agenda, sobre todos os ativos da carteira. */

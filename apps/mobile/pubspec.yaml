@@ -22,7 +22,7 @@ environment:
   sdk: ^3.13.4
   # A mesma versão fixada em `.flutter-version` e usada pelo CI: o app não
   # compila com um SDK mais antigo do que o validado no pipeline.
-  flutter: ">=3.47.5"
+  flutter: ">=3.47.7"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions

@@ -888,6 +888,90 @@ describe('DividendFetchService — fetchMonthlyDividends', () => {
       ]);
     });
 
+    // A agenda precisa saber a data-com do pagamento que ela exibe para não
+    // contar cotas compradas depois dela (#562).
+    it('deve expor a data-com do provento que define o valor e a data de pagamento', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'MXRF11',
+            label: 'RENDIMENTO',
+            rate: 0.1,
+            lastDatePrior: '2026-09-30T00:00:00.000Z',
+            paymentDate: '2026-10-15T00:00:00.000Z',
+          },
+          {
+            symbol: 'MXRF11',
+            label: 'RENDIMENTO',
+            rate: 0.09,
+            lastDatePrior: '2026-08-31T00:00:00.000Z',
+            paymentDate: '2026-09-15T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'MXRF11', assetType: 'FII' }],
+        today,
+      );
+
+      expect(result.get('MXRF11')).toMatchObject({
+        monthlyDividend: 0.1,
+        paymentDate: '2026-10-15',
+        comDate: '2026-09-30',
+      });
+    });
+
+    it('deve expor a data-com do último provento de ações', async () => {
+      mockFetch({
+        results: [
+          {
+            symbol: 'ITSA4',
+            data: {
+              cashDividends: [
+                {
+                  rate: 0.0242425,
+                  label: 'JCP',
+                  lastDatePrior: '2026-08-31T03:00:00.000Z',
+                  paymentDate: '2026-10-01T03:00:00.000Z',
+                },
+              ],
+              stockDividends: [],
+              subscriptions: [],
+            },
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'ITSA4', assetType: 'STOCK' }],
+        today,
+      );
+
+      expect(result.get('ITSA4')?.comDate).toBe('2026-08-31');
+    });
+
+    it('não deve expor data-com quando o último provento não a informa', async () => {
+      mockFetch({
+        dividends: [
+          {
+            symbol: 'HGLG11',
+            label: 'RENDIMENTO',
+            rate: 1.1,
+            lastDatePrior: null,
+            paymentDate: '2026-09-15T00:00:00.000Z',
+          },
+        ],
+      });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'HGLG11', assetType: 'FII' }],
+        today,
+      );
+
+      expect(result.get('HGLG11')).not.toHaveProperty('comDate');
+    });
+
     it('não deve expor anunciados sem data-com', async () => {
       mockFetch({
         dividends: [

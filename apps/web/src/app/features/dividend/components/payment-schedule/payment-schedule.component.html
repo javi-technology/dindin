@@ -44,9 +44,25 @@
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
                     </strong>
-                    por cota × {{ item.quantity }} =
-                    {{ formatCurrency(item.monthlyIncome) }}
+                    por cota × {{ scheduleQuantity(item) }} =
+                    {{ formatCurrency(scheduleAmount(item)) }}
                   </span>
+                  @if (afterComDateNote(item); as note) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-after-com-date"
+                    >
+                      {{ note }}
+                    </span>
+                  }
+                  @if (soldAfterComDateNote(item); as soldNote) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-sold-after-com-date"
+                    >
+                      {{ soldNote }}
+                    </span>
+                  }
                 </li>
               }
             </ul>
@@ -93,9 +109,25 @@
                     >
                       {{ formatCurrency(item.monthlyDividend) }}
                     </strong>
-                    por cota × {{ item.quantity }} =
-                    {{ formatCurrency(item.monthlyIncome) }}
+                    por cota × {{ scheduleQuantity(item) }} =
+                    {{ formatCurrency(scheduleAmount(item)) }}
                   </span>
+                  @if (afterComDateNote(item); as note) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-after-com-date"
+                    >
+                      {{ note }}
+                    </span>
+                  }
+                  @if (soldAfterComDateNote(item); as soldNote) {
+                    <span
+                      class="block text-text-muted"
+                      data-testid="schedule-sold-after-com-date"
+                    >
+                      {{ soldNote }}
+                    </span>
+                  }
                 </li>
               }
             </ul>

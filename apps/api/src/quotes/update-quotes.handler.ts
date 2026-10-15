@@ -54,6 +54,7 @@ async function processTickerQuote(
       dividend?.paymentDate,
       dividend?.annualDividend,
       quote.quotedAt,
+      dividend?.comDate,
     );
     logInfo('updateAllQuotes.tickerUpdated', {
       ticker,

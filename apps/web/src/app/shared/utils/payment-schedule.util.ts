@@ -25,6 +25,49 @@ const MS_PER_DAY = 86400000;
 const round = (value: number): number => Math.round(value * 100) / 100;
 
 /**
+ * Valor do pagamento do item: sem as cotas compradas depois da data-com, que
+ * só recebem no pagamento seguinte (#562). A API omite `scheduledIncome`
+ * quando ele é igual à renda mensal projetada.
+ */
+export function scheduleAmount(item: MonthlyIncomeItem): number {
+  return item.scheduledIncome ?? item.monthlyIncome;
+}
+
+/**
+ * Cotas do item que recebem o pagamento da agenda: a quantidade da data-com
+ * (#562), que pode ser maior que a atual quando houve venda depois dela.
+ */
+export function scheduleQuantity(item: MonthlyIncomeItem): number {
+  return item.scheduledQuantity ?? item.quantity;
+}
+
+/**
+ * Aviso das cotas compradas depois da data-com (#562). Sem ele, o usuário que
+ * acabou de aplicar uma compra veria o valor de antes e concluiria que ela
+ * não foi registrada.
+ */
+/**
+ * Aviso das cotas vendidas depois da data-com, que ainda recebem (#562): sem
+ * ele, "× 30" com 19 cotas na carteira pareceria erro de conta.
+ */
+export function soldAfterComDateNote(item: MonthlyIncomeItem): string | null {
+  const sold =
+    scheduleQuantity(item) - (item.quantity - (item.quantityAfterComDate ?? 0));
+  if (sold <= 0) return null;
+  return sold === 1
+    ? '1 cota vendida após a data-com ainda recebe este pagamento'
+    : `${sold} cotas vendidas após a data-com ainda recebem este pagamento`;
+}
+
+export function afterComDateNote(item: MonthlyIncomeItem): string | null {
+  const quantity = item.quantityAfterComDate ?? 0;
+  if (quantity <= 0) return null;
+  return quantity === 1
+    ? '1 cota comprada após a data-com entra no próximo pagamento'
+    : `${quantity} cotas compradas após a data-com entram no próximo pagamento`;
+}
+
+/**
  * Converte `YYYY-MM-DD` em timestamp UTC de meia-noite. Tratar a data como
  * data (e não como instante) evita que o fuso local desloque o dia.
  */
@@ -88,7 +131,9 @@ export function buildPaymentSchedule(
       return {
         date,
         items: group,
-        total: round(group.reduce((sum, item) => sum + item.monthlyIncome, 0)),
+        total: round(
+          group.reduce((sum, item) => sum + scheduleAmount(item), 0),
+        ),
         daysUntil,
         relativeLabel: relativeLabel(daysUntil),
       };

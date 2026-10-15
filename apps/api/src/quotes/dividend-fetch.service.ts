@@ -15,6 +15,9 @@ export interface PaidDividendEvent {
 export interface DividendInfo {
   monthlyDividend: number;
   paymentDate?: string; // YYYY-MM-DD
+  // Data-com do provento de `monthlyDividend` e `paymentDate`: a agenda a usa
+  // para não contar cotas compradas depois dela (#562).
+  comDate?: string; // YYYY-MM-DD
   // Soma dos proventos pagos nos 12 meses até hoje. Ausente quando nenhum
   // evento tem data: sem ela não há como saber a periodicidade.
   annualDividend?: number;
@@ -106,9 +109,15 @@ function toDateOnly(value: unknown): string | undefined {
 function dividendInfo(
   monthlyDividend: number,
   paymentDate: unknown,
+  lastDatePrior?: unknown,
 ): DividendInfo {
   const date = toDateOnly(paymentDate);
-  return date ? { monthlyDividend, paymentDate: date } : { monthlyDividend };
+  const comDate = toDateOnly(lastDatePrior);
+  return {
+    monthlyDividend,
+    ...(date ? { paymentDate: date } : {}),
+    ...(comDate ? { comDate } : {}),
+  };
 }
 
 interface RawDividendEvent {
@@ -231,7 +240,7 @@ async function fetchFiiDividendBatch(
     [...byTicker.entries()].map(([ticker, event]) => [
       ticker,
       withPaidEvents(
-        dividendInfo(event.rate, event.paymentDate),
+        dividendInfo(event.rate, event.paymentDate, event.lastDatePrior),
         eventsByTicker.get(ticker)!,
         today,
       ),
@@ -282,7 +291,7 @@ async function fetchStocksDividendBatch(
     output.set(
       (item.requestedSymbol ?? item.symbol).toUpperCase(),
       withPaidEvents(
-        dividendInfo(latest.rate, latest.paymentDate),
+        dividendInfo(latest.rate, latest.paymentDate, latest.lastDatePrior),
         dividends.filter((dividend) => isValidRate(dividend.rate)),
         today,
       ),

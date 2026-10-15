@@ -43,6 +43,11 @@ function createFirestoreMock(options: {
   fridgeItems?: Record<string, unknown>[];
   quotes?: Record<string, unknown>;
   subscription?: Partial<UserSubscription> | null;
+  /** Quantidade por carteira e geladeira na foto, por `ticker/comDate` (#562). */
+  comDateSnapshots?: Record<
+    string,
+    Record<string, { wallets: Record<string, number>; fridge?: number }>
+  >;
 }) {
   const wallets = options.wallets ?? [];
   const quotes = options.quotes ?? {};
@@ -114,6 +119,25 @@ function createFirestoreMock(options: {
     collection: jest.fn((name: string) => {
       if (name === 'quotes') {
         return { doc: jest.fn((ticker: string) => ({ id: ticker })) };
+      }
+      if (name === 'dividendSync') {
+        return {
+          doc: jest.fn((ticker: string) => ({
+            collection: jest.fn(() => ({
+              doc: jest.fn((comDate: string) => ({
+                get: jest.fn(async () => {
+                  const holdings =
+                    options.comDateSnapshots?.[`${ticker}/${comDate}`];
+                  return {
+                    exists: holdings !== undefined,
+                    data: () =>
+                      holdings ? { quantities: {}, holdings } : undefined,
+                  };
+                }),
+              })),
+            })),
+          })),
+        };
       }
       if (name === 'users') {
         return {
@@ -277,6 +301,181 @@ describe('GET /api/monthly-income', () => {
     const response = await request(app).get('/api/monthly-income');
 
     expect(response.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agenda pela quantidade da data-com (issue #562)
+//
+// As datas ficam longe de hoje para o teste não depender do relógio: a
+// data-com já passou e o pagamento ainda vai cair.
+// ---------------------------------------------------------------------------
+describe('agenda e data-com nas rotas de renda', () => {
+  const authHeader = 'Bearer valid-token';
+  const assinante: Partial<UserSubscription> = {
+    status: 'active',
+    plan: 'basic',
+  };
+  const mxrf = {
+    monthlyDividend: 0.1,
+    dividendPaymentDate: '2999-01-15',
+    dividendComDate: '2020-01-10',
+  };
+  // Na data-com: 10 cotas na carteira 1, nada na 2. Depois, 9 na carteira 2.
+  const compraNaCarteira2 = () =>
+    createFirestoreMock({
+      wallets: [
+        { id: 'wallet-1', positions: [{ ticker: 'MXRF11', quantity: 10 }] },
+        { id: 'wallet-2', positions: [{ ticker: 'MXRF11', quantity: 9 }] },
+      ],
+      quotes: { MXRF11: mxrf },
+      subscription: assinante,
+      comDateSnapshots: {
+        'MXRF11/2020-01-10': { 'user-123': { wallets: { 'wallet-1': 10 } } },
+      },
+    });
+  const renda = (path: string) =>
+    request(app).get(path).set('Authorization', authHeader);
+
+  beforeEach(() => {
+    verifyIdTokenMock.mockReset();
+    verifyIdTokenMock.mockResolvedValue({ uid: 'user-123' });
+  });
+
+  it('deve tirar do A receber as cotas compradas após a data-com, na visão consolidada', async () => {
+    firestoreMock = compraNaCarteira2();
+
+    const response = await renda('/api/monthly-income');
+
+    expect(response.status).toBe(200);
+    expect(response.body.byTicker).toEqual([
+      expect.objectContaining({
+        ticker: 'MXRF11',
+        quantity: 19,
+        monthlyIncome: 1.9,
+        quantityAfterComDate: 9,
+        scheduledQuantity: 10,
+        scheduledIncome: 1,
+      }),
+    ]);
+    expect(response.body.scheduleTotals).toEqual({
+      upcomingTotal: 1,
+      paidTotal: 0,
+    });
+    // A renda mensal projetada continua com todas as cotas.
+    expect(response.body.total).toBe(1.9);
+  });
+
+  // Revisão do #564: a compra na carteira 2 descontava também da carteira 1.
+  it('deve atribuir a compra só à carteira que comprou', async () => {
+    firestoreMock = compraNaCarteira2();
+
+    const [carteira1, carteira2] = await Promise.all([
+      renda('/api/wallets/wallet-1/monthly-income'),
+      renda('/api/wallets/wallet-2/monthly-income'),
+    ]);
+
+    expect(carteira1.body.byTicker[0]).not.toHaveProperty(
+      'quantityAfterComDate',
+    );
+    expect(carteira1.body.scheduleTotals.upcomingTotal).toBe(1);
+    expect(carteira2.body.byTicker[0]).toMatchObject({
+      quantityAfterComDate: 9,
+      scheduledQuantity: 0,
+      scheduledIncome: 0,
+    });
+    expect(carteira2.body.scheduleTotals.upcomingTotal).toBe(0);
+  });
+
+  it('deve fechar a soma das carteiras com o consolidado', async () => {
+    firestoreMock = compraNaCarteira2();
+
+    const respostas = await Promise.all([
+      renda('/api/wallets/wallet-1/monthly-income'),
+      renda('/api/wallets/wallet-2/monthly-income'),
+      renda('/api/monthly-income'),
+    ]);
+    const [carteira1, carteira2, consolidado] = respostas.map(
+      (response) => response.body.scheduleTotals.upcomingTotal,
+    );
+
+    expect(carteira1 + carteira2).toBe(consolidado);
+  });
+
+  // Revisão do #564: a compra feita só na geladeira descontava da carteira.
+  it('não deve mexer na carteira quando a compra foi só na geladeira', async () => {
+    firestoreMock = createFirestoreMock({
+      wallets: [
+        { id: 'wallet-1', positions: [{ ticker: 'MXRF11', quantity: 10 }] },
+      ],
+      fridgeItems: [{ ticker: 'MXRF11', quantity: 9 }],
+      quotes: { MXRF11: mxrf },
+      subscription: assinante,
+      comDateSnapshots: {
+        'MXRF11/2020-01-10': {
+          'user-123': { wallets: { 'wallet-1': 10 }, fridge: 0 },
+        },
+      },
+    });
+
+    const response = await renda('/api/monthly-income');
+
+    expect(response.status).toBe(200);
+    expect(response.body.byTicker[0]).not.toHaveProperty(
+      'quantityAfterComDate',
+    );
+    expect(response.body.scheduleTotals.upcomingTotal).toBe(1);
+  });
+
+  // Revisão do #564: quem vendeu depois da data-com recebe pela foto.
+  it('deve pagar pela quantidade da foto quando houve venda depois da data-com', async () => {
+    firestoreMock = createFirestoreMock({
+      wallets: [
+        { id: 'wallet-1', positions: [{ ticker: 'MXRF11', quantity: 19 }] },
+      ],
+      quotes: { MXRF11: mxrf },
+      subscription: assinante,
+      comDateSnapshots: {
+        'MXRF11/2020-01-10': { 'user-123': { wallets: { 'wallet-1': 30 } } },
+      },
+    });
+
+    const response = await renda('/api/monthly-income');
+
+    expect(response.status).toBe(200);
+    expect(response.body.byTicker[0]).toMatchObject({
+      quantity: 19,
+      monthlyIncome: 1.9,
+      scheduledQuantity: 30,
+      scheduledIncome: 3,
+    });
+    expect(response.body.scheduleTotals.upcomingTotal).toBe(3);
+    expect(response.body.total).toBe(1.9);
+  });
+
+  it('deve levar o valor do pagamento aos itens da agenda recortada', async () => {
+    firestoreMock = createFirestoreMock({
+      wallets: [
+        { id: 'wallet-1', positions: [{ ticker: 'MXRF11', quantity: 19 }] },
+      ],
+      quotes: { MXRF11: mxrf },
+      comDateSnapshots: {
+        'MXRF11/2020-01-10': { 'user-123': { wallets: { 'wallet-1': 10 } } },
+      },
+    });
+
+    const response = await renda('/api/monthly-income');
+
+    expect(response.status).toBe(200);
+    expect(response.body.limited).toBe(true);
+    expect(response.body.scheduleItems).toEqual([
+      expect.objectContaining({
+        quantityAfterComDate: 9,
+        scheduledQuantity: 10,
+        scheduledIncome: 1,
+      }),
+    ]);
+    expect(response.body.scheduleTotals.upcomingTotal).toBe(1);
   });
 });
 

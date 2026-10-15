@@ -241,6 +241,72 @@ describe('QuoteHistoryService', () => {
       );
     });
 
+    // A agenda usa a data-com para não contar cotas compradas depois dela
+    // (#562).
+    it('deve salvar a data-com do provento no documento principal', async () => {
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: jest.fn().mockResolvedValue(undefined) })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory(
+        'HGLG11',
+        165.5,
+        0.92,
+        'brapi',
+        '2026-07-14',
+        undefined,
+        undefined,
+        '2026-06-30',
+      );
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dividendPaymentDate: '2026-07-14',
+          dividendComDate: '2026-06-30',
+        }),
+      );
+    });
+
+    it('deve preservar a data-com existente quando o provento não é informado', async () => {
+      const quoteSet = jest.fn().mockResolvedValue(undefined);
+      const quoteDoc = jest.fn(() => ({
+        set: quoteSet,
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({
+            ticker: 'MXRF11',
+            price: 10.32,
+            monthlyDividend: 0.07,
+            dividendPaymentDate: '2026-07-14',
+            dividendComDate: '2026-06-30',
+            updatedAt: '2026-07-15T18:00:00Z',
+            source: 'brapi',
+          }),
+        }),
+        collection: jest.fn(() => ({
+          doc: jest.fn(() => ({ set: jest.fn().mockResolvedValue(undefined) })),
+        })),
+      }));
+
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: quoteDoc })),
+      };
+
+      await saveQuoteHistory('MXRF11', 10.5, undefined);
+
+      expect(quoteSet).toHaveBeenCalledWith(
+        expect.objectContaining({ dividendComDate: '2026-06-30' }),
+      );
+    });
+
     // Horário de apuração da cotação na fonte (issue #387). Sem ele não há
     // como distinguir atraso da Brapi de falha nossa: `updatedAt` só diz
     // quando *nós* escrevemos.
@@ -354,6 +420,7 @@ describe('QuoteHistoryService', () => {
       price: 73.99,
       monthlyDividend: 0.7,
       dividendPaymentDate: '2026-09-15',
+      dividendComDate: '2026-08-29',
       annualDividend: 8.4,
       updatedAt: '2026-09-23T21:40:00Z',
       quotedAt: '2026-09-23T21:31:00Z',
@@ -407,6 +474,7 @@ describe('QuoteHistoryService', () => {
         expect.objectContaining({
           monthlyDividend: 0.7,
           dividendPaymentDate: '2026-09-15',
+          dividendComDate: '2026-08-29',
           annualDividend: 8.4,
         }),
       );

@@ -124,6 +124,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -133,6 +134,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -166,6 +168,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         '2026-07-14',
         10.8,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -295,13 +298,21 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
       mockFetchMonthlyDividends.mockResolvedValue(
         new Map([
-          ['HGLG11', { monthlyDividend: 0.92, paymentDate: '2026-07-14' }],
+          [
+            'HGLG11',
+            {
+              monthlyDividend: 0.92,
+              paymentDate: '2026-07-14',
+              comDate: '2026-06-30',
+            },
+          ],
           ['MXRF11', { monthlyDividend: 0.07 }],
         ]),
       );
 
       await updateAllQuotes();
 
+      // A data-com vai junto: é a que a agenda usa (#562).
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'HGLG11',
         165.5,
@@ -310,6 +321,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         '2026-07-14',
         undefined,
         '2026-07-15T18:00:00Z',
+        '2026-06-30',
       );
       expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
         'MXRF11',
@@ -319,6 +331,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -342,6 +355,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -417,6 +431,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -448,6 +463,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
     });
 
@@ -479,6 +495,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
+        undefined,
       );
 
       consoleErrorSpy.mockRestore();
@@ -522,6 +539,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           undefined,
           undefined,
           '2026-07-15T18:00:00Z',
+          undefined,
         );
       }
     });
@@ -588,6 +606,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         undefined,
         undefined,
         '2026-09-23T21:31:00Z',
+        undefined,
       );
     });
 

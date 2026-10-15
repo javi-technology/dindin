@@ -19,6 +19,7 @@ export async function saveQuoteHistory(
   dividendPaymentDate?: string,
   annualDividend?: number,
   quotedAt?: string,
+  dividendComDate?: string,
 ): Promise<void> {
   const now = new Date().toISOString();
   const date = today();
@@ -28,11 +29,13 @@ export async function saveQuoteHistory(
 
   let resolvedMonthlyDividend = monthlyDividend;
   let resolvedPaymentDate = dividendPaymentDate;
+  let resolvedComDate = dividendComDate;
   let resolvedAnnualDividend = annualDividend;
   if (resolvedMonthlyDividend === undefined) {
     const existing = (await quoteRef.get()).data() as Quote | undefined;
     resolvedMonthlyDividend = existing?.monthlyDividend ?? 0;
     resolvedPaymentDate = existing?.dividendPaymentDate;
+    resolvedComDate = existing?.dividendComDate;
     resolvedAnnualDividend = existing?.annualDividend;
   }
 
@@ -41,6 +44,7 @@ export async function saveQuoteHistory(
     price,
     monthlyDividend: resolvedMonthlyDividend,
     ...(resolvedPaymentDate && { dividendPaymentDate: resolvedPaymentDate }),
+    ...(resolvedComDate && { dividendComDate: resolvedComDate }),
     ...(resolvedAnnualDividend !== undefined && {
       annualDividend: resolvedAnnualDividend,
     }),
@@ -96,6 +100,9 @@ export async function saveReconciledPrice(
     monthlyDividend,
     ...(stored?.dividendPaymentDate && {
       dividendPaymentDate: stored.dividendPaymentDate,
+    }),
+    ...(stored?.dividendComDate && {
+      dividendComDate: stored.dividendComDate,
     }),
     ...(stored?.annualDividend !== undefined && {
       annualDividend: stored.annualDividend,

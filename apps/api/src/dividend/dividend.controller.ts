@@ -9,6 +9,7 @@ import {
 import {
   computeConsolidatedMonthlyIncome,
   computeMonthlyIncome,
+  withComDateEligibility,
 } from './monthly-income.service';
 import {
   computeScheduleTotals,
@@ -251,7 +252,9 @@ export const getMonthlyIncome = asyncHandler(
     const userId = uid(req);
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
-      computeMonthlyIncome(userId, walletId),
+      computeMonthlyIncome(userId, walletId).then((income) =>
+        withComDateEligibility(income, userId),
+      ),
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
@@ -300,7 +303,9 @@ export const getConsolidatedMonthlyIncome = asyncHandler(
     const userId = uid(req);
     const user = (req as AuthRequest).user;
     const [{ byTicker, total, totalFromFridge }, entitled] = await Promise.all([
-      computeConsolidatedMonthlyIncome(userId),
+      computeConsolidatedMonthlyIncome(userId).then((income) =>
+        withComDateEligibility(income, userId),
+      ),
       hasEntitlement(userId, 'projections', user?.admin === true),
     ]);
 
