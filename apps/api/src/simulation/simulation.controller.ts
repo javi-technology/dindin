@@ -15,10 +15,9 @@ import { HttpError } from '../shared/http-error';
 /**
  * Rotas da simulação (issue #396).
  *
- * A simulação por carteira sugerida é gratuita por decisão de produto: é a
- * porta de entrada da funcionalidade, e por isso ela não consulta entitlement
- * nem devolve `limited`. A simulação por ativo é paga, e o bloqueio é total:
- * o gate mora na rota (`requireEntitlement('projections')`), não aqui.
+ * A simulação inteira, por carteira sugerida e por ativo, é recurso de
+ * assinante (issue #573). O bloqueio é total e mora na rota
+ * (`requireEntitlement('projections')`), não aqui.
  */
 
 export const listSimulationWallets = asyncHandler(

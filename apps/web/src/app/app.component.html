@@ -58,13 +58,36 @@
           data-testid="recommended-wallet-link"
           >Carteira recomendada</a
         >
-        <a
-          routerLink="/simulacao"
-          routerLinkActive="text-action! font-semibold"
-          class="text-sm font-medium text-text-secondary hover:text-action"
-          data-testid="simulation-link"
-          >Simulação</a
-        >
+        <span class="group relative inline-flex">
+          <a
+            routerLink="/simulacao"
+            routerLinkActive="text-action! font-semibold"
+            class="inline-flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-action"
+            data-testid="simulation-link"
+            [attr.aria-describedby]="
+              simulationLocked() ? 'simulation-lock-tooltip' : null
+            "
+            >Simulação
+            @if (simulationLocked()) {
+              <svg
+                lucideLock
+                [size]="14"
+                aria-hidden="true"
+                data-testid="simulation-lock"
+              ></svg>
+            }
+          </a>
+          @if (simulationLocked()) {
+            <!-- Aparece no hover e no foco do teclado, não só com o mouse. -->
+            <span
+              id="simulation-lock-tooltip"
+              role="tooltip"
+              class="pointer-events-none absolute top-full left-1/2 z-10 mt-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-text-primary px-2 py-1 text-xs text-surface shadow-lg group-hover:block group-focus-within:block"
+              data-testid="simulation-lock-tooltip"
+              >Exclusivo para assinantes</span
+            >
+          }
+        </span>
         <a
           routerLink="/assinatura"
           routerLinkActive="text-action! font-semibold"

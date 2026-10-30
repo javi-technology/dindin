@@ -211,6 +211,12 @@ export function simulateDividendIncome(
     allocatedAmount: roundCurrency(amount - unallocatedAmount),
     unallocatedAmount,
     monthlyIncome,
+    // Com proventos sacados, as cotas não mudam e a renda final é a inicial;
+    // é este número, e não o total do período, que mostra o efeito do
+    // reinvestimento quando a renda de cada mês ainda é parecida.
+    finalMonthlyIncome: roundCurrency(
+      states.reduce((total, state) => total + monthlyIncomeOf(state), 0),
+    ),
     totalIncome: roundCurrency(
       states.reduce((total, state) => total + state.totalIncome, 0),
     ),

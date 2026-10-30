@@ -14,16 +14,18 @@ import 'package:dindin_mobile/core/auth/token_provider.dart';
 import 'package:dindin_mobile/core/data/cache_local.dart';
 import 'package:dindin_mobile/core/data/dindin_api.dart';
 import 'package:dindin_mobile/core/theme/dindin_theme.dart';
+import 'package:dindin_mobile/features/simulacao/simulacao_form.dart';
 import 'package:dindin_mobile/features/simulacao/simulacao_screen.dart';
 
+import '../../support/assinatura_controlada.dart';
 import '../../support/cache_de_teste.dart';
 
 // ---------------------------------------------------------------------------
-// Liberação do recurso de assinante na simulação (issue #442).
+// Simulação como recurso de assinante (issues #442 e #573).
 //
-// Quem já assina pela web precisa encontrar a simulação por ativo liberada no
-// app. Quem não assina continua vendo o ponto de entrada marcado, porque
-// escondê-lo faria o assinante não descobrir que o recurso existe.
+// A simulação inteira é de assinante. Quem já assina pela web a encontra
+// liberada no app; quem não assina vê o paywall no lugar dela, com o caminho
+// para assinar, e não um erro da API.
 // ---------------------------------------------------------------------------
 
 class _ComToken implements TokenProvider {
@@ -48,6 +50,15 @@ void main() {
         tokenProvider: _ComToken(),
         httpClient: MockClient((req) async {
           caminhos.add('${req.method} ${req.url.path}');
+          if (req.url.path == '/api/simulations/wallet') {
+            return http.Response(
+              jsonEncode({
+                'error': 'Acesso negado',
+                'code': 'SUBSCRIPTION_REQUIRED',
+              }),
+              403,
+            );
+          }
           if (req.url.path == '/api/simulations/wallets') {
             return http.Response(
               jsonEncode([
@@ -81,29 +92,23 @@ void main() {
     ),
   );
 
-  // O selo fica abaixo do formulário, fora da primeira tela do celular: sem
-  // rolar, o widget nem chega a ser construído pela lista.
-  Future<void> rolarAteOFim(WidgetTester tester) async {
-    await tester.drag(find.byType(ListView).first, const Offset(0, -600));
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets('sem assinatura, a simulação por ativo segue marcada', (
+  testWidgets('sem assinatura, mostra o paywall no lugar da simulação', (
     tester,
   ) async {
     final assinatura = AssinaturaService(apiFalsa());
+    await assinatura.carregar();
 
     await tester.pumpWidget(tela(assinatura));
     await tester.pumpAndSettle();
-    await rolarAteOFim(tester);
 
-    expect(
-      find.byKey(const Key('selo-simulacao-ativo'), skipOffstage: false),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('paywall-simulacao')), findsOneWidget);
+    expect(find.byType(SimulacaoForm), findsNothing);
+    // A API recusa a lista a quem não assina: pedi-la só traria um erro para
+    // a tela onde deve estar o paywall.
+    expect(caminhos, isNot(contains('GET /api/simulations/wallets')));
   });
 
-  // Issue #405: o ponto de entrada marcado passa a levar à compra in-app.
+  // Issue #405: o paywall leva à compra in-app.
   testWidgets('sem assinatura e com loja, "Ver planos" abre a compra', (
     tester,
   ) async {
@@ -117,7 +122,6 @@ void main() {
 
     await tester.pumpWidget(tela(assinatura));
     await tester.pumpAndSettle();
-    await rolarAteOFim(tester);
     await tester.tap(find.byKey(const Key('ver-planos')));
     await tester.pumpAndSettle();
 
@@ -133,44 +137,51 @@ void main() {
   ) async {
     await tester.pumpWidget(tela(AssinaturaService(apiFalsa())));
     await tester.pumpAndSettle();
-    await rolarAteOFim(tester);
 
-    expect(
-      find.byKey(const Key('ver-planos'), skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('paywall-simulacao')), findsOneWidget);
+    expect(find.byKey(const Key('ver-planos')), findsNothing);
   });
 
-  testWidgets('com assinatura, o recurso deixa de ser marcado como pago', (
+  testWidgets('com assinatura, a simulação fica liberada', (tester) async {
+    await tester.pumpWidget(tela(AssinaturaControlada()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SimulacaoForm), findsOneWidget);
+    expect(find.byKey(const Key('paywall-simulacao')), findsNothing);
+  });
+
+  // A assinatura comprada dentro do app chega depois de a tela abrir.
+  testWidgets('a assinatura reconhecida depois libera a simulação', (
     tester,
   ) async {
-    final assinatura = _AssinaturaLiberada();
+    final assinatura = AssinaturaControlada(liberada: false);
 
     await tester.pumpWidget(tela(assinatura));
     await tester.pumpAndSettle();
-    await rolarAteOFim(tester);
+    assinatura.liberar();
+    await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('selo-simulacao-ativo'), skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.byType(SimulacaoForm), findsOneWidget);
+    expect(caminhos, contains('GET /api/simulations/wallets'));
   });
-}
 
-class _AssinaturaLiberada extends AssinaturaService {
-  _AssinaturaLiberada()
-    : super(
-        DinDinApi(
-          ApiClient(
-            baseUrl: 'https://api.exemplo',
-            tokenProvider: _ComToken(),
-            httpClient: MockClient((_) async => http.Response('{}', 500)),
-          ),
-        ),
-      );
+  // Assinatura que venceu no meio da sessão: a API recusa, e a tela volta ao
+  // paywall em vez de mostrar "Acesso negado".
+  testWidgets('simulação recusada por falta de assinatura volta ao paywall', (
+    tester,
+  ) async {
+    final assinatura = AssinaturaControlada(aoRecarregar: () => false);
 
-  @override
-  bool get temProjecoes => true;
+    await tester.pumpWidget(tela(assinatura));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('campo-valor')), '1000');
+    await tester.tap(find.byKey(const Key('botao-simular')));
+    await tester.pumpAndSettle();
+
+    expect(assinatura.recargas, 1);
+    expect(find.byKey(const Key('paywall-simulacao')), findsOneWidget);
+    expect(find.text('Acesso negado'), findsNothing);
+  });
 }
 
 class _LojaMinima implements LojaBackend {

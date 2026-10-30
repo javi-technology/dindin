@@ -502,6 +502,10 @@ export interface SimulationResult {
   /** Troco do aporte: não comprou cota inteira e não rende. */
   unallocatedAmount: number;
   monthlyIncome: number;
+  /**
+   * Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+   */
+  finalMonthlyIncome?: number;
   totalIncome: number;
   reinvestedAmount: number;
   uninvestedIncome: number;
@@ -555,6 +559,10 @@ export interface AssetSimulationResponse {
   /** Troco do aporte: não comprou cota inteira e não rende. */
   unallocatedAmount: number;
   monthlyIncome: number;
+  /**
+   * Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+   */
+  finalMonthlyIncome?: number;
   totalIncome: number;
   reinvestedAmount: number;
   uninvestedIncome: number;
@@ -573,6 +581,10 @@ export interface WalletSimulationResponse {
   /** Troco do aporte: não comprou cota inteira e não rende. */
   unallocatedAmount: number;
   monthlyIncome: number;
+  /**
+   * Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+   */
+  finalMonthlyIncome?: number;
   totalIncome: number;
   reinvestedAmount: number;
   uninvestedIncome: number;

@@ -101,6 +101,57 @@ describe('dividend-simulation', () => {
     ).toBe(simulateDividendIncome({ ...base, mode: 'withdraw' }).totalIncome);
   });
 
+  it('deve manter a renda mensal final igual à inicial quando os proventos são sacados', () => {
+    const result = simulateDividendIncome({
+      assets,
+      amount: 1000,
+      months: 12,
+      mode: 'withdraw',
+    });
+
+    expect(result.finalMonthlyIncome).toBe(result.monthlyIncome);
+  });
+
+  it('deve elevar a renda mensal final com as cotas compradas no reinvestimento', () => {
+    const result = simulateDividendIncome({
+      assets,
+      amount: 1000,
+      months: 12,
+      mode: 'reinvest',
+    });
+    const expected = result.byTicker.reduce(
+      (total, item) => total + item.finalQuantity * item.monthlyDividend,
+      0,
+    );
+
+    expect(result.finalMonthlyIncome).toBeGreaterThan(result.monthlyIncome);
+    expect(result.finalMonthlyIncome).toBeCloseTo(expected, 2);
+  });
+
+  it('deve contar na renda mensal final a cota comprada com o provento do último mês', () => {
+    const base = { assets, amount: 1000, months: 1 } as const;
+
+    expect(
+      simulateDividendIncome({ ...base, mode: 'reinvest' }).finalMonthlyIncome,
+    ).toBe(10.1);
+    expect(
+      simulateDividendIncome({ ...base, mode: 'withdraw' }).finalMonthlyIncome,
+    ).toBe(10);
+  });
+
+  it('deve manter a renda mensal final quando o provento não completa uma cota', () => {
+    const result = simulateDividendIncome({
+      assets: [{ ticker: 'CCCC11', price: 100, monthlyDividend: 1 }],
+      amount: 1000,
+      months: 1,
+      mode: 'reinvest',
+    });
+
+    expect(result.reinvestedAmount).toBe(0);
+    expect(result.uninvestedIncome).toBe(10);
+    expect(result.finalMonthlyIncome).toBe(result.monthlyIncome);
+  });
+
   it('deve informar o troco que não completou uma cota', () => {
     const result = simulateDividendIncome({
       assets: [{ ticker: 'AAAA11', price: 30, monthlyDividend: 1 }],

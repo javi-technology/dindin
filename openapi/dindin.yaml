@@ -45,6 +45,8 @@ x-incompatible-changes:
   - 'issue #499: GET /api/dividends/projection e GET /api/recommended-wallets/bb-fii/suggestions passam a ser descritos como a API sempre os devolveu; o comportamento da API não mudou, só a descrição que estava errada.'
   - 'issue #544: POST /api/recommended-wallets/bb-fii/suggestions/{id}/applied passa a exigir generationId, para não lançar a compra de uma geração anterior na atual; o corpo passa a ser descrito como o objeto que a API sempre recebeu, não um array. Só o web usa a rota (o app não aplica sugestões), então não há versão mínima do app a subir.'
 
+  - 'issue #573: GET /api/simulations/wallets e POST /api/simulations/wallet passam a exigir assinatura (entitlement projections) e respondem 403 SUBSCRIPTION_REQUIRED a quem não assina. O app anterior a esta mudança mostra erro na simulação geral, em vez do paywall, até atualizar; a versão mínima do app (APP_MIN_VERSION) não sobe.'
+
 servers:
   - url: https://dindin-4e720.web.app
     description: Produção
@@ -1131,6 +1133,9 @@ components:
           type: number
           description: 'Troco do aporte: não comprou cota inteira e não rende.'
         monthlyIncome: { type: number }
+        finalMonthlyIncome:
+          type: number
+          description: 'Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.'
         totalIncome: { type: number }
         reinvestedAmount: { type: number }
         uninvestedIncome: { type: number }
@@ -2099,6 +2104,7 @@ paths:
   /api/simulations/wallets:
     get:
       summary: Carteiras sugeridas disponíveis para simulação
+      description: 'Recurso de assinante: exige o entitlement `projections`.'
       operationId: listSimulationWallets
       responses:
         '200':
@@ -2109,11 +2115,12 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/SimulationWalletOption' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /api/simulations/wallet:
     post:
       summary: Simulação geral por carteira sugerida
-      description: Gratuita, sem assinatura.
+      description: 'Recurso de assinante: exige o entitlement `projections`.'
       operationId: simulateWallet
       requestBody:
         required: true
@@ -2127,6 +2134,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/WalletSimulationResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /api/simulations/asset:

@@ -215,10 +215,10 @@ class DinDinApi {
 
   /// Simulação por ativo específico — recurso de assinante.
   ///
-  /// Sem o entitlement, a API responde 402 com `code:
-  /// 'SUBSCRIPTION_REQUIRED'`, que o app reconhece para oferecer a assinatura
-  /// em vez de mostrar "erro". A liberação no app depende de compra in-app
-  /// (issue #405).
+  /// Sem o entitlement, a API responde 403 com `code:
+  /// 'SUBSCRIPTION_REQUIRED'` ([codigoAssinaturaNecessaria]), que o app
+  /// reconhece para oferecer a assinatura em vez de mostrar "erro". A
+  /// liberação no app depende de compra in-app (issue #405).
   Future<AssetSimulationResponse> simularAtivo(
     AssetSimulationRequest dados,
   ) async => AssetSimulationResponse.fromJson(

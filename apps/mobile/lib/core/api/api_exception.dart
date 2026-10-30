@@ -20,6 +20,9 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode: $message)';
 }
 
+/// Recurso de assinante pedido sem o entitlement (403).
+const codigoAssinaturaNecessaria = 'SUBSCRIPTION_REQUIRED';
+
 /// A API recusou a versão instalada do app (426, issue #500).
 class AtualizacaoObrigatoriaException extends ApiException {
   const AtualizacaoObrigatoriaException({String? message})

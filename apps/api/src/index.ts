@@ -348,10 +348,19 @@ app.post('/api/patrimony/snapshots', postPatrimonySnapshot);
 // A simulação recebe o provedor no corpo, não no caminho: está previsto haver
 // mais carteiras sugeridas, e um bloco de rotas por provedor repetiria a mesma
 // implementação (issue #396).
-app.get('/api/simulations/wallets', listSimulationWallets);
-app.post('/api/simulations/wallet', simulateWallet);
-// Bloqueio total, não recorte: sem o gate na rota, o cálculo continuaria
-// acessível a quem chamasse a API direto (issue #397).
+// Bloqueio total, não recorte: a simulação inteira é recurso de assinante
+// (issues #397 e #573), e sem o gate na rota o cálculo continuaria acessível a
+// quem chamasse a API direto.
+app.get(
+  '/api/simulations/wallets',
+  requireEntitlement('projections'),
+  listSimulationWallets,
+);
+app.post(
+  '/api/simulations/wallet',
+  requireEntitlement('projections'),
+  simulateWallet,
+);
 app.post(
   '/api/simulations/asset',
   requireEntitlement('projections'),

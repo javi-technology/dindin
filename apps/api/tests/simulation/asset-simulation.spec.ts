@@ -135,18 +135,6 @@ describe('simulação por ativo sob assinatura', () => {
     expect(simulateAssetMock).not.toHaveBeenCalled();
   });
 
-  it('deve manter a simulação por carteira acessível sem assinatura', async () => {
-    hasEntitlementMock.mockResolvedValue(false);
-
-    const response = await request(app)
-      .post('/api/simulations/wallet')
-      .set('Authorization', 'Bearer token')
-      .send({ amount: 100, months: 1 });
-
-    expect(response.status).toBe(200);
-    expect(simulateRecommendedWalletMock).toHaveBeenCalled();
-  });
-
   it('deve exigir autenticação antes do gate de assinatura', async () => {
     const response = await request(app)
       .post('/api/simulations/asset')

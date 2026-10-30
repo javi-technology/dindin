@@ -27,6 +27,11 @@ class ResultadoView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final reinveste = resultado.mode == SimulationMode.reinvest;
+    final cotasNovas = resultado.byTicker.fold<double>(
+      0,
+      (total, item) => total + item.finalQuantity - item.quantity,
+    );
 
     // Coluna, e não lista: o resultado é embutido na lista da tela, e uma
     // área rolável dentro de outra não tem altura definida — o Flutter lança
@@ -69,15 +74,46 @@ class ResultadoView extends StatelessWidget {
                   rotulo: 'Troco (não comprou cota inteira)',
                   valor: Moeda.exibir(resultado.unallocatedAmount),
                 ),
-              if (resultado.mode == SimulationMode.reinvest &&
-                  resultado.reinvestedAmount > 0)
+              if (reinveste && resultado.reinvestedAmount > 0)
                 _Linha(
                   rotulo: 'Reinvestido',
                   valor: Moeda.exibir(resultado.reinvestedAmount),
                 ),
+              // Em horizonte curto o total do período é igual nos dois modos:
+              // o efeito do reinvestimento aparece na renda ao fim dele e nas
+              // cotas novas (issue #574).
+              if (reinveste && resultado.finalMonthlyIncome != null)
+                _Linha(
+                  chave: const Key('renda-final'),
+                  rotulo: 'Renda mensal ao fim do período',
+                  valor: Moeda.exibir(resultado.finalMonthlyIncome!),
+                ),
+              if (reinveste && cotasNovas > 0)
+                _Linha(
+                  chave: const Key('cotas-reinvestidas'),
+                  rotulo: 'Cotas compradas com proventos',
+                  valor: Moeda.exibirSemSimbolo(cotasNovas),
+                ),
             ],
           ),
         ),
+        if (reinveste && resultado.reinvestedAmount == 0) ...[
+          const SizedBox(height: 8),
+          Container(
+            key: const Key('reinvestimento-sem-efeito'),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: t.warningSoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'Os ${Moeda.exibir(resultado.uninvestedIncome)} de proventos do '
+              'período não completaram nenhuma cota inteira, então reinvestir '
+              'não mudou o resultado. Aumente o horizonte para ver o efeito.',
+              style: TextStyle(color: t.warningInk, fontSize: 13),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),

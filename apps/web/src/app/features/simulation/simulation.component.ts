@@ -31,12 +31,11 @@ import { LucideArrowLeft, LucideCalculator } from '@lucide/angular';
 /**
  * Tela de simulação de investimento (issue #396).
  *
- * A simulação por carteira sugerida é gratuita: a tela não consulta assinatura
- * para liberar o formulário. A carteira é escolhida pelo usuário, e não fixada
- * na do BB, porque está previsto haver mais de uma.
- *
- * A simulação por ativo, ao lado, é de assinante (#397) e tem gate próprio: o
- * bloqueio de uma não pode alcançar a outra.
+ * A simulação inteira, por carteira sugerida e por ativo, é recurso de
+ * assinante (issue #573): sem acesso, a tela mostra o paywall no lugar dos
+ * formulários e nem busca as carteiras, que a API também recusa. A carteira é
+ * escolhida pelo usuário, e não fixada na do BB, porque está previsto haver
+ * mais de uma.
  */
 @Component({
   selector: 'app-simulation',
@@ -91,12 +90,18 @@ export class SimulationComponent implements OnInit {
             : this.simulationService.simulateWallet(request).pipe(
                 // O erro é tratado aqui dentro para não encerrar o fluxo: uma
                 // falha não pode impedir a próxima simulação.
-                catchError((failure: { error?: { error?: string } }) =>
-                  of({
-                    error:
-                      failure?.error?.error ??
-                      'Não foi possível simular. Tente novamente.',
-                  }),
+                catchError(
+                  (failure: { status?: number; error?: { error?: string } }) =>
+                    of({
+                      // O 403 já vira paywall pelo interceptor; repetir a
+                      // mensagem aqui só empilharia dois avisos do mesmo
+                      // bloqueio.
+                      error:
+                        failure?.status === 403
+                          ? null
+                          : (failure?.error?.error ??
+                            'Não foi possível simular. Tente novamente.'),
+                    }),
                 ),
               ),
         ),
@@ -159,23 +164,28 @@ export class SimulationComponent implements OnInit {
   readonly assetResult = signal<AssetSimulationResponse | null>(null);
   readonly assetLoading = signal(false);
   readonly assetError = signal<string | null>(null);
-  readonly hasAssetAccess = computed(
+  readonly hasAccess = computed(
     () =>
       this.billingService.hasProjections() &&
       !this.billingService.subscriptionRequired(),
   );
-  readonly showAssetPaywall = computed(
-    () => this.billingService.loaded() && !this.hasAssetAccess(),
+  readonly showPaywall = computed(
+    () => this.billingService.loaded() && !this.hasAccess(),
   );
 
   ngOnInit(): void {
+    // As carteiras só são buscadas depois de saber da assinatura: para quem
+    // não assina, a API as recusa, e a tela mostraria um erro onde deve haver
+    // o paywall.
     this.billingService
       .loadMe()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({ error: () => undefined });
-    this.simulationService
-      .listWallets()
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        catchError(() => of(null)),
+        switchMap(() =>
+          this.hasAccess() ? this.simulationService.listWallets() : EMPTY,
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (wallets) => {
           this.wallets.set(wallets);
@@ -230,7 +240,7 @@ export class SimulationComponent implements OnInit {
   }
 
   simulateAsset(request: AssetSimulationRequestEvent): void {
-    if (!this.hasAssetAccess()) return;
+    if (!this.hasAccess()) return;
 
     this.assetError.set(null);
     this.assetLoading.set(true);

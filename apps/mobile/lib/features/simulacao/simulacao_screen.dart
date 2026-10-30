@@ -9,6 +9,7 @@ import '../../core/data/dindin_api.dart';
 import '../../core/data/envio.dart';
 import '../../core/data/recurso.dart';
 import '../../core/theme/dindin_tokens.dart';
+import '../../shared/components/cartao.dart';
 import '../../shared/components/estado_erro.dart';
 import '../../shared/components/selo_assinante.dart';
 import '../../shared/components/visao_recurso.dart';
@@ -20,9 +21,8 @@ import 'sugestoes_view.dart';
 /// Carteira sugerida e simulação (issue #404).
 ///
 /// São o diferencial do DinDin, e ficariam de fora do app se a paridade
-/// parasse nas telas de carteira própria. A simulação geral é gratuita; a por
-/// ativo específico é de assinante, e sua liberação depende de compra in-app
-/// (issue #405) — aqui ela só é anunciada.
+/// parasse nas telas de carteira própria. A simulação inteira é de assinante
+/// (issue #573): sem acesso, a aba mostra o paywall no lugar dela.
 class SimulacaoScreen extends StatefulWidget {
   const SimulacaoScreen({
     super.key,
@@ -38,8 +38,8 @@ class SimulacaoScreen extends StatefulWidget {
   /// conhecido enquanto busca o atual, como as demais telas já fazem.
   final CacheLocal cache;
 
-  /// Status da assinatura (#442). A simulação por ativo é paga; quem já assina
-  /// pela web precisa encontrá-la liberada aqui.
+  /// Status da assinatura (#442). A simulação é paga; quem já assina pela web
+  /// precisa encontrá-la liberada aqui.
   final AssinaturaService assinatura;
 
   /// Carteiras do usuário, para a comparação. Vazia enquanto não carregaram.
@@ -66,20 +66,37 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
   );
 
   WalletSimulationResponse? _resultado;
+  bool _buscouCarteiras = false;
 
   @override
   void initState() {
     super.initState();
     _carteirasSugeridas.addListener(_aoMudar);
-    _carteirasSugeridas.carregar();
+    widget.assinatura.addListener(_aoMudarAssinatura);
+    _buscarCarteirasSeLiberada();
   }
 
   void _aoMudar() {
     if (mounted) setState(() {});
   }
 
+  /// A assinatura comprada dentro do app chega com a tela já aberta.
+  void _aoMudarAssinatura() {
+    _buscarCarteirasSeLiberada();
+    _aoMudar();
+  }
+
+  /// A API recusa as carteiras a quem não assina: buscá-las antes só traria
+  /// um erro para a tela onde deve estar o paywall.
+  void _buscarCarteirasSeLiberada() {
+    if (_buscouCarteiras || !widget.assinatura.temProjecoes) return;
+    _buscouCarteiras = true;
+    _carteirasSugeridas.carregar();
+  }
+
   @override
   void dispose() {
+    widget.assinatura.removeListener(_aoMudarAssinatura);
     _carteirasSugeridas.removeListener(_aoMudar);
     _carteirasSugeridas.dispose();
     _envio.dispose();
@@ -88,11 +105,20 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
 
   Future<bool> _simular(WalletSimulationRequest dados) async {
     WalletSimulationResponse? resposta;
+    var semAssinatura = false;
 
     final deuCerto = await _envio.executar(() async {
-      resposta = await widget.api.simularCarteira(dados);
+      try {
+        resposta = await widget.api.simularCarteira(dados);
+      } on ApiException catch (erro) {
+        semAssinatura = erro.code == codigoAssinaturaNecessaria;
+        rethrow;
+      }
     });
 
+    // Assinatura vencida no meio da sessão: relê o status, e a tela volta ao
+    // paywall em vez de mostrar "Acesso negado".
+    if (semAssinatura) await widget.assinatura.carregar();
     if (deuCerto && mounted) setState(() => _resultado = resposta);
     return deuCerto;
   }
@@ -125,11 +151,15 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                VisaoRecurso<List<SimulationWalletOption>>(
-                  estado: _carteirasSugeridas.estado,
-                  aoRecarregar: _carteirasSugeridas.carregar,
-                  conteudo: (context, disponiveis) => _abaSimular(disponiveis),
-                ),
+                if (widget.assinatura.temProjecoes)
+                  VisaoRecurso<List<SimulationWalletOption>>(
+                    estado: _carteirasSugeridas.estado,
+                    aoRecarregar: _carteirasSugeridas.carregar,
+                    conteudo: (context, disponiveis) =>
+                        _abaSimular(disponiveis),
+                  )
+                else
+                  _paywall(),
                 _abaComparar(),
               ],
             ),
@@ -147,23 +177,9 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
       builder: (context, _) => ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Simulação por carteira sugerida',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Text(
-                'Grátis',
-                style: TextStyle(
-                  color: context.tokens.positiveInk,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          Text(
+            'Simulação por carteira sugerida',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
           SimulacaoForm(
@@ -179,31 +195,47 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
               resultado: resultado,
               aoSimularAtivo: _avisarRecursoDeAssinante,
             ),
-          ] else if (!widget.assinatura.temProjecoes) ...[
-            const SizedBox(height: 24),
-            Row(
-              key: const Key('selo-simulacao-ativo'),
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SeloAssinante(),
-                const SizedBox(width: 8),
-                const Flexible(
-                  child: Text(
-                    'Simular um ativo isoladamente é recurso de assinante.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-                if (widget.assinatura.loja case final loja?)
-                  TextButton(
-                    key: const Key('ver-planos'),
-                    onPressed: () => abrirPlanosDaLoja(context, loja),
-                    child: const Text('Ver planos'),
-                  ),
-              ],
-            ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _paywall() {
+    final t = context.tokens;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Cartao(
+          key: const Key('paywall-simulacao'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SeloAssinante(),
+              const SizedBox(height: 12),
+              Text(
+                'Disponível para assinantes',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Assine para simular quanto um valor renderia de proventos na '
+                'carteira sugerida ou em um ativo específico.',
+                style: TextStyle(color: t.textSecondary),
+              ),
+              if (widget.assinatura.loja case final loja?) ...[
+                const SizedBox(height: 16),
+                FilledButton(
+                  key: const Key('ver-planos'),
+                  onPressed: () => abrirPlanosDaLoja(context, loja),
+                  child: const Text('Ver planos'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -15,7 +15,28 @@
         Quanto um valor renderia de proventos na carteira sugerida.
       </p>
 
-      @if (wallets().length === 0) {
+      @if (showPaywall()) {
+        <div
+          class="mt-6 rounded-xl border border-brand-soft bg-brand-soft p-5"
+          data-testid="simulation-paywall"
+        >
+          <h2 class="text-base font-semibold text-text-primary">
+            Disponível para assinantes
+          </h2>
+          <p class="mt-2 text-sm text-text-secondary">
+            Assine para simular quanto um valor renderia de proventos na
+            carteira sugerida ou em um ativo específico.
+          </p>
+          <a
+            routerLink="/assinatura"
+            class="mt-4 inline-flex items-center rounded-lg bg-action px-4 py-2 font-medium text-on-action hover:bg-action-hover"
+            data-testid="simulation-paywall-cta"
+            >Assinar</a
+          >
+        </div>
+      } @else if (!hasAccess()) {
+        <!-- Assinatura ainda não carregada: nem paywall nem formulário. -->
+      } @else if (wallets().length === 0) {
         <p class="mt-6 text-text-muted" data-testid="empty-wallets">
           Nenhuma carteira sugerida disponível para simular.
         </p>
@@ -114,7 +135,7 @@
         </button>
       }
 
-      @if (error()) {
+      @if (hasAccess() && error()) {
         <p
           class="mt-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger-ink"
           data-testid="simulation-error"
@@ -123,19 +144,21 @@
         </p>
       }
 
-      @if (result(); as simulation) {
-        <app-simulation-result [result]="simulation" />
-      }
+      @if (hasAccess()) {
+        @if (result(); as simulation) {
+          <app-simulation-result [result]="simulation" />
+        }
 
-      <app-asset-simulation
-        [hasAccess]="hasAssetAccess()"
-        [showPaywall]="showAssetPaywall()"
-        [loading]="assetLoading()"
-        [error]="assetError()"
-        [result]="assetResult()"
-        (simulate)="simulateAsset($event)"
-        (parametersChanged)="discardAssetResult()"
-      />
+        <app-asset-simulation
+          [hasAccess]="hasAccess()"
+          [showPaywall]="false"
+          [loading]="assetLoading()"
+          [error]="assetError()"
+          [result]="assetResult()"
+          (simulate)="simulateAsset($event)"
+          (parametersChanged)="discardAssetResult()"
+        />
+      }
     </div>
   </div>
 </main>

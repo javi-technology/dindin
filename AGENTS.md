@@ -171,6 +171,11 @@ serve para saber o que está em andamento se ele refletir a realidade:
   `Backlog` sinaliza que a issue ainda não foi refinada.
 - A transição para `In progress` acompanha a criação da branch, não o primeiro
   commit.
+- **Ao mover para `In progress`, quem vai implementar se torna assignee da
+  issue** (`gh issue edit <N> --add-assignee @me`). O `@me` é a conta
+  autenticada no `gh`: o agente atribui a issue ao usuário em nome de quem
+  trabalha, não a si mesmo. Sem assignee, o board mostra o que está em
+  andamento, mas não de quem é.
 - Em stacked PR, cada issue da pilha segue o ciclo por conta própria.
 
 ```bash
@@ -179,6 +184,9 @@ gh project item-list 4 --owner javi-technology --format json
 
 gh project item-edit --project-id <project_id> --id <item_id> \
   --field-id <status_id> --single-select-option-id <opcao_id>
+
+# ao mover para In progress
+gh issue edit <N> --add-assignee @me
 ```
 
 Ids atuais do project (reconferir com `gh project field-list 4 --owner javi-technology`):
@@ -210,7 +218,7 @@ Regras:
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
-2. Preparar branch: atualizar a `main` → criar `issue-<N>` a partir dela (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
+2. Preparar branch: atualizar a `main` → criar `issue-<N>` a partir dela (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`, com você como assignee da issue
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
 4. Abrir PR de `issue-<N>` para `main` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão — o merge na `main` é publicado em produção
@@ -386,10 +394,14 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ### Carteira sugerida e simulação no app (`apps/mobile`)
 
-- A **simulação geral por carteira sugerida é gratuita**; a simulação por
-  ativo específico é recurso de assinante. No app, a liberação do pago depende
-  de compra in-app (issue #405): até lá o ponto de entrada existe, marcado com
-  `SeloAssinante`. Escondê-lo faria o assinante da web não encontrá-lo no app.
+- A **simulação inteira é recurso de assinante** (issue #573): por carteira
+  sugerida e por ativo, no web, no app e na API, que recusa com **403**
+  `SUBSCRIPTION_REQUIRED` as rotas `/api/simulations/*` (`requireEntitlement('projections')`).
+  Bloquear só na tela deixaria o cálculo acessível a quem chamasse a API
+  direto. Quem não assina vê o **paywall no lugar da simulação**, com o
+  caminho para assinar (no app, a compra in-app), e as telas nem buscam as
+  carteiras simuláveis. O app anterior a esta mudança mostra erro na
+  simulação até atualizar; a versão mínima não subiu.
 - A tela **permite escolher a carteira sugerida** quando há mais de uma. O
   sistema prevê outras além da do BB, e assumir uma só quebraria na segunda.
 - O valor a investir vai para a API **como o usuário digitou**: a API converte
