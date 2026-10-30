@@ -24,7 +24,7 @@ export interface AssetSimulationRequestEvent {
 /**
  * Simulação por ativo (issue #397).
  *
- * Recurso de assinante, ao lado da simulação por carteira, que é gratuita. O
+ * Recurso de assinante, como a simulação por carteira (issue #573). O
  * selo aparece **antes** do formulário: descobrir que o recurso é pago só
  * depois de preencher ticker, valor e horizonte é o que faz o usuário desistir.
  * Quem não assina é levado ao fluxo de assinatura, não apenas informado.
