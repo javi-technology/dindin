@@ -142,4 +142,70 @@ describe('SimulationResultComponent', () => {
 
     expect(element.querySelector('[data-testid="final-quantity"]')).toBeNull();
   });
+
+  // Issue #574: com horizonte curto, o total do período é igual nos dois
+  // modos, e só a renda ao fim do período e as cotas novas mostram o efeito.
+  it('deve mostrar a renda mensal ao fim do período quando há reinvestimento', () => {
+    const element = render({
+      ...result,
+      mode: 'reinvest',
+      reinvestedAmount: 100,
+      finalMonthlyIncome: 11,
+    });
+
+    expect(
+      element.querySelector('[data-testid="final-monthly-income"]')
+        ?.textContent,
+    ).toContain('11,00');
+  });
+
+  it('deve somar as cotas compradas com proventos no período', () => {
+    const element = render({
+      ...result,
+      mode: 'reinvest',
+      reinvestedAmount: 100,
+      finalMonthlyIncome: 11,
+      byTicker: [
+        { ...result.byTicker[0], finalQuantity: 60 },
+        { ...result.byTicker[1], finalQuantity: 25 },
+      ],
+    });
+
+    expect(
+      element.querySelector('[data-testid="reinvested-shares"]')?.textContent,
+    ).toContain('11 novas cotas');
+  });
+
+  it('não deve mostrar a renda mensal final no modo de saque', () => {
+    const element = render({ ...result, finalMonthlyIncome: 10 });
+
+    expect(
+      element.querySelector('[data-testid="final-monthly-income"]'),
+    ).toBeNull();
+  });
+
+  it('deve avisar quando os proventos não completaram nenhuma cota', () => {
+    const element = render({
+      ...result,
+      mode: 'reinvest',
+      months: 1,
+      reinvestedAmount: 0,
+      uninvestedIncome: 10.4,
+      finalMonthlyIncome: 10,
+    });
+
+    const notice = element.querySelector(
+      '[data-testid="reinvest-without-effect"]',
+    )?.textContent;
+    expect(notice).toContain('10,40');
+    expect(notice).toContain('cota inteira');
+  });
+
+  it('não deve avisar sobre o reinvestimento no modo de saque', () => {
+    const element = render(result);
+
+    expect(
+      element.querySelector('[data-testid="reinvest-without-effect"]'),
+    ).toBeNull();
+  });
 });
