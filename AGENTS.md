@@ -386,10 +386,14 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 
 ### Carteira sugerida e simulação no app (`apps/mobile`)
 
-- A **simulação geral por carteira sugerida é gratuita**; a simulação por
-  ativo específico é recurso de assinante. No app, a liberação do pago depende
-  de compra in-app (issue #405): até lá o ponto de entrada existe, marcado com
-  `SeloAssinante`. Escondê-lo faria o assinante da web não encontrá-lo no app.
+- A **simulação inteira é recurso de assinante** (issue #573): por carteira
+  sugerida e por ativo, no web, no app e na API, que recusa com **403**
+  `SUBSCRIPTION_REQUIRED` as rotas `/api/simulations/*` (`requireEntitlement('projections')`).
+  Bloquear só na tela deixaria o cálculo acessível a quem chamasse a API
+  direto. Quem não assina vê o **paywall no lugar da simulação**, com o
+  caminho para assinar (no app, a compra in-app), e as telas nem buscam as
+  carteiras simuláveis. O app anterior a esta mudança mostra erro na
+  simulação até atualizar; a versão mínima não subiu.
 - A tela **permite escolher a carteira sugerida** quando há mais de uma. O
   sistema prevê outras além da do BB, e assumir uma só quebraria na segunda.
 - O valor a investir vai para a API **como o usuário digitou**: a API converte
