@@ -24,8 +24,8 @@ import { SimulationAsset, simulateDividendIncome } from './dividend-simulation';
  *
  * Junta o que o motor precisa — peso, preço e último provento de cada ativo —
  * e nada mais: a conta em si mora em `dividend-simulation`, sem Firestore.
- * A rota é gratuita, então aqui não há consulta de assinatura nem recorte de
- * resultado.
+ * O acesso de assinante é conferido na rota (issue #573), então aqui não há
+ * consulta de assinatura nem recorte de resultado.
  */
 
 export interface WalletSimulationParams {
