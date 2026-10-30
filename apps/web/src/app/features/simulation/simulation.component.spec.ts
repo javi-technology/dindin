@@ -13,9 +13,10 @@ import { SimulationComponent } from './simulation.component';
 // ---------------------------------------------------------------------------
 // Testes da tela de simulação (issue #396)
 //
-// A simulação geral é gratuita: a tela não consulta assinatura para liberar o
-// formulário da carteira. O que ela precisa garantir é a escolha da carteira
-// — está previsto haver mais de uma — e que o resultado apareça inteiro.
+// A simulação inteira é recurso de assinante (issue #573): sem acesso, a tela
+// mostra o paywall no lugar dos formulários. Com acesso, o que ela precisa
+// garantir é a escolha da carteira — está previsto haver mais de uma — e que o
+// resultado apareça inteiro.
 // ---------------------------------------------------------------------------
 
 const wallets = [
@@ -312,20 +313,82 @@ describe('SimulationComponent', () => {
     expect(element.querySelector('[data-testid="asset-paywall"]')).toBeNull();
   });
 
-  it('deve bloquear a simulação por ativo para quem não assina', () => {
-    billingServiceMock.hasProjections.set(false);
-    fixture.detectChanges();
+  describe('sem assinatura', () => {
+    function renderWithoutAccess(): HTMLElement {
+      listWallets.mockClear();
+      billingServiceMock.hasProjections.set(false);
+      const blocked = TestBed.createComponent(SimulationComponent);
+      blocked.detectChanges();
+      return blocked.nativeElement as HTMLElement;
+    }
 
-    expect(
-      element.querySelector('[data-testid="asset-paywall"]'),
-    ).not.toBeNull();
-    expect(
-      element.querySelector('[data-testid="asset-ticker-input"]'),
-    ).toBeNull();
-    // A simulação geral segue liberada: o bloqueio é só do recurso pago.
-    expect(
-      element.querySelector('[data-testid="simulate-button"]'),
-    ).not.toBeNull();
+    it('deve mostrar o paywall no lugar da simulação', () => {
+      const blocked = renderWithoutAccess();
+
+      expect(
+        blocked.querySelector('[data-testid="simulation-paywall"]'),
+      ).not.toBeNull();
+      expect(
+        blocked
+          .querySelector('[data-testid="simulation-paywall-cta"]')
+          ?.getAttribute('href'),
+      ).toBe('/assinatura');
+      expect(
+        blocked.querySelector('[data-testid="simulate-button"]'),
+      ).toBeNull();
+      expect(
+        blocked.querySelector('[data-testid="asset-ticker-input"]'),
+      ).toBeNull();
+    });
+
+    it('não deve buscar as carteiras simuláveis', () => {
+      renderWithoutAccess();
+
+      expect(listWallets).not.toHaveBeenCalled();
+    });
+
+    it('deve mostrar o paywall quando a API exige assinatura', () => {
+      billingServiceMock.subscriptionRequired.set(true);
+      fixture.detectChanges();
+
+      expect(
+        element.querySelector('[data-testid="simulation-paywall"]'),
+      ).not.toBeNull();
+      expect(
+        element.querySelector('[data-testid="simulate-button"]'),
+      ).toBeNull();
+    });
+
+    it('não deve mostrar paywall nem formulário antes de saber da assinatura', () => {
+      listWallets.mockClear();
+      billingServiceMock.loaded.set(false);
+      billingServiceMock.hasProjections.set(false);
+      billingServiceMock.loadMe.mockReturnValue(new Subject());
+      const pending = TestBed.createComponent(SimulationComponent);
+      pending.detectChanges();
+      const node = pending.nativeElement as HTMLElement;
+
+      expect(
+        node.querySelector('[data-testid="simulation-paywall"]'),
+      ).toBeNull();
+      expect(node.querySelector('[data-testid="simulate-button"]')).toBeNull();
+      expect(listWallets).not.toHaveBeenCalled();
+    });
+
+    it('não deve repetir em erro o bloqueio que já virou paywall', () => {
+      setInput('amount-input', '1000');
+      simulateWallet.mockReturnValue(
+        throwError(() => ({
+          status: 403,
+          error: { error: 'Acesso negado', code: 'SUBSCRIPTION_REQUIRED' },
+        })),
+      );
+      submit();
+
+      expect(
+        element.querySelector('[data-testid="simulation-error"]'),
+      ).toBeNull();
+    });
   });
 
   it('deve simular o ativo pedido pelo componente filho', () => {
