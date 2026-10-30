@@ -26,6 +26,8 @@ describe('AppComponent', () => {
   let billingServiceMock: {
     loaded: ReturnType<typeof signal<boolean>>;
     isSubscriber: ReturnType<typeof signal<boolean>>;
+    hasProjections: ReturnType<typeof signal<boolean>>;
+    subscriptionRequired: ReturnType<typeof signal<boolean>>;
     loadMe: any;
   };
 
@@ -37,6 +39,8 @@ describe('AppComponent', () => {
     billingServiceMock = {
       loaded: signal(false),
       isSubscriber: signal(false),
+      hasProjections: signal(false),
+      subscriptionRequired: signal(false),
       loadMe: jasmine.createSpy('loadMe').and.returnValue(of({})),
     };
 
@@ -187,6 +191,62 @@ describe('AppComponent', () => {
 
       expect(badge()).toBeNull();
       expect(billingServiceMock.loadMe).not.toHaveBeenCalled();
+    });
+  });
+
+  // A simulação é recurso de assinante (issue #573): o cadeado avisa antes do
+  // clique, em vez de o usuário só descobrir no paywall.
+  describe('cadeado da simulação', () => {
+    const lock = () =>
+      fixture.nativeElement.querySelector('[data-testid="simulation-lock"]');
+    const tooltip = () =>
+      fixture.nativeElement.querySelector(
+        '[data-testid="simulation-lock-tooltip"]',
+      );
+
+    beforeEach(() => {
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+      billingServiceMock.loaded.set(true);
+    });
+
+    it('deve mostrar o cadeado e a mensagem para quem não assina', () => {
+      fixture.detectChanges();
+
+      expect(lock()).not.toBeNull();
+      expect(tooltip()?.textContent?.trim()).toBe('Exclusivo para assinantes');
+      expect(tooltip()?.getAttribute('role')).toBe('tooltip');
+    });
+
+    it('deve ligar a mensagem ao link para leitores de tela', () => {
+      fixture.detectChanges();
+
+      const link = fixture.nativeElement.querySelector(
+        '[data-testid="simulation-link"]',
+      ) as HTMLElement;
+      expect(link.getAttribute('aria-describedby')).toBe(tooltip()?.id);
+    });
+
+    it('não deve mostrar o cadeado para quem assina', () => {
+      billingServiceMock.hasProjections.set(true);
+      fixture.detectChanges();
+
+      expect(lock()).toBeNull();
+      expect(tooltip()).toBeNull();
+    });
+
+    it('deve mostrar o cadeado quando a API passa a exigir assinatura', () => {
+      billingServiceMock.hasProjections.set(true);
+      billingServiceMock.subscriptionRequired.set(true);
+      fixture.detectChanges();
+
+      expect(lock()).not.toBeNull();
+    });
+
+    it('não deve mostrar o cadeado antes de saber da assinatura', () => {
+      billingServiceMock.loaded.set(false);
+      fixture.detectChanges();
+
+      expect(lock()).toBeNull();
     });
   });
 });
