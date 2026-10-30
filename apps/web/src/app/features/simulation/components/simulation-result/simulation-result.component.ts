@@ -29,6 +29,18 @@ export class SimulationResultComponent {
   readonly result = input.required<SimulationResult>();
 
   readonly reinvesting = computed(() => this.result().mode === 'reinvest');
+  // O total do período quase não muda com o modo em horizonte curto: o efeito
+  // do reinvestimento aparece na renda mensal ao fim dele e nas cotas novas
+  // (issue #574). Sem isso, os dois modos parecem dar o mesmo resultado.
+  readonly reinvestedShares = computed(() =>
+    this.result().byTicker.reduce(
+      (total, item) => total + item.finalQuantity - item.quantity,
+      0,
+    ),
+  );
+  readonly reinvestWithoutEffect = computed(
+    () => this.reinvesting() && this.result().reinvestedAmount === 0,
+  );
   readonly horizonLabel = computed(() => {
     const months = this.result().months;
     return months === 1 ? '1 mês' : `${months} meses`;
