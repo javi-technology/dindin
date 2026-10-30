@@ -40,8 +40,7 @@ describe('simulation.controller — carteira sugerida', () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     simulateRecommendedWalletMock.mockResolvedValue(result);
     listSimulationProvidersMock.mockResolvedValue([opcaoDeCarteiraFixture]);
-    // A simulação geral é gratuita: nenhuma rota dela consulta assinatura.
-    hasEntitlementMock.mockResolvedValue(false);
+    hasEntitlementMock.mockResolvedValue(true);
   });
 
   it('deve simular a carteira sugerida para usuário autenticado', async () => {
@@ -57,15 +56,47 @@ describe('simulation.controller — carteira sugerida', () => {
     );
   });
 
-  it('deve responder sem recorte para quem não assina', async () => {
+  // A simulação inteira é recurso de assinante (issue #573): sem o gate na
+  // rota, o cálculo continuaria acessível a quem chamasse a API direto.
+  it('deve exigir o entitlement de projeções para simular', async () => {
+    await request(app)
+      .post('/api/simulations/wallet')
+      .set('Authorization', 'Bearer token')
+      .send({ amount: 1000, months: 1 });
+
+    expect(hasEntitlementMock).toHaveBeenCalledWith(
+      'user-1',
+      'projections',
+      false,
+    );
+  });
+
+  it('deve bloquear a simulação de quem não assina sem calcular nada', async () => {
+    hasEntitlementMock.mockResolvedValue(false);
+
     const response = await request(app)
       .post('/api/simulations/wallet')
       .set('Authorization', 'Bearer token')
       .send({ amount: 1000, months: 1 });
 
-    expect(response.status).toBe(200);
-    expect(response.body.limited).toBeUndefined();
-    expect(hasEntitlementMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      error: 'Acesso negado',
+      code: 'SUBSCRIPTION_REQUIRED',
+    });
+    expect(simulateRecommendedWalletMock).not.toHaveBeenCalled();
+  });
+
+  it('deve bloquear a lista de carteiras simuláveis para quem não assina', async () => {
+    hasEntitlementMock.mockResolvedValue(false);
+
+    const response = await request(app)
+      .get('/api/simulations/wallets')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('SUBSCRIPTION_REQUIRED');
+    expect(listSimulationProvidersMock).not.toHaveBeenCalled();
   });
 
   it('deve aceitar valor com vírgula decimal e separador de milhar', async () => {
