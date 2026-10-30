@@ -21,16 +21,22 @@ WalletSimulationResponse resultado({
   double unallocatedAmount = 20,
   List<SimulationItem> byTicker = const [],
   List<String> missingDividendTickers = const [],
+  SimulationMode mode = SimulationMode.reinvest,
+  int months = 12,
+  double reinvestedAmount = 90,
+  double uninvestedIncome = 12,
+  double? finalMonthlyIncome,
 }) => WalletSimulationResponse(
   amount: 1000,
-  months: 12,
-  mode: SimulationMode.reinvest,
+  months: months,
+  mode: mode,
   allocatedAmount: 980,
   unallocatedAmount: unallocatedAmount,
   monthlyIncome: 8.5,
   totalIncome: 102,
-  reinvestedAmount: 90,
-  uninvestedIncome: 12,
+  reinvestedAmount: reinvestedAmount,
+  uninvestedIncome: uninvestedIncome,
+  finalMonthlyIncome: finalMonthlyIncome,
   byTicker: byTicker,
   missingDividendTickers: missingDividendTickers,
   staleDividendTickers: const [],
@@ -51,13 +57,14 @@ WalletSimulationResponse resultado({
 SimulationItem item({
   String ticker = 'HGLG11',
   double quantity = 6,
+  double? finalQuantity,
   bool missingDividend = false,
 }) => SimulationItem(
   ticker: ticker,
   price: 160,
   monthlyDividend: missingDividend ? 0 : 1.1,
   quantity: quantity,
-  finalQuantity: quantity,
+  finalQuantity: finalQuantity ?? quantity,
   investedAmount: 960,
   monthlyIncome: missingDividend ? 0 : 6.6,
   totalIncome: missingDividend ? 0 : 79.2,
@@ -229,6 +236,103 @@ void main() {
       );
 
       expect(find.byKey(const Key('troco')), findsNothing);
+    });
+
+    // Issue #574: em horizonte curto o total do período é igual nos dois
+    // modos; só a renda ao fim dele e as cotas novas mostram o reinvestimento.
+    testWidgets('mostra a renda mensal ao fim do período ao reinvestir', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        emApp(
+          ResultadoView(
+            resultado: resultado(byTicker: [item()], finalMonthlyIncome: 9.6),
+            aoSimularAtivo: null,
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('renda-final')),
+          matching: find.textContaining('9,60'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('soma as cotas compradas com proventos', (tester) async {
+      await tester.pumpWidget(
+        emApp(
+          ResultadoView(
+            resultado: resultado(
+              byTicker: [item(finalQuantity: 9)],
+              finalMonthlyIncome: 9.9,
+            ),
+            aoSimularAtivo: null,
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('cotas-reinvestidas')),
+          matching: find.textContaining('3'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('proventos sacados não mostram renda final', (tester) async {
+      await tester.pumpWidget(
+        emApp(
+          ResultadoView(
+            resultado: resultado(
+              mode: SimulationMode.withdraw,
+              reinvestedAmount: 0,
+              uninvestedIncome: 0,
+              byTicker: [item()],
+              finalMonthlyIncome: 8.5,
+            ),
+            aoSimularAtivo: null,
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('renda-final')), findsNothing);
+      expect(find.byKey(const Key('reinvestimento-sem-efeito')), findsNothing);
+    });
+
+    testWidgets('avisa quando os proventos não completaram nenhuma cota', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        emApp(
+          ResultadoView(
+            resultado: resultado(
+              months: 1,
+              reinvestedAmount: 0,
+              uninvestedIncome: 10.4,
+              byTicker: [item()],
+              finalMonthlyIncome: 8.5,
+            ),
+            aoSimularAtivo: null,
+          ),
+        ),
+      );
+
+      final aviso = find.byKey(const Key('reinvestimento-sem-efeito'));
+      expect(
+        find.descendant(of: aviso, matching: find.textContaining('10,40')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: aviso,
+          matching: find.textContaining('cota inteira'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('deixa a premissa visível', (tester) async {
