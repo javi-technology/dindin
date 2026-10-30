@@ -171,6 +171,11 @@ serve para saber o que está em andamento se ele refletir a realidade:
   `Backlog` sinaliza que a issue ainda não foi refinada.
 - A transição para `In progress` acompanha a criação da branch, não o primeiro
   commit.
+- **Ao mover para `In progress`, quem vai implementar se torna assignee da
+  issue** (`gh issue edit <N> --add-assignee @me`). O `@me` é a conta
+  autenticada no `gh`: o agente atribui a issue ao usuário em nome de quem
+  trabalha, não a si mesmo. Sem assignee, o board mostra o que está em
+  andamento, mas não de quem é.
 - Em stacked PR, cada issue da pilha segue o ciclo por conta própria.
 
 ```bash
@@ -179,6 +184,9 @@ gh project item-list 4 --owner javi-technology --format json
 
 gh project item-edit --project-id <project_id> --id <item_id> \
   --field-id <status_id> --single-select-option-id <opcao_id>
+
+# ao mover para In progress
+gh issue edit <N> --add-assignee @me
 ```
 
 Ids atuais do project (reconferir com `gh project field-list 4 --owner javi-technology`):
@@ -210,7 +218,7 @@ Regras:
 ### Fluxo Completo de Tarefa
 
 1. Verificar/criar issue no GitHub Projects, com `Estimate`, `Size` e `Priority` preenchidos → `Status: Ready`
-2. Preparar branch: atualizar a `main` → criar `issue-<N>` a partir dela (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`
+2. Preparar branch: atualizar a `main` → criar `issue-<N>` a partir dela (em stacked PR, a partir da branch anterior da pilha) → `Status: In progress`, com você como assignee da issue
 3. RED → GREEN → REFACTOR (commits `test(#N)`, `feat(#N)`, `refactor(#N)`)
 4. Abrir PR de `issue-<N>` para `main` (em stacked PR, para a branch anterior da pilha), usando obrigatoriamente `.github/PULL_REQUEST_TEMPLATE.md` e referenciando a issue (`Closes #N`) → `Status: In review`
 5. Merge após revisão — o merge na `main` é publicado em produção
