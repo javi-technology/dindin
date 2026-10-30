@@ -2557,6 +2557,7 @@ class SimulationResult {
     required this.allocatedAmount,
     required this.unallocatedAmount,
     required this.monthlyIncome,
+    this.finalMonthlyIncome,
     required this.totalIncome,
     required this.reinvestedAmount,
     required this.uninvestedIncome,
@@ -2574,6 +2575,9 @@ class SimulationResult {
         allocatedAmount: (json['allocatedAmount'] as num).toDouble(),
         unallocatedAmount: (json['unallocatedAmount'] as num).toDouble(),
         monthlyIncome: (json['monthlyIncome'] as num).toDouble(),
+        finalMonthlyIncome: json['finalMonthlyIncome'] == null
+            ? null
+            : (json['finalMonthlyIncome'] as num).toDouble(),
         totalIncome: (json['totalIncome'] as num).toDouble(),
         reinvestedAmount: (json['reinvestedAmount'] as num).toDouble(),
         uninvestedIncome: (json['uninvestedIncome'] as num).toDouble(),
@@ -2598,6 +2602,9 @@ class SimulationResult {
   /// Troco do aporte: não comprou cota inteira e não rende.
   final double unallocatedAmount;
   final double monthlyIncome;
+
+  /// Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+  final double? finalMonthlyIncome;
   final double totalIncome;
   final double reinvestedAmount;
   final double uninvestedIncome;
@@ -2613,6 +2620,7 @@ class SimulationResult {
     'allocatedAmount': allocatedAmount,
     'unallocatedAmount': unallocatedAmount,
     'monthlyIncome': monthlyIncome,
+    if (finalMonthlyIncome != null) 'finalMonthlyIncome': finalMonthlyIncome,
     'totalIncome': totalIncome,
     'reinvestedAmount': reinvestedAmount,
     'uninvestedIncome': uninvestedIncome,
@@ -2770,6 +2778,7 @@ class AssetSimulationResponse {
     required this.allocatedAmount,
     required this.unallocatedAmount,
     required this.monthlyIncome,
+    this.finalMonthlyIncome,
     required this.totalIncome,
     required this.reinvestedAmount,
     required this.uninvestedIncome,
@@ -2788,6 +2797,9 @@ class AssetSimulationResponse {
         allocatedAmount: (json['allocatedAmount'] as num).toDouble(),
         unallocatedAmount: (json['unallocatedAmount'] as num).toDouble(),
         monthlyIncome: (json['monthlyIncome'] as num).toDouble(),
+        finalMonthlyIncome: json['finalMonthlyIncome'] == null
+            ? null
+            : (json['finalMonthlyIncome'] as num).toDouble(),
         totalIncome: (json['totalIncome'] as num).toDouble(),
         reinvestedAmount: (json['reinvestedAmount'] as num).toDouble(),
         uninvestedIncome: (json['uninvestedIncome'] as num).toDouble(),
@@ -2813,6 +2825,9 @@ class AssetSimulationResponse {
   /// Troco do aporte: não comprou cota inteira e não rende.
   final double unallocatedAmount;
   final double monthlyIncome;
+
+  /// Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+  final double? finalMonthlyIncome;
   final double totalIncome;
   final double reinvestedAmount;
   final double uninvestedIncome;
@@ -2829,6 +2844,7 @@ class AssetSimulationResponse {
     'allocatedAmount': allocatedAmount,
     'unallocatedAmount': unallocatedAmount,
     'monthlyIncome': monthlyIncome,
+    if (finalMonthlyIncome != null) 'finalMonthlyIncome': finalMonthlyIncome,
     'totalIncome': totalIncome,
     'reinvestedAmount': reinvestedAmount,
     'uninvestedIncome': uninvestedIncome,
@@ -2848,6 +2864,7 @@ class WalletSimulationResponse {
     required this.allocatedAmount,
     required this.unallocatedAmount,
     required this.monthlyIncome,
+    this.finalMonthlyIncome,
     required this.totalIncome,
     required this.reinvestedAmount,
     required this.uninvestedIncome,
@@ -2868,6 +2885,9 @@ class WalletSimulationResponse {
         allocatedAmount: (json['allocatedAmount'] as num).toDouble(),
         unallocatedAmount: (json['unallocatedAmount'] as num).toDouble(),
         monthlyIncome: (json['monthlyIncome'] as num).toDouble(),
+        finalMonthlyIncome: json['finalMonthlyIncome'] == null
+            ? null
+            : (json['finalMonthlyIncome'] as num).toDouble(),
         totalIncome: (json['totalIncome'] as num).toDouble(),
         reinvestedAmount: (json['reinvestedAmount'] as num).toDouble(),
         uninvestedIncome: (json['uninvestedIncome'] as num).toDouble(),
@@ -2897,6 +2917,9 @@ class WalletSimulationResponse {
   /// Troco do aporte: não comprou cota inteira e não rende.
   final double unallocatedAmount;
   final double monthlyIncome;
+
+  /// Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.
+  final double? finalMonthlyIncome;
   final double totalIncome;
   final double reinvestedAmount;
   final double uninvestedIncome;
@@ -2915,6 +2938,7 @@ class WalletSimulationResponse {
     'allocatedAmount': allocatedAmount,
     'unallocatedAmount': unallocatedAmount,
     'monthlyIncome': monthlyIncome,
+    if (finalMonthlyIncome != null) 'finalMonthlyIncome': finalMonthlyIncome,
     'totalIncome': totalIncome,
     'reinvestedAmount': reinvestedAmount,
     'uninvestedIncome': uninvestedIncome,

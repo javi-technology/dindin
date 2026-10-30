@@ -1131,6 +1131,9 @@ components:
           type: number
           description: 'Troco do aporte: não comprou cota inteira e não rende.'
         monthlyIncome: { type: number }
+        finalMonthlyIncome:
+          type: number
+          description: 'Renda mensal ao fim do horizonte, com as cotas compradas pelo reinvestimento.'
         totalIncome: { type: number }
         reinvestedAmount: { type: number }
         uninvestedIncome: { type: number }
