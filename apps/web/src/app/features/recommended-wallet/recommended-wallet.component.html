@@ -83,6 +83,11 @@
           </span>
         </div>
 
+        <app-wallet-changes
+          [wallet]="wallet"
+          [actionable]="wallet.month === months()[0]"
+        />
+
         <app-recommended-assets-table
           [assets]="currentAssets()"
           [tab]="selectedTab()"

@@ -1,0 +1,138 @@
+<section class="mb-6" data-testid="wallet-changes">
+  <h2 class="text-lg font-semibold text-text-primary mb-3">
+    Entra e sai do mês
+  </h2>
+
+  @if (holdingsError()) {
+    <p
+      class="bg-warning-soft text-warning-ink rounded-lg p-3 text-sm mb-3"
+      data-testid="holdings-error"
+    >
+      Não foi possível conferir suas posições. As mudanças do mês continuam
+      abaixo, sem as ações de mover e descongelar.
+    </p>
+  }
+
+  <div class="grid gap-4 md:grid-cols-2">
+    @for (section of sections(); track section.key) {
+      <div
+        class="border border-border rounded-lg p-4"
+        [attr.data-testid]="'changes-' + section.key"
+      >
+        <h3 class="text-sm font-semibold text-text-secondary mb-2">
+          {{ section.label }}
+        </h3>
+
+        @if (!section.known) {
+          <p
+            class="text-sm text-text-muted"
+            [attr.data-testid]="'changes-' + section.key + '-unknown'"
+          >
+            Não informado neste relatório.
+          </p>
+        } @else if (section.unchanged) {
+          <p
+            class="text-sm text-text-muted"
+            [attr.data-testid]="'changes-' + section.key + '-unchanged'"
+          >
+            Sem alterações neste mês.
+          </p>
+        } @else {
+          <ul class="space-y-3 text-sm">
+            @for (fund of section.leaving; track fund.ticker) {
+              <li [attr.data-testid]="'leaving-' + fund.ticker">
+                <span class="font-medium text-danger-ink">Sai</span>
+                <span class="font-medium text-text-primary ml-2">{{
+                  fund.ticker
+                }}</span>
+                @if (fund.stillIn) {
+                  <p class="text-text-muted">
+                    Continua recomendado na {{ fund.stillIn }}.
+                  </p>
+                }
+                @for (position of fund.positions; track position.id) {
+                  <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <span class="text-text-secondary"
+                      >{{ position.quantity }} cotas em
+                      {{ walletName(position.walletId) }}</span
+                    >
+                    @if (actionable()) {
+                      <button
+                        type="button"
+                        class="text-action hover:text-brand-ink font-medium"
+                        [attr.data-testid]="'btn-mover-' + position.id"
+                        (click)="openMove(position)"
+                      >
+                        Mover para a geladeira
+                      </button>
+                    }
+                  </div>
+                }
+              </li>
+            }
+            @for (fund of section.entering; track fund.ticker) {
+              <li [attr.data-testid]="'entering-' + fund.ticker">
+                <span class="font-medium text-positive-ink">Entra</span>
+                <span class="font-medium text-text-primary ml-2">{{
+                  fund.ticker
+                }}</span>
+                @for (item of fund.items; track item.id) {
+                  <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <span class="text-text-secondary"
+                      >{{ item.quantity }} cotas na geladeira</span
+                    >
+                    @if (actionable()) {
+                      <button
+                        type="button"
+                        class="text-action hover:text-brand-ink font-medium"
+                        [attr.data-testid]="'btn-descongelar-' + item.id"
+                        (click)="openUnfreeze(item)"
+                      >
+                        Descongelar
+                      </button>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+@if (moving(); as position) {
+  <app-modal
+    title="Mover para geladeira"
+    testId="mover-confirm-modal"
+    (closed)="closeMove()"
+  >
+    <app-move-to-fridge-form
+      [position]="position"
+      [fridges]="holdings()?.fridges ?? []"
+      [error]="actionError()"
+      [submitting]="moveSubmission.pending()"
+      (confirmed)="confirmMove($event)"
+      (closed)="closeMove()"
+    />
+  </app-modal>
+}
+
+@if (unfreezing(); as item) {
+  <app-modal
+    title="Descongelar item"
+    maxWidth="sm"
+    testId="unfreeze-modal"
+    (closed)="closeUnfreeze()"
+  >
+    <app-unfreeze-form
+      [item]="item"
+      [wallets]="holdings()?.wallets ?? []"
+      [error]="actionError()"
+      [submitting]="unfreezeSubmission.pending()"
+      (confirmed)="confirmUnfreeze($event)"
+      (closed)="closeUnfreeze()"
+    />
+  </app-modal>
+}

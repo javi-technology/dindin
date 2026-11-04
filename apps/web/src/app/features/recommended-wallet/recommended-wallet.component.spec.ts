@@ -892,6 +892,9 @@ describe('RecommendedWalletComponent', () => {
   });
 
   it('deve mostrar o quadro de entra e sai do mês selecionado (issue #586)', () => {
+    fixture.detectChanges();
+    fixture.detectChanges();
+
     const compiled = fixture.nativeElement as HTMLElement;
     expect(
       compiled.querySelector('[data-testid="wallet-changes"]'),
