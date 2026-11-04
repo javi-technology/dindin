@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import {
   Fridge,
   FridgeItem,
@@ -218,6 +218,19 @@ describe('WalletChangesComponent', () => {
       expect(positionMock.list).toHaveBeenCalled();
     });
 
+    it('não deve mover duas vezes com um segundo envio em andamento', () => {
+      positionMock.list.and.returnValue(of([posicao('RZTR11')]));
+      positionMock.moveToFridge.and.returnValue(new Subject<FridgeItem>());
+      const root = criar(novembro);
+
+      (testid(root, 'btn-mover-pos-RZTR11') as HTMLButtonElement).click();
+      const pedido = { fridgeId: 'fridge-1', targetPrice: 120 };
+      fixture.componentInstance.confirmMove(pedido);
+      fixture.componentInstance.confirmMove(pedido);
+
+      expect(positionMock.moveToFridge).toHaveBeenCalledTimes(1);
+    });
+
     it('deve manter o modal aberto com o erro quando mover falha', () => {
       positionMock.list.and.returnValue(of([posicao('RZTR11')]));
       positionMock.moveToFridge.and.returnValue(
@@ -271,6 +284,18 @@ describe('WalletChangesComponent', () => {
       expect(testid(root, 'unfreeze-modal')).toBeNull();
       expect(fridgeMock.listItems).toHaveBeenCalled();
     });
+  });
+
+  it('não deve descongelar duas vezes com um segundo envio em andamento', () => {
+    fridgeMock.listItems.and.returnValue(of([itemKncr]));
+    fridgeMock.unfreezeItem.and.returnValue(new Subject<Position>());
+    const root = criar(novembro);
+
+    (testid(root, 'btn-descongelar-item-1') as HTMLButtonElement).click();
+    fixture.componentInstance.confirmUnfreeze('wallet-2');
+    fixture.componentInstance.confirmUnfreeze('wallet-2');
+
+    expect(fridgeMock.unfreezeItem).toHaveBeenCalledTimes(1);
   });
 
   it('não deve oferecer ações em mês anterior, cuja recomendação pode ter mudado', () => {
