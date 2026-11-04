@@ -16,7 +16,7 @@ import { assetExists } from '../assets/asset.service';
 import { parseBbFileName, parseBbFiiPdf, ParsedRow } from './bb-pdf.parser';
 import { fetchLatestBbPdf } from './bb-pdf.fetch.service';
 import { BB_WALLET_PREFIX, saveBbPdf } from './storage.service';
-import { logInfo } from '../shared/logger';
+import { logInfo, logWarn } from '../shared/logger';
 import { DEFAULT_RECOMMENDED_WALLET_SLUG } from './providers';
 import { FieldPath, Query } from 'firebase-admin/firestore';
 
@@ -73,6 +73,29 @@ async function mapAssets(rows: ParsedRow[]): Promise<RecommendedWalletAsset[]> {
   );
 }
 
+/**
+ * Mês importado antes da #586 ganha as entradas e saídas reenviando o mesmo PDF.
+ * Um PDF ilegível mantém o documento, como acontecia antes de haver esse caminho.
+ */
+async function withChangesFromPdf(
+  wallet: RecommendedWallet,
+  buffer: Buffer,
+  sourceFile: string,
+): Promise<RecommendedWallet> {
+  try {
+    const { changes } = await parseBbFiiPdf(buffer);
+    return changes
+      ? { ...wallet, changes, updatedAt: new Date().toISOString() }
+      : wallet;
+  } catch (error) {
+    logWarn('buildRecommendedWallet.changesUnreadable', {
+      sourceFile,
+      message: (error as Error).message,
+    });
+    return wallet;
+  }
+}
+
 export async function buildRecommendedWallet(
   buffer: Buffer,
   sourceFile: string,
@@ -95,7 +118,10 @@ export async function buildRecommendedWallet(
       sourceFile,
       revision: parsedFile.revision,
     });
-    return { ...existing, id: existing.id ?? id };
+    const current = { ...existing, id: existing.id ?? id };
+    return existing.revision === parsedFile.revision && !existing.changes
+      ? withChangesFromPdf(current, buffer, sourceFile)
+      : current;
   }
 
   const parsed = await parseBbFiiPdf(buffer);
@@ -115,6 +141,7 @@ export async function buildRecommendedWallet(
     status: 'pending_review',
     renda,
     ganho,
+    ...(parsed.changes ? { changes: parsed.changes } : {}),
     parsedAt: now,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -132,7 +159,22 @@ export async function persistRecommendedWallet(
       ? (existingDoc.data() as RecommendedWallet)
       : undefined;
     if (existing && existing.revision >= wallet.revision) {
-      return { ...existing, id: existing.id ?? wallet.id };
+      const current = { ...existing, id: existing.id ?? wallet.id };
+      if (
+        existing.revision !== wallet.revision ||
+        existing.changes ||
+        !wallet.changes
+      ) {
+        return current;
+      }
+      // Só estes campos: tabelas, status e confirmação continuam como estão.
+      const filled = { changes: wallet.changes, updatedAt: wallet.updatedAt };
+      transaction.update(docRef, filled);
+      logInfo('persistRecommendedWallet.changesFilled', {
+        walletId: wallet.id,
+        revision: wallet.revision,
+      });
+      return { ...current, ...filled };
     }
 
     const persisted = {

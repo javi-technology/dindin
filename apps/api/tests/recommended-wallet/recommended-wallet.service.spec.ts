@@ -149,6 +149,7 @@ describe('recommended-wallet.service', () => {
       id: 'bb-fii_2026-09',
       revision: 2,
       status: 'confirmed',
+      changes: { renda: { entering: [], leaving: [] } },
       createdAt: '2026-09-01T00:00:00Z',
     };
     const docRef = {
