@@ -362,6 +362,13 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Objetivo da Geladeira (issue #587)
+
+- O FII na geladeira fica **parado, sem recomendação de aporte**, aguardando a
+  valorização para a venda e rendendo dividendos todo mês.
+- O **preço-alvo é de venda**: alerta e selo "Alvo atingido" valem com a cotação
+  igual ou acima dele. Web, app e API usam o mesmo sentido.
+
 ### Notificação push do alerta de preço-alvo (issue #408)
 
 - O alerta tem **dois canais**, push e e-mail, e o estado de envio é gravado
