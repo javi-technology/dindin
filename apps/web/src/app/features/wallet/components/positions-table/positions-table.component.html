@@ -98,30 +98,41 @@
             {{ formatPercent(dividendYieldFor(position)) }}
           </td>
           <td class="py-3 px-4 text-right">
-            <button
-              [attr.data-testid]="'btn-editar-' + i"
-              class="text-action hover:text-brand-ink font-medium text-sm mr-3 inline-flex items-center"
-              (click)="edit.emit(position)"
-            >
-              <svg lucidePencil [size]="14" class="mr-1"></svg>
-              Editar
-            </button>
-            <button
-              [attr.data-testid]="'btn-mover-geladeira-' + i"
-              class="text-action hover:text-brand-ink font-medium text-sm mr-3 inline-flex items-center"
-              (click)="moveToFridge.emit(position)"
-            >
-              <svg lucideRefrigerator [size]="14" class="mr-1"></svg>
-              Geladeira
-            </button>
-            <button
-              [attr.data-testid]="'btn-remover-' + i"
-              class="text-danger hover:text-danger-ink font-medium text-sm inline-flex items-center"
-              (click)="remove.emit(position)"
-            >
-              <svg lucideTrash2 [size]="14" class="mr-1"></svg>
-              Remover
-            </button>
+            <div class="inline-flex flex-nowrap items-center gap-1">
+              <app-tooltip text="Editar">
+                <button
+                  type="button"
+                  [attr.data-testid]="'btn-editar-' + i"
+                  aria-label="Editar"
+                  class="text-action hover:text-brand-ink hover:bg-surface inline-flex h-8 w-8 items-center justify-center rounded-md"
+                  (click)="edit.emit(position)"
+                >
+                  <svg lucidePencil [size]="16" aria-hidden="true"></svg>
+                </button>
+              </app-tooltip>
+              <app-tooltip text="Geladeira">
+                <button
+                  type="button"
+                  [attr.data-testid]="'btn-mover-geladeira-' + i"
+                  aria-label="Geladeira"
+                  class="text-action hover:text-brand-ink hover:bg-surface inline-flex h-8 w-8 items-center justify-center rounded-md"
+                  (click)="moveToFridge.emit(position)"
+                >
+                  <svg lucideRefrigerator [size]="16" aria-hidden="true"></svg>
+                </button>
+              </app-tooltip>
+              <app-tooltip text="Remover">
+                <button
+                  type="button"
+                  [attr.data-testid]="'btn-remover-' + i"
+                  aria-label="Remover"
+                  class="text-danger hover:text-danger-ink hover:bg-surface inline-flex h-8 w-8 items-center justify-center rounded-md"
+                  (click)="remove.emit(position)"
+                >
+                  <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+                </button>
+              </app-tooltip>
+            </div>
           </td>
         </tr>
       }
