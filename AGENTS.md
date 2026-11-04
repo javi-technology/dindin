@@ -422,6 +422,23 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   justamente a coluna da comparação. Ativo ausente na carteira é sinalizado,
   não zerado — "não está" e "está com peso nenhum" são coisas diferentes.
 
+### Entra e sai da carteira sugerida (issue #586)
+
+- As entradas e saídas vêm dos blocos "Sai:" e "Entra:" do PDF, em
+  `RecommendedWallet.changes`. **Carteira ausente é "não informado"; listas
+  vazias são "sem alterações"**: o PDF de agosto/2026 nem traz os blocos, e dizer
+  que nada mudou seria afirmar o que o relatório não disse.
+- A ordem dos blocos varia entre os relatórios e o nome da carteira não vem
+  junto, então **a carteira sai da tabela em que o fundo que entra está**. Bloco
+  que não confere é descartado com aviso, sem impedir a importação das tabelas.
+- **Reenviar o PDF de um mês já gravado, na mesma revisão, preenche só `changes`**
+  quando o documento não o tem. Tabelas, status e confirmação continuam como
+  estão.
+- Mover para a geladeira e descongelar são sempre decisão do usuário. Fundo que
+  sai de uma carteira e continua na outra não é candidato à geladeira.
+- O quadro é aberto a todo usuário logado. No app, o atalho fica na aba
+  Geladeira porque a Simulação é restrita a assinantes (#573).
+
 ### Operações de escrita do app (`apps/mobile`)
 
 - **Envio duplicado não pode gerar registro duplicado — no web, no app e na
