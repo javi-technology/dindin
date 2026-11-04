@@ -39,7 +39,7 @@ function parsePercentage(value: string): number {
   );
 }
 
-function parseRowsUntilNov26(pageText: string): ParsedRow[] {
+function parseRowsTickerFirst(pageText: string): ParsedRow[] {
   // Os `\s*` entre as colunas absorvem a diferença de extração do pdf-parse 2
   // (issue #319): a v1 entregava `1,07%R$ 88,04` colado, a v2 entrega
   // `1,07% R$ 88,04`. O padrão aceita os dois.
@@ -58,7 +58,7 @@ function parseRowsUntilNov26(pageText: string): ParsedRow[] {
  * Layout adotado pelo BB em novembro/2026 (issue #584): a linha começa pelo
  * peso, e o volume médio diário entra entre o IFIX e a cota.
  */
-function parseRowsFromNov26(pageText: string): ParsedRow[] {
+function parseRowsWeightFirst(pageText: string): ParsedRow[] {
   const regex =
     /^(\d+,\d{2}%)\s*([A-Z]{4}11)\s*([^\d%]+?)\s*(-?\d+,\d{2}%)\s*[\d.,]+\s*R\$\s*([\d.]+,\d{2})/gm;
   return [...pageText.matchAll(regex)].map((match) => ({
@@ -71,9 +71,11 @@ function parseRowsFromNov26(pageText: string): ParsedRow[] {
 }
 
 export function parseWalletTable(pageText: string): ParsedRow[] {
-  const rowsUntilNov26 = parseRowsUntilNov26(pageText);
+  const tickerFirstRows = parseRowsTickerFirst(pageText);
   const rows =
-    rowsUntilNov26.length > 0 ? rowsUntilNov26 : parseRowsFromNov26(pageText);
+    tickerFirstRows.length > 0
+      ? tickerFirstRows
+      : parseRowsWeightFirst(pageText);
 
   if (rows.length < 4 || rows.length > 15) {
     throw new Error(
