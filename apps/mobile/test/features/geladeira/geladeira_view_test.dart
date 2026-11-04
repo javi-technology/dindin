@@ -112,10 +112,7 @@ void main() {
       );
 
       expect(find.byKey(objetivo), findsOneWidget);
-      expect(
-        find.textContaining('sem recomendação de aporte'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('sem recomendação de aporte'), findsOneWidget);
       expect(find.textContaining('valorização'), findsOneWidget);
       expect(find.textContaining('venda'), findsOneWidget);
       expect(find.textContaining('dividendos'), findsOneWidget);
