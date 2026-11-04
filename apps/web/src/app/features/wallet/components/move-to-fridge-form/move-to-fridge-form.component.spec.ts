@@ -144,4 +144,10 @@ describe('MoveToFridgeFormComponent', () => {
       ).toBe(true);
     });
   });
+
+  it('deve deixar claro que o preço-alvo é o de venda (issue #587)', () => {
+    expect(element('label[for="mover-target-price"]')?.textContent).toContain(
+      'Preço-alvo de venda',
+    );
+  });
 });

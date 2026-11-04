@@ -196,4 +196,16 @@ void main() {
 
     expect(pedido.ticker, 'HGLG11');
   });
+
+  testWidgets('deixa claro que o preço-alvo é o de venda (issue #587)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      emApp(ItemForm(catalogo: catalogo, aoSalvar: (_) async => true)),
+    );
+
+    expect(find.textContaining('Preço-alvo de venda'), findsOneWidget);
+    expect(find.textContaining('quer vender'), findsOneWidget);
+    expect(find.textContaining('quer comprar'), findsNothing);
+  });
 }
