@@ -291,4 +291,132 @@ describe('recommended-wallet.service', () => {
       },
     ]);
   });
+
+  describe('reimportação para preencher as entradas e saídas (issue #586)', () => {
+    const changes = {
+      renda: { entering: ['KNCR11'], leaving: ['RZTR11'] },
+    };
+    const gravada = {
+      id: 'bb-fii_2026-09',
+      revision: 2,
+      status: 'confirmed',
+      confirmedAt: '2026-09-03T00:00:00Z',
+      renda: [{ ticker: 'KNCR11' }],
+      ganho: [],
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-02T00:00:00Z',
+    };
+
+    function montar(existente: Record<string, unknown>) {
+      const docRef = {
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => existente,
+        }),
+      };
+      const transaction = {
+        get: jest.fn().mockResolvedValue({
+          exists: true,
+          data: () => existente,
+        }),
+        set: jest.fn(),
+        update: jest.fn(),
+      };
+      firestoreMock = {
+        collection: jest.fn(() => ({ doc: jest.fn(() => docRef) })),
+        runTransaction: jest.fn((callback: (tx: unknown) => unknown) =>
+          callback(transaction),
+        ),
+      };
+      return { docRef, transaction };
+    }
+
+    const reenviar = () =>
+      importBbWallet(Buffer.from('pdf'), 'wallets/fii-bb/CartFII_Set26_2.pdf');
+
+    it('preenche só as entradas e saídas do documento que não as tem', async () => {
+      parseBbFiiPdfMock.mockResolvedValue({
+        publishedAt: '2026-09-02',
+        renda: [],
+        ganho: [],
+        changes,
+      });
+      const { docRef, transaction } = montar(gravada);
+
+      const result = await reenviar();
+
+      expect(transaction.set).not.toHaveBeenCalled();
+      expect(transaction.update).toHaveBeenCalledWith(docRef, {
+        changes,
+        updatedAt: expect.any(String),
+      });
+      expect(result).toMatchObject({
+        status: 'confirmed',
+        confirmedAt: '2026-09-03T00:00:00Z',
+        renda: [{ ticker: 'KNCR11' }],
+        changes,
+      });
+    });
+
+    it('não faz nada no documento que já as tem', async () => {
+      const { transaction } = montar({ ...gravada, changes });
+
+      await reenviar();
+
+      expect(parseBbFiiPdfMock).not.toHaveBeenCalled();
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it('não grava quando o PDF também não informa', async () => {
+      parseBbFiiPdfMock.mockResolvedValue({
+        publishedAt: '2026-09-02',
+        renda: [],
+        ganho: [],
+      });
+      const { transaction } = montar(gravada);
+
+      const result = await reenviar();
+
+      expect(transaction.update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'confirmed' });
+    });
+
+    it('mantém o documento quando o PDF reenviado não pode ser lido', async () => {
+      parseBbFiiPdfMock.mockRejectedValue(new Error('PDF ilegível'));
+      const { transaction } = montar(gravada);
+
+      const result = await reenviar();
+
+      expect(transaction.update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'confirmed' });
+    });
+
+    it('não preenche a partir de revisão mais antiga que a gravada', async () => {
+      const { transaction } = montar({ ...gravada, revision: 3 });
+
+      await reenviar();
+
+      expect(parseBbFiiPdfMock).not.toHaveBeenCalled();
+      expect(transaction.update).not.toHaveBeenCalled();
+    });
+
+    it('grava as entradas e saídas numa importação nova', async () => {
+      parseBbFiiPdfMock.mockResolvedValue({
+        publishedAt: '2026-09-02',
+        renda: [],
+        ganho: [],
+        changes,
+      });
+      const { transaction } = montar(gravada);
+      const naoExiste = { exists: false, data: () => undefined };
+      transaction.get.mockResolvedValue(naoExiste);
+      (firestoreMock.collection as jest.Mock).mockReturnValue({
+        doc: jest.fn(() => ({ get: jest.fn().mockResolvedValue(naoExiste) })),
+      });
+
+      const result = await reenviar();
+
+      expect(result.changes).toEqual(changes);
+    });
+  });
 });

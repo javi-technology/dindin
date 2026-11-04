@@ -247,4 +247,36 @@ describe('bb-pdf.parser', () => {
       });
     });
   });
+
+  describe('entradas e saídas do mês (issue #586)', () => {
+    const lerFixture = (nome: string) =>
+      parseBbFiiPdf(readFileSync(join(__dirname, '../fixtures', nome)));
+
+    it('não informa nada quando o PDF não traz os blocos, como em agosto', async () => {
+      const { changes } = await lerFixture('CartFII_Ago26.pdf');
+
+      expect(changes).toBeUndefined();
+    });
+
+    it('lê a mudança da Renda e o "Sem alterações" do Ganho em setembro', async () => {
+      const { changes } = await lerFixture('CartFII_Set26_2.pdf');
+
+      expect(changes).toEqual({
+        renda: { entering: ['MXRF11'], leaving: ['TRXF11'] },
+        ganho: { entering: [], leaving: [] },
+      });
+    });
+
+    it('lê os dois blocos de novembro, com mais de um fundo e quebra de linha', async () => {
+      const { changes } = await lerFixture('CartFII_Nov26.pdf');
+
+      expect(changes).toEqual({
+        renda: { entering: ['KNCR11'], leaving: ['RZTR11'] },
+        ganho: {
+          entering: ['XPLG11', 'VISC11'],
+          leaving: ['RZAT11', 'PSEC11'],
+        },
+      });
+    });
+  });
 });
