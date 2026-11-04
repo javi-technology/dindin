@@ -458,6 +458,56 @@ class RecommendedWalletAsset {
   };
 }
 
+/// Fundos que entram e saem de uma carteira no mês, como o BB os publica.
+class RecommendedWalletChange {
+  const RecommendedWalletChange({
+    required this.entering,
+    required this.leaving,
+  });
+
+  factory RecommendedWalletChange.fromJson(Map<String, dynamic> json) =>
+      RecommendedWalletChange(
+        entering: (json['entering'] as List<dynamic>)
+            .map((e) => e as String)
+            .toList(),
+        leaving: (json['leaving'] as List<dynamic>)
+            .map((e) => e as String)
+            .toList(),
+      );
+
+  final List<String> entering;
+  final List<String> leaving;
+
+  Map<String, dynamic> toJson() => {'entering': entering, 'leaving': leaving};
+}
+
+/// Carteira ausente é "não informado"; listas vazias são "sem alterações" (#586).
+class RecommendedWalletChanges {
+  const RecommendedWalletChanges({this.renda, this.ganho});
+
+  factory RecommendedWalletChanges.fromJson(Map<String, dynamic> json) =>
+      RecommendedWalletChanges(
+        renda: json['renda'] == null
+            ? null
+            : RecommendedWalletChange.fromJson(
+                json['renda'] as Map<String, dynamic>,
+              ),
+        ganho: json['ganho'] == null
+            ? null
+            : RecommendedWalletChange.fromJson(
+                json['ganho'] as Map<String, dynamic>,
+              ),
+      );
+
+  final RecommendedWalletChange? renda;
+  final RecommendedWalletChange? ganho;
+
+  Map<String, dynamic> toJson() => {
+    if (renda != null) 'renda': renda?.toJson(),
+    if (ganho != null) 'ganho': ganho?.toJson(),
+  };
+}
+
 class RecommendedWallet {
   const RecommendedWallet({
     required this.id,
@@ -470,6 +520,7 @@ class RecommendedWallet {
     required this.status,
     required this.renda,
     required this.ganho,
+    this.changes,
     required this.parsedAt,
     this.confirmedAt,
     required this.createdAt,
@@ -495,6 +546,11 @@ class RecommendedWallet {
     ganho: (json['ganho'] as List<dynamic>)
         .map((e) => RecommendedWalletAsset.fromJson(e as Map<String, dynamic>))
         .toList(),
+    changes: json['changes'] == null
+        ? null
+        : RecommendedWalletChanges.fromJson(
+            json['changes'] as Map<String, dynamic>,
+          ),
     parsedAt: json['parsedAt'] as String,
     confirmedAt: json['confirmedAt'] == null
         ? null
@@ -515,6 +571,7 @@ class RecommendedWallet {
   final RecommendedWalletStatus status;
   final List<RecommendedWalletAsset> renda;
   final List<RecommendedWalletAsset> ganho;
+  final RecommendedWalletChanges? changes;
   final String parsedAt;
   final String? confirmedAt;
   final String createdAt;
@@ -531,6 +588,7 @@ class RecommendedWallet {
     'status': status.toJson(),
     'renda': renda.map((e) => e.toJson()).toList(),
     'ganho': ganho.map((e) => e.toJson()).toList(),
+    if (changes != null) 'changes': changes?.toJson(),
     'parsedAt': parsedAt,
     if (confirmedAt != null) 'confirmedAt': confirmedAt,
     'createdAt': createdAt,

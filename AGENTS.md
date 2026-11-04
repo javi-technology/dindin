@@ -362,6 +362,13 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Objetivo da Geladeira (issue #587)
+
+- O FII na geladeira fica **parado, sem recomendação de aporte**, aguardando a
+  valorização para a venda e rendendo dividendos todo mês.
+- O **preço-alvo é de venda**: alerta e selo "Alvo atingido" valem com a cotação
+  igual ou acima dele. Web, app e API usam o mesmo sentido.
+
 ### Notificação push do alerta de preço-alvo (issue #408)
 
 - O alerta tem **dois canais**, push e e-mail, e o estado de envio é gravado
@@ -414,6 +421,26 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   tela de celular, quatro colunas viram rolagem horizontal, que esconde
   justamente a coluna da comparação. Ativo ausente na carteira é sinalizado,
   não zerado — "não está" e "está com peso nenhum" são coisas diferentes.
+
+### Entra e sai da carteira sugerida (issue #586)
+
+- As entradas e saídas vêm dos blocos "Sai:" e "Entra:" do PDF, em
+  `RecommendedWallet.changes`. **Carteira ausente é "não informado"; listas
+  vazias são "sem alterações"**: o PDF de agosto/2026 nem traz os blocos, e dizer
+  que nada mudou seria afirmar o que o relatório não disse.
+- A ordem dos blocos varia entre os relatórios e o nome da carteira não vem
+  junto, então **a carteira sai da tabela em que o fundo que entra está**. Bloco
+  que não confere é descartado com aviso, sem impedir a importação das tabelas.
+- **Reenviar o PDF de um mês já gravado, na mesma revisão, preenche só `changes`**
+  quando o documento não o tem. Tabelas, status e confirmação continuam como
+  estão.
+- Mover para a geladeira e descongelar são sempre decisão do usuário. Fundo que
+  sai de uma carteira e continua na outra não é candidato à geladeira.
+- As ações só aparecem no **mês mais recente**: num mês antigo, a recomendação
+  pode já ter mudado. O web as limita pelo mês selecionado; o app só mostra o
+  mês mais recente, porque usa a rota `latest`.
+- O quadro é aberto a todo usuário logado. No app, o atalho fica na aba
+  Geladeira porque a Simulação é restrita a assinantes (#573).
 
 ### Operações de escrita do app (`apps/mobile`)
 

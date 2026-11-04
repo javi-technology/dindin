@@ -1,4 +1,8 @@
 import { PDFParse } from 'pdf-parse';
+import type {
+  RecommendedWalletChange,
+  RecommendedWalletChanges,
+} from 'dindin-models';
 import { today } from '../shared/date';
 import { logWarn } from '../shared/logger';
 
@@ -101,6 +105,108 @@ export function parseWalletTable(pageText: string): ParsedRow[] {
   return rows;
 }
 
+type ChangeMarker = 'Sai' | 'Entra';
+type ChangeBlock = Partial<Record<ChangeMarker, string[]>>;
+
+/** O fundo pode continuar na linha seguinte: `Sai: RZAT11 (logístico) e PSEC11`. */
+const CHANGE_CONTINUATION = /^(\(|e\s|[A-Z]{4}11\b)/;
+const COMPOSITION_PAGE = /^Carteira Renda - /m;
+
+function tickersIn(line: string): string[] {
+  return line.match(/[A-Z]{4}11/g) ?? [];
+}
+
+/**
+ * Lê os blocos da página de composição, que vêm em pares de "Sai:" e "Entra:".
+ * A ordem do par varia entre os relatórios: setembro/2026 traz "Entra" antes.
+ */
+function readChangeBlocks(lines: string[]): ChangeBlock[] {
+  const blocks: ChangeBlock[] = [];
+  let current: ChangeBlock = {};
+
+  lines.forEach((line, index) => {
+    const marker = line.match(/^(Sai|Entra):/)?.[1] as ChangeMarker | undefined;
+    if (!marker) return;
+    if (current[marker]) {
+      blocks.push(current);
+      current = {};
+    }
+    const next = lines[index + 1] ?? '';
+    current[marker] = [
+      ...tickersIn(line),
+      ...(CHANGE_CONTINUATION.test(next) ? tickersIn(next) : []),
+    ];
+  });
+  if (current.Sai || current.Entra) blocks.push(current);
+  return blocks;
+}
+
+/**
+ * Entradas e saídas do mês (issue #586).
+ *
+ * O nome da carteira não vem junto do bloco, e o texto extraído de
+ * novembro/2026 traz Ganho antes de Renda, então a carteira sai da tabela em
+ * que o fundo que entra está. A informação é complementar: bloco que não confere
+ * é descartado com aviso, sem impedir a importação das tabelas.
+ */
+export function parseWalletChanges(
+  pages: string[],
+  rendaTickers: string[],
+  ganhoTickers: string[],
+): RecommendedWalletChanges | undefined {
+  const lines = pages
+    .filter((page) => COMPOSITION_PAGE.test(page))
+    .flatMap((page) => page.split('\n').map((line) => line.trim()));
+  const blocks = readChangeBlocks(lines);
+
+  if (blocks.some((block) => !block.Sai || !block.Entra)) {
+    logWarn('parseWalletChanges.unpairedBlocks', { blocks: blocks.length });
+    return undefined;
+  }
+
+  const tables = {
+    renda: rendaTickers,
+    ganho: ganhoTickers,
+  };
+  const changes: RecommendedWalletChanges = {};
+  let discarded = false;
+
+  for (const block of blocks) {
+    const change: RecommendedWalletChange = {
+      entering: block.Entra ?? [],
+      leaving: block.Sai ?? [],
+    };
+    const wallet = (['renda', 'ganho'] as const).find(
+      (name) =>
+        !changes[name] &&
+        change.entering.length > 0 &&
+        change.leaving.length > 0 &&
+        change.entering.every((ticker) => tables[name].includes(ticker)) &&
+        !change.leaving.some((ticker) => tables[name].includes(ticker)),
+    );
+    if (wallet) {
+      changes[wallet] = change;
+    } else {
+      discarded = true;
+      logWarn('parseWalletChanges.blockDiscarded', { ...change });
+    }
+  }
+
+  // "Sem alterações" também não diz a carteira: só vale quando sobra exatamente
+  // o número de carteiras sem bloco.
+  const withoutBlock = (['renda', 'ganho'] as const).filter(
+    (name) => tables[name].length > 0 && !changes[name],
+  );
+  const unchanged = lines.filter((line) => line === 'Sem alterações').length;
+  if (!discarded && unchanged > 0 && unchanged === withoutBlock.length) {
+    for (const name of withoutBlock) {
+      changes[name] = { entering: [], leaving: [] };
+    }
+  }
+
+  return Object.keys(changes).length > 0 ? changes : undefined;
+}
+
 function publishedDateFromText(text: string): string | null {
   const match = text.match(
     /(\d{1,2}) de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i,
@@ -130,6 +236,7 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
   publishedAt: string;
   renda: ParsedRow[];
   ganho: ParsedRow[];
+  changes?: RecommendedWalletChanges;
 }> {
   /**
    * O pdf-parse 2 já quebra linha por coordenada e separa colunas (issue
@@ -174,10 +281,19 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
     logWarn('parseBbFiiPdf.ganhoPageMissing');
   }
 
+  const renda = parseWalletTable(rendaPage);
+  const ganho = ganhoPage ? parseWalletTable(ganhoPage) : [];
+  const changes = parseWalletChanges(
+    pages,
+    renda.map((row) => row.ticker),
+    ganho.map((row) => row.ticker),
+  );
+
   return {
     publishedAt: publishedDateFromText(parsed.text) ?? today(),
-    renda: parseWalletTable(rendaPage),
-    ganho: ganhoPage ? parseWalletTable(ganhoPage) : [],
+    renda,
+    ganho,
+    ...(changes ? { changes } : {}),
   };
 }
 

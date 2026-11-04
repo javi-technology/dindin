@@ -723,4 +723,37 @@ describe('FridgeComponent', () => {
       ).toContain('idêntico');
     }));
   });
+
+  describe('quadro explicativo (issue #587)', () => {
+    function quadro(): string | null | undefined {
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        '[data-testid="explicacao-geladeira"]',
+      )?.textContent;
+    }
+
+    it('deve explicar o objetivo da geladeira', () => {
+      expect(quadro()).toContain('sem recomendação de aporte');
+      expect(quadro()).toContain('valorização');
+      expect(quadro()).toContain('venda');
+      expect(quadro()).toContain('dividendos');
+    });
+
+    it('deve aparecer com a geladeira vazia', () => {
+      fridgeServiceMock.listItems.and.returnValue(of([]));
+      fixture = TestBed.createComponent(FridgeComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(quadro()).toContain('sem recomendação de aporte');
+    });
+
+    it('deve aparecer sem nenhuma geladeira cadastrada', () => {
+      fridgeServiceMock.listFridges.and.returnValue(of([]));
+      fixture = TestBed.createComponent(FridgeComponent);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(quadro()).toContain('sem recomendação de aporte');
+    });
+  });
 });

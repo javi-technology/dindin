@@ -216,6 +216,21 @@ export type RecommendedWalletStatus = 'pending_review' | 'confirmed';
 export type RecommendedWalletProvider = 'BB';
 
 /** Carteira recomendada publicada pelo Banco do Brasil. */
+/** Fundos que entram e saem de uma carteira no mês, como o BB os publica. */
+export interface RecommendedWalletChange {
+  entering: string[];
+  leaving: string[];
+}
+
+/**
+ * Carteira ausente é "não informado"; listas vazias são "sem alterações". São
+ * estados diferentes: o PDF de agosto/2026 nem traz os blocos (issue #586).
+ */
+export interface RecommendedWalletChanges {
+  renda?: RecommendedWalletChange;
+  ganho?: RecommendedWalletChange;
+}
+
 export interface RecommendedWallet {
   id: string;
   provider: RecommendedWalletProvider;
@@ -231,6 +246,7 @@ export interface RecommendedWallet {
   status: RecommendedWalletStatus;
   renda: RecommendedWalletAsset[];
   ganho: RecommendedWalletAsset[];
+  changes?: RecommendedWalletChanges;
   parsedAt: string;
   confirmedAt?: string;
   createdAt: string;

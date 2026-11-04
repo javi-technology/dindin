@@ -12,8 +12,8 @@ import '../../shared/components/visao_recurso.dart';
 
 /// Itens da geladeira (issue #402).
 ///
-/// O item existe para ser comprado a um preço-alvo, então o que a tela
-/// precisa responder num relance é: já chegou no alvo?
+/// O item fica parado aguardando a valorização para a venda (issue #587), então
+/// o que a tela precisa responder num relance é: já chegou no alvo?
 class GeladeiraView extends StatelessWidget {
   const GeladeiraView({
     super.key,
@@ -38,22 +38,65 @@ class GeladeiraView extends StatelessWidget {
       estado: estado,
       aoRecarregar: aoRecarregar,
       estaVazio: (itens) => itens.isEmpty,
-      vazio: (_) => const EstadoVazio(
-        titulo: 'Nenhum ativo na geladeira',
-        descricao:
-            'Mova uma posição para cá para acompanhar o preço-alvo de compra.',
-        icone: Icons.ac_unit,
+      vazio: (_) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          _QuadroExplicativo(),
+          EstadoVazio(
+            titulo: 'Nenhum ativo na geladeira',
+            descricao:
+                'Mova uma posição para cá para acompanhar o preço-alvo de '
+                'venda.',
+            icone: Icons.ac_unit,
+          ),
+        ],
       ),
       conteudo: (context, itens) => ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: itens.length,
+        itemCount: itens.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => _LinhaDoItem(
-          item: itens[i],
-          aoEditar: aoEditar,
-          aoExcluir: aoExcluir,
-          aoRetirar: aoRetirar,
-        ),
+        itemBuilder: (context, i) => i == 0
+            ? const _QuadroExplicativo()
+            : _LinhaDoItem(
+                item: itens[i - 1],
+                aoEditar: aoEditar,
+                aoExcluir: aoExcluir,
+                aoRetirar: aoRetirar,
+              ),
+      ),
+    );
+  }
+}
+
+/// Diz para que a geladeira serve: sem isso, o preço-alvo parece ser de compra.
+class _QuadroExplicativo extends StatelessWidget {
+  const _QuadroExplicativo();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+
+    return Container(
+      key: const Key('explicacao-geladeira'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.infoSoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Para que serve a Geladeira',
+            style: TextStyle(color: t.infoInk, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Aqui o FII fica parado, sem recomendação de aporte, aguardando a '
+            'valorização para a venda e rendendo dividendos todo mês.',
+            style: TextStyle(color: t.infoInk, fontSize: 13),
+          ),
+        ],
       ),
     );
   }
@@ -76,7 +119,7 @@ class _LinhaDoItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final preco = item.currentPrice;
-    final atingiu = preco != null && preco <= item.targetPrice;
+    final atingiu = preco != null && preco >= item.targetPrice;
 
     return Cartao(
       child: Column(

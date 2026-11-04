@@ -10,9 +10,10 @@ import 'package:dindin_mobile/features/geladeira/geladeira_view.dart';
 // ---------------------------------------------------------------------------
 // Geladeira (issue #402).
 //
-// O item existe para ser comprado a um preço-alvo, então o que a tela precisa
-// responder num relance é: já chegou no alvo? Sem cotação, ela não responde —
-// e dizer isso é melhor do que mostrar um número que não existe.
+// O item fica parado aguardando a valorização para a venda (issue #587), então
+// o que a tela precisa responder num relance é: já chegou no alvo? Sem cotação,
+// ela não responde — e dizer isso é melhor do que mostrar um número que não
+// existe.
 // ---------------------------------------------------------------------------
 FridgeItem item({
   String ticker = 'MXRF11',
@@ -49,7 +50,7 @@ void main() {
 
   testWidgets('preço-alvo atingido é sinalizado', (tester) async {
     await tester.pumpWidget(
-      arvore(EstadoDoRecurso(dados: [item(currentPrice: 9.4)])),
+      arvore(EstadoDoRecurso(dados: [item(currentPrice: 10.2)])),
     );
 
     final marca = tester.widget<Text>(find.byKey(const Key('alvo-MXRF11')));
@@ -59,9 +60,19 @@ void main() {
     );
   });
 
-  testWidgets('acima do alvo não é sinalizado como atingido', (tester) async {
+  testWidgets('cotação igual ao alvo é sinalizada como atingida', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      arvore(EstadoDoRecurso(dados: [item(currentPrice: 10.2)])),
+      arvore(EstadoDoRecurso(dados: [item(currentPrice: 9.5)])),
+    );
+
+    expect(find.byKey(const Key('alvo-MXRF11')), findsOneWidget);
+  });
+
+  testWidgets('abaixo do alvo não é sinalizado como atingido', (tester) async {
+    await tester.pumpWidget(
+      arvore(EstadoDoRecurso(dados: [item(currentPrice: 9.4)])),
     );
 
     expect(find.byKey(const Key('alvo-MXRF11')), findsNothing);
@@ -82,5 +93,38 @@ void main() {
     );
 
     expect(find.textContaining('Nenhum ativo'), findsOneWidget);
+  });
+
+  testWidgets('geladeira vazia não fala em compra', (tester) async {
+    await tester.pumpWidget(
+      arvore(const EstadoDoRecurso(dados: <FridgeItem>[])),
+    );
+
+    expect(find.textContaining('compra'), findsNothing);
+  });
+
+  group('quadro explicativo (issue #587)', () {
+    const objetivo = Key('explicacao-geladeira');
+
+    testWidgets('explica o objetivo da geladeira', (tester) async {
+      await tester.pumpWidget(
+        arvore(EstadoDoRecurso(dados: [item(currentPrice: 10.2)])),
+      );
+
+      expect(find.byKey(objetivo), findsOneWidget);
+      expect(find.textContaining('sem recomendação de aporte'), findsOneWidget);
+      expect(find.textContaining('valorização'), findsOneWidget);
+      expect(find.textContaining('venda'), findsOneWidget);
+      expect(find.textContaining('dividendos'), findsOneWidget);
+    });
+
+    testWidgets('aparece com a geladeira vazia', (tester) async {
+      await tester.pumpWidget(
+        arvore(const EstadoDoRecurso(dados: <FridgeItem>[])),
+      );
+
+      expect(find.byKey(objetivo), findsOneWidget);
+      expect(find.textContaining('Nenhum ativo'), findsOneWidget);
+    });
   });
 }

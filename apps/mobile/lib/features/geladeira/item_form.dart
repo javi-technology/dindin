@@ -120,10 +120,10 @@ class _ItemFormState extends State<ItemForm> with EnvioDeFormulario<ItemForm> {
           const SizedBox(height: 16),
           CampoTexto(
             chave: 'campo-preco-alvo',
-            rotulo: 'Preço-alvo',
+            rotulo: 'Preço-alvo de venda',
             controller: _precoAlvo,
             tecladoNumerico: true,
-            dica: 'Preço em que você quer comprar.',
+            dica: 'Preço em que você quer vender.',
             validador: (valor) => _positivo(valor, 'o preço-alvo'),
           ),
           const SizedBox(height: 24),

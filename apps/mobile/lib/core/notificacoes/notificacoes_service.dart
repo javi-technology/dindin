@@ -7,7 +7,7 @@ import 'notificacoes_backend.dart';
 
 /// Notificações push do alerta de preço-alvo (issue #408).
 ///
-/// O alerta avisa que um ativo chegou ao preço-alvo de compra: chegar tarde
+/// O alerta avisa que um ativo chegou ao preço-alvo de venda: chegar tarde
 /// reduz o valor do aviso, e é por isso que push se justifica sobre o e-mail
 /// que o usuário lê horas depois.
 ///

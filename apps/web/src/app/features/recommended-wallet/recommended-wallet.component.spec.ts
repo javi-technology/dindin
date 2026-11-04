@@ -1,3 +1,4 @@
+import { FridgeService } from '../../core/services/fridge.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
@@ -200,6 +201,14 @@ describe('RecommendedWalletComponent', () => {
         { provide: BillingService, useValue: billingServiceMock },
         { provide: PositionService, useValue: positionServiceMock },
         { provide: AssetService, useValue: assetServiceMock },
+        {
+          provide: FridgeService,
+          useValue: jasmine.createSpyObj('FridgeService', [
+            'listFridges',
+            'listItems',
+            'unfreezeItem',
+          ]),
+        },
       ],
     }).compileComponents();
 
@@ -880,5 +889,15 @@ describe('RecommendedWalletComponent', () => {
     pendente.next([userWallet]);
 
     expect(component.wallets()).toEqual([]);
+  });
+
+  it('deve mostrar o quadro de entra e sai do mês selecionado (issue #586)', () => {
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(
+      compiled.querySelector('[data-testid="wallet-changes"]'),
+    ).toBeTruthy();
   });
 });

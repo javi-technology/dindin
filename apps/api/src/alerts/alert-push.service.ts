@@ -12,8 +12,8 @@ import {
 /**
  * Notificação push do alerta de preço-alvo (issue #408).
  *
- * O aviso é sobre oportunidade de compra a um preço-alvo, então chegar tarde
- * reduz o valor do alerta — é justamente o caso em que push se justifica
+ * O aviso é sobre a chance de vender na valorização (issue #587), então chegar
+ * tarde reduz o valor do alerta — é justamente o caso em que push se justifica
  * sobre o e-mail que o usuário lê horas depois.
  *
  * O e-mail continua sendo o canal para quem não tem token válido ou negou a

@@ -33,7 +33,7 @@ import { sendAlertPushes } from '../../src/alerts/alert-push.service';
 // ---------------------------------------------------------------------------
 // Notificação push do alerta de preço-alvo (issue #408)
 //
-// O aviso é sobre oportunidade de compra a um preço-alvo: chegar tarde reduz
+// O aviso é sobre a chance de vender na valorização: chegar tarde reduz
 // o valor do alerta, e é justamente o caso em que push se justifica sobre o
 // e-mail que o usuário lê horas depois.
 //

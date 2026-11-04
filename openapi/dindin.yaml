@@ -284,6 +284,27 @@ components:
         inCatalog: { type: boolean }
       x-ts-import: dindin-models
 
+    RecommendedWalletChange:
+      type: object
+      description: Fundos que entram e saem de uma carteira no mês, como o BB os publica.
+      required: [entering, leaving]
+      properties:
+        entering:
+          type: array
+          items: { type: string }
+        leaving:
+          type: array
+          items: { type: string }
+      x-ts-import: dindin-models
+
+    RecommendedWalletChanges:
+      type: object
+      description: 'Carteira ausente é "não informado"; listas vazias são "sem alterações" (#586).'
+      properties:
+        renda: { $ref: '#/components/schemas/RecommendedWalletChange' }
+        ganho: { $ref: '#/components/schemas/RecommendedWalletChange' }
+      x-ts-import: dindin-models
+
     RecommendedWallet:
       type: object
       required:
@@ -318,6 +339,7 @@ components:
         ganho:
           type: array
           items: { $ref: '#/components/schemas/RecommendedWalletAsset' }
+        changes: { $ref: '#/components/schemas/RecommendedWalletChanges' }
         parsedAt: { type: string, format: date-time }
         confirmedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }

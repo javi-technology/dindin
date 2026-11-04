@@ -65,6 +65,10 @@ export const carteiraSugeridaFixture: RecommendedWallet = {
   status: 'pending_review',
   renda: [],
   ganho: [],
+  changes: {
+    renda: { entering: ['MXRF11'], leaving: ['TRXF11'] },
+    ganho: { entering: [], leaving: [] },
+  },
   parsedAt: '2026-09-02T10:00:00.000Z',
   createdAt: '2026-09-02T10:00:00.000Z',
   updatedAt: '2026-09-02T10:00:00.000Z',

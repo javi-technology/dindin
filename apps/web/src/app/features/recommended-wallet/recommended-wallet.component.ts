@@ -25,6 +25,7 @@ import {
   WalletTab,
 } from './components/recommended-assets-table/recommended-assets-table.component';
 import { WalletComparisonComponent } from './components/wallet-comparison/wallet-comparison.component';
+import { WalletChangesComponent } from './components/wallet-changes/wallet-changes.component';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Subject, forkJoin, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -60,6 +61,7 @@ import { LucideArrowLeft, LucideCheck, LucideUpload } from '@lucide/angular';
     AiSuggestionPanelComponent,
     RecommendedAssetsTableComponent,
     WalletComparisonComponent,
+    WalletChangesComponent,
   ],
   templateUrl: './recommended-wallet.component.html',
 })
