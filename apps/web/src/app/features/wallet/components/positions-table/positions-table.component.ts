@@ -16,6 +16,7 @@ import {
   formatPercent,
   formatQuotedAt,
 } from '../../../../shared/utils/format.util';
+import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import {
   LucideArrowDown,
   LucideArrowUp,
@@ -62,6 +63,7 @@ const tickerCollator = new Intl.Collator('pt-BR');
     LucidePencil,
     LucideRefrigerator,
     LucideTrash2,
+    TooltipComponent,
   ],
   templateUrl: './positions-table.component.html',
 })
