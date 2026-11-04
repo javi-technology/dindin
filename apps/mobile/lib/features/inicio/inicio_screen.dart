@@ -9,10 +9,12 @@ import '../../core/data/recurso.dart';
 import '../../core/data/envio.dart';
 import '../../core/notificacoes/notificacoes_service.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../shared/components/cartao.dart';
 import '../../shared/components/modal_formulario.dart';
 import '../../shared/components/seletor_tema.dart';
 import '../carteiras/carteira_form.dart';
 import '../carteiras/posicao_form.dart';
+import '../geladeira/entra_e_sai_view.dart';
 import '../geladeira/item_form.dart';
 import '../proventos/provento_form.dart';
 import '../geladeira/convite_de_notificacao.dart';
@@ -753,16 +755,24 @@ class _InicioScreenState extends State<InicioScreen> {
     // Sem geladeira cadastrada não há itens a buscar: o estado da lista de
     // geladeiras é o que a aba mostra, para não ficar carregando para sempre.
     if (itens == null) {
-      return _Observando(
-        _geladeiras,
-        (estado) => GeladeiraView(
-          estado: EstadoDoRecurso<List<FridgeItem>>(
-            dados: (estado.dados?.isEmpty ?? false) ? const [] : null,
-            carregando: estado.carregando,
-            erro: estado.erro,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _atalhoDeEntraESai(),
+          Expanded(
+            child: _Observando(
+              _geladeiras,
+              (estado) => GeladeiraView(
+                estado: EstadoDoRecurso<List<FridgeItem>>(
+                  dados: (estado.dados?.isEmpty ?? false) ? const [] : null,
+                  carregando: estado.carregando,
+                  erro: estado.erro,
+                ),
+                aoRecarregar: _geladeiras.carregar,
+              ),
+            ),
           ),
-          aoRecarregar: _geladeiras.carregar,
-        ),
+        ],
       );
     }
 
@@ -782,6 +792,7 @@ class _InicioScreenState extends State<InicioScreen> {
             aoRenomear: () => _renomearGeladeira(aberta),
             aoExcluir: () => _excluirGeladeira(aberta),
           ),
+        _atalhoDeEntraESai(),
         // O convite fica na geladeira, que é onde o alerta acontece: pedir a
         // permissão na primeira abertura, sem contexto, é o jeito mais rápido
         // de receber um "não" definitivo.
@@ -789,6 +800,59 @@ class _InicioScreenState extends State<InicioScreen> {
         Expanded(child: _listaDaGeladeira(itens)),
       ],
     );
+  }
+
+  /// Fica aqui, e não na Simulação, porque o quadro é aberto a todo usuário e a
+  /// Simulação é restrita a assinantes (#586, #573).
+  Widget _atalhoDeEntraESai() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    child: Cartao(
+      key: const Key('abrir-entra-e-sai'),
+      aoTocar: _abrirEntraESai,
+      child: const Row(
+        children: [
+          Expanded(child: Text('O que entra e sai da carteira do BB este mês')),
+          Icon(Icons.chevron_right),
+        ],
+      ),
+    ),
+  );
+
+  void _abrirEntraESai() {
+    final dados = Recurso<DadosDeEntraESai>(
+      chave: 'entra-e-sai',
+      cache: widget.cache,
+      buscar: () => DadosDeEntraESai.buscar(widget.api),
+      serializar: (d) => d.toJson(),
+      desserializar: (json) =>
+          DadosDeEntraESai.fromJson(json as Map<String, dynamic>),
+    );
+    dados.carregar();
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Entra e sai do mês')),
+              body: _Observando(
+                dados,
+                (estado) => EntraESaiView(
+                  estado: estado,
+                  aoRecarregar: dados.carregar,
+                  aoMover: (posicao) async {
+                    await _moverParaGeladeira(posicao.walletId, posicao);
+                    await dados.carregar();
+                  },
+                  aoDescongelar: (item) async {
+                    await _retirarDaGeladeira(item);
+                    await dados.carregar();
+                  },
+                ),
+              ),
+            ),
+          ),
+        )
+        .then((_) => dados.dispose());
   }
 
   Widget _listaDaGeladeira(Recurso<List<FridgeItem>> itens) {
