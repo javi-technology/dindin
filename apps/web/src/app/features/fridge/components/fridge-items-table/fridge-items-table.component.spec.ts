@@ -116,6 +116,54 @@ describe('FridgeItemsTableComponent', () => {
     expect(editados).toEqual([items[0]]);
     expect(removidos).toEqual([items[0]]);
   });
+  // Issue #591: o texto dos botões quebrava a linha da tabela.
+  describe('botões só com ícone', () => {
+    const acoes = [
+      { nome: 'Descongelar', testId: 'btn-descongelar-item-0' },
+      { nome: 'Editar', testId: 'btn-editar-item-0' },
+      { nome: 'Remover', testId: 'btn-remover-item-0' },
+    ];
+
+    function acao(testId: string): HTMLElement {
+      return element(`[data-testid="${testId}"]`) as HTMLElement;
+    }
+
+    it.each(acoes)('$nome não deve ter texto visível', ({ testId }) => {
+      setup();
+      expect(acao(testId).textContent?.trim()).toBe('');
+      expect(acao(testId).querySelector('svg')).not.toBeNull();
+    });
+
+    it.each(acoes)('$nome deve ter aria-label', ({ testId, nome }) => {
+      setup();
+      expect(acao(testId).getAttribute('aria-label')).toBe(nome);
+    });
+
+    it.each(acoes)(
+      '$nome deve mostrar o tooltip ao passar o mouse',
+      ({ testId, nome }) => {
+        setup();
+        const alvo = acao(testId).closest('app-tooltip') as HTMLElement;
+
+        alvo.dispatchEvent(new Event('mouseenter'));
+        fixture.detectChanges();
+
+        expect(
+          alvo.querySelector('[role="tooltip"]')?.textContent?.trim(),
+        ).toBe(nome);
+      },
+    );
+
+    it('deve manter as ações em uma só linha', () => {
+      setup();
+      const grupo = acao(acoes[0].testId).closest('app-tooltip')
+        ?.parentElement as HTMLElement;
+
+      expect(grupo.classList).toContain('inline-flex');
+      expect(grupo.classList).toContain('flex-nowrap');
+    });
+  });
+
   // Sem a data de apuração (issue #390), um fechamento do dia anterior parece
   // um preço errado.
   describe('data de apuração da cotação', () => {
