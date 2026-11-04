@@ -39,24 +39,43 @@ function parsePercentage(value: string): number {
   );
 }
 
-export function parseWalletTable(pageText: string): ParsedRow[] {
+function parseRowsTickerFirst(pageText: string): ParsedRow[] {
   // Os `\s*` entre as colunas absorvem a diferença de extração do pdf-parse 2
   // (issue #319): a v1 entregava `1,07%R$ 88,04` colado, a v2 entrega
   // `1,07% R$ 88,04`. O padrão aceita os dois.
   const regex =
     /^([A-Z]{4}11)([^\d%]+?)(-?\d+,\d{2}%)\s*R\$\s*([\d.]+,\d{2})\s*(\d+,\d{2}%)/gm;
-  const rows: ParsedRow[] = [];
-  let match: RegExpExecArray | null;
+  return [...pageText.matchAll(regex)].map((match) => ({
+    ticker: match[1],
+    segment: match[2].trim(),
+    ifixWeight: parsePercentage(match[3]),
+    closePrice: parseBrazilianNumber(match[4]),
+    weight: parsePercentage(match[5]),
+  }));
+}
 
-  while ((match = regex.exec(pageText)) !== null) {
-    rows.push({
-      ticker: match[1],
-      segment: match[2].trim(),
-      ifixWeight: parsePercentage(match[3]),
-      closePrice: parseBrazilianNumber(match[4]),
-      weight: parsePercentage(match[5]),
-    });
-  }
+/**
+ * Layout adotado pelo BB em novembro/2026 (issue #584): a linha começa pelo
+ * peso, e o volume médio diário entra entre o IFIX e a cota.
+ */
+function parseRowsWeightFirst(pageText: string): ParsedRow[] {
+  const regex =
+    /^(\d+,\d{2}%)\s*([A-Z]{4}11)\s*([^\d%]+?)\s*(-?\d+,\d{2}%)\s*[\d.,]+\s*R\$\s*([\d.]+,\d{2})/gm;
+  return [...pageText.matchAll(regex)].map((match) => ({
+    ticker: match[2],
+    segment: match[3].trim(),
+    ifixWeight: parsePercentage(match[4]),
+    closePrice: parseBrazilianNumber(match[5]),
+    weight: parsePercentage(match[1]),
+  }));
+}
+
+export function parseWalletTable(pageText: string): ParsedRow[] {
+  const tickerFirstRows = parseRowsTickerFirst(pageText);
+  const rows =
+    tickerFirstRows.length > 0
+      ? tickerFirstRows
+      : parseRowsWeightFirst(pageText);
 
   if (rows.length < 4 || rows.length > 15) {
     throw new Error(
@@ -133,11 +152,17 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
   }
   const pages = parsed.pages.map((page) => page.text);
 
-  const rendaPage = pages.find(
-    (text) =>
-      text.includes('Carteira Renda') &&
-      text.includes('Fundos Recomendados') &&
-      !text.includes('Ganho de Capital'),
+  const tablePages = pages.filter((text) =>
+    text.includes('Fundos Recomendados'),
+  );
+  // O PDF de novembro/2026 traz a página de Ganho com o título "Carteira Renda"
+  // (issue #584). Sem o título certo, vale a ordem do relatório: Renda, depois
+  // Ganho. Um parser só pelo título gravaria a carteira sem o Ganho.
+  const ganhoPage =
+    tablePages.find((text) => text.includes('Carteira Ganho de Capital')) ??
+    tablePages[1];
+  const rendaPage = tablePages.find(
+    (text) => text.includes('Carteira Renda') && text !== ganhoPage,
   );
   if (!rendaPage) {
     throw new Error(
@@ -145,11 +170,6 @@ export async function parseBbFiiPdf(buffer: Buffer): Promise<{
     );
   }
 
-  const ganhoPage = pages.find(
-    (text) =>
-      text.includes('Carteira Ganho de Capital') &&
-      text.includes('Fundos Recomendados'),
-  );
   if (!ganhoPage) {
     logWarn('parseBbFiiPdf.ganhoPageMissing');
   }
