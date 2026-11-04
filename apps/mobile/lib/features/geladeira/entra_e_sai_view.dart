@@ -33,6 +33,10 @@ class DadosDeEntraESai {
             .toList(),
       );
 
+  /// Só o mês mais recente: a rota `latest` devolve a última carteira, e mover
+  /// ou descongelar não faz sentido sobre uma recomendação passada. Se o app
+  /// passar a navegar entre meses, as ações precisam ser limitadas, como no web.
+  ///
   /// Sem mudança para cruzar, não busca as posições de cada carteira.
   static Future<DadosDeEntraESai> buscar(DinDinApi api) async {
     final sugerida = await api.carteiraSugerida();

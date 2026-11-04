@@ -436,6 +436,9 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   estão.
 - Mover para a geladeira e descongelar são sempre decisão do usuário. Fundo que
   sai de uma carteira e continua na outra não é candidato à geladeira.
+- As ações só aparecem no **mês mais recente**: num mês antigo, a recomendação
+  pode já ter mudado. O web as limita pelo mês selecionado; o app só mostra o
+  mês mais recente, porque usa a rota `latest`.
 - O quadro é aberto a todo usuário logado. No app, o atalho fica na aba
   Geladeira porque a Simulação é restrita a assinantes (#573).
 
