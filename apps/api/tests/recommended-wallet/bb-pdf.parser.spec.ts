@@ -55,6 +55,26 @@ describe('bb-pdf.parser', () => {
       ]);
     });
 
+    it('deve extrair as linhas do layout com o peso na primeira coluna', () => {
+      const rows = parseWalletTable(
+        [
+          '25,00% GARE11 Híbrido 1,64% 7,51 R$ 8,20 0,91 -1,53% -0,16% 2,24% 1,01% 12,15%',
+          '25,00% KNCR11 Recebíveis 9,49% 26,06 R$ 1.104,98 1,02 -0,22% 8,81% 13,24% 1,08% 13,26%',
+          '25,00% XPCI11 Recebíveis 0,46% 1,70 R$ 76,78 0,86 -2,43% 3,00% 4,38% 1,07% 13,92%',
+          '25,00% XPML11 Shopping 4,33% 22,23 R$ 96,80 0,90 -2,00% -2,28% 2,04% 0,95% 11,40%',
+        ].join('\n'),
+      );
+
+      expect(rows[1]).toEqual({
+        ticker: 'KNCR11',
+        segment: 'Recebíveis',
+        ifixWeight: 0.0949,
+        closePrice: 1104.98,
+        weight: 0.25,
+      });
+      expect(rows).toHaveLength(4);
+    });
+
     it('deve rejeitar tabela com quantidade de linhas insuficiente', () => {
       expect(() =>
         parseWalletTable('RZTR11Agronegócio1,07%R$ 88,04100,00%'),
@@ -141,6 +161,49 @@ describe('bb-pdf.parser', () => {
         segment: 'Logísticos',
         closePrice: 100.81,
         ifixWeight: 0.045,
+      });
+    });
+
+    it('deve extrair novembro, com o novo layout e a página de Ganho sem o título certo', async () => {
+      const buffer = readFileSync(
+        join(__dirname, '../fixtures/CartFII_Nov26.pdf'),
+      );
+      const result = await parseBbFiiPdf(buffer);
+
+      expect(result.publishedAt).toBe('2026-11-03');
+      expect(result.renda.map(({ ticker }) => ticker)).toEqual([
+        'GARE11',
+        'KNHF11',
+        'HGCR11',
+        'KNCR11',
+        'KNIP11',
+        'MXRF11',
+        'XPCI11',
+        'XPML11',
+      ]);
+      expect(result.renda[0]).toEqual({
+        ticker: 'GARE11',
+        segment: 'Híbrido',
+        ifixWeight: 0.0164,
+        closePrice: 8.2,
+        weight: 0.125,
+      });
+      expect(result.ganho.map(({ ticker }) => ticker)).toEqual([
+        'BTLG11',
+        'HGLG11',
+        'VILG11',
+        'XPLG11',
+        'PCIP11',
+        'RECR11',
+        'CPSH11',
+        'VISC11',
+      ]);
+      expect(result.ganho[1]).toEqual({
+        ticker: 'HGLG11',
+        segment: 'Logísticos',
+        ifixWeight: 0.0464,
+        closePrice: 149.5,
+        weight: 0.125,
       });
     });
 
