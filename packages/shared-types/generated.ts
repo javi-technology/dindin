@@ -143,6 +143,12 @@ export interface MeResponse {
   admin: boolean;
   subscription: PublicSubscription;
   entitlements: Entitlement[];
+  /**
+   * Se a cobrança está ligada (issue #594). Desligada, todo usuário
+   * recebe todos os entitlements e o cliente esconde os convites para
+   * assinar. Opcional: a API anterior não o envia.
+   */
+  billingEnabled?: boolean;
 }
 
 /** Recurso padrão que `POST /api/me/setup` pode criar (#275). */

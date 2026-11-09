@@ -9,6 +9,7 @@ import {
 } from './middleware/auth.middleware';
 import { requireMinAppVersion } from './middleware/app-version.middleware';
 import { requireEntitlement } from './middleware/entitlement.middleware';
+import { isBillingEnabled } from './billing/billing-mode';
 import {
   adminRateLimiter,
   apiRateLimiter,
@@ -239,6 +240,7 @@ app.get('/api/me', async (req: AuthRequest, res: Response) => {
         status: effectiveStatus(subscription),
       }),
       entitlements: listEntitlements(subscription, isAdmin),
+      billingEnabled: isBillingEnabled(),
     };
     res.json(body);
   } catch (error) {

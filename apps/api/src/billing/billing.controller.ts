@@ -15,6 +15,7 @@ import {
 } from './checkout-session.service';
 import { logError, logWarn } from '../shared/logger';
 import { HttpError } from '../shared/http-error';
+import { assertBillingEnabled } from './billing-mode';
 
 function alreadySubscribed(): never {
   throw HttpError.conflict('Assinatura já ativa', {
@@ -25,6 +26,7 @@ function alreadySubscribed(): never {
 export const createCheckoutSession = asyncHandler(
   'createCheckoutSession',
   async (req: Request, res: Response) => {
+    assertBillingEnabled();
     const { interval } = req.body ?? {};
     if (interval !== 'month' && interval !== 'year') {
       throw HttpError.badRequest('interval inválido');

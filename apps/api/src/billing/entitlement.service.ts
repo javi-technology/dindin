@@ -1,4 +1,5 @@
 import { subscriptionDocument } from '../firestore/paths';
+import { isBillingEnabled } from './billing-mode';
 import {
   Entitlement,
   PublicSubscription,
@@ -150,7 +151,8 @@ const BASIC_PLAN_ENTITLEMENTS: Entitlement[] = ['ai', 'projections'];
  * Todo entitlement do plano básico é liberado quando a assinatura está
  * `trialing`/`active`, ou `past_due` ainda dentro do período pago (carência
  * até `currentPeriodEnd`), ou o usuário é admin. Concessões `manual` expiram
- * em `currentPeriodEnd` (`null` = sem validade).
+ * em `currentPeriodEnd` (`null` = sem validade). Com a cobrança desligada
+ * (#594), todo usuário recebe o plano básico inteiro.
  */
 export function isEntitled(
   subscription: UserSubscription,
@@ -160,6 +162,7 @@ export function isEntitled(
 ): boolean {
   if (isAdmin) return true;
   if (!BASIC_PLAN_ENTITLEMENTS.includes(entitlement)) return false;
+  if (!isBillingEnabled()) return true;
 
   const withinPeriod =
     subscription.currentPeriodEnd !== null &&

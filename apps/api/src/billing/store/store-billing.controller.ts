@@ -13,6 +13,7 @@ import {
   StorePlatform,
 } from './store-validators';
 import { HttpError } from '../../shared/http-error';
+import { assertBillingEnabled } from '../billing-mode';
 
 const PLATFORMS: StorePlatform[] = ['apple', 'google'];
 
@@ -30,6 +31,7 @@ function respondBusinessError(res: Response, error: unknown): boolean {
 export const registerStorePurchaseHandler = asyncHandler(
   'registerStorePurchase',
   async (req: Request, res: Response) => {
+    assertBillingEnabled();
     const { platform, productId, credential } = req.body ?? {};
     if (
       !PLATFORMS.includes(platform) ||

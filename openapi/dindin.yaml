@@ -90,7 +90,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Conflict:
-      description: Conflito com o estado atual do recurso (`code`, como `ALREADY_SUBSCRIBED`).
+      description: Conflito com o estado atual do recurso (`code`, como `ALREADY_SUBSCRIBED` ou `BILLING_DISABLED`).
       content:
         application/json:
           schema:
@@ -591,6 +591,12 @@ components:
         entitlements:
           type: array
           items: { $ref: '#/components/schemas/Entitlement' }
+        billingEnabled:
+          type: boolean
+          description: |
+            Se a cobrança está ligada (issue #594). Desligada, todo usuário
+            recebe todos os entitlements e o cliente esconde os convites para
+            assinar. Opcional: a API anterior não o envia.
 
     DefaultResource:
       type: string
@@ -1381,9 +1387,15 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
-          description: 'Assinatura já ativa (`ALREADY_SUBSCRIBED`) ou recibo de outra conta (`RECEIPT_ALREADY_USED`)'
+          description: 'Assinatura já ativa (`ALREADY_SUBSCRIBED`), recibo de outra conta (`RECEIPT_ALREADY_USED`) ou cobrança desligada (`BILLING_DISABLED`, #594)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '503':
           description: 'Loja não configurada (`STORE_NOT_CONFIGURED`)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /api/billing/store/apple-notifications:
     post:
