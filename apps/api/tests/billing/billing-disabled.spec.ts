@@ -48,6 +48,13 @@ jest.mock('../../src/billing/stripe-customer.service', () => ({
 
 import { app } from '../../src/index';
 import { isBillingEnabled } from '../../src/billing/billing-mode';
+import {
+  NO_SUBSCRIPTION,
+  isEntitled,
+  listEntitlements,
+  resolveSubscription,
+} from '../../src/billing/entitlement.service';
+import { UserSubscription } from 'dindin-shared-types';
 import { sugestaoFixture } from '../support/fixtures-contrato';
 
 const BILLING_DISABLED = {
@@ -142,5 +149,45 @@ describe('cobrança desligada', () => {
     expect(response.status).toBe(409);
     expect(response.body).toEqual(BILLING_DISABLED);
     expect(registerStorePurchaseMock).not.toHaveBeenCalled();
+  });
+
+  // `isEntitled` também responde "a concessão ainda vale?" para o
+  // `resolveSubscription`, o webhook da Stripe e a concessão do admin. A
+  // liberação gratuita decide só o acesso: misturar as duas faria uma
+  // concessão manual vencida parecer vigente e esconder a Stripe paga.
+  describe('vigência das concessões', () => {
+    const PAST = '2026-01-01T00:00:00.000Z';
+    const FUTURE = '2999-01-01T00:00:00.000Z';
+    const manualVencidaComStripe: UserSubscription = {
+      ...NO_SUBSCRIPTION,
+      status: 'active',
+      plan: 'basic',
+      provider: 'manual',
+      currentPeriodEnd: PAST,
+      stripe: {
+        status: 'active',
+        interval: 'year',
+        providerSubscriptionId: 'sub_1',
+        currentPeriodEnd: FUTURE,
+        cancelAtPeriodEnd: false,
+        updatedAt: PAST,
+      },
+    };
+
+    it('não considera vigente a concessão manual vencida', () => {
+      expect(isEntitled(manualVencidaComStripe, 'ai')).toBe(false);
+      expect(isEntitled(NO_SUBSCRIPTION, 'projections')).toBe(false);
+    });
+
+    it('volta a valer a Stripe quando a concessão manual vence', () => {
+      const resolvida = resolveSubscription(manualVencidaComStripe);
+
+      expect(resolvida.provider).toBe('stripe');
+      expect(resolvida.status).toBe('active');
+    });
+
+    it('libera todos os entitlements no acesso, sem assinatura', () => {
+      expect(listEntitlements(NO_SUBSCRIPTION)).toEqual(['ai', 'projections']);
+    });
   });
 });
