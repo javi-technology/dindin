@@ -21,6 +21,7 @@ describe('BillingComponent', () => {
     subscription: ReturnType<typeof signal<PublicSubscription>>;
     entitlements: ReturnType<typeof signal<string[]>>;
     loaded: ReturnType<typeof signal<boolean>>;
+    billingEnabled: ReturnType<typeof signal<boolean>>;
     hasAi: ReturnType<typeof signal<boolean>>;
     subscriptionRequired: ReturnType<typeof signal<boolean>>;
     loadMe: jasmine.Spy;
@@ -47,11 +48,13 @@ describe('BillingComponent', () => {
     subscription: PublicSubscription,
     queryParams: Record<string, string> = {},
     autoDetect = true,
+    billingEnabled = true,
   ) {
     billingServiceMock = {
       subscription: signal(subscription),
       entitlements: signal([]),
       loaded: signal(true),
+      billingEnabled: signal(billingEnabled),
       hasAi: signal(false),
       subscriptionRequired: signal(false),
       loadMe: jasmine
@@ -101,6 +104,45 @@ describe('BillingComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid="canceled-note"]'),
     ).toBeNull();
+  });
+
+  // Cobrança desligada (issue #594): nada a assinar, mas quem ainda paga
+  // precisa do portal para cancelar.
+  describe('com a cobrança desligada', () => {
+    it('deve avisar que tudo está liberado, sem planos', () => {
+      setup(baseSubscription, {}, true, false);
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="plans-section"]'),
+      ).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="free-notice"]')
+          ?.textContent,
+      ).toContain('todos os recursos estão liberados');
+    });
+
+    it('deve manter o portal para quem ainda tem assinatura', () => {
+      setup(
+        {
+          ...baseSubscription,
+          status: 'active',
+          plan: 'basic',
+          interval: 'month',
+          currentPeriodEnd: '2026-12-01T00:00:00Z',
+        },
+        {},
+        true,
+        false,
+      );
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="manage-button"]'),
+      ).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="free-notice"]')
+          ?.textContent,
+      ).toContain('cancelar');
+    });
   });
 
   it('deve listar os benefícios do plano', async () => {

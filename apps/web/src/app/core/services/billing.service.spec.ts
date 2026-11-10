@@ -58,6 +58,24 @@ describe('BillingService', () => {
     expect(service.hasProjections()).toBe(true);
   });
 
+  // Cobrança desligada (issue #594): sem o campo, vale a API anterior, que
+  // cobra; só o `false` explícito esconde os convites para assinar.
+  it('deve considerar a cobrança ligada antes de carregar e sem o campo', () => {
+    expect(service.billingEnabled()).toBe(true);
+
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush(me);
+
+    expect(service.billingEnabled()).toBe(true);
+  });
+
+  it('deve expor a cobrança desligada informada por /api/me', () => {
+    service.loadMe().subscribe();
+    httpMock.expectOne('/api/me').flush({ ...me, billingEnabled: false });
+
+    expect(service.billingEnabled()).toBe(false);
+  });
+
   it('deve expor valores padrão antes de carregar', () => {
     expect(service.loaded()).toBe(false);
     expect(service.subscription()).toEqual({

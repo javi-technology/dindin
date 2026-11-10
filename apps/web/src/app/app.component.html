@@ -8,7 +8,7 @@
       class="text-xl font-bold text-text-primary hover:text-action transition-colors"
       >DinDin</a
     >
-    @if (user() && subscriptionLoaded()) {
+    @if (user() && subscriptionLoaded() && billingEnabled()) {
       <span
         data-testid="subscription-badge"
         class="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -88,13 +88,15 @@
             >
           }
         </span>
-        <a
-          routerLink="/assinatura"
-          routerLinkActive="text-action! font-semibold"
-          class="text-sm font-medium text-text-secondary hover:text-action"
-          data-testid="billing-link"
-          >Assinatura</a
-        >
+        @if (showBillingLink()) {
+          <a
+            routerLink="/assinatura"
+            routerLinkActive="text-action! font-semibold"
+            class="text-sm font-medium text-text-secondary hover:text-action"
+            data-testid="billing-link"
+            >Assinatura</a
+          >
+        }
       </nav>
       <span class="text-sm text-text-secondary hidden sm:inline">{{
         currentUser.email

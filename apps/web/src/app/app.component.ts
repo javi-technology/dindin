@@ -43,6 +43,17 @@ export class AppComponent {
   user = this.authService.user;
   readonly subscriptionLoaded = this.billingService.loaded;
   readonly isSubscriber = this.billingService.isSubscriber;
+  readonly billingEnabled = this.billingService.billingEnabled;
+  /**
+   * Com a cobrança desligada (#594), o link só fica para quem ainda tem
+   * assinatura vigente: é o caminho até o portal, onde ela é cancelada.
+   */
+  readonly showBillingLink = computed(
+    () =>
+      !this.billingService.loaded() ||
+      this.billingService.billingEnabled() ||
+      this.billingService.isSubscriber(),
+  );
   readonly version = APP_VERSION;
   /**
    * Cadeado no link da simulação, recurso de assinante (issue #573). Usa o
