@@ -9,6 +9,7 @@ import {
   formatCurrency,
   formatQuotedAt,
 } from '../../../../shared/utils/format.util';
+import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import { LucideFlame, LucidePencil, LucideTrash2 } from '@lucide/angular';
 
 /**
@@ -21,7 +22,7 @@ import { LucideFlame, LucidePencil, LucideTrash2 } from '@lucide/angular';
   selector: 'app-fridge-items-table',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideFlame, LucidePencil, LucideTrash2],
+  imports: [LucideFlame, LucidePencil, LucideTrash2, TooltipComponent],
   templateUrl: './fridge-items-table.component.html',
 })
 export class FridgeItemsTableComponent {
