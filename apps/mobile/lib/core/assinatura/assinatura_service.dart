@@ -36,6 +36,11 @@ class AssinaturaService extends ChangeNotifier {
   /// uma só liberaria tela que o backend recusa com 402.
   bool get temIa => _perfil?.entitlements.contains(Entitlement.ai) ?? false;
 
+  /// Se a cobrança está ligada (issue #594). Desligada, o DinDin é gratuito:
+  /// a API libera tudo, e o app não chama nada de recurso de assinante. Sem
+  /// o campo (API anterior), vale a cobrança ligada.
+  bool get cobrancaLigada => _perfil?.billingEnabled ?? true;
+
   /// Se o usuário é administrador, como o web também deriva de `/api/me`.
   bool get admin => _perfil?.admin ?? false;
 
