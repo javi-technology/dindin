@@ -9,17 +9,19 @@
         Voltar
       </a>
       <h1 class="text-2xl font-bold text-text-primary">Assinatura</h1>
-      <p class="text-text-secondary mt-1 mb-4">
-        Libere a sugestão mensal por IA e a projeção completa dos seus ativos.
-      </p>
+      @if (billingEnabled()) {
+        <p class="text-text-secondary mt-1 mb-4">
+          Libere a sugestão mensal por IA e a projeção completa dos seus ativos.
+        </p>
 
-      <ul
-        class="text-sm text-text-secondary list-disc list-inside space-y-1 mb-6"
-        data-testid="plan-benefits"
-      >
-        <li>Sugestão mensal de compras por IA</li>
-        <li>Projeção completa por ativo e agenda de pagamentos</li>
-      </ul>
+        <ul
+          class="text-sm text-text-secondary list-disc list-inside space-y-1 mb-6"
+          data-testid="plan-benefits"
+        >
+          <li>Sugestão mensal de compras por IA</li>
+          <li>Projeção completa por ativo e agenda de pagamentos</li>
+        </ul>
+      }
 
       @if (successMessage()) {
         <div
@@ -128,7 +130,13 @@
           </section>
         }
 
-        @if (status() === 'trialing' || status() === 'active') {
+        <!-- Cobrança desligada (#594): pendência de pagamento não se cobra
+             mais; o past_due só precisa do portal para cancelar. -->
+        @if (
+          status() === 'trialing' ||
+          status() === 'active' ||
+          (!billingEnabled() && status() === 'past_due')
+        ) {
           <section data-testid="active-section">
             <h2 class="text-lg font-semibold text-text-primary">
               Plano Básico ·
@@ -164,7 +172,7 @@
           </section>
         }
 
-        @if (status() === 'past_due') {
+        @if (billingEnabled() && status() === 'past_due') {
           <section data-testid="past-due-section">
             <div class="bg-danger-soft text-danger-ink rounded-lg p-4">
               Pagamento pendente. Atualize sua forma de pagamento para manter o
@@ -183,15 +191,20 @@
         }
       }
 
-      <section class="border-t border-border mt-6 pt-5">
-        <h2 class="text-lg font-semibold text-text-primary mb-3">
-          O que está incluso
-        </h2>
-        <ul class="list-disc list-inside text-text-secondary space-y-1">
-          <li>Sugestão mensal de compras por IA na carteira recomendada</li>
-          <li>Futuras funcionalidades de IA</li>
-        </ul>
-      </section>
+      @if (billingEnabled()) {
+        <section
+          class="border-t border-border mt-6 pt-5"
+          data-testid="included-section"
+        >
+          <h2 class="text-lg font-semibold text-text-primary mb-3">
+            O que está incluso
+          </h2>
+          <ul class="list-disc list-inside text-text-secondary space-y-1">
+            <li>Sugestão mensal de compras por IA na carteira recomendada</li>
+            <li>Futuras funcionalidades de IA</li>
+          </ul>
+        </section>
+      }
     </div>
   </div>
 </main>

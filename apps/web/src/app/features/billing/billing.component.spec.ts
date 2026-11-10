@@ -121,6 +121,36 @@ describe('BillingComponent', () => {
       ).toContain('todos os recursos estão liberados');
     });
 
+    // Benefícios do plano e "o que está incluso" contradiriam o aviso de que
+    // tudo já está liberado.
+    it('não deve anunciar benefícios de plano', () => {
+      setup(baseSubscription, {}, true, false);
+
+      const page = fixture.nativeElement as HTMLElement;
+      expect(page.querySelector('[data-testid="plan-benefits"]')).toBeNull();
+      expect(page.querySelector('[data-testid="included-section"]')).toBeNull();
+      expect(page.textContent).not.toContain('Libere a sugestão');
+    });
+
+    it('não deve cobrar pagamento pendente, mas manter o portal', () => {
+      setup(
+        {
+          ...baseSubscription,
+          status: 'past_due',
+          plan: 'basic',
+          interval: 'month',
+          currentPeriodEnd: '2026-12-01T00:00:00Z',
+        },
+        {},
+        true,
+        false,
+      );
+
+      const page = fixture.nativeElement as HTMLElement;
+      expect(page.querySelector('[data-testid="past-due-section"]')).toBeNull();
+      expect(page.querySelector('[data-testid="manage-button"]')).toBeTruthy();
+    });
+
     it('deve manter o portal para quem ainda tem assinatura', () => {
       setup(
         {
