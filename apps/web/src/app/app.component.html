@@ -5,9 +5,30 @@
   <div class="flex items-center gap-2">
     <a
       routerLink="/"
-      class="text-xl font-bold text-text-primary hover:text-action transition-colors"
-      >DinDin</a
+      class="inline-flex items-center gap-2 text-xl font-bold text-text-primary hover:text-action transition-colors"
+      data-testid="brand-link"
+      ><img
+        src="favicon.svg"
+        alt=""
+        width="28"
+        height="28"
+        class="size-7"
+      />DinDin</a
     >
+    @if (user() && subscriptionLoaded() && !billingEnabled()) {
+      <!-- Cobrança desligada (#594): o DinDin é gratuito, e quem quiser
+           apoiar contribui por fora do app. -->
+      <a
+        [href]="buyMeACoffeeUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand-ink hover:bg-brand-soft/80 transition-colors"
+        data-testid="buy-me-a-coffee"
+      >
+        <svg lucideCoffee [size]="14" aria-hidden="true"></svg>
+        Me pague um café
+      </a>
+    }
     @if (user() && subscriptionLoaded() && billingEnabled()) {
       <span
         data-testid="subscription-badge"

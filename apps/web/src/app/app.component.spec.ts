@@ -229,6 +229,52 @@ describe('AppComponent', () => {
     });
   });
 
+  // Identidade e apoio no cabeçalho (issue #594).
+  describe('cabeçalho', () => {
+    const coffee = (): HTMLAnchorElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="buy-me-a-coffee"]');
+
+    it('deve mostrar o logo à esquerda do nome, no link da página inicial', () => {
+      fixture.detectChanges();
+
+      const home = fixture.nativeElement.querySelector(
+        '[data-testid="brand-link"]',
+      ) as HTMLAnchorElement;
+      const logo = home.querySelector('img') as HTMLImageElement;
+      expect(logo.getAttribute('src')).toBe('favicon.svg');
+      // O nome ao lado já diz o que é: o logo é decorativo.
+      expect(logo.getAttribute('alt')).toBe('');
+      expect(home.firstElementChild).toBe(logo);
+      expect(home.textContent?.trim()).toBe('DinDin');
+    });
+
+    it('deve mostrar o Buy Me a Coffee no lugar da badge com a cobrança desligada', () => {
+      billingServiceMock.loaded.set(true);
+      billingServiceMock.billingEnabled.set(false);
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+
+      fixture.detectChanges();
+
+      const link = coffee()!;
+      expect(link.getAttribute('href')).toBe(
+        'https://buymeacoffee.com/vkremersanx',
+      );
+      // Abre fora do app, sem dar ao site externo acesso à janela do DinDin.
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(link.textContent?.trim()).toBe('Me pague um café');
+    });
+
+    it('não deve pedir café enquanto a cobrança estiver ligada', () => {
+      billingServiceMock.loaded.set(true);
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+
+      fixture.detectChanges();
+
+      expect(coffee()).toBeNull();
+    });
+  });
+
   // A simulação é recurso de assinante (issue #573): o cadeado avisa antes do
   // clique, em vez de o usuário só descobrir no paywall.
   describe('cadeado da simulação', () => {
