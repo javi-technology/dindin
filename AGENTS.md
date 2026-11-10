@@ -502,6 +502,10 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   assinatura vigente, como caminho até o portal), e a página de assinatura
   troca os planos por um aviso. O app deixa de marcar a simulação por ativo
   como recurso de assinante.
+- No lugar do selo, o cabeçalho do web mostra o **Buy Me a Coffee**
+  (`BUY_ME_A_COFFEE_URL`, em `app.component.ts`), aberto em nova aba com
+  `rel="noopener noreferrer"`. Apoio é contribuição voluntária, por fora do
+  app: não libera recurso nenhum, ou voltaria a ser cobrança.
 - **A integração com a Stripe e com as lojas continua no código**, e as regras
   das seções de assinatura abaixo continuam valendo para quando for religada.
   A suíte da API roda com `BILLING_ENABLED=true` (`tests/setup-env.js`), e o
