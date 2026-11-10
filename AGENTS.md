@@ -480,6 +480,35 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 - Formulário abre em folha de baixo (`ModalFormulario`), não em diálogo
   centralizado: com o teclado aberto, o diálogo some atrás dele.
 
+### Cobrança desligada (issue #594)
+
+- **O DinDin é ferramenta gratuita**, usada pelo dono e pelas pessoas
+  convidadas. Cobrar por recomendação de investimento aproxima o produto das
+  atividades de analista (Resolução CVM 20) e de consultor (Resolução CVM 19),
+  que exigem credenciamento ou autorização, além de obrigar à emissão de NFS-e.
+- A chave é **`BILLING_ENABLED`** na API (`billing/billing-mode.ts`), e
+  **ausente vale desligado**: o deploy não a escreve no `.env` das Functions, e
+  esquecer a chave não pode voltar a cobrar ninguém.
+- Desligada, `isEntitled` concede todo o plano básico a qualquer usuário: as
+  rotas com `requireEntitlement` atendem todos, e `GET /api/me` devolve todos
+  os entitlements. Web e app leem os entitlements de lá, então o paywall some
+  **também no app já instalado**, sem versão nova nas lojas.
+- Checkout da Stripe e compra in-app recusam com **409 `BILLING_DISABLED`**.
+  Portal da Stripe e webhooks (da Stripe e das lojas) **continuam ligados**:
+  quem já assina precisa conseguir cancelar, e o cancelamento precisa chegar.
+- `GET /api/me` informa `billingEnabled`. Sem o campo (API anterior), os
+  clientes assumem a cobrança ligada. Com `false`, o web esconde o selo
+  "Assinante/Não assinante" e o link "Assinatura" (que fica para quem ainda tem
+  assinatura vigente, como caminho até o portal), e a página de assinatura
+  troca os planos por um aviso. O app deixa de marcar a simulação por ativo
+  como recurso de assinante.
+- **A integração com a Stripe e com as lojas continua no código**, e as regras
+  das seções de assinatura abaixo continuam valendo para quando for religada.
+  A suíte da API roda com `BILLING_ENABLED=true` (`tests/setup-env.js`), e o
+  modo gratuito é coberto à parte. Religar a cobrança exige antes resolver o
+  enquadramento na CVM e a emissão de NFS-e.
+- As menções a "recurso de assinante" nas seções abaixo descrevem o modo pago.
+
 ### Compra in-app e assinatura nas lojas (issue #405)
 
 - **O acesso nunca é concedido pelo que o app afirma.** O app repassa o recibo a
