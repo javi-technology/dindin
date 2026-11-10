@@ -193,7 +193,11 @@ class _SimulacaoScreenState extends State<SimulacaoScreen> {
             // formulário em vez de disputar a rolagem com ele.
             ResultadoView(
               resultado: resultado,
-              aoSimularAtivo: _avisarRecursoDeAssinante,
+              // Com a cobrança desligada (#594) não há assinatura a anunciar,
+              // e a simulação por ativo ainda não existe no app.
+              aoSimularAtivo: widget.assinatura.cobrancaLigada
+                  ? _avisarRecursoDeAssinante
+                  : null,
             ),
           ],
         ],

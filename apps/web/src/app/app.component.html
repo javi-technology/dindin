@@ -5,10 +5,31 @@
   <div class="flex items-center gap-2">
     <a
       routerLink="/"
-      class="text-xl font-bold text-text-primary hover:text-action transition-colors"
-      >DinDin</a
+      class="inline-flex items-center gap-2 text-xl font-bold text-text-primary hover:text-action transition-colors"
+      data-testid="brand-link"
+      ><img
+        src="favicon.svg"
+        alt=""
+        width="28"
+        height="28"
+        class="size-7"
+      />DinDin</a
     >
-    @if (user() && subscriptionLoaded()) {
+    @if (user() && subscriptionLoaded() && !billingEnabled()) {
+      <!-- Cobrança desligada (#594): o DinDin é gratuito, e quem quiser
+           apoiar contribui por fora do app. -->
+      <a
+        [href]="buyMeACoffeeUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand-ink hover:bg-brand-soft/80 transition-colors"
+        data-testid="buy-me-a-coffee"
+      >
+        <svg lucideCoffee [size]="14" aria-hidden="true"></svg>
+        Me pague um café
+      </a>
+    }
+    @if (user() && subscriptionLoaded() && billingEnabled()) {
       <span
         data-testid="subscription-badge"
         class="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -88,13 +109,15 @@
             >
           }
         </span>
-        <a
-          routerLink="/assinatura"
-          routerLinkActive="text-action! font-semibold"
-          class="text-sm font-medium text-text-secondary hover:text-action"
-          data-testid="billing-link"
-          >Assinatura</a
-        >
+        @if (showBillingLink()) {
+          <a
+            routerLink="/assinatura"
+            routerLinkActive="text-action! font-semibold"
+            class="text-sm font-medium text-text-secondary hover:text-action"
+            data-testid="billing-link"
+            >Assinatura</a
+          >
+        }
       </nav>
       <span class="text-sm text-text-secondary hidden sm:inline">{{
         currentUser.email

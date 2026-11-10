@@ -26,6 +26,7 @@ describe('AppComponent', () => {
   let billingServiceMock: {
     loaded: ReturnType<typeof signal<boolean>>;
     isSubscriber: ReturnType<typeof signal<boolean>>;
+    billingEnabled: ReturnType<typeof signal<boolean>>;
     hasProjections: ReturnType<typeof signal<boolean>>;
     subscriptionRequired: ReturnType<typeof signal<boolean>>;
     loadMe: any;
@@ -39,6 +40,7 @@ describe('AppComponent', () => {
     billingServiceMock = {
       loaded: signal(false),
       isSubscriber: signal(false),
+      billingEnabled: signal(true),
       hasProjections: signal(false),
       subscriptionRequired: signal(false),
       loadMe: jasmine.createSpy('loadMe').and.returnValue(of({})),
@@ -191,6 +193,85 @@ describe('AppComponent', () => {
 
       expect(badge()).toBeNull();
       expect(billingServiceMock.loadMe).not.toHaveBeenCalled();
+    });
+  });
+
+  // Cobrança desligada (issue #594): o DinDin é gratuito, e selo e link de
+  // assinatura só confundiriam. Quem ainda assina mantém o link, para chegar
+  // ao portal e cancelar.
+  describe('cobrança desligada', () => {
+    const billingLink = () =>
+      fixture.nativeElement.querySelector('[data-testid="billing-link"]');
+
+    beforeEach(() => {
+      billingServiceMock.loaded.set(true);
+      billingServiceMock.billingEnabled.set(false);
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+    });
+
+    it('não deve exibir a badge nem o link de assinatura', () => {
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector(
+          '[data-testid="subscription-badge"]',
+        ),
+      ).toBeNull();
+      expect(billingLink()).toBeNull();
+    });
+
+    it('deve manter o link para quem ainda tem assinatura vigente', () => {
+      billingServiceMock.isSubscriber.set(true);
+
+      fixture.detectChanges();
+
+      expect(billingLink()).toBeTruthy();
+    });
+  });
+
+  // Identidade e apoio no cabeçalho (issue #594).
+  describe('cabeçalho', () => {
+    const coffee = (): HTMLAnchorElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="buy-me-a-coffee"]');
+
+    it('deve mostrar o logo à esquerda do nome, no link da página inicial', () => {
+      fixture.detectChanges();
+
+      const home = fixture.nativeElement.querySelector(
+        '[data-testid="brand-link"]',
+      ) as HTMLAnchorElement;
+      const logo = home.querySelector('img') as HTMLImageElement;
+      expect(logo.getAttribute('src')).toBe('favicon.svg');
+      // O nome ao lado já diz o que é: o logo é decorativo.
+      expect(logo.getAttribute('alt')).toBe('');
+      expect(home.firstElementChild).toBe(logo);
+      expect(home.textContent?.trim()).toBe('DinDin');
+    });
+
+    it('deve mostrar o Buy Me a Coffee no lugar da badge com a cobrança desligada', () => {
+      billingServiceMock.loaded.set(true);
+      billingServiceMock.billingEnabled.set(false);
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+
+      fixture.detectChanges();
+
+      const link = coffee()!;
+      expect(link.getAttribute('href')).toBe(
+        'https://buymeacoffee.com/vkremersanx',
+      );
+      // Abre fora do app, sem dar ao site externo acesso à janela do DinDin.
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(link.textContent?.trim()).toBe('Me pague um café');
+    });
+
+    it('não deve pedir café enquanto a cobrança estiver ligada', () => {
+      billingServiceMock.loaded.set(true);
+      authServiceMock.user.set({ email: 'user@dindin.app' });
+
+      fixture.detectChanges();
+
+      expect(coffee()).toBeNull();
     });
   });
 

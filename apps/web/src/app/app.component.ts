@@ -18,7 +18,10 @@ import { BillingService } from './core/services/billing.service';
 import { APP_VERSION } from '../environments/version';
 import { RateLimitNoticeComponent } from './shared/components/rate-limit-notice/rate-limit-notice.component';
 import { ThemeToggleComponent } from './shared/components/theme-toggle/theme-toggle.component';
-import { LucideLock } from '@lucide/angular';
+import { LucideCoffee, LucideLock } from '@lucide/angular';
+
+/** Página de apoio ao DinDin, que é gratuito (issue #594). */
+export const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/vkremersanx';
 
 @Component({
   selector: 'app-root',
@@ -29,6 +32,7 @@ import { LucideLock } from '@lucide/angular';
     ThemeToggleComponent,
     RateLimitNoticeComponent,
     LucideLock,
+    LucideCoffee,
   ],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,6 +47,18 @@ export class AppComponent {
   user = this.authService.user;
   readonly subscriptionLoaded = this.billingService.loaded;
   readonly isSubscriber = this.billingService.isSubscriber;
+  readonly billingEnabled = this.billingService.billingEnabled;
+  readonly buyMeACoffeeUrl = BUY_ME_A_COFFEE_URL;
+  /**
+   * Com a cobrança desligada (#594), o link só fica para quem ainda tem
+   * assinatura vigente: é o caminho até o portal, onde ela é cancelada.
+   */
+  readonly showBillingLink = computed(
+    () =>
+      !this.billingService.loaded() ||
+      this.billingService.billingEnabled() ||
+      this.billingService.isSubscriber(),
+  );
   readonly version = APP_VERSION;
   /**
    * Cadeado no link da simulação, recurso de assinante (issue #573). Usa o

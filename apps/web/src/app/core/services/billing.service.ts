@@ -52,6 +52,14 @@ export class BillingService {
   readonly isSubscriber = computed(() =>
     SUBSCRIBER_STATUSES.includes(this.subscription().status),
   );
+  /**
+   * Se a cobrança está ligada (issue #594). Desligada, o DinDin é gratuito:
+   * a API libera todos os entitlements e o web esconde os convites para
+   * assinar. Sem o campo (API anterior), vale a cobrança ligada.
+   */
+  readonly billingEnabled = computed(
+    () => this.meState()?.billingEnabled ?? true,
+  );
   /** Ligado pelo interceptor quando a API responde SUBSCRIPTION_REQUIRED. */
   readonly subscriptionRequired = signal(false);
 

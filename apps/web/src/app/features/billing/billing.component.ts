@@ -30,6 +30,8 @@ export class BillingComponent implements OnInit {
   readonly subscription = this.billingService.subscription;
   readonly status = computed(() => this.subscription().status);
   readonly loading = computed(() => !this.billingService.loaded());
+  /** Cobrança desligada (#594): sem planos, só o portal para quem assina. */
+  readonly billingEnabled = this.billingService.billingEnabled;
 
   readonly verifying = signal(false);
   readonly checkoutLoading = signal(false);

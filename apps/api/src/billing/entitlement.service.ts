@@ -1,4 +1,5 @@
 import { subscriptionDocument } from '../firestore/paths';
+import { isBillingEnabled } from './billing-mode';
 import {
   Entitlement,
   PublicSubscription,
@@ -151,6 +152,11 @@ const BASIC_PLAN_ENTITLEMENTS: Entitlement[] = ['ai', 'projections'];
  * `trialing`/`active`, ou `past_due` ainda dentro do período pago (carência
  * até `currentPeriodEnd`), ou o usuário é admin. Concessões `manual` expiram
  * em `currentPeriodEnd` (`null` = sem validade).
+ *
+ * Responde também "a concessão ainda vale?" ao `resolveSubscription`, ao
+ * webhook da Stripe e à concessão do admin, e por isso **não** considera a
+ * cobrança desligada (#594): quem libera o acesso gratuito é
+ * [hasEntitlement] e [listEntitlements].
  */
 export function isEntitled(
   subscription: UserSubscription,
@@ -189,6 +195,7 @@ export async function hasEntitlement(
   isAdmin = false,
 ): Promise<boolean> {
   if (isAdmin) return true;
+  if (freeAccess(entitlement)) return true;
   const subscription = await getSubscription(uid);
   return isEntitled(subscription, entitlement, isAdmin);
 }
@@ -197,7 +204,12 @@ export function listEntitlements(
   subscription: UserSubscription,
   isAdmin = false,
 ): Entitlement[] {
-  return BASIC_PLAN_ENTITLEMENTS.filter((e) =>
-    isEntitled(subscription, e, isAdmin),
+  return BASIC_PLAN_ENTITLEMENTS.filter(
+    (e) => freeAccess(e) || isEntitled(subscription, e, isAdmin),
   );
+}
+
+/** Com a cobrança desligada (#594), o plano básico inteiro é de todos. */
+function freeAccess(entitlement: Entitlement): boolean {
+  return !isBillingEnabled() && BASIC_PLAN_ENTITLEMENTS.includes(entitlement);
 }

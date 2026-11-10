@@ -1213,6 +1213,7 @@ class MeResponse {
     required this.admin,
     required this.subscription,
     required this.entitlements,
+    this.billingEnabled,
   });
 
   factory MeResponse.fromJson(Map<String, dynamic> json) => MeResponse(
@@ -1224,6 +1225,9 @@ class MeResponse {
     entitlements: (json['entitlements'] as List<dynamic>)
         .map((e) => Entitlement.fromJson(e as String))
         .toList(),
+    billingEnabled: json['billingEnabled'] == null
+        ? null
+        : json['billingEnabled'] as bool,
   );
 
   final String uid;
@@ -1231,11 +1235,17 @@ class MeResponse {
   final PublicSubscription subscription;
   final List<Entitlement> entitlements;
 
+  /// Se a cobrança está ligada (issue #594). Desligada, todo usuário
+  /// recebe todos os entitlements e o cliente esconde os convites para
+  /// assinar. Opcional: a API anterior não o envia.
+  final bool? billingEnabled;
+
   Map<String, dynamic> toJson() => {
     'uid': uid,
     'admin': admin,
     'subscription': subscription.toJson(),
     'entitlements': entitlements.map((e) => e.toJson()).toList(),
+    if (billingEnabled != null) 'billingEnabled': billingEnabled,
   };
 }
 

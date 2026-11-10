@@ -256,6 +256,7 @@ describe('GET /api/me', () => {
         cancelAtPeriodEnd: false,
       },
       entitlements: [],
+      billingEnabled: true,
     });
   });
 
@@ -280,6 +281,7 @@ describe('GET /api/me', () => {
         cancelAtPeriodEnd: false,
       },
       entitlements: ['ai', 'projections'],
+      billingEnabled: true,
     });
     expect(JSON.stringify(response.body)).not.toContain('cus_1');
     expect(JSON.stringify(response.body)).not.toContain('sub_1');
