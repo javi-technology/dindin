@@ -51,7 +51,9 @@ describe('fontes de dados de mercado', () => {
   describe('AGENTS.md', () => {
     const guia = ler('AGENTS.md');
     const inicio = guia.indexOf('### Fontes de dados de mercado');
-    const secao = guia.slice(inicio, guia.indexOf('\n### ', inicio + 1));
+    // Sem seção seguinte, a seção vai até o fim do arquivo.
+    const proxima = guia.indexOf('\n### ', inicio + 1);
+    const secao = guia.slice(inicio, proxima === -1 ? guia.length : proxima);
 
     it('deve ter a seção das fontes de dados de mercado', () => {
       expect(inicio).toBeGreaterThan(-1);
