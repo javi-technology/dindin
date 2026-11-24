@@ -5,6 +5,11 @@ const mockListActiveAssetTickers = jest.fn();
 const mockGetQuotesByTicker = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
 const mockRecordPaidDividends = jest.fn();
+const mockFetchCotahist = jest.fn();
+
+jest.mock('../../src/quotes/cotahist', () => ({
+  fetchCotahistClosingPrices: mockFetchCotahist,
+}));
 
 // A cadeia de provedores marca cada cotação com a fonte (#598). As fixtures
 // sem `source` representam o provedor principal, o Yahoo.
@@ -74,6 +79,8 @@ describe('reconcileClosingQuotes', () => {
     ]);
     mockGetQuotesByTicker.mockResolvedValue(new Map());
     mockSaveReconciledPrice.mockResolvedValue(undefined);
+    // Sem arquivo do pregão, a reconciliação usa a cadeia de provedores.
+    mockFetchCotahist.mockResolvedValue(undefined);
   });
 
   function storedQuote(price: number, quotedAt?: string) {
@@ -294,6 +301,108 @@ describe('reconcileClosingQuotes', () => {
       expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
+    });
+  });
+
+  // Fechamento oficial da B3 (#600): o COTAHIST traz o preço do leilão de
+  // fechamento, que o Yahoo e a Brapi nem sempre servem. Sai entre 20h30 e
+  // 21h20, antes do job das 23:30.
+  describe('fechamento oficial da B3 (COTAHIST)', () => {
+    function official(price: number) {
+      return new Map([
+        ['TRXF11', { date: '2026-11-23', price, isin: 'BRTRXFCTF001' }],
+      ]);
+    }
+
+    it('deve consultar o arquivo do pregão de hoje', async () => {
+      await reconcileClosingQuotes();
+
+      expect(mockFetchCotahist).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
+    });
+
+    it('deve gravar o fechamento oficial, sem horário de apuração, com source b3-cotahist', async () => {
+      mockGetQuotesByTicker.mockResolvedValue(
+        storedQuote(73.99, '2026-09-23T21:31:00Z'),
+      );
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+
+      await reconcileClosingQuotes();
+
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        expect.objectContaining({ price: 73.99 }),
+        undefined,
+        'b3-cotahist',
+      );
+    });
+
+    it('não deve consultar os provedores quando o arquivo do pregão existe', async () => {
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+
+      await reconcileClosingQuotes();
+
+      expect(mockFetchQuotes).not.toHaveBeenCalled();
+    });
+
+    it('não deve regravar quando o preço gravado já é o fechamento oficial', async () => {
+      mockGetQuotesByTicker.mockResolvedValue(storedQuote(73.9));
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+
+      await reconcileClosingQuotes();
+
+      expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
+    });
+
+    it('deve avisar os tickers do catálogo ausentes do arquivo', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'TRXF11', assetType: 'FII' },
+        { ticker: 'XPTO11', assetType: 'FII' },
+      ]);
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+
+      await reconcileClosingQuotes();
+
+      expect(functionsLogger.warn).toHaveBeenCalledWith(
+        'reconcileQuotes.tickersWithoutClose',
+        expect.objectContaining({ tickers: ['XPTO11'] }),
+      );
+    });
+
+    it('deve usar a cadeia de provedores e avisar quando o arquivo não existe', async () => {
+      mockGetQuotesByTicker.mockResolvedValue(
+        storedQuote(73.99, '2026-09-23T21:31:00Z'),
+      );
+      mockFetchQuotes.mockResolvedValue(fetched(73.9, '2026-09-23T23:05:00Z'));
+
+      await reconcileClosingQuotes();
+
+      expect(functionsLogger.warn).toHaveBeenCalledWith(
+        'reconcileQuotes.cotahistUnavailable',
+        expect.objectContaining({ date: expect.any(String) }),
+      );
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        expect.anything(),
+        '2026-09-23T23:05:00Z',
+        'yahoo',
+      );
+    });
+
+    it('deve usar a cadeia de provedores e avisar quando a B3 falha', async () => {
+      mockFetchCotahist.mockRejectedValue(new Error('B3 fora do ar'));
+      mockFetchQuotes.mockResolvedValue(new Map());
+
+      await expect(reconcileClosingQuotes()).resolves.toBeUndefined();
+
+      expect(functionsLogger.warn).toHaveBeenCalledWith(
+        'reconcileQuotes.cotahistFailed',
+        expect.objectContaining({ message: 'B3 fora do ar' }),
+      );
+      expect(mockFetchQuotes).toHaveBeenCalled();
     });
   });
 });
