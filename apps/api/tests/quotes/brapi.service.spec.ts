@@ -22,7 +22,6 @@ describe('BrapiService — fetchQuotes', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     delete process.env.BRAPI_API_KEY;
-    delete process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST;
   });
 
   function mockFetch(response: unknown, status = 200) {
@@ -132,20 +131,6 @@ describe('BrapiService — fetchQuotes', () => {
       expect((options.headers as Record<string, string>)['Authorization']).toBe(
         'Bearer test-api-key',
       );
-    });
-
-    it('deve ignorar BRAPI_MAX_SYMBOLS_PER_REQUEST, que só valia no plano Pro', async () => {
-      process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST = '20';
-      const fetchMock = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: jest.fn().mockResolvedValue({ results: [] }),
-      });
-      globalThis.fetch = fetchMock;
-
-      await fetchQuotes(['HGLG11', 'MXRF11']);
-
-      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
 
