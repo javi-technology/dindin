@@ -473,10 +473,10 @@ export const api = onRequest(
 // Os três agendamentos diários abaixo formam uma cadeia — cotações, snapshot
 // patrimonial e preço-alvo — e se movem em bloco: os dois últimos leem o preço
 // gravado pelo primeiro.
-// Ver issues #10, #22, #192 e #212 — busca cotações via Brapi (fonte única)
-// e salva em `quotes/{ticker}` + histórico.
-// O segredo BRAPI_API_KEY é vinculado via `secrets` para ficar disponível
-// em process.env dentro da execução. Configurar com:
+// Ver issues #10, #22, #192 e #598 — busca cotações no Yahoo Finance, com o
+// plano gratuito da Brapi de reserva, e salva em `quotes/{ticker}` + histórico.
+// O segredo BRAPI_API_KEY (token do plano gratuito) é vinculado via `secrets`
+// para ficar disponível em process.env dentro da execução. Configurar com:
 //   firebase functions:secrets:set BRAPI_API_KEY
 export const updateQuotesScheduled = onSchedule(
   {
@@ -532,7 +532,7 @@ export const checkTargetPricesScheduled = onSchedule(
 // Reconciliação noturna do preço de fechamento, às 23:30 (issue #389).
 //
 // Mesmo depois de atrasar a cadeia diária para depois do after-market (#388),
-// a Brapi pode continuar servindo o último negócio do pregão contínuo por
+// a fonte pode continuar servindo o último negócio do pregão contínuo por
 // horas. Este job volta no fim do dia e corrige só o preço — sem registrar
 // proventos nem tirar a foto de data-com —, e antes da meia-noite, para que a
 // correção caia no histórico do próprio pregão.

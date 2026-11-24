@@ -68,7 +68,7 @@ async function reconcileTicker(
  * Reconciliação noturna do preço de fechamento (issue #389).
  *
  * Mesmo depois de atrasar a cadeia diária para depois do after-market (#388),
- * não há garantia de que a Brapi já consolidou o fechamento: ela chegou a
+ * não há garantia de que a fonte já consolidou o fechamento: a Brapi chegou a
  * servir o último negócio do pregão contínuo mais de uma hora depois do
  * encerramento. Este job volta mais tarde e corrige **apenas o preço**.
  *
