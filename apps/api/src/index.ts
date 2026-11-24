@@ -536,6 +536,9 @@ export const checkTargetPricesScheduled = onSchedule(
 // horas. Este job volta no fim do dia e corrige só o preço — sem registrar
 // proventos nem tirar a foto de data-com —, e antes da meia-noite, para que a
 // correção caia no histórico do próprio pregão.
+// O preço vem do COTAHIST oficial da B3 (issue #600), publicado entre 20h30 e
+// 21h20; sem o arquivo do pregão, usa a cadeia Yahoo → Brapi, que precisa do
+// segredo BRAPI_API_KEY.
 export const reconcileQuotesScheduled = onSchedule(
   {
     schedule: '30 23 * * *',
