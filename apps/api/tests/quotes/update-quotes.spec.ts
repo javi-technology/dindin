@@ -4,8 +4,21 @@ const mockListActiveAssetTickers = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
 const mockRecordPaidDividends = jest.fn();
 
-jest.mock('../../src/quotes/brapi.service', () => ({
-  fetchQuotes: mockFetchQuotes,
+// A cadeia de provedores marca cada cotação com a fonte (#598). As fixtures
+// sem `source` representam o provedor principal, o Yahoo.
+jest.mock('../../src/quotes/quote-provider-chain', () => ({
+  fetchQuotesWithFallback: async (tickers: string[]) => {
+    const quotes = (await mockFetchQuotes(tickers)) as Map<
+      string,
+      { source?: string }
+    >;
+    return new Map(
+      [...quotes].map(([ticker, quote]) => [
+        ticker,
+        { source: 'yahoo', ...quote },
+      ]),
+    );
+  },
 }));
 
 jest.mock('../../src/quotes/dividend-fetch.service', () => ({
@@ -45,7 +58,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
   });
 
   describe('sem ativos no catálogo', () => {
-    it('não deve chamar a Brapi quando não há ativos cadastrados', async () => {
+    it('não deve consultar os provedores quando não há ativos cadastrados', async () => {
       mockListActiveAssetTickers.mockResolvedValue([]);
 
       await updateAllQuotes();
@@ -120,7 +133,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         0.92,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -130,7 +143,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'MXRF11',
         10.32,
         0.07,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -164,7 +177,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         0.92,
-        'brapi',
+        'yahoo',
         '2026-07-14',
         10.8,
         '2026-07-15T18:00:00Z',
@@ -317,7 +330,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         0.92,
-        'brapi',
+        'yahoo',
         '2026-07-14',
         undefined,
         '2026-07-15T18:00:00Z',
@@ -327,7 +340,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'MXRF11',
         10.32,
         0.07,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -351,7 +364,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         undefined,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -359,7 +372,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       );
     });
 
-    it('deve consultar ações e FIIs do catálogo em uma única chamada à Brapi', async () => {
+    it('deve consultar ações e FIIs do catálogo em uma única chamada à cadeia de provedores', async () => {
       const assets = [
         { ticker: 'HGLG11', assetType: 'FII' },
         { ticker: 'PETR4', assetType: 'STOCK' },
@@ -385,7 +398,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       expect(mockSaveQuoteHistory).toHaveBeenCalledTimes(3);
     });
 
-    it('deve logar os tickers que ficaram sem cotação na Brapi', async () => {
+    it('deve logar os tickers que ficaram sem cotação nos provedores', async () => {
       const consoleWarnSpy = jest
         .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
@@ -406,7 +419,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('não deve quebrar quando um ticker do catálogo não tem cotação na Brapi', async () => {
+    it('não deve quebrar quando um ticker do catálogo não tem cotação nos provedores', async () => {
       mockListActiveAssetTickers.mockResolvedValue([
         { ticker: 'HGLG11', assetType: 'FII' },
         { ticker: 'TICKER_INEXISTENTE', assetType: 'OTHER' },
@@ -427,7 +440,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         0.92,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -459,7 +472,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'MXRF11',
         10.32,
         0.07,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -491,7 +504,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'HGLG11',
         165.5,
         undefined,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-07-15T18:00:00Z',
@@ -535,7 +548,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
           tickers[i],
           10 + i,
           (10 + i) / 100,
-          'brapi',
+          'yahoo',
           undefined,
           undefined,
           '2026-07-15T18:00:00Z',
@@ -545,29 +558,29 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
     });
   });
 
-  describe('erro na Brapi', () => {
-    it('deve lançar erro quando a Brapi falha totalmente, para acionar o retry do scheduler', async () => {
+  describe('erro nos provedores de cotação', () => {
+    it('deve lançar erro quando todos os provedores falham, para acionar o retry do scheduler', async () => {
       const consoleErrorSpy = jest
         .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
       mockListActiveAssetTickers.mockResolvedValue([
         { ticker: 'HGLG11', assetType: 'FII' },
       ]);
-      mockFetchQuotes.mockRejectedValue(new Error('Brapi API error'));
+      mockFetchQuotes.mockRejectedValue(new Error('falha na brapi'));
 
       await expect(updateAllQuotes()).rejects.toThrow(
-        'Nenhuma cotação obtida na Brapi: Brapi API error',
+        'Nenhuma cotação obtida nos provedores: falha na brapi',
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'updateAllQuotes.brapiFailed',
-        expect.objectContaining({ message: 'Brapi API error' }),
+        'updateAllQuotes.quotesFailed',
+        expect.objectContaining({ message: 'falha na brapi' }),
       );
       expect(mockSaveQuoteHistory).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
 
-    it('não deve lançar erro quando a Brapi retorna vazio sem falhar', async () => {
+    it('não deve lançar erro quando os provedores respondem vazio sem falhar', async () => {
       const consoleWarnSpy = jest
         .spyOn(functionsLogger, 'warn')
         .mockImplementation(() => {});
@@ -582,11 +595,37 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
       consoleWarnSpy.mockRestore();
     });
   });
+  // A gravação leva o provedor que de fato forneceu a cotação (#598): com a
+  // Brapi como reserva, o literal 'brapi' esconderia de onde veio o preço.
+  describe('fonte da cotação', () => {
+    it('deve gravar em source o provedor de reserva quando foi ele que respondeu', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'XPTO11', assetType: 'FII' },
+      ]);
+      mockFetchQuotes.mockResolvedValue(
+        new Map([['XPTO11', { price: 10, source: 'brapi' }]]),
+      );
+
+      await updateAllQuotes();
+
+      expect(mockSaveQuoteHistory).toHaveBeenCalledWith(
+        'XPTO11',
+        10,
+        undefined,
+        'brapi',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
   // Horário de apuração da cotação (issue #387): repassado à gravação e
-  // registrado no log, para medir no Cloud Logging quando a Brapi consolida
+  // registrado no log, para medir no Cloud Logging quando a fonte consolida
   // o fechamento de cada pregão.
   describe('horário de apuração da cotação', () => {
-    it('deve repassar o horário de apuração da Brapi para a gravação', async () => {
+    it('deve repassar o horário de apuração da fonte para a gravação', async () => {
       mockListActiveAssetTickers.mockResolvedValue([
         { ticker: 'TRXF11', assetType: 'FII' },
       ]);
@@ -602,7 +641,7 @@ describe('UpdateQuotesHandler — updateAllQuotes', () => {
         'TRXF11',
         73.9,
         undefined,
-        'brapi',
+        'yahoo',
         undefined,
         undefined,
         '2026-09-23T21:31:00Z',

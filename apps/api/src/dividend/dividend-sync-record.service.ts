@@ -13,13 +13,13 @@ import { PaidDividendEvent } from '../quotes/dividend-fetch.service';
  *
  * `quotes` guarda só o último provento anunciado, então um job em data fixa
  * perdia pagamentos: cedo demais o evento do mês ainda não existe; tarde
- * demais já foi trocado pelo anúncio seguinte. O sync recebe da Brapi a lista
+ * demais já foi trocado pelo anúncio seguinte. O sync recebe da fonte a lista
  * de eventos pagos e registra cada um no dia do pagamento.
  *
  * `dividendSync/{ticker}.recorded` guarda o valor por cota já registrado em
  * cada dia de pagamento. Um dia é reprocessado quando é novo ou quando a soma
  * mudou: um JCP publicado depois do dividendo do mesmo dia, ou um pagamento
- * que a Brapi inclui com data anterior ao último registro. O estado só é
+ * que a fonte inclui com data anterior ao último registro. O estado só é
  * gravado depois do commit, então uma falha é refeita na execução seguinte. E
  * só quem tem dia novo ou alterado custa as consultas de quem possui o ativo.
  *
@@ -40,7 +40,7 @@ const LEGACY_AUTO_ID = /^\d{4}-\d{2}_/;
 
 interface DividendSyncState {
   // YYYY-MM-DD → valor por cota registrado naquele dia. Espelha os eventos da
-  // janela de 12 meses devolvida pela Brapi, então não cresce sem limite.
+  // janela de 12 meses devolvida pela fonte, então não cresce sem limite.
   recorded: Record<string, number>;
   // Datas-com com foto guardada. Espelha as datas-com dos eventos recebidos:
   // a foto que sai da janela é apagada.

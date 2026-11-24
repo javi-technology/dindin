@@ -1,12 +1,13 @@
-import { fetchQuotes, QuoteResult } from './brapi.service';
+import { SourcedQuote } from './quote-provider';
+import { fetchQuotesWithFallback } from './quote-provider-chain';
 import { logError, logWarn } from '../shared/logger';
 
 /**
- * Busca na Brapi as cotações dos tickers informados, a fonte oficial e única
- * do DinDin.
+ * Busca as cotações dos tickers informados na cadeia de provedores (#598):
+ * Yahoo Finance, com o plano gratuito da Brapi de reserva.
  *
- * Tickers sem cotação são apenas logados. Lança erro quando a Brapi falha por
- * completo, para que o scheduler acione o retry.
+ * Tickers sem cotação são apenas logados. Lança erro quando todos os
+ * provedores falham, para que o scheduler acione o retry.
  *
  * Mora aqui, e não no job diário, porque a reconciliação noturna (#389) faz a
  * mesma busca com o mesmo tratamento de falha; `event` distingue os dois no
@@ -15,14 +16,16 @@ import { logError, logWarn } from '../shared/logger';
 export async function fetchCatalogQuotes(
   tickerList: string[],
   event: string,
-): Promise<Map<string, QuoteResult>> {
-  let quotes: Map<string, QuoteResult>;
+): Promise<Map<string, SourcedQuote>> {
+  let quotes: Map<string, SourcedQuote>;
   try {
-    quotes = await fetchQuotes(tickerList);
+    quotes = await fetchQuotesWithFallback(tickerList);
   } catch (error) {
-    const brapiError = error as Error;
-    logError(`${event}.brapiFailed`, { message: brapiError.message });
-    throw new Error(`Nenhuma cotação obtida na Brapi: ${brapiError.message}`);
+    const quotesError = error as Error;
+    logError(`${event}.quotesFailed`, { message: quotesError.message });
+    throw new Error(
+      `Nenhuma cotação obtida nos provedores: ${quotesError.message}`,
+    );
   }
 
   const withoutQuote = tickerList.filter((ticker) => !quotes.has(ticker));

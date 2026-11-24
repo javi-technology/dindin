@@ -362,6 +362,43 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   uma segunda verdade sobre os tipos de ativo aceitos (issue #303). O Dart,
   que não tem esse pacote, gera a classe.
 
+### Fontes de dados de mercado (issues #598 a #601)
+
+- O plano Pro da Brapi foi cancelado por custo. As fontes atuais são
+  gratuitas:
+
+  | Dado                         | Fonte                                                                   | Onde                             |
+  | ---------------------------- | ----------------------------------------------------------------------- | -------------------------------- |
+  | Cotação diária (19:30)       | Yahoo Finance (`v8/finance/chart/{TICKER}.SA`), sem chave               | `quotes/yahoo-quote.provider.ts` |
+  | Reserva de cotação           | Brapi, plano gratuito (1 ticker por chamada, `BRAPI_API_KEY`)           | `quotes/brapi.service.ts`        |
+  | Fechamento oficial (23:30)   | COTAHIST diário da B3 (`PREULT`), publicado entre 20h30 e 21h20         | `quotes/cotahist.ts`             |
+  | Proventos, data-com e agenda | B3 Listados (`GetListedSupplementFunds` e `GetListedSupplementCompany`) | `quotes/b3-dividend.provider.ts` |
+
+- **Os jobs dependem das interfaces `QuoteProvider` e `DividendProvider`**, não
+  de um provedor: Yahoo e B3 Listados são endpoints públicos **sem
+  documentação oficial**, que podem mudar de formato ou bloquear IPs do GCP. A
+  próxima troca de fonte é um provedor novo, sem mexer nos handlers.
+- A cadeia de cotação consulta o Yahoo e manda **só os tickers que faltaram**
+  para a Brapi: a cota do plano gratuito é pequena. Bloqueio (401, 403, 429)
+  interrompe as consultas ao provedor e cai na reserva.
+- O `source` da cotação gravada é o provedor que a forneceu (`yahoo`, `brapi`
+  ou `b3-cotahist`), nunca um literal fixo.
+- O fechamento do COTAHIST é **o oficial** e prevalece na reconciliação. Ele é
+  gravado **sem `quotedAt`**, porque o arquivo não traz horário (#387); como é
+  gravado depois do fim do pregão, só uma cotação apurada depois da gravação
+  (de um pregão seguinte) o substitui. Sem o arquivo do pregão (fim de semana,
+  feriado, atraso), e para os tickers ausentes dele, a reconciliação usa a
+  cadeia de cotação.
+- Na B3 Listados, a lista de proventos mistura classes e recibos: **o evento
+  vale para o ticker pelo ISIN** (`CTF` para a cota de FII, `ACNOR`/`ACNPR`/...
+  pelo sufixo da ação, `CDA` para UNIT, `BDR` para os sufixos 31 a 35). Somar
+  o recibo de subscrição dobraria o provento de quem tem a cota. Valores e datas vêm em pt-BR, e a resposta
+  pode chegar codificada duas vezes (texto JSON de um JSON).
+- **Formato inesperado é aviso no log e "sem dado conhecido", nunca zero**: o
+  zero seria lido como "o ativo não paga" ou "não vale nada".
+- Não voltar a configurar lote de tickers do plano Pro
+  (`BRAPI_MAX_SYMBOLS_PER_REQUEST`): a suíte reprova.
+
 ### Objetivo da Geladeira (issue #587)
 
 - O FII na geladeira fica **parado, sem recomendação de aporte**, aguardando a

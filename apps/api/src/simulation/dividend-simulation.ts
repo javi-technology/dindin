@@ -19,7 +19,7 @@ import { todayAsUtcDate } from '../shared/date';
  * emulador.
  *
  * A base é sempre `quotes.monthlyDividend`, o **último provento real** da
- * Brapi. A média de 12 meses (`annualDividend / 12`) não entra aqui, nem como
+ * fonte de proventos (B3 Listados, #599). A média de 12 meses (`annualDividend / 12`) não entra aqui, nem como
  * fallback: ela suaviza o provento variável de FII e o número exibido deixaria
  * de existir em algum extrato.
  */
@@ -114,7 +114,7 @@ export function simulateDividendIncome(
   const states: AssetState[] = input.assets.map((asset, index) => {
     const price = validAmount(asset.price);
     // Provento zerado conta como desconhecido: é o valor que a cotação recebe
-    // quando a Brapi não informou nada, e projetar zero calado esconderia do
+    // quando a fonte não informou nada, e projetar zero calado esconderia do
     // usuário que aquele ativo simplesmente não entrou na conta.
     const dividend = validAmount(asset.monthlyDividend);
     return {

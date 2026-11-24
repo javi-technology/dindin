@@ -45,7 +45,7 @@ export interface AiSuggestionInputItem extends RecommendedWalletComparisonItem {
   segment?: string;
   weight?: number;
   closePrice?: number;
-  monthlyDividend?: number; // último provento pago informado pela Brapi (#290)
+  monthlyDividend?: number; // último provento pago informado pela fonte (#290, #599)
   qualifiedInvestor?: boolean;
 }
 

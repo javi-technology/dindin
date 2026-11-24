@@ -132,7 +132,7 @@ export async function saveReconciledPrice(
  * aqui é o que permite ao endpoint de histórico ler ~12 documentos por ticker
  * em vez de varrer ~365 e descartar quase todos.
  *
- * A chave é o mês do pagamento, não o da execução: a Brapi devolve sempre o
+ * A chave é o mês do pagamento, não o da execução: a fonte devolve sempre o
  * último provento anunciado, então num pagador trimestral os jobs dos meses
  * seguintes ainda veem o mesmo provento. Chavear pela execução registraria
  * três pagamentos onde houve um.

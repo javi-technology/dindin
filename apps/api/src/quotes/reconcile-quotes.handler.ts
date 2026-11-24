@@ -1,17 +1,19 @@
-import { QuoteResult } from './brapi.service';
+import { SourcedQuote } from './quote-provider';
 import { fetchCatalogQuotes } from './catalog-quotes';
+import { CotahistQuote, fetchCotahistClosingPrices } from './cotahist';
 import { saveReconciledPrice } from './quote-history.service';
 import { getQuotesByTicker } from './quote-prices';
 import { listActiveAssetTickers } from '../assets/asset.service';
-import { logError, logInfo } from '../shared/logger';
+import { today } from '../shared/date';
+import { logError, logInfo, logWarn } from '../shared/logger';
 import { Quote } from 'dindin-models';
 
 // Mesmo lote do job diário: escrever todos os tickers de uma vez estouraria
 // os limites de taxa do Firestore conforme o catálogo crescer.
 const BATCH_SIZE = 10;
 
-// A Brapi é a fonte oficial e única de cotações e proventos (issue #212).
-const QUOTE_SOURCE = 'brapi';
+// Fechamento do leilão publicado pela B3 no COTAHIST (#600).
+const OFFICIAL_SOURCE = 'b3-cotahist';
 
 /**
  * Se a cotação vinda da fonte foi apurada depois da que já está gravada.
@@ -20,21 +22,31 @@ const QUOTE_SOURCE = 'brapi';
  * novo — pode ser a mesma leitura em cache —, e sobrescrever seria trocar um
  * fechamento consolidado por um palpite. Cotação gravada antes da #387 não
  * tem o campo, e aí qualquer apuração conhecida é ganho de informação.
+ *
+ * O fechamento oficial também não tem o campo, mas foi gravado depois do fim
+ * do pregão: só uma apuração posterior à gravação é de um pregão seguinte.
  */
-function isNewerQuote(quote: QuoteResult, stored: Quote | undefined): boolean {
+function isNewerQuote(quote: SourcedQuote, stored: Quote | undefined): boolean {
   if (!quote.quotedAt) return false;
+  if (stored?.source === OFFICIAL_SOURCE && !stored.quotedAt) {
+    return Date.parse(quote.quotedAt) > Date.parse(stored.updatedAt);
+  }
   if (!stored?.quotedAt) return true;
   return Date.parse(quote.quotedAt) > Date.parse(stored.quotedAt);
 }
 
+/**
+ * Preço a gravar. O COTAHIST não informa horário, e o preço oficial é gravado
+ * sem `quotedAt`: inventar um horário contrariaria a #387.
+ */
+type Correction = SourcedQuote;
+
 /** `true` quando o preço foi de fato corrigido. */
 async function reconcileTicker(
   ticker: string,
-  quote: QuoteResult,
+  quote: Correction,
   stored: Quote | undefined,
 ): Promise<boolean> {
-  if (!isNewerQuote(quote, stored)) return false;
-
   try {
     // Caminho dedicado, que não passa pelo histórico mensal de proventos: a
     // reconciliação corrige preço, e regravar aquele registro toda noite o
@@ -44,7 +56,7 @@ async function reconcileTicker(
       quote.price,
       stored,
       quote.quotedAt,
-      QUOTE_SOURCE,
+      quote.source,
     );
     logInfo('reconcileQuotes.priceReconciled', {
       ticker,
@@ -53,6 +65,7 @@ async function reconcileTicker(
       difference:
         stored?.price === undefined ? undefined : quote.price - stored.price,
       quotedAt: quote.quotedAt,
+      source: quote.source,
     });
     return true;
   } catch (error) {
@@ -68,10 +81,68 @@ async function reconcileTicker(
 }
 
 /**
+ * Fechamentos oficiais do pregão, ou `undefined` para recorrer à cadeia de
+ * provedores: sem arquivo (fim de semana, feriado, atraso da B3) ou com a B3
+ * fora do ar, a reconciliação de antes continua valendo.
+ */
+async function loadOfficialCloses(
+  date: string,
+): Promise<Map<string, CotahistQuote> | undefined> {
+  try {
+    const official = await fetchCotahistClosingPrices(date);
+    if (!official) logWarn('reconcileQuotes.cotahistUnavailable', { date });
+    return official;
+  } catch (error) {
+    logWarn('reconcileQuotes.cotahistFailed', {
+      date,
+      message: (error as Error).message,
+    });
+    return undefined;
+  }
+}
+
+/**
+ * O fechamento oficial vale sobre qualquer leitura do dia; igual, não regrava.
+ * Os tickers ausentes do arquivo (sem negócio no pregão, ou não publicados)
+ * vão para a cadeia de provedores, como antes do #600.
+ */
+async function officialCorrections(
+  official: Map<string, CotahistQuote>,
+  tickerList: string[],
+  stored: Map<string, Quote>,
+): Promise<[string, Correction][]> {
+  const corrections = tickerList.flatMap((ticker): [string, Correction][] => {
+    const close = official.get(ticker);
+    if (!close || stored.get(ticker)?.price === close.price) return [];
+    return [[ticker, { price: close.price, source: OFFICIAL_SOURCE }]];
+  });
+
+  const missing = tickerList.filter((ticker) => !official.has(ticker));
+  if (missing.length === 0) return corrections;
+  logWarn('reconcileQuotes.tickersWithoutClose', { tickers: missing });
+  try {
+    return [...corrections, ...(await providerCorrections(missing, stored))];
+  } catch {
+    // A falha já foi logada pela busca; os fechamentos oficiais seguem.
+    return corrections;
+  }
+}
+
+async function providerCorrections(
+  tickerList: string[],
+  stored: Map<string, Quote>,
+): Promise<[string, Correction][]> {
+  const quotes = await fetchCatalogQuotes(tickerList, 'reconcileQuotes');
+  return [...quotes.entries()].filter(([ticker, quote]) =>
+    isNewerQuote(quote, stored.get(ticker)),
+  );
+}
+
+/**
  * Reconciliação noturna do preço de fechamento (issue #389).
  *
  * Mesmo depois de atrasar a cadeia diária para depois do after-market (#388),
- * não há garantia de que a Brapi já consolidou o fechamento: ela chegou a
+ * não há garantia de que a fonte já consolidou o fechamento: a Brapi chegou a
  * servir o último negócio do pregão contínuo mais de uma hora depois do
  * encerramento. Este job volta mais tarde e corrige **apenas o preço**.
  *
@@ -79,8 +150,10 @@ async function reconcileTicker(
  * e tira a foto de data-com, varrendo todos os usuários. O registro é
  * idempotente, mas a varredura extra custa leituras sem necessidade.
  *
- * A gravação é a mesma do job diário (`saveQuoteHistory`); o que muda é a
- * guarda: só sobrescreve quando a fonte apurou depois do que está gravado.
+ * A fonte é o COTAHIST da B3 (#600), que traz o preço oficial do leilão de
+ * fechamento e é publicado antes deste job. Sem o arquivo do pregão, ou para
+ * os tickers ausentes dele, recorre à cadeia de provedores e só sobrescreve
+ * quando a fonte apurou depois do que está gravado.
  */
 export async function reconcileClosingQuotes(): Promise<void> {
   try {
@@ -94,11 +167,13 @@ export async function reconcileClosingQuotes(): Promise<void> {
     const tickerList = assetList.map((asset) => asset.ticker);
     logInfo('reconcileQuotes.start', { tickers: tickerList.length });
 
-    const quotes = await fetchCatalogQuotes(tickerList, 'reconcileQuotes');
     const stored = await getQuotesByTicker(tickerList);
+    const official = await loadOfficialCloses(today());
+    const entries = official
+      ? await officialCorrections(official, tickerList, stored)
+      : await providerCorrections(tickerList, stored);
 
     let reconciled = 0;
-    const entries = [...quotes.entries()];
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       const batch = entries.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(

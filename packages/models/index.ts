@@ -159,7 +159,7 @@ export interface Quote {
    * fonte de falha nossa. Ausente nas cotações gravadas antes da #387.
    */
   quotedAt?: string;
-  source: string; // ex: "brapi"
+  source: string; // provedor da cotação: "yahoo", "brapi" (#598)
 }
 
 /** Registro histórico de cotação — subcoleção `quotes/{ticker}/history` */
