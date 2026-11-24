@@ -329,9 +329,11 @@ de mercado".
 (issue #389), sem registrar proventos nem tirar a foto de data-com. O preço vem
 do **COTAHIST** da B3, o fechamento oficial do leilão, publicado entre 20h30 e
 21h20 (issue #600), e é gravado com `source: b3-cotahist` e sem `quotedAt`.
-Sem o arquivo do pregão, a reconciliação usa a cadeia de cotação e só
-sobrescreve quando o `quotedAt` da fonte é posterior ao já gravado, para um
-dado em cache não substituir um fechamento consolidado.
+Sem o arquivo do pregão, e para os tickers ausentes dele, a reconciliação usa
+a cadeia de cotação e só sobrescreve quando o `quotedAt` da fonte é posterior
+ao já gravado, para um dado em cache não substituir um fechamento consolidado.
+O fechamento oficial, sem `quotedAt`, só é substituído por uma cotação apurada
+depois de gravado, ou seja, de um pregão seguinte.
 
 ## Alertas de preço-alvo da geladeira
 

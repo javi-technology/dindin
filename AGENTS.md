@@ -384,13 +384,15 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
 - O `source` da cotação gravada é o provedor que a forneceu (`yahoo`, `brapi`
   ou `b3-cotahist`), nunca um literal fixo.
 - O fechamento do COTAHIST é **o oficial** e prevalece na reconciliação. Ele é
-  gravado **sem `quotedAt`**, porque o arquivo não traz horário (#387). Sem o
-  arquivo do pregão (fim de semana, feriado, atraso), a reconciliação usa a
+  gravado **sem `quotedAt`**, porque o arquivo não traz horário (#387); como é
+  gravado depois do fim do pregão, só uma cotação apurada depois da gravação
+  (de um pregão seguinte) o substitui. Sem o arquivo do pregão (fim de semana,
+  feriado, atraso), e para os tickers ausentes dele, a reconciliação usa a
   cadeia de cotação.
 - Na B3 Listados, a lista de proventos mistura classes e recibos: **o evento
   vale para o ticker pelo ISIN** (`CTF` para a cota de FII, `ACNOR`/`ACNPR`/...
-  pelo sufixo da ação, `CDA` para UNIT). Somar o recibo de subscrição dobraria
-  o provento de quem tem a cota. Valores e datas vêm em pt-BR, e a resposta
+  pelo sufixo da ação, `CDA` para UNIT, `BDR` para os sufixos 31 a 35). Somar
+  o recibo de subscrição dobraria o provento de quem tem a cota. Valores e datas vêm em pt-BR, e a resposta
   pode chegar codificada duas vezes (texto JSON de um JSON).
 - **Formato inesperado é aviso no log e "sem dado conhecido", nunca zero**: o
   zero seria lido como "o ativo não paga" ou "não vale nada".
