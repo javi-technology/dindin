@@ -315,6 +315,8 @@ describe('reconcileClosingQuotes', () => {
     }
 
     it('deve consultar o arquivo do pregão de hoje', async () => {
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+
       await reconcileClosingQuotes();
 
       expect(mockFetchCotahist).toHaveBeenCalledWith(
