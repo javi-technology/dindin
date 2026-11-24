@@ -12,6 +12,9 @@ import { Quote } from 'dindin-models';
 // os limites de taxa do Firestore conforme o catálogo crescer.
 const BATCH_SIZE = 10;
 
+// Fechamento do leilão publicado pela B3 no COTAHIST (#600).
+const OFFICIAL_SOURCE = 'b3-cotahist';
+
 /**
  * Se a cotação vinda da fonte foi apurada depois da que já está gravada.
  *
@@ -19,15 +22,18 @@ const BATCH_SIZE = 10;
  * novo — pode ser a mesma leitura em cache —, e sobrescrever seria trocar um
  * fechamento consolidado por um palpite. Cotação gravada antes da #387 não
  * tem o campo, e aí qualquer apuração conhecida é ganho de informação.
+ *
+ * O fechamento oficial também não tem o campo, mas foi gravado depois do fim
+ * do pregão: só uma apuração posterior à gravação é de um pregão seguinte.
  */
 function isNewerQuote(quote: SourcedQuote, stored: Quote | undefined): boolean {
   if (!quote.quotedAt) return false;
+  if (stored?.source === OFFICIAL_SOURCE && !stored.quotedAt) {
+    return Date.parse(quote.quotedAt) > Date.parse(stored.updatedAt);
+  }
   if (!stored?.quotedAt) return true;
   return Date.parse(quote.quotedAt) > Date.parse(stored.quotedAt);
 }
-
-// Fechamento do leilão publicado pela B3 no COTAHIST (#600).
-const OFFICIAL_SOURCE = 'b3-cotahist';
 
 /**
  * Preço a gravar. O COTAHIST não informa horário, e o preço oficial é gravado
@@ -95,21 +101,31 @@ async function loadOfficialCloses(
   }
 }
 
-/** O fechamento oficial vale sobre qualquer leitura do dia; igual, não regrava. */
-function officialCorrections(
+/**
+ * O fechamento oficial vale sobre qualquer leitura do dia; igual, não regrava.
+ * Os tickers ausentes do arquivo (sem negócio no pregão, ou não publicados)
+ * vão para a cadeia de provedores, como antes do #600.
+ */
+async function officialCorrections(
   official: Map<string, CotahistQuote>,
   tickerList: string[],
   stored: Map<string, Quote>,
-): [string, Correction][] {
-  const missing = tickerList.filter((ticker) => !official.has(ticker));
-  if (missing.length > 0) {
-    logWarn('reconcileQuotes.tickersWithoutClose', { tickers: missing });
-  }
-  return tickerList.flatMap((ticker): [string, Correction][] => {
+): Promise<[string, Correction][]> {
+  const corrections = tickerList.flatMap((ticker): [string, Correction][] => {
     const close = official.get(ticker);
     if (!close || stored.get(ticker)?.price === close.price) return [];
     return [[ticker, { price: close.price, source: OFFICIAL_SOURCE }]];
   });
+
+  const missing = tickerList.filter((ticker) => !official.has(ticker));
+  if (missing.length === 0) return corrections;
+  logWarn('reconcileQuotes.tickersWithoutClose', { tickers: missing });
+  try {
+    return [...corrections, ...(await providerCorrections(missing, stored))];
+  } catch {
+    // A falha já foi logada pela busca; os fechamentos oficiais seguem.
+    return corrections;
+  }
 }
 
 async function providerCorrections(
@@ -135,9 +151,9 @@ async function providerCorrections(
  * idempotente, mas a varredura extra custa leituras sem necessidade.
  *
  * A fonte é o COTAHIST da B3 (#600), que traz o preço oficial do leilão de
- * fechamento e é publicado antes deste job. Sem o arquivo do pregão, recorre
- * à cadeia de provedores e só sobrescreve quando a fonte apurou depois do que
- * está gravado.
+ * fechamento e é publicado antes deste job. Sem o arquivo do pregão, ou para
+ * os tickers ausentes dele, recorre à cadeia de provedores e só sobrescreve
+ * quando a fonte apurou depois do que está gravado.
  */
 export async function reconcileClosingQuotes(): Promise<void> {
   try {
@@ -154,7 +170,7 @@ export async function reconcileClosingQuotes(): Promise<void> {
     const stored = await getQuotesByTicker(tickerList);
     const official = await loadOfficialCloses(today());
     const entries = official
-      ? officialCorrections(official, tickerList, stored)
+      ? await officialCorrections(official, tickerList, stored)
       : await providerCorrections(tickerList, stored);
 
     let reconciled = 0;
