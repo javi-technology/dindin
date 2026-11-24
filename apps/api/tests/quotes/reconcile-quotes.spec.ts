@@ -6,8 +6,21 @@ const mockGetQuotesByTicker = jest.fn();
 const mockFetchMonthlyDividends = jest.fn();
 const mockRecordPaidDividends = jest.fn();
 
-jest.mock('../../src/quotes/brapi.service', () => ({
-  fetchQuotes: mockFetchQuotes,
+// A cadeia de provedores marca cada cotação com a fonte (#598). As fixtures
+// sem `source` representam o provedor principal, o Yahoo.
+jest.mock('../../src/quotes/quote-provider-chain', () => ({
+  fetchQuotesWithFallback: async (tickers: string[]) => {
+    const quotes = (await mockFetchQuotes(tickers)) as Map<
+      string,
+      { source?: string }
+    >;
+    return new Map(
+      [...quotes].map(([ticker, quote]) => [
+        ticker,
+        { source: 'yahoo', ...quote },
+      ]),
+    );
+  },
 }));
 
 jest.mock('../../src/quotes/dividend-fetch.service', () => ({
@@ -158,6 +171,30 @@ describe('reconcileClosingQuotes', () => {
     // `saveQuoteHistory` regrava o documento mensal de proventos junto com o
     // preço. Usá-lo aqui reescreveria esse registro toda noite, com
     // `updatedAt` novo e nenhum provento novo por trás.
+    it('deve gravar em source o provedor que forneceu o preço reconciliado', async () => {
+      mockGetQuotesByTicker.mockResolvedValue(
+        storedQuote(73.99, '2026-09-23T21:31:00Z'),
+      );
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          [
+            'TRXF11',
+            { price: 73.9, quotedAt: '2026-09-23T23:05:00Z', source: 'brapi' },
+          ],
+        ]),
+      );
+
+      await reconcileClosingQuotes();
+
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        expect.anything(),
+        '2026-09-23T23:05:00Z',
+        'brapi',
+      );
+    });
+
     it('deve gravar pelo caminho que não toca no histórico de proventos', async () => {
       mockGetQuotesByTicker.mockResolvedValue(
         storedQuote(73.99, '2026-09-23T21:31:00Z'),
@@ -172,11 +209,11 @@ describe('reconcileClosingQuotes', () => {
         73.9,
         expect.objectContaining({ price: 73.99 }),
         '2026-09-23T23:05:00Z',
-        'brapi',
+        'yahoo',
       );
     });
 
-    it('não deve consultar a Brapi sem ativos no catálogo', async () => {
+    it('não deve consultar os provedores sem ativos no catálogo', async () => {
       mockListActiveAssetTickers.mockResolvedValue([]);
 
       await reconcileClosingQuotes();
@@ -247,13 +284,13 @@ describe('reconcileClosingQuotes', () => {
       errorSpy.mockRestore();
     });
 
-    it('deve lançar erro quando a Brapi falha por completo, para acionar o retry', async () => {
+    it('deve lançar erro quando todos os provedores falham, para acionar o retry', async () => {
       const errorSpy = jest
         .spyOn(functionsLogger, 'error')
         .mockImplementation(() => {});
-      mockFetchQuotes.mockRejectedValue(new Error('Brapi API error'));
+      mockFetchQuotes.mockRejectedValue(new Error('falha na brapi'));
 
-      await expect(reconcileClosingQuotes()).rejects.toThrow('Brapi API error');
+      await expect(reconcileClosingQuotes()).rejects.toThrow('falha na brapi');
       expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
