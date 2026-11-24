@@ -5,7 +5,7 @@
  *  - validar o ticker no cadastro de posições/itens da geladeira;
  *  - alimentar o seletor de ativos no frontend;
  *  - informar quais tickers o job `updateQuotesScheduled` deve consultar
- *    na Brapi (ver issue #86).
+ *    nos provedores de cotação e de proventos (ver issues #86 e #598).
  *
  * Uso (a partir da raiz do repositório):
  *   npm run seed:assets --workspace=apps/api
