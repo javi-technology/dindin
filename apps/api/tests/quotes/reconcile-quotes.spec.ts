@@ -373,6 +373,100 @@ describe('reconcileClosingQuotes', () => {
       );
     });
 
+    // Ticker sem negócio no pregão, ou que a B3 não publicou no arquivo:
+    // sem fechamento oficial, vale a reconciliação de antes do #600.
+    it('deve buscar na cadeia de provedores só os tickers ausentes do arquivo', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'TRXF11', assetType: 'FII' },
+        { ticker: 'XPTO11', assetType: 'FII' },
+      ]);
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+      mockFetchQuotes.mockResolvedValue(
+        new Map([
+          ['XPTO11', { price: 10.5, quotedAt: '2026-11-23T20:07:00Z' }],
+        ]),
+      );
+
+      await reconcileClosingQuotes();
+
+      expect(mockFetchQuotes).toHaveBeenCalledWith(['XPTO11']);
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'TRXF11',
+        73.9,
+        undefined,
+        undefined,
+        'b3-cotahist',
+      );
+      expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+        'XPTO11',
+        10.5,
+        undefined,
+        '2026-11-23T20:07:00Z',
+        'yahoo',
+      );
+    });
+
+    it('deve gravar os fechamentos oficiais mesmo quando a cadeia falha para os ausentes', async () => {
+      mockListActiveAssetTickers.mockResolvedValue([
+        { ticker: 'TRXF11', assetType: 'FII' },
+        { ticker: 'XPTO11', assetType: 'FII' },
+      ]);
+      mockFetchCotahist.mockResolvedValue(official(73.9));
+      mockFetchQuotes.mockRejectedValue(new Error('Yahoo e Brapi fora do ar'));
+
+      await expect(reconcileClosingQuotes()).resolves.toBeUndefined();
+
+      expect(mockSaveReconciledPrice).toHaveBeenCalledTimes(1);
+      expect(mockSaveReconciledPrice.mock.calls[0][0]).toBe('TRXF11');
+    });
+
+    // O fechamento oficial é gravado sem `quotedAt` e às 23:30, depois do fim
+    // do pregão: a leitura do mesmo pregão, apurada antes, não o substitui.
+    describe('fechamento oficial já gravado', () => {
+      function storedOfficial(price: number) {
+        return new Map([
+          [
+            'TRXF11',
+            {
+              ticker: 'TRXF11',
+              price,
+              monthlyDividend: 0.7,
+              updatedAt: '2026-11-21T02:30:00Z',
+              source: 'b3-cotahist',
+            },
+          ],
+        ]);
+      }
+
+      it('não deve sobrescrevê-lo com a leitura do mesmo pregão', async () => {
+        mockGetQuotesByTicker.mockResolvedValue(storedOfficial(73.9));
+        mockFetchQuotes.mockResolvedValue(
+          fetched(73.99, '2026-11-20T20:07:00Z'),
+        );
+
+        await reconcileClosingQuotes();
+
+        expect(mockSaveReconciledPrice).not.toHaveBeenCalled();
+      });
+
+      it('deve sobrescrevê-lo com a leitura de um pregão seguinte', async () => {
+        mockGetQuotesByTicker.mockResolvedValue(storedOfficial(73.9));
+        mockFetchQuotes.mockResolvedValue(
+          fetched(74.5, '2026-11-23T20:07:00Z'),
+        );
+
+        await reconcileClosingQuotes();
+
+        expect(mockSaveReconciledPrice).toHaveBeenCalledWith(
+          'TRXF11',
+          74.5,
+          expect.anything(),
+          '2026-11-23T20:07:00Z',
+          'yahoo',
+        );
+      });
+    });
+
     it('deve usar a cadeia de provedores e avisar quando o arquivo não existe', async () => {
       mockGetQuotesByTicker.mockResolvedValue(
         storedQuote(73.99, '2026-09-23T21:31:00Z'),
