@@ -106,6 +106,20 @@ function requestUrl(issuer: Issuer): string {
   return `${base}${encodeURIComponent(encoded)}`;
 }
 
+/**
+ * A B3 devolve o corpo como texto JSON de um JSON (codificado duas vezes)
+ * quando a requisição pede `application/json`. Texto que não é JSON segue
+ * como está e cai no aviso de formato inesperado.
+ */
+function decodeBody(data: unknown): unknown {
+  if (typeof data !== 'string') return data;
+  try {
+    return JSON.parse(data) as unknown;
+  } catch {
+    return data;
+  }
+}
+
 /** Lista de proventos da resposta; `undefined` se o formato mudou. */
 function cashDividendsOf(
   data: unknown,
@@ -163,7 +177,10 @@ async function fetchIssuer(
     );
   }
 
-  const dividends = cashDividendsOf(await response.json(), issuer.kind);
+  const dividends = cashDividendsOf(
+    decodeBody(await response.json()),
+    issuer.kind,
+  );
   const result = new Map<string, DividendEvent[]>();
   if (!dividends) {
     logWarn('dividends.provider.unexpectedShape', {
