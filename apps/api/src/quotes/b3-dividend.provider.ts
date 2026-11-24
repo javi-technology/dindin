@@ -46,7 +46,8 @@ function issuerCode(ticker: string): string {
 
 // Tipo e classe do ISIN (posições 7 a 11) por sufixo do ticker de ação:
 // ACN = ação, OR = ordinária, PR/PA/PB... = preferenciais; CDA = certificado
-// de depósito, que é a UNIT (11).
+// de depósito, que é a UNIT (11); BDR = certificado de ação estrangeira
+// (31 a 35), que a B3 lista no endpoint de empresas.
 const STOCK_ISIN_CLASS: Record<string, string> = {
   '3': 'ACNOR',
   '4': 'ACNPR',
@@ -55,6 +56,11 @@ const STOCK_ISIN_CLASS: Record<string, string> = {
   '7': 'ACNPC',
   '8': 'ACNPD',
   '11': 'CDA',
+  '31': 'BDR',
+  '32': 'BDR',
+  '33': 'BDR',
+  '34': 'BDR',
+  '35': 'BDR',
 };
 
 /**
