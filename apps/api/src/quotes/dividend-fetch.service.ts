@@ -1,7 +1,8 @@
 import { AssetType } from 'dindin-models';
 import { today as appToday } from '../shared/date';
 import { ActiveAsset } from '../assets/asset.service';
-import { BrapiHttpError, fetchInBatches } from './brapi-batch';
+import { fetchInBatches } from './brapi-batch';
+import { ProviderHttpError } from './provider-http-error';
 import { logError, logWarn } from '../shared/logger';
 
 export interface PaidDividendEvent {
@@ -200,7 +201,7 @@ async function fetchFiiDividendBatch(
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
-    throw new BrapiHttpError(
+    throw new ProviderHttpError(
       `Brapi FII dividends API returned status ${response.status}`,
       response.status,
     );
@@ -257,7 +258,7 @@ async function fetchStocksDividendBatch(
   const response = await fetch(url, { headers: buildAuthHeaders() });
 
   if (!response.ok) {
-    throw new BrapiHttpError(
+    throw new ProviderHttpError(
       `Brapi stocks dividends API returned status ${response.status}`,
       response.status,
     );

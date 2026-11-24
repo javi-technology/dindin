@@ -1,4 +1,4 @@
-import { QuoteResult } from './brapi.service';
+import { SourcedQuote } from './quote-provider';
 import { fetchCatalogQuotes } from './catalog-quotes';
 import { DividendInfo, fetchMonthlyDividends } from './dividend-fetch.service';
 import { saveQuoteHistory } from './quote-history.service';
@@ -11,9 +11,6 @@ import { logError, logInfo } from '../shared/logger';
 // escritas simultâneas no Firestore (nem sobrecarregar limites de taxa)
 // conforme o catálogo de ativos crescer.
 const BATCH_SIZE = 10;
-
-// A Brapi é a fonte oficial e única de cotações e proventos (issue #212).
-const QUOTE_SOURCE = 'brapi';
 
 async function recordTickerDividends(
   ticker: string,
@@ -41,7 +38,7 @@ async function recordTickerDividends(
 
 async function processTickerQuote(
   ticker: string,
-  quote: QuoteResult,
+  quote: SourcedQuote,
   dividend: DividendInfo | undefined,
   today: string,
 ): Promise<void> {
@@ -50,7 +47,7 @@ async function processTickerQuote(
       ticker,
       quote.price,
       dividend?.monthlyDividend,
-      QUOTE_SOURCE,
+      quote.source,
       dividend?.paymentDate,
       dividend?.annualDividend,
       quote.quotedAt,
@@ -60,9 +57,9 @@ async function processTickerQuote(
       ticker,
       price: quote.price,
       // Horário de apuração na fonte (#387): é o que permite medir no Cloud
-      // Logging a que horas a Brapi consolida o fechamento de cada pregão.
+      // Logging a que horas a fonte consolida o fechamento de cada pregão.
       quotedAt: quote.quotedAt,
-      source: QUOTE_SOURCE,
+      source: quote.source,
     });
   } catch (error) {
     logError('updateAllQuotes.tickerFailed', {

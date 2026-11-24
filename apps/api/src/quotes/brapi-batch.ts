@@ -1,27 +1,8 @@
 import { logError } from '../shared/logger';
-/** Erro HTTP da Brapi, com o status para decidir se vale repetir a consulta. */
-export class BrapiHttpError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = 'BrapiHttpError';
-  }
-}
-
-// Status que afetam todas as requisições (autenticação, permissão e limite de
-// taxa): repetir ticker a ticker só multiplicaria as falhas.
-const NON_ISOLATABLE_STATUSES = new Set([401, 403, 429]);
+import { isBlockingError } from './provider-http-error';
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
-}
-
-function canIsolate(error: Error): boolean {
-  return !(
-    error instanceof BrapiHttpError && NON_ISOLATABLE_STATUSES.has(error.status)
-  );
 }
 
 /**
@@ -29,6 +10,8 @@ function canIsolate(error: Error): boolean {
  * tickers dele são consultados um a um, para que um único símbolo recusado
  * (ex.: ETF no endpoint de proventos de ações) ou uma falha pontual não deixe
  * os demais sem dados.
+ *
+ * Um bloqueio (401, 403, 429) interrompe os lotes seguintes.
  *
  * Lança o último erro apenas quando nenhum ticker retornou dados.
  */
@@ -60,7 +43,10 @@ export async function fetchInBatches<T>(
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
     const error = await attempt(batch);
-    if (error && batch.length > 1 && canIsolate(error)) {
+    // Bloqueio vale para todas as requisições: seguir para os próximos lotes
+    // só gastaria a cota do plano gratuito com recusas (#598).
+    if (isBlockingError(error)) break;
+    if (error && batch.length > 1) {
       for (const ticker of batch) {
         await attempt([ticker]);
       }

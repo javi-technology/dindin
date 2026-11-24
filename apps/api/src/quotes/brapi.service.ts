@@ -1,18 +1,6 @@
-import { BrapiHttpError, fetchInBatches } from './brapi-batch';
-
-export interface QuoteResult {
-  price: number;
-  /**
-   * Horário de apuração informado pela fonte (`regularMarketTime`), em
-   * ISO-8601 (issue #387).
-   *
-   * Opcional de propósito: quando a Brapi não informa, a cotação é gravada
-   * sem o campo. Preencher com a hora da nossa consulta faria um dado em
-   * cache parecer recém-apurado — exatamente a confusão que o campo existe
-   * para desfazer.
-   */
-  quotedAt?: string;
-}
+import { fetchInBatches } from './brapi-batch';
+import { ProviderHttpError } from './provider-http-error';
+import { QuoteProvider, QuoteResult } from './quote-provider';
 
 interface BrapiResult {
   symbol: string;
@@ -32,17 +20,9 @@ interface BrapiResponse {
 // O endpoint de cotações v2 atende ações, FIIs e ETFs na mesma chamada.
 const BRAPI_BASE_URL = 'https://brapi.dev/api/v2/stocks/quote';
 
-// O plano Pro da Brapi aceita até 20 ativos por requisição; acima disso a
-// API responde 400 (QUOTES_PER_REQUEST_EXCEEDED). BRAPI_MAX_SYMBOLS_PER_REQUEST
-// permite reduzir o lote (ex.: plano com limite menor), nunca ultrapassar 20.
-const MAX_SYMBOLS_PER_REQUEST = 20;
-
-function getMaxSymbolsPerRequest(): number {
-  const parsed = Number(process.env.BRAPI_MAX_SYMBOLS_PER_REQUEST);
-  return Number.isInteger(parsed) && parsed > 0
-    ? Math.min(parsed, MAX_SYMBOLS_PER_REQUEST)
-    : MAX_SYMBOLS_PER_REQUEST;
-}
+// A Brapi virou reserva de cotação no plano gratuito, que aceita um ticker
+// por chamada (#598); acima disso ela responde 400.
+const SYMBOLS_PER_REQUEST = 1;
 
 async function fetchQuoteBatch(
   tickers: string[],
@@ -61,7 +41,7 @@ async function fetchQuoteBatch(
   const response = await fetch(url, { headers });
 
   if (!response.ok) {
-    throw new BrapiHttpError(
+    throw new ProviderHttpError(
       `Brapi API returned status ${response.status}`,
       response.status,
     );
@@ -104,8 +84,13 @@ export async function fetchQuotes(
 
   return fetchInBatches(
     tickers,
-    getMaxSymbolsPerRequest(),
+    SYMBOLS_PER_REQUEST,
     fetchQuoteBatch,
     'fetchQuotes.batchFailed',
   );
 }
+
+export const brapiQuoteProvider: QuoteProvider = {
+  name: 'brapi',
+  fetchQuotes,
+};

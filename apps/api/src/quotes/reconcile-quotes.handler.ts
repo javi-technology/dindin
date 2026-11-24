@@ -1,4 +1,4 @@
-import { QuoteResult } from './brapi.service';
+import { SourcedQuote } from './quote-provider';
 import { fetchCatalogQuotes } from './catalog-quotes';
 import { saveReconciledPrice } from './quote-history.service';
 import { getQuotesByTicker } from './quote-prices';
@@ -10,9 +10,6 @@ import { Quote } from 'dindin-models';
 // os limites de taxa do Firestore conforme o catálogo crescer.
 const BATCH_SIZE = 10;
 
-// A Brapi é a fonte oficial e única de cotações e proventos (issue #212).
-const QUOTE_SOURCE = 'brapi';
-
 /**
  * Se a cotação vinda da fonte foi apurada depois da que já está gravada.
  *
@@ -21,7 +18,7 @@ const QUOTE_SOURCE = 'brapi';
  * fechamento consolidado por um palpite. Cotação gravada antes da #387 não
  * tem o campo, e aí qualquer apuração conhecida é ganho de informação.
  */
-function isNewerQuote(quote: QuoteResult, stored: Quote | undefined): boolean {
+function isNewerQuote(quote: SourcedQuote, stored: Quote | undefined): boolean {
   if (!quote.quotedAt) return false;
   if (!stored?.quotedAt) return true;
   return Date.parse(quote.quotedAt) > Date.parse(stored.quotedAt);
@@ -30,7 +27,7 @@ function isNewerQuote(quote: QuoteResult, stored: Quote | undefined): boolean {
 /** `true` quando o preço foi de fato corrigido. */
 async function reconcileTicker(
   ticker: string,
-  quote: QuoteResult,
+  quote: SourcedQuote,
   stored: Quote | undefined,
 ): Promise<boolean> {
   if (!isNewerQuote(quote, stored)) return false;
@@ -44,7 +41,7 @@ async function reconcileTicker(
       quote.price,
       stored,
       quote.quotedAt,
-      QUOTE_SOURCE,
+      quote.source,
     );
     logInfo('reconcileQuotes.priceReconciled', {
       ticker,
