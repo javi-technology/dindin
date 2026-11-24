@@ -318,13 +318,20 @@ Cada cotação guarda dois horários distintos: `updatedAt`, quando **nós**
 escrevemos, e `quotedAt`, quando a **fonte** apurou o preço (issue #387). É o
 `quotedAt` que aparece nas telas de geladeira e de posições como
 "Fechamento de dd/MM/aaaa" (issue #390), e é ele que permite medir no Cloud
-Logging a que horas a Brapi consolida o fechamento de cada pregão.
+Logging a que horas a fonte consolida o fechamento de cada pregão.
+
+A cotação diária vem do **Yahoo Finance**, com o plano gratuito da **Brapi** de
+reserva para os tickers que faltarem (issue #598), e os proventos vêm da **B3
+Listados** (issue #599). As regras estão em `AGENTS.md`, seção "Fontes de dados
+de mercado".
 
 Às **23:30**, `reconcileQuotesScheduled` volta e corrige apenas o preço do dia
-(issue #389), sem registrar proventos nem tirar a foto de data-com — a Brapi
-pode continuar servindo o último negócio do pregão contínuo por horas depois do
-fechamento. A cotação só é sobrescrita quando o `quotedAt` da fonte é posterior
-ao já gravado, para um dado em cache não substituir um fechamento consolidado.
+(issue #389), sem registrar proventos nem tirar a foto de data-com. O preço vem
+do **COTAHIST** da B3, o fechamento oficial do leilão, publicado entre 20h30 e
+21h20 (issue #600), e é gravado com `source: b3-cotahist` e sem `quotedAt`.
+Sem o arquivo do pregão, a reconciliação usa a cadeia de cotação e só
+sobrescreve quando o `quotedAt` da fonte é posterior ao já gravado, para um
+dado em cache não substituir um fechamento consolidado.
 
 ## Alertas de preço-alvo da geladeira
 
