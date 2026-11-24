@@ -384,15 +384,14 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      # Variáveis de ambiente não sensíveis das Functions (ex.: limite de
-      # tickers por requisição na Brapi, ids dos Prices da Stripe) são
+      # Variáveis de ambiente não sensíveis das Functions (ex.: ids dos
+      # Prices da Stripe, versão mínima do app) são
       # carregadas via arquivo .env específico do projeto, lido pelo Firebase
       # Functions v2 no deploy. Secrets (STRIPE_SECRET_KEY etc.) ficam no
       # Secret Manager. Ver https://firebase.google.com/docs/functions/config-env
       - name: Configurar variáveis de ambiente das Functions
         run: |
           cat >> apps/api/.env.dindin-4e720 <<EOF
-          BRAPI_MAX_SYMBOLS_PER_REQUEST=${{ vars.BRAPI_MAX_SYMBOLS_PER_REQUEST }}
           STRIPE_PRICE_BASIC_MONTHLY=${{ vars.STRIPE_PRICE_BASIC_MONTHLY }}
           STRIPE_PRICE_BASIC_YEARLY=${{ vars.STRIPE_PRICE_BASIC_YEARLY }}
           APP_BASE_URL=${{ vars.APP_BASE_URL }}
