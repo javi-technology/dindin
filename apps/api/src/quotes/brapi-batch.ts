@@ -6,10 +6,9 @@ function toError(error: unknown): Error {
 }
 
 /**
- * Consulta a Brapi em lotes. Quando um lote com mais de um ticker falha, os
- * tickers dele são consultados um a um, para que um único símbolo recusado
- * (ex.: ETF no endpoint de proventos de ações) ou uma falha pontual não deixe
- * os demais sem dados.
+ * Consulta a Brapi em lotes. A falha de um lote é logada e não impede os
+ * seguintes: um ticker recusado ou uma falha pontual não deixa os demais sem
+ * dados. No plano gratuito o lote é de um ticker (#598).
  *
  * Um bloqueio (401, 403, 429) interrompe os lotes seguintes.
  *
@@ -24,32 +23,21 @@ export async function fetchInBatches<T>(
   const resultMap = new Map<string, T>();
   let lastError: Error | undefined;
 
-  const attempt = async (batch: string[]): Promise<Error | undefined> => {
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
     try {
       for (const [ticker, value] of await fetchBatch(batch)) {
         resultMap.set(ticker, value);
       }
-      return undefined;
     } catch (error) {
       lastError = toError(error);
       logError(errorLogMessage, {
         tickers: batch,
         message: lastError.message,
       });
-      return lastError;
-    }
-  };
-
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    const error = await attempt(batch);
-    // Bloqueio vale para todas as requisições: seguir para os próximos lotes
-    // só gastaria a cota do plano gratuito com recusas (#598).
-    if (isBlockingError(error)) break;
-    if (error && batch.length > 1) {
-      for (const ticker of batch) {
-        await attempt([ticker]);
-      }
+      // Bloqueio vale para todas as requisições: seguir para os próximos
+      // lotes só gastaria a cota do plano gratuito com recusas (#598).
+      if (isBlockingError(lastError)) break;
     }
   }
 
