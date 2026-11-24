@@ -268,6 +268,28 @@ describe('DividendFetchService — fetchMonthlyDividends (B3 Listados)', () => {
       expect(result.get('ITSA4')?.paidEvents).toHaveLength(2);
     });
 
+    // BDR (sufixo 31 a 35) tem ISIN `BDR`. Trecho real da AAPL34, consultado
+    // na B3 Listados em 24/11/2026.
+    it('deve devolver os proventos do BDR pelo ISIN do certificado', async () => {
+      const aapl = [
+        cash('BRAAPLBDR004', '23/11/2026', '0,05282213000', {
+          label: 'DIVIDENDO',
+          lastDatePrior: '10/11/2026',
+        }),
+      ];
+      mockB3({ companies: { AAPL: companyBody(aapl) } });
+
+      const result = await fetchMonthlyDividends(
+        [{ ticker: 'AAPL34', assetType: 'OTHER' }],
+        new Date('2026-11-24T12:00:00.000Z'),
+      );
+
+      expect(result.get('AAPL34')).toMatchObject({
+        monthlyDividend: 0.05282213,
+        paymentDate: '2026-11-23',
+      });
+    });
+
     it('deve consultar o emissor uma vez para todos os tickers dele', async () => {
       const fetchMock = mockB3({ companies: { ITSA: companyBody(ITSA_REAL) } });
 
