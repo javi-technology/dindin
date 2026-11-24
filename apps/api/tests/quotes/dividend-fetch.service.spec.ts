@@ -359,6 +359,37 @@ describe('DividendFetchService — fetchMonthlyDividends (B3 Listados)', () => {
     });
   });
 
+  // Observado na B3 em 23/11/2026: com `Accept: application/json`, o corpo
+  // vem como texto JSON de um JSON (codificado duas vezes).
+  describe('resposta codificada duas vezes', () => {
+    it.each([
+      [
+        'fundo',
+        'FII',
+        'HGLG11',
+        { funds: { HGLG: JSON.stringify(fundBody(HGLG_REAL)) } },
+      ],
+      [
+        'empresa',
+        'STOCK',
+        'ITSA4',
+        { companies: { ITSA: JSON.stringify(companyBody(ITSA_REAL)) } },
+      ],
+    ] as const)(
+      'deve ler a resposta de %s que chega como texto JSON',
+      async (_kind, assetType, ticker, routes) => {
+        mockB3(routes as B3Routes);
+
+        const result = await fetchMonthlyDividends(
+          [{ ticker, assetType }],
+          TODAY,
+        );
+
+        expect(result.has(ticker)).toBe(true);
+      },
+    );
+  });
+
   describe('formato pt-BR da B3', () => {
     it('deve converter valor com vírgula decimal e separador de milhar', async () => {
       mockB3({
