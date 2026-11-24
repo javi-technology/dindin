@@ -12,6 +12,12 @@ const B3_COMPANIES_URL =
   'https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/GetListedSupplementCompany/';
 const PROVIDER = 'b3';
 
+// Parâmetros da busca de fundos, iguais aos que o site da B3 envia: o fundo é
+// achado pelo código (`identifierFund`), o CNPJ '0' significa "não informado"
+// e o tipo 7 é o FII, que inclui os REITs listados como fundo.
+const FUND_SEARCH_CNPJ = '0';
+const FUND_TYPE_FII = 7;
+
 // Uma requisição por emissor; algumas em paralelo, para o job caber no tempo
 // sem disparar limite de taxa.
 const CONCURRENCY = 5;
@@ -105,7 +111,11 @@ function parseDate(value: unknown): string | undefined {
 function requestUrl(issuer: Issuer): string {
   const params =
     issuer.kind === 'fund'
-      ? { cnpj: '0', identifierFund: issuer.code, typeFund: 7 }
+      ? {
+          cnpj: FUND_SEARCH_CNPJ,
+          identifierFund: issuer.code,
+          typeFund: FUND_TYPE_FII,
+        }
       : { issuingCompany: issuer.code, language: 'pt-br' };
   const encoded = Buffer.from(JSON.stringify(params)).toString('base64');
   const base = issuer.kind === 'fund' ? B3_FUNDS_URL : B3_COMPANIES_URL;
