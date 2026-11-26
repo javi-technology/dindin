@@ -535,10 +535,15 @@ decide é o usuário, e o código/agente é quem aplica a regra de ação abaixo
   quem já assina precisa conseguir cancelar, e o cancelamento precisa chegar.
 - `GET /api/me` informa `billingEnabled`. Sem o campo (API anterior), os
   clientes assumem a cobrança ligada. Com `false`, o web esconde o selo
-  "Assinante/Não assinante" e o link "Assinatura" (que fica para quem ainda tem
-  assinatura vigente, como caminho até o portal), e a página de assinatura
-  troca os planos por um aviso. O app deixa de marcar a simulação por ativo
+  "Assinante/Não assinante". O app deixa de marcar a simulação por ativo
   como recurso de assinante.
+- **A página de assinatura só existe com a cobrança ligada** (issue #607). Com
+  ela desligada, o link "Assinatura" some do menu **inclusive para quem ainda
+  assina**, e o `billingGuard` leva `/assinatura` ao dashboard (também na volta
+  do portal e do checkout). O link só aparece depois de o `/api/me` carregar,
+  para não piscar no menu. Quem ainda assina cancela pela Stripe (link do
+  e-mail de cobrança ou pelo administrador), já que o portal deixa de ter
+  entrada no app; ele e os webhooks continuam ligados para isso.
 - No lugar do selo, o cabeçalho do web mostra o **Buy Me a Coffee**
   (`BUY_ME_A_COFFEE_URL`, em `app.component.ts`), aberto em nova aba com
   `rel="noopener noreferrer"`. Apoio é contribuição voluntária, por fora do
