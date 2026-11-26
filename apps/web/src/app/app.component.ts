@@ -50,14 +50,12 @@ export class AppComponent {
   readonly billingEnabled = this.billingService.billingEnabled;
   readonly buyMeACoffeeUrl = BUY_ME_A_COFFEE_URL;
   /**
-   * Com a cobrança desligada (#594), o link só fica para quem ainda tem
-   * assinatura vigente: é o caminho até o portal, onde ela é cancelada.
+   * O link de assinatura só existe com a cobrança ligada, inclusive para quem
+   * ainda assina (issue #607), e só depois de a assinatura carregar: antes
+   * disso, ele piscaria no menu de quem não deve vê-lo.
    */
   readonly showBillingLink = computed(
-    () =>
-      !this.billingService.loaded() ||
-      this.billingService.billingEnabled() ||
-      this.billingService.isSubscriber(),
+    () => this.billingService.loaded() && this.billingService.billingEnabled(),
   );
   readonly version = APP_VERSION;
   /**
