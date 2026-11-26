@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { billingGuard } from './core/guards/billing.guard';
-import { adminGuard } from './core/guards/admin.guard';
 import { loginGuard } from './core/guards/login.guard';
 
 // Toda rota carrega o componente sob demanda (issue #258): com `component:` e
