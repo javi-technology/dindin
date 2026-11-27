@@ -60,6 +60,7 @@ describe('AppComponent', () => {
   });
 
   it('deve exibir navegação entre dashboard, carteira, geladeira, proventos, carteira recomendada, simulação e assinatura quando autenticado', () => {
+    billingServiceMock.loaded.set(true);
     authServiceMock.user.set({ email: 'user@dindin.app' });
 
     fixture.detectChanges();
@@ -196,9 +197,8 @@ describe('AppComponent', () => {
     });
   });
 
-  // Cobrança desligada (issue #594): o DinDin é gratuito, e selo e link de
-  // assinatura só confundiriam. Quem ainda assina mantém o link, para chegar
-  // ao portal e cancelar.
+  // Cobrança desligada (issues #594 e #607): o DinDin é gratuito, e selo e
+  // link de assinatura só confundiriam, inclusive para quem ainda assina.
   describe('cobrança desligada', () => {
     const billingLink = () =>
       fixture.nativeElement.querySelector('[data-testid="billing-link"]');
@@ -220,8 +220,25 @@ describe('AppComponent', () => {
       expect(billingLink()).toBeNull();
     });
 
-    it('deve manter o link para quem ainda tem assinatura vigente', () => {
+    it('não deve exibir o link nem para quem ainda tem assinatura vigente', () => {
       billingServiceMock.isSubscriber.set(true);
+
+      fixture.detectChanges();
+
+      expect(billingLink()).toBeNull();
+    });
+
+    it('não deve exibir o link antes de a assinatura carregar', () => {
+      billingServiceMock.loaded.set(false);
+      billingServiceMock.billingEnabled.set(true);
+
+      fixture.detectChanges();
+
+      expect(billingLink()).toBeNull();
+    });
+
+    it('deve exibir o link com a cobrança ligada', () => {
+      billingServiceMock.billingEnabled.set(true);
 
       fixture.detectChanges();
 

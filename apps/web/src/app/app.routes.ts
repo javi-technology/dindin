@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
+import { authGuard } from './core/guards/auth.guard';
+import { billingGuard } from './core/guards/billing.guard';
 import { loginGuard } from './core/guards/login.guard';
 
 // Toda rota carrega o componente sob demanda (issue #258): com `component:` e
@@ -72,7 +73,7 @@ export const routes: Routes = [
   },
   {
     path: 'assinatura',
-    canActivate: [authGuard],
+    canActivate: [authGuard, billingGuard],
     loadComponent: () =>
       import('./features/billing/billing.component').then(
         (m) => m.BillingComponent,

@@ -55,6 +55,9 @@
           Carregando…
         </p>
       } @else {
+        <!-- Com a cobrança desligada, o billingGuard leva ao dashboard (#607).
+             Este aviso e o past_due com a cobrança desligada são só defesa:
+             valem quando o guard não conseguiu ler o /api/me e deixou passar. -->
         @if (!billingEnabled()) {
           <div
             class="bg-positive-soft text-positive-ink rounded-lg p-4 mb-4"

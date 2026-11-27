@@ -2,6 +2,7 @@ import { Route } from '@angular/router';
 import { routes } from './app.routes';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
+import { billingGuard } from './core/guards/billing.guard';
 import { loginGuard } from './core/guards/login.guard';
 import { AdminAssetsComponent } from './features/admin-assets/admin-assets.component';
 import { AdminUsersComponent } from './features/admin-users/admin-users.component';
@@ -35,7 +36,11 @@ const ROTAS = [
     componente: RecommendedWalletComponent,
     guards: [authGuard],
   },
-  { path: 'assinatura', componente: BillingComponent, guards: [authGuard] },
+  {
+    path: 'assinatura',
+    componente: BillingComponent,
+    guards: [authGuard, billingGuard],
+  },
   {
     path: 'admin/assets',
     componente: AdminAssetsComponent,
